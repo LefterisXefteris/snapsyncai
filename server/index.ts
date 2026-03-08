@@ -129,38 +129,43 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  await initStripe();
-  await registerRoutes(httpServer, app);
+let setupPromise: Promise<void> | null = null;
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+export const setupApp = async () => {
+  if (!setupPromise) {
+    setupPromise = (async () => {
+      await initStripe();
+      await registerRoutes(httpServer, app);
 
-    console.error("Internal Server Error:", err);
+      app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        console.error("Internal Server Error:", err);
+        if (res.headersSent) return next(err);
+        return res.status(status).json({ message });
+      });
 
-    if (res.headersSent) {
-      return next(err);
-    }
-
-    return res.status(status).json({ message });
-  });
-
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+      if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
+        serveStatic(app);
+      } else if (process.env.NODE_ENV !== "production") {
+        const { setupVite } = await import("./vite");
+        await setupVite(httpServer, app);
+      }
+    })();
   }
+  return setupPromise;
+};
 
-  const port = parseInt(process.env.PORT || "5001", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
+if (!process.env.VERCEL) {
+  setupApp().then(() => {
+    const port = parseInt(process.env.PORT || "5001", 10);
+    httpServer.listen({ port, host: "0.0.0.0" }, () => {
       log(`serving on port ${port}`);
-    },
-  );
-})();
+    });
+  });
+}
+
+export default async function handler(req: Request, res: Response) {
+  await setupApp();
+  return app(req, res);
+}
