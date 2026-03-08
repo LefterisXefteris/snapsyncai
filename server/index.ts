@@ -156,7 +156,8 @@ export const setupApp = async () => {
   return setupPromise;
 };
 
-if (!process.env.VERCEL) {
+// Only start the HTTP server if we are running locally/standalone, not on Vercel
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
   setupApp().then(() => {
     const port = parseInt(process.env.PORT || "5001", 10);
     httpServer.listen({ port, host: "0.0.0.0" }, () => {
