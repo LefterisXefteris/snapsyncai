@@ -711,8 +711,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       res.json({ checkoutUrl: session.url, sessionId: session.id });
     } catch (error: any) {
-      console.error("Subscription checkout error:", error);
-      res.status(500).json({ message: "Failed to create subscription checkout" });
+      console.error("Subscription checkout error details:", error);
+      res.status(500).json({
+        message: "Failed to create subscription checkout",
+        detail: error?.message || String(error)
+      });
     }
   });
 
