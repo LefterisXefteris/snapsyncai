@@ -22,6 +22,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import listaiLogo from "../assets/listai-logo.png";
 import { dark } from "@clerk/themes";
 import type { Image } from "@shared/schema";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default function Home() {
   const { data: images, isLoading } = useImages();
@@ -441,6 +442,7 @@ export default function Home() {
                 },
               }}
             />
+            <ModeToggle />
           </div>
         </header>
 

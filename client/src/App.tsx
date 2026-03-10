@@ -11,6 +11,7 @@ import Landing from "@/pages/Landing";
 import { Loader2 } from "lucide-react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ThemeProvider } from "@/components/theme-provider";
 
 function AuthScreen() {
   return <Landing />;
@@ -88,12 +89,14 @@ function AppWithClerk() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AppWithClerk />
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider defaultTheme="system" storageKey="listai-theme">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AppWithClerk />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
