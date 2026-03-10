@@ -619,3 +619,21 @@ export function useGeneratePhotoshoot() {
     },
   });
 }
+
+export function useEditBackground() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, style }: { id: number; style: string }) => {
+      const res = await apiRequest("POST", `/api/images/${id}/edit-background`, { style });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as any).message || "Failed to edit background");
+      }
+      return res.json() as Promise<{ key: string; url: string }>;
+    },
+    onError: (error) => {
+      toast({ title: "Background Edit Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}

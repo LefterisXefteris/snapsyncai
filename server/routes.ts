@@ -2023,5 +2023,75 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
     }
   });
 
+
+  /* ── AI Background Editor ──────────────────────────────────────────────────
+     POST /api/images/:id/edit-background  { style: string }
+     Uses gpt-image-1 images.edit to replace the product background.
+     Edited images are kept in-memory (bgEditBuffers) and served via GET below. */
+
+  const bgEditBuffers = new Map<string, { buffer: Buffer; mimeType: string }>();
+
+  const BG_STYLES: Record<string, string> = {
+    studio:    "a clean, professional white studio photography background with soft even lighting",
+    gradient:  "a soft purple-to-violet gradient background, smooth and elegant",
+    lifestyle: "a bright, natural lifestyle scene with wooden surfaces and plants",
+    minimal:   "a light warm grey minimalist background with subtle shadows",
+    dark:      "a dramatic dark charcoal background with moody ambient lighting",
+  };
+
+  app.post("/api/images/:id/edit-background", requireAuth(), async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid image ID" });
+
+      const image = await storage.getImage(id);
+      if (!image) return res.status(404).json({ message: "Image not found" });
+
+      const { style = "studio" } = req.body;
+      const bgDescription = BG_STYLES[style] ?? BG_STYLES.studio;
+
+      // Fetch the raw image buffer
+      let imageBuffer = imageBuffers.get(id);
+      if (!imageBuffer) {
+        return res.status(404).json({ message: "Image file not available on this server instance. Please re-upload." });
+      }
+
+      // gpt-image-1 requires PNG for edits; convert buffer to an uploadable File
+      const { toFile } = await import("openai");
+      const imageFile = await toFile(imageBuffer, `product-${id}.png`, { type: "image/png" });
+
+      const prompt = `Replace ONLY the background of this product image with ${bgDescription}. The product itself must remain completely unchanged — same position, same lighting on the product, same scale. Do not alter the product in any way. High quality e-commerce style.`;
+
+      const response = await openai.images.edit({
+        model: "gpt-image-1",
+        image: imageFile,
+        prompt: prompt.substring(0, 4000),
+        size: "1024x1024",
+      });
+
+      const base64 = response.data?.[0]?.b64_json;
+      if (!base64) throw new Error("gpt-image-1 did not return image data");
+
+      const editedBuffer = Buffer.from(base64, "base64");
+      const cacheKey = `${id}-${style}-${Date.now()}`;
+      bgEditBuffers.set(cacheKey, { buffer: editedBuffer, mimeType: "image/png" });
+
+      res.json({ key: cacheKey, url: `/api/images/${id}/bg/${cacheKey}` });
+    } catch (error: any) {
+      console.error("Background edit error:", error);
+      res.status(500).json({ message: "Failed to edit background", error: error.message });
+    }
+  });
+
+  // Serve edited background images
+  app.get("/api/images/:id/bg/:key", (req, res) => {
+    const { key } = req.params;
+    const entry = bgEditBuffers.get(key);
+    if (!entry) return res.status(404).json({ message: "Edited image not found or expired" });
+    res.setHeader("Content-Type", entry.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(entry.buffer);
+  });
+
   return httpServer;
 }

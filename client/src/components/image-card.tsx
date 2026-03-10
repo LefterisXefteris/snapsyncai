@@ -1,5 +1,5 @@
-import { useState, memo, useMemo } from "react";
-import { FileJson, ImageIcon, Download, Calendar, Pencil, Trash2, DollarSign, Tag, Check, X, Search, Type, Layers, Lock, MessageCircleQuestion, Bot, FolderTree, Instagram } from "lucide-react";
+import { useState, memo, useMemo, useRef, useCallback, useEffect } from "react";
+import { BrainCircuit, FileJson, ImageIcon, Download, Calendar, Pencil, Trash2, DollarSign, Tag, Check, X, Search, Type, Layers, Lock, MessageCircleQuestion, Bot, FolderTree, Instagram, Wand2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { Image } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
@@ -28,9 +28,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useUpdateImage, useDeleteImage, useGeneratePhotoshoot } from "@/hooks/use-images";
+import { useUpdateImage, useDeleteImage, useGeneratePhotoshoot, useEditBackground } from "@/hooks/use-images";
 
 const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
+
+/* ─── 3-D card tilt ────────────────────────────────────────────────────────
+   Tracks the cursor inside the card and applies a perspective rotateX/Y.
+   Uses requestAnimationFrame so it never blocks the main thread.
+   Only transform + opacity are mutated → fully GPU-composited, zero reflow. */
+function useCardTilt(intensity = 8) {
+  const ref = useRef<HTMLDivElement>(null);
+  const raf = useRef<number | null>(null);
+
+  const onMove = useCallback((e: MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    if (raf.current) cancelAnimationFrame(raf.current);
+    raf.current = requestAnimationFrame(() => {
+      const r  = el.getBoundingClientRect();
+      const dx = ((e.clientX - r.left)  / r.width  - 0.5) * 2;  // −1 → +1
+      const dy = ((e.clientY - r.top)   / r.height - 0.5) * 2;
+      el.style.transform  = `perspective(900px) rotateY(${dx * intensity}deg) rotateX(${-dy * intensity}deg) translateZ(6px)`;
+      el.style.transition = 'transform 0.08s linear';
+      const glare = el.querySelector<HTMLDivElement>('.tilt-glare');
+      if (glare) {
+        glare.style.background = `radial-gradient(circle at ${(dx + 1) * 50}% ${(dy + 1) * 50}%, rgba(255,255,255,0.18) 0%, transparent 65%)`;
+        glare.style.opacity = '1';
+      }
+    });
+  }, [intensity]);
+
+  const onLeave = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (raf.current) cancelAnimationFrame(raf.current);
+    el.style.transform  = 'perspective(900px) rotateY(0deg) rotateX(0deg) translateZ(0px)';
+    el.style.transition = 'transform 0.55s cubic-bezier(0.23,1,0.32,1)';
+    const glare = el.querySelector<HTMLDivElement>('.tilt-glare');
+    if (glare) glare.style.opacity = '0';
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseleave', onLeave);
+    return () => {
+      el.removeEventListener('mousemove', onMove);
+      el.removeEventListener('mouseleave', onLeave);
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
+  }, [onMove, onLeave]);
+
+  return ref;
+}
 
 interface ImageCardProps {
   image: Image;
@@ -64,6 +115,30 @@ export const ImageCard = memo(function ImageCard({ image, index, selected, onSel
   const updateMutation = useUpdateImage();
   const deleteMutation = useDeleteImage();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
+  const editBackgroundMutation = useEditBackground();
+
+  const [bgEditUrl, setBgEditUrl] = useState<string | null>(null);
+  const [showBgPicker, setShowBgPicker] = useState(false);
+
+  const BG_STYLES = [
+    { key: "studio",    label: "Studio",    color: "#f8f8f8" },
+    { key: "gradient",  label: "Gradient",  color: "#9333ea" },
+    { key: "lifestyle", label: "Lifestyle", color: "#84cc16" },
+    { key: "minimal",   label: "Minimal",   color: "#e5e5e5" },
+    { key: "dark",      label: "Dark",      color: "#1c1c1c" },
+  ] as const;
+
+  const handleEditBackground = (style: string) => {
+    setShowBgPicker(false);
+    editBackgroundMutation.mutate(
+      { id: image.id, style },
+      {
+        onSuccess: (data) => {
+          setBgEditUrl(data.url);
+        },
+      }
+    );
+  };
 
   const aiDataDisplay = useMemo(() => image.aiData ? JSON.stringify(image.aiData, null, 2) : "No analysis data available.", [image.aiData]);
   const variants = useMemo(() => Array.isArray(image.variants) ? image.variants as { name: string; values: string[] }[] : [], [image.variants]);
@@ -107,15 +182,23 @@ export const ImageCard = memo(function ImageCard({ image, index, selected, onSel
         ? "Failed"
         : "Pending";
 
+  const tiltRef = useCardTilt(7);
+
   return (
     <div
+      ref={tiltRef}
       className="group relative flex flex-col overflow-hidden rounded-2xl glass-card animate-in fade-in duration-300"
       data-testid={`card-product-${image.id}`}
-      style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
+      style={{ animationDelay: `${Math.min(index * 20, 300)}ms`, willChange: 'transform', transformStyle: 'preserve-3d' }}
     >
       <div className="relative h-40 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center border-b border-white/5">
+        {/* Glare overlay – moves with mouse via useCardTilt */}
+        <div
+          className="tilt-glare absolute inset-0 pointer-events-none rounded-t-2xl z-20 transition-opacity duration-300"
+          style={{ opacity: 0 }}
+        />
         <img
-          src={`/api/images/${image.id}/file`}
+          src={bgEditUrl ?? `/api/images/${image.id}/file`}
           alt={image.altText || image.title || image.originalName}
           className="absolute inset-0 w-full h-full object-cover"
           loading="lazy"
@@ -123,6 +206,38 @@ export const ImageCard = memo(function ImageCard({ image, index, selected, onSel
           data-testid={`img-product-${image.id}`}
         />
         <ImageIcon className="w-10 h-10 text-white/20" />
+
+        {/* AI editing spinner overlay */}
+        {editBackgroundMutation.isPending && (
+          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-30 rounded-t-2xl gap-2">
+            <Wand2 className="w-6 h-6 text-primary animate-pulse" />
+            <span className="text-xs text-white/80">Editing background…</span>
+          </div>
+        )}
+
+        {/* Background style picker */}
+        {showBgPicker && !editBackgroundMutation.isPending && (
+          <div className="absolute inset-0 bg-black/70 z-30 rounded-t-2xl flex flex-col items-center justify-center gap-3 p-3">
+            <p className="text-xs font-semibold text-white">Pick a background</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {BG_STYLES.map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => handleEditBackground(s.key)}
+                  className="flex flex-col items-center gap-1 group"
+                  title={s.label}
+                >
+                  <span
+                    className="w-8 h-8 rounded-full border-2 border-white/20 group-hover:border-primary transition-colors block"
+                    style={{ background: s.color }}
+                  />
+                  <span className="text-[9px] text-white/70">{s.label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowBgPicker(false)} className="text-[10px] text-white/40 hover:text-white/70 transition-colors mt-1">Cancel</button>
+          </div>
+        )}
 
         <div className="absolute top-3 left-3">
           <Checkbox
@@ -433,6 +548,19 @@ export const ImageCard = memo(function ImageCard({ image, index, selected, onSel
               >
                 <Pencil className="w-3.5 h-3.5 mr-1.5" />
                 Edit
+              </Button>
+
+              {/* AI Background edit button */}
+              <Button
+                data-testid={`button-bg-edit-${image.id}`}
+                variant="outline"
+                size="icon"
+                className={`bg-transparent border-white/10 ${showBgPicker ? 'border-primary/50 text-primary' : ''}`}
+                onClick={() => setShowBgPicker(v => !v)}
+                disabled={editBackgroundMutation.isPending}
+                title="AI Background Editor"
+              >
+                <Wand2 className="w-4 h-4" />
               </Button>
 
               {instagramConnected && onInstagramPost && (
