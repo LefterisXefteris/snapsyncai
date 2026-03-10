@@ -47,12 +47,17 @@ async function runWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T,
 
 const SUBSCRIPTION_PRICE_PENCE = 3000;
 
+let cachedPriceId: string | null = null;
+
 async function getOrCreateSubscriptionPriceId(): Promise<string> {
+  if (cachedPriceId) return cachedPriceId;
+
   const result = await db.execute(
     sql`SELECT pr.id as price_id, pr.unit_amount FROM stripe.products p JOIN stripe.prices pr ON pr.product = p.id WHERE p.active = true AND p.metadata->>'type' = 'monthly_subscription' AND pr.active = true AND pr.type = 'recurring' AND pr.recurring->>'interval' = 'month' ORDER BY pr.created DESC LIMIT 1`
   );
   if (result.rows.length > 0 && Number(result.rows[0].unit_amount) === SUBSCRIPTION_PRICE_PENCE) {
-    return result.rows[0].price_id as string;
+    cachedPriceId = result.rows[0].price_id as string;
+    return cachedPriceId;
   }
 
   const stripe = await getUncachableStripeClient();
@@ -85,7 +90,8 @@ async function getOrCreateSubscriptionPriceId(): Promise<string> {
     currency: 'gbp',
     recurring: { interval: 'month' },
   });
-  return price.id;
+  cachedPriceId = price.id;
+  return cachedPriceId;
 }
 
 const updateSchema = z.object({
