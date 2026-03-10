@@ -77,7 +77,7 @@ export function useVerifySubscription() {
       if (data.alreadyActive) {
         toast({ title: "Already Subscribed", description: "Your subscription is already active." });
       } else {
-        toast({ title: "Subscribed!", description: "Welcome to ListAI Pro! You can now unlock unlimited AI analysis." });
+        toast({ title: "Subscribed!", description: "Welcome to SnapSync AI Pro! You can now unlock unlimited AI analysis." });
       }
     },
     onError: (error) => {

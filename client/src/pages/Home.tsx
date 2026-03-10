@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserButton } from "@clerk/clerk-react";
 import { useSidebar } from "@/components/ui/sidebar";
-import listaiLogo from "../assets/listai-logo.png";
+import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 import { dark } from "@clerk/themes";
 import type { Image } from "@shared/schema";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -80,14 +80,14 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const subscriptionParam = params.get('subscription');
-    const sessionId = params.get('checkout_session_id') || localStorage.getItem('listai_checkout_session_id');
+    const sessionId = params.get('checkout_session_id') || localStorage.getItem('snapsyncai_checkout_session_id');
 
     if (subscriptionParam === 'success' && sessionId) {
       verifySubscription.mutate(sessionId);
-      localStorage.removeItem('listai_checkout_session_id');
+      localStorage.removeItem('snapsyncai_checkout_session_id');
       window.history.replaceState({}, '', '/');
     } else if (subscriptionParam === 'cancelled') {
-      localStorage.removeItem('listai_checkout_session_id');
+      localStorage.removeItem('snapsyncai_checkout_session_id');
       toast({
         title: "Subscription Cancelled",
         description: "Your subscription checkout was cancelled. You can try again.",
@@ -124,7 +124,7 @@ export default function Home() {
     if (unpaidSelected.length > 0) {
       toast({
         title: "Full Analysis Required",
-        description: `${unpaidSelected.length} selected product(s) need full AI analysis. Subscribe to ListAI Pro — new uploads will be fully analyzed automatically.`,
+        description: `${unpaidSelected.length} selected product(s) need full AI analysis. Subscribe to SnapSync AI Pro — new uploads will be fully analyzed automatically.`,
         variant: "destructive",
       });
       return;
@@ -293,7 +293,7 @@ export default function Home() {
     if (unpaidSelected.length > 0) {
       toast({
         title: "Full Analysis Required",
-        description: `${unpaidSelected.length} selected product(s) need full AI analysis. Subscribe to ListAI Pro — new uploads will be fully analyzed automatically.`,
+        description: `${unpaidSelected.length} selected product(s) need full AI analysis. Subscribe to SnapSync AI Pro — new uploads will be fully analyzed automatically.`,
         variant: "destructive",
       });
       return;
@@ -313,7 +313,7 @@ export default function Home() {
     if (unpaidSelected.length > 0) {
       toast({
         title: "Full Analysis Required",
-        description: `${unpaidSelected.length} selected product(s) need full AI analysis. Subscribe to ListAI Pro — new uploads will be fully analyzed automatically.`,
+        description: `${unpaidSelected.length} selected product(s) need full AI analysis. Subscribe to SnapSync AI Pro — new uploads will be fully analyzed automatically.`,
         variant: "destructive",
       });
       return;
@@ -401,8 +401,8 @@ export default function Home() {
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
       <header className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 relative">
         <div className="flex items-center gap-2.5">
-          <img src={listaiLogo} alt="ListAI" className="w-7 h-7 rounded-sm" />
-          <span className="font-display text-base font-bold tracking-tight">ListAI workspace</span>
+          <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-7 h-7 rounded-sm" />
+          <span className="font-display text-base font-bold tracking-tight">SnapSync AI workspace</span>
           {isSubscribed && (
             <Badge variant="outline" className="no-default-active-elevate text-[10px] h-5 py-0 px-1.5" data-testid="badge-pro">
               <Crown className="w-2.5 h-2.5 mr-0.5" />
@@ -480,7 +480,7 @@ export default function Home() {
                 <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/20">
                   <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium">ListAI Pro</p>
+                    <p className="text-xs font-medium">SnapSync AI Pro</p>
                     <p className="text-[10px] text-muted-foreground truncate">
                       {subscriptionStatus?.currentPeriodEnd
                         ? `Renews ${new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()}`
@@ -501,7 +501,7 @@ export default function Home() {
                       createSubscriptionCheckout.mutate(undefined, {
                         onSuccess: (data: any) => {
                           if (data.checkoutUrl) {
-                            if (data.sessionId) localStorage.setItem('listai_checkout_session_id', data.sessionId);
+                            if (data.sessionId) localStorage.setItem('snapsyncai_checkout_session_id', data.sessionId);
                             window.location.href = data.checkoutUrl;
                           }
                         },

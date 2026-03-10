@@ -84,7 +84,7 @@ function AppWithClerk() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="listai-theme">
+    <ThemeProvider defaultTheme="system" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AppWithClerk />

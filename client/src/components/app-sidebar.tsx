@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { usePaymentConfig, useSubscriptionStatus, useCreateSubscriptionCheckout, useCancelSubscription } from "@/hooks/use-images";
-import listaiLogo from "../assets/listai-logo.png";
+import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 
 export function AppSidebar() {
   const { data: paymentConfig } = usePaymentConfig();
@@ -36,7 +36,7 @@ export function AppSidebar() {
       onSuccess: (data) => {
         if (data.checkoutUrl) {
           if (data.sessionId) {
-            localStorage.setItem('listai_checkout_session_id', data.sessionId);
+            localStorage.setItem('snapsyncai_checkout_session_id', data.sessionId);
           }
           window.location.href = data.checkoutUrl;
         }
@@ -57,8 +57,8 @@ export function AppSidebar() {
       <Sidebar side="left" collapsible="offcanvas">
         <SidebarHeader>
           <div className="flex items-center gap-2.5 px-2 py-1">
-            <img src={listaiLogo} alt="ListAI" className="w-7 h-7 rounded-md" />
-            <span className="font-display text-base font-bold tracking-tight">ListAI</span>
+            <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-7 h-7 rounded-md" />
+            <span className="font-display text-base font-bold tracking-tight">SnapSync AI</span>
             {isSubscribed && (
               <Badge variant="outline" className="no-default-active-elevate text-xs" data-testid="sidebar-badge-pro">
                 <Crown className="w-3 h-3 mr-1" />
@@ -81,7 +81,7 @@ export function AppSidebar() {
                     <CardContent className="p-3 space-y-3">
                       <div className="flex items-center gap-2">
                         <Crown className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm font-medium" data-testid="text-subscription-status">ListAI Pro Active</span>
+                        <span className="text-sm font-medium" data-testid="text-subscription-status">SnapSync AI Pro Active</span>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Unlimited AI analysis, SEO, AEO & more.
@@ -112,7 +112,7 @@ export function AppSidebar() {
                     <CardContent className="p-3 space-y-3">
                       <div className="flex items-center gap-2">
                         <Crown className="w-4 h-4" />
-                        <span className="text-sm font-medium">ListAI Pro</span>
+                        <span className="text-sm font-medium">SnapSync AI Pro</span>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Subscribe for unlimited AI-powered product analysis.
@@ -154,7 +154,7 @@ export function AppSidebar() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Crown className="w-5 h-5" />
-              ListAI Pro Subscription
+              SnapSync AI Pro Subscription
             </DialogTitle>
             <DialogDescription>
               Subscribe to unlock unlimited AI-powered product analysis — full descriptions, pricing, SEO, AEO content, and variant suggestions for all your products.
@@ -218,7 +218,7 @@ export function AppSidebar() {
               Cancel Subscription
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel your ListAI Pro subscription? You'll continue to have access until the end of your current billing period.
+              Are you sure you want to cancel your SnapSync AI Pro subscription? You'll continue to have access until the end of your current billing period.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

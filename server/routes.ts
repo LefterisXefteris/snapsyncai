@@ -77,7 +77,7 @@ async function getOrCreateSubscriptionPriceId(): Promise<string> {
     productId = productResult.rows[0].product_id as string;
   } else {
     const product = await stripe.products.create({
-      name: 'ListAI Pro',
+      name: 'SnapSync AI Pro',
       description: 'Unlimited AI-powered product listing generation — titles, descriptions, pricing, SEO, AEO and more',
       metadata: { type: 'monthly_subscription' },
     });

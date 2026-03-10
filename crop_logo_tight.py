@@ -12,7 +12,7 @@ if candidates:
     # The image is 640x640. Let's crop from x=100 to 260, y=200 to 410
     cropped = img.crop((100, 200, 260, 410))
     
-    logo_path = '/Users/lefterisgilmaz/Desktop/lisai-app/client/src/assets/listai-logo.png'
+    logo_path = '/Users/lefterisgilmaz/Desktop/lisai-app/client/src/assets/snapsyncai-logo.png'
     cropped.save(logo_path)
     
     # Favicon

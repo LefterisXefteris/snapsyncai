@@ -6,40 +6,40 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Sparkles, Upload, Store, Zap, Shield, BrainCircuit, Image, Tags, FileText, Search, Bot, ArrowRight, CheckCircle2, Clock, Globe } from "lucide-react";
 import { useClerk } from "@clerk/clerk-react";
-import listaiLogo from "../assets/listai-logo.png";
+import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 
 const FAQ_DATA = [
   {
-    question: "What is ListAI and how does it work?",
-    answer: "ListAI is an AI-powered product listing generator. You upload product photos, and our AI analyses each image to generate complete e-commerce listings — including titles, descriptions, pricing, categories, SEO metadata, and AEO content. You can then review, edit, and push listings to Shopify, Etsy, or Amazon with one click."
+    question: "What is SnapSync AI and how does it work?",
+    answer: "SnapSync AI is an AI-powered product listing generator. You upload product photos, and our AI analyses each image to generate complete e-commerce listings — including titles, descriptions, pricing, categories, SEO metadata, and AEO content. You can then review, edit, and push listings to Shopify, Etsy, or Amazon with one click."
   },
   {
     question: "How do I create product listings from photos?",
-    answer: "Simply drag and drop up to 100 product images into ListAI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to ListAI Pro (£30/month) to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, FAQ content, and variant options for every product."
+    answer: "Simply drag and drop up to 100 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to SnapSync AI Pro (£30/month) to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, FAQ content, and variant options for every product."
   },
   {
-    question: "Which e-commerce platforms does ListAI support?",
-    answer: "ListAI supports Shopify, Etsy, and Amazon. Connect your store credentials, review your AI-generated listings in the built-in review queue, then push approved products to any or all three platforms simultaneously."
+    question: "Which e-commerce platforms does SnapSync AI support?",
+    answer: "SnapSync AI supports Shopify, Etsy, and Amazon. Connect your store credentials, review your AI-generated listings in the built-in review queue, then push approved products to any or all three platforms simultaneously."
   },
   {
     question: "What is AEO (Answer Engine Optimisation)?",
-    answer: "AEO stands for Answer Engine Optimisation. ListAI generates FAQ pairs and conversational snippets for each product, designed to be picked up by AI assistants like ChatGPT, Google AI Overviews, and voice search. This helps your products appear in AI-powered search results alongside traditional SEO."
+    answer: "AEO stands for Answer Engine Optimisation. SnapSync AI generates FAQ pairs and conversational snippets for each product, designed to be picked up by AI assistants like ChatGPT, Google AI Overviews, and voice search. This helps your products appear in AI-powered search results alongside traditional SEO."
   },
   {
-    question: "How much does ListAI cost?",
-    answer: "Uploading images and getting AI previews is completely free. To unlock full AI-generated descriptions, pricing, SEO, AEO content, and variants, subscribe to ListAI Pro for £30 per month. This gives you unlimited image analysis with no per-image charges."
+    question: "How much does SnapSync AI cost?",
+    answer: "Uploading images and getting AI previews is completely free. To unlock full AI-generated descriptions, pricing, SEO, AEO content, and variants, subscribe to SnapSync AI Pro for £30 per month. This gives you unlimited image analysis with no per-image charges."
   },
   {
     question: "Can I edit AI-generated product listings before publishing?",
-    answer: "Yes. ListAI includes a built-in review queue where you can edit every field — title, description, price, category, tags, SEO metadata, and more — before pushing products to your connected stores. You have full control over what gets published."
+    answer: "Yes. SnapSync AI includes a built-in review queue where you can edit every field — title, description, price, category, tags, SEO metadata, and more — before pushing products to your connected stores. You have full control over what gets published."
   },
   {
-    question: "How is ListAI different from writing product descriptions manually?",
-    answer: "ListAI reduces product listing time by up to 90%. Instead of spending 15-30 minutes per product writing titles, descriptions, and SEO content, ListAI generates everything in seconds from a single photo. It also handles tasks most sellers skip, like AEO content, alt text, and variant suggestions."
+    question: "How is SnapSync AI different from writing product descriptions manually?",
+    answer: "SnapSync AI reduces product listing time by up to 90%. Instead of spending 15-30 minutes per product writing titles, descriptions, and SEO content, SnapSync AI generates everything in seconds from a single photo. It also handles tasks most sellers skip, like AEO content, alt text, and variant suggestions."
   },
   {
-    question: "Does ListAI generate SEO-optimised listings?",
-    answer: "Yes. Every listing includes an SEO title, meta description, alt text for images, keyword-rich product descriptions, and structured category taxonomy. ListAI also generates AEO content (FAQs and conversational snippets) to maximise visibility across both traditional search engines and AI assistants."
+    question: "Does SnapSync AI generate SEO-optimised listings?",
+    answer: "Yes. Every listing includes an SEO title, meta description, alt text for images, keyword-rich product descriptions, and structured category taxonomy. SnapSync AI also generates AEO content (FAQs and conversational snippets) to maximise visibility across both traditional search engines and AI assistants."
   }
 ];
 
@@ -80,7 +80,7 @@ export default function Landing() {
   const { openSignIn } = useClerk();
 
   useEffect(() => {
-    document.title = "ListAI — AI Product Listing Generator for Shopify, Etsy & Amazon";
+    document.title = "SnapSync AI — AI Product Listing Generator for Shopify, Etsy & Amazon";
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
       metaDesc.setAttribute("content", "Upload product photos and let AI generate complete e-commerce listings in seconds. Titles, descriptions, pricing, SEO metadata, and AEO content — then push to Shopify, Etsy, or Amazon with one click.");
@@ -103,7 +103,7 @@ export default function Landing() {
   const softwareJsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "ListAI",
+    "name": "SnapSync AI",
     "description": "AI-powered product listing generator for Shopify, Etsy, and Amazon. Upload product photos and get complete e-commerce listings with SEO and AEO content in seconds.",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
@@ -112,7 +112,7 @@ export default function Landing() {
       "price": "30.00",
       "priceCurrency": "GBP",
       "priceValidUntil": "2027-12-31",
-      "description": "ListAI Pro — unlimited AI product analysis"
+      "description": "SnapSync AI Pro — unlimited AI product analysis"
     },
     "featureList": [
       "AI product image analysis",
@@ -136,8 +136,8 @@ export default function Landing() {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/80" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <img src={listaiLogo} alt="ListAI logo" className="w-8 h-8 rounded-md" width="32" height="32" />
-            <span className="font-display text-lg font-bold tracking-tight">ListAI</span>
+            <img src={snapsyncaiLogo} alt="SnapSync AI logo" className="w-8 h-8 rounded-md" width="32" height="32" />
+            <span className="font-display text-lg font-bold tracking-tight">SnapSync AI</span>
           </div>
           <div className="flex items-center gap-6 flex-wrap">
             <a href="#features" className="text-sm text-muted-foreground transition-colors hidden sm:inline" data-testid="link-features">Features</a>
@@ -353,7 +353,7 @@ export default function Landing() {
           <div className="text-center mb-14">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">FAQ</Badge>
             <h2 id="faq-heading" className="text-3xl font-display font-bold tracking-tight mb-3">Frequently Asked Questions</h2>
-            <p className="text-muted-foreground max-w-lg mx-auto">Everything you need to know about ListAI and AI-powered product listings.</p>
+            <p className="text-muted-foreground max-w-lg mx-auto">Everything you need to know about SnapSync AI and AI-powered product listings.</p>
           </div>
           <Accordion type="single" collapsible className="w-full" data-testid="faq-list">
             {FAQ_DATA.map((faq, index) => (
@@ -385,8 +385,8 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <img src={listaiLogo} alt="ListAI" className="w-6 h-6 rounded" width="24" height="24" />
-              <span className="font-display text-sm font-semibold">ListAI</span>
+              <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-6 h-6 rounded" width="24" height="24" />
+              <span className="font-display text-sm font-semibold">SnapSync AI</span>
             </div>
             <p className="text-xs text-muted-foreground text-center">AI-powered product listing generator for Shopify, Etsy, and Amazon. From Photo to Product in Seconds.</p>
           </div>
