@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,12 +6,75 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Sparkles, Upload, Store, Zap, Shield, BrainCircuit, Image, Tags, FileText,
-  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, Star, TrendingUp,
-  Layers, BarChart3, MousePointerClick, Cpu
+  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers
 } from "lucide-react";
 import { SiShopify, SiEtsy, SiAmazon } from "react-icons/si";
 import { useClerk } from "@clerk/clerk-react";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
+
+/* ─── Lightweight CSS-only particle field ───────────────────────────────────
+   ~18 dots animated with GPU-composited transform + opacity only.
+   No requestAnimationFrame loop, no canvas, zero JS overhead after mount.  */
+function ParticleField() {
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 18 }, (_, i) => ({
+        id: i,
+        left: `${(i * 5.7 + Math.sin(i * 1.3) * 8 + 50) % 100}%`,
+        top:  `${(i * 7.2 + Math.cos(i * 1.7) * 10 + 20) % 90}%`,
+        size: (i % 4) + 2,                      // 2–5 px
+        duration: 14 + (i % 7) * 2.5,           // 14–30 s
+        delay: -(i * 2.1),                       // stagger so they don't burst at once
+        opacity: 0.12 + (i % 5) * 0.06,         // 0.12–0.36
+      })),
+    []
+  );
+
+  return (
+    <div
+      className="absolute inset-0 overflow-hidden pointer-events-none select-none"
+      aria-hidden="true"
+    >
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="particle"
+          style={{
+            left:              p.left,
+            top:               p.top,
+            width:             p.size,
+            height:            p.size,
+            opacity:           p.opacity,
+            animationDuration: `${p.duration}s`,
+            animationDelay:    `${p.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ─── Scroll-reveal hook ─────────────────────────────────────────────────────
+   Adds 'revealed' class when .reveal elements enter the viewport.
+   Uses IntersectionObserver (zero scroll-listener overhead).             */
+function useScrollReveal() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("revealed");
+            observer.unobserve(entry.target); // fire once, then stop watching
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" }
+    );
+
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+}
 
 const FAQ_DATA = [
   {
@@ -78,12 +141,12 @@ const FEATURES = [
 ];
 
 const SEO_AEO_FEATURES = [
-  { icon: Search, title: "SEO Titles & Meta Descriptions", description: "Keyword-optimised meta titles and descriptions crafted to rank on Google, Bing, and beyond." },
-  { icon: Image, title: "Image Alt Text", description: "Auto-generated descriptive alt text for every image — boosting accessibility and image search rankings." },
-  { icon: Tags, title: "Smart Categories & Tags", description: "Auto-categorisation with full Shopify-compatible taxonomy paths and keyword-rich product tags." },
-  { icon: Bot, title: "AEO FAQ Pairs", description: "AI-generated Q&A content designed to be surfaced by ChatGPT, Google AI Overviews, and Perplexity." },
-  { icon: FileText, title: "Conversational Snippets", description: "Natural-language product summaries optimised for voice search and AI assistant responses." },
-  { icon: Zap, title: "90% Faster Listing", description: "What takes 30 minutes per product manually is done in under 10 seconds with SnapSync AI." }
+  { icon: Search,   title: "SEO Titles & Meta Descriptions",  description: "Keyword-optimised meta titles and descriptions crafted to rank on Google, Bing, and beyond." },
+  { icon: Image,    title: "Image Alt Text",                  description: "Auto-generated descriptive alt text for every image — boosting accessibility and image search rankings." },
+  { icon: Tags,     title: "Smart Categories & Tags",         description: "Auto-categorisation with full Shopify-compatible taxonomy paths and keyword-rich product tags." },
+  { icon: Bot,      title: "AEO FAQ Pairs",                   description: "AI-generated Q&A content designed to be surfaced by ChatGPT, Google AI Overviews, and Perplexity." },
+  { icon: FileText, title: "Conversational Snippets",         description: "Natural-language product summaries optimised for voice search and AI assistant responses." },
+  { icon: Zap,      title: "90% Faster Listing",              description: "What takes 30 minutes per product manually is done in under 10 seconds with SnapSync AI." }
 ];
 
 const STEPS = [
@@ -108,14 +171,15 @@ const STEPS = [
 ];
 
 const STATS = [
-  { value: "90%", label: "Faster than manual listing", icon: TrendingUp },
-  { value: "100", label: "Images per batch upload", icon: Layers },
-  { value: "3", label: "Marketplaces supported", icon: Globe },
-  { value: "10s", label: "Average listing generation time", icon: Clock },
+  { value: "90%",  label: "Faster than manual listing",       icon: TrendingUp },
+  { value: "100",  label: "Images per batch upload",          icon: Layers },
+  { value: "3",    label: "Marketplaces supported",           icon: Globe },
+  { value: "10s",  label: "Average listing generation time",  icon: Clock },
 ];
 
 export default function Landing() {
   const { openSignIn } = useClerk();
+  useScrollReveal();
 
   useEffect(() => {
     document.title = "SnapSync AI — AI Product Listing Generator for Shopify, Etsy & Amazon";
@@ -131,10 +195,7 @@ export default function Landing() {
     "mainEntity": FAQ_DATA.map(faq => ({
       "@type": "Question",
       "name": faq.question,
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": faq.answer
-      }
+      "acceptedAnswer": { "@type": "Answer", "text": faq.answer }
     }))
   };
 
@@ -163,20 +224,13 @@ export default function Landing() {
       "bestRating": "5"
     },
     "featureList": [
-      "AI product image analysis",
-      "Batch upload up to 100 images",
-      "Auto-generated product titles and descriptions",
-      "AI-suggested pricing",
-      "SEO title and meta description generation",
-      "Image alt text generation",
-      "AEO (Answer Engine Optimisation) FAQ pairs",
-      "Conversational product snippets for AI assistants",
-      "Shopify one-click publishing",
-      "Etsy one-click publishing",
-      "Amazon one-click publishing",
-      "Built-in product review queue",
-      "Bulk product publishing",
-      "Product variant suggestions"
+      "AI product image analysis", "Batch upload up to 100 images",
+      "Auto-generated product titles and descriptions", "AI-suggested pricing",
+      "SEO title and meta description generation", "Image alt text generation",
+      "AEO FAQ pairs", "Conversational product snippets for AI assistants",
+      "Shopify one-click publishing", "Etsy one-click publishing",
+      "Amazon one-click publishing", "Built-in product review queue",
+      "Bulk product publishing", "Product variant suggestions"
     ]
   };
 
@@ -185,12 +239,7 @@ export default function Landing() {
     "@type": "Organization",
     "name": "SnapSync AI",
     "url": "https://snapsyncai.co.uk",
-    "logo": "https://snapsyncai.co.uk/favicon.png",
-    "sameAs": [],
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "contactType": "customer support"
-    }
+    "logo": "https://snapsyncai.co.uk/favicon.png"
   };
 
   return (
@@ -207,27 +256,26 @@ export default function Landing() {
             <span className="font-display text-lg font-bold tracking-tight">SnapSync AI</span>
           </div>
           <div className="flex items-center gap-6 flex-wrap">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-features">Features</a>
+            <a href="#features"     className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-features">Features</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-how-it-works">How It Works</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-pricing">Pricing</a>
-            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-faq">FAQ</a>
-            <Button variant="outline" size="sm" data-testid="button-login-nav" onClick={() => openSignIn()}>
-              Sign In
-            </Button>
-            <Button size="sm" className="hidden sm:flex" onClick={() => openSignIn()} data-testid="button-nav-cta">
-              Start Free
-            </Button>
+            <a href="#pricing"      className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-pricing">Pricing</a>
+            <a href="#faq"          className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-faq">FAQ</a>
+            <Button variant="outline" size="sm" data-testid="button-login-nav" onClick={() => openSignIn()}>Sign In</Button>
+            <Button size="sm" className="hidden sm:flex" onClick={() => openSignIn()} data-testid="button-nav-cta">Start Free</Button>
           </div>
         </div>
       </nav>
 
       <main className="pt-14">
 
-        {/* ── HERO ── */}
+        {/* ── HERO (particles live here) ── */}
         <section className="relative overflow-hidden" aria-labelledby="hero-heading">
-          {/* Background glow */}
+          {/* Glow blobs */}
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/[0.03] to-transparent pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
+
+          {/* ✨ Particles */}
+          <ParticleField />
 
           <div className="max-w-5xl mx-auto px-6 py-28 md:py-40 relative text-center">
             <Badge variant="outline" className="mb-6 no-default-active-elevate gap-1.5 px-3 py-1 text-xs animate-in fade-in duration-500">
@@ -269,7 +317,7 @@ export default function Landing() {
             {/* Platform logos */}
             <div className="mt-12 flex items-center justify-center gap-8 flex-wrap animate-in fade-in duration-700 delay-300">
               <span className="text-xs text-muted-foreground uppercase tracking-wider">Works with</span>
-              <div className="flex items-center gap-6 text-muted-foreground/60">
+              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <SiShopify className="w-5 h-5 text-[#96BF48]" />
                   <span className="text-sm font-medium text-muted-foreground">Shopify</span>
@@ -292,7 +340,7 @@ export default function Landing() {
           <div className="max-w-5xl mx-auto px-6 py-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
               {STATS.map((stat, i) => (
-                <div key={i} className="space-y-1">
+                <div key={i} className={`space-y-1 reveal delay-${i + 1}`}>
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <stat.icon className="w-4 h-4 text-primary" />
                   </div>
@@ -306,7 +354,7 @@ export default function Landing() {
 
         {/* ── FEATURES ── */}
         <section id="features" className="max-w-6xl mx-auto px-6 py-24" aria-labelledby="features-heading">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">Features</Badge>
             <h2 id="features-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
               Everything You Need to List Products Faster
@@ -317,7 +365,7 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {FEATURES.map((feature, i) => (
-              <Card key={i} className="hover-elevate relative overflow-hidden group border-border/80 hover:border-primary/30 transition-colors" data-testid={`card-feature-${i}`}>
+              <Card key={i} className={`hover-elevate relative overflow-hidden group border-border/80 hover:border-primary/30 transition-colors reveal delay-${i + 1}`} data-testid={`card-feature-${i}`}>
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <CardHeader>
                   <div className="flex items-center justify-between mb-3">
@@ -341,7 +389,7 @@ export default function Landing() {
         {/* ── SEO & AEO ── */}
         <section className="bg-muted/30 py-24 border-y border-border" aria-labelledby="seo-aeo-heading">
           <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center mb-16">
+            <div className="text-center mb-16 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
                 <Search className="w-3 h-3" /> SEO &amp; AEO
               </Badge>
@@ -354,8 +402,7 @@ export default function Landing() {
               </p>
             </div>
 
-            {/* AEO Explainer callout */}
-            <div className="mb-10 p-6 rounded-2xl border border-primary/20 bg-primary/5 flex flex-col md:flex-row items-start gap-4">
+            <div className="mb-10 p-6 rounded-2xl border border-primary/20 bg-primary/5 flex flex-col md:flex-row items-start gap-4 reveal">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Bot className="w-5 h-5 text-primary" />
               </div>
@@ -371,7 +418,7 @@ export default function Landing() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SEO_AEO_FEATURES.map((feature, i) => (
-                <Card key={i} className="hover-elevate group hover:border-primary/30 transition-colors" data-testid={`card-seo-${i}`}>
+                <Card key={i} className={`hover-elevate group hover:border-primary/30 transition-colors reveal delay-${(i % 3) + 1}`} data-testid={`card-seo-${i}`}>
                   <CardContent className="flex items-start gap-3 pt-6 pb-5">
                     <div className="w-9 h-9 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center flex-shrink-0 transition-colors">
                       <feature.icon className="w-4 h-4 group-hover:text-primary transition-colors" />
@@ -389,7 +436,7 @@ export default function Landing() {
 
         {/* ── HOW IT WORKS ── */}
         <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24" aria-labelledby="how-heading">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">How It Works</Badge>
             <h2 id="how-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
               Three Steps to Live Listings
@@ -399,10 +446,9 @@ export default function Landing() {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* connector lines */}
             <div className="hidden md:block absolute top-7 left-[calc(33%+1rem)] right-[calc(33%+1rem)] h-px bg-gradient-to-r from-border via-primary/30 to-border" />
             {STEPS.map((step, i) => (
-              <div key={i} className="flex flex-col items-center text-center group" data-testid={`step-${i}`}>
+              <div key={i} className={`flex flex-col items-center text-center group reveal delay-${i + 1}`} data-testid={`step-${i}`}>
                 <div className="w-14 h-14 rounded-2xl bg-muted group-hover:bg-primary/10 border border-border group-hover:border-primary/30 flex items-center justify-center mb-5 transition-all duration-300 relative z-10">
                   <step.icon className="w-6 h-6 group-hover:text-primary transition-colors" />
                 </div>
@@ -410,9 +456,7 @@ export default function Landing() {
                   <Badge variant="outline" className="no-default-active-elevate font-mono text-xs">{step.number}</Badge>
                 </div>
                 <h3 className="font-display font-bold text-xl mb-3">{step.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  {step.description}
-                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.description}</p>
               </div>
             ))}
           </div>
@@ -421,7 +465,7 @@ export default function Landing() {
         {/* ── PRICING ── */}
         <section id="pricing" className="bg-muted/30 border-y border-border py-24" aria-labelledby="pricing-heading">
           <div className="max-w-4xl mx-auto px-6">
-            <div className="text-center mb-16">
+            <div className="text-center mb-16 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate">Pricing</Badge>
               <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
                 Simple, Transparent Pricing
@@ -431,8 +475,7 @@ export default function Landing() {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-              {/* Free tier */}
-              <Card className="flex flex-col" data-testid="card-pricing-free">
+              <Card className="flex flex-col reveal delay-1" data-testid="card-pricing-free">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl">Free</CardTitle>
                   <CardDescription>AI previews for every image</CardDescription>
@@ -444,27 +487,18 @@ export default function Landing() {
                 <CardContent className="flex-1">
                   <Separator className="mb-5" />
                   <ul className="space-y-3">
-                    {[
-                      "Upload up to 100 images per batch",
-                      "AI-generated titles & categories",
-                      "Auto-tagging for every product",
-                      "Connect Shopify, Etsy & Amazon",
-                      "No credit card required"
-                    ].map((item, i) => (
+                    {["Upload up to 100 images per batch", "AI-generated titles & categories", "Auto-tagging for every product", "Connect Shopify, Etsy & Amazon", "No credit card required"].map((item, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
                         <CheckCircle2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <span className="text-muted-foreground">{item}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button variant="outline" className="w-full mt-6" onClick={() => openSignIn()} data-testid="button-pricing-free-start">
-                    Start Free
-                  </Button>
+                  <Button variant="outline" className="w-full mt-6" onClick={() => openSignIn()} data-testid="button-pricing-free-start">Start Free</Button>
                 </CardContent>
               </Card>
 
-              {/* Pro tier */}
-              <Card className="flex flex-col border-primary/50 shadow-lg shadow-primary/5 relative overflow-hidden" data-testid="card-pricing-pro">
+              <Card className="flex flex-col border-primary/50 shadow-lg shadow-primary/5 relative overflow-hidden reveal delay-2" data-testid="card-pricing-pro">
                 <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-purple-500 to-purple-700" />
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between gap-2">
@@ -480,17 +514,7 @@ export default function Landing() {
                 <CardContent className="flex-1">
                   <Separator className="mb-5" />
                   <ul className="space-y-3 mb-6">
-                    {[
-                      "Everything in Free",
-                      "Full AI-generated product descriptions",
-                      "AI-suggested pricing & variants",
-                      "SEO title, meta description & alt text",
-                      "AEO FAQ pairs & conversational snippets",
-                      "Unlimited image analysis",
-                      "Built-in review queue",
-                      "Bulk publish to all platforms",
-                      "Priority support"
-                    ].map((item, i) => (
+                    {["Everything in Free", "Full AI-generated product descriptions", "AI-suggested pricing & variants", "SEO title, meta description & alt text", "AEO FAQ pairs & conversational snippets", "Unlimited image analysis", "Built-in review queue", "Bulk publish to all platforms", "Priority support"].map((item, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
                         <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                         <span>{item}</span>
@@ -510,7 +534,7 @@ export default function Landing() {
 
         {/* ── FAQ ── */}
         <section id="faq" className="max-w-3xl mx-auto px-6 py-24" aria-labelledby="faq-heading">
-          <div className="text-center mb-14">
+          <div className="text-center mb-14 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">FAQ</Badge>
             <h2 id="faq-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
               Frequently Asked Questions
@@ -519,23 +543,21 @@ export default function Landing() {
               Everything you need to know about SnapSync AI, AI product listings, SEO, and AEO for e-commerce.
             </p>
           </div>
-          <Accordion type="single" collapsible className="w-full space-y-2" data-testid="faq-list">
-            {FAQ_DATA.map((faq, index) => (
-              <AccordionItem key={index} value={`faq-${index}`} data-testid={`faq-item-${index}`} className="border border-border rounded-xl px-4 data-[state=open]:border-primary/30">
-                <AccordionTrigger className="text-left text-sm font-medium py-4 hover:no-underline">
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed text-sm pb-4">
-                  {faq.answer}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+          <div className="reveal">
+            <Accordion type="single" collapsible className="w-full space-y-2" data-testid="faq-list">
+              {FAQ_DATA.map((faq, index) => (
+                <AccordionItem key={index} value={`faq-${index}`} data-testid={`faq-item-${index}`} className="border border-border rounded-xl px-4 data-[state=open]:border-primary/30">
+                  <AccordionTrigger className="text-left text-sm font-medium py-4 hover:no-underline">{faq.question}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground leading-relaxed text-sm pb-4">{faq.answer}</AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
         </section>
 
         {/* ── BOTTOM CTA ── */}
         <section className="max-w-6xl mx-auto px-6 pb-24" aria-labelledby="cta-heading">
-          <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-purple-900/10 p-12 md:p-16 text-center overflow-hidden" data-testid="card-cta-bottom">
+          <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-purple-900/10 p-12 md:p-16 text-center overflow-hidden reveal" data-testid="card-cta-bottom">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
             <div className="relative">
               <Badge variant="outline" className="mb-6 no-default-active-elevate gap-1.5">
@@ -583,9 +605,9 @@ export default function Landing() {
             <div className="flex flex-wrap gap-8 text-sm text-muted-foreground">
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Product</p>
-                <a href="#features" className="block hover:text-foreground transition-colors">Features</a>
+                <a href="#features"     className="block hover:text-foreground transition-colors">Features</a>
                 <a href="#how-it-works" className="block hover:text-foreground transition-colors">How It Works</a>
-                <a href="#pricing" className="block hover:text-foreground transition-colors">Pricing</a>
+                <a href="#pricing"      className="block hover:text-foreground transition-colors">Pricing</a>
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Platforms</p>
