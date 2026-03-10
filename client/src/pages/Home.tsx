@@ -97,14 +97,14 @@ export default function Home() {
     }
   }, []);
 
-  const handleSelect = (id: number, selected: boolean) => {
+  const handleSelect = useCallback((id: number, selected: boolean) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (selected) next.add(id);
       else next.delete(id);
       return next;
     });
-  };
+  }, []);
 
   const selectAll = () => {
     if (images) {
@@ -267,12 +267,12 @@ export default function Home() {
     );
   };
 
-  const openInstagramPostDialog = (imageId: number) => {
+  const openInstagramPostDialog = useCallback((imageId: number) => {
     setInstagramPostImageId(imageId);
     const img = images?.find((i: Image) => i.id === imageId);
     setInstagramPostCaption(img?.instagramCaption || "");
     setShowInstagramPostDialog(true);
-  };
+  }, [images]);
 
   const handleGenerateCaption = () => {
     if (!instagramPostImageId) return;

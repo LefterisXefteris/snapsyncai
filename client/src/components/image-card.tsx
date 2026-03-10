@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, memo, useMemo } from "react";
 import { FileJson, ImageIcon, Download, Calendar, Pencil, Trash2, DollarSign, Tag, Check, X, Search, Type, Layers, Lock, MessageCircleQuestion, Bot, FolderTree, Instagram } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { Image } from "@shared/schema";
@@ -48,7 +47,7 @@ function categoryLabel(category: string): string {
   return parts[parts.length - 1];
 }
 
-export function ImageCard({ image, index, selected, onSelect, instagramConnected, onInstagramPost }: ImageCardProps) {
+export const ImageCard = memo(function ImageCard({ image, index, selected, onSelect, instagramConnected, onInstagramPost }: ImageCardProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(image.title || "");
   const [description, setDescription] = useState(image.description || "");
@@ -66,9 +65,10 @@ export function ImageCard({ image, index, selected, onSelect, instagramConnected
   const deleteMutation = useDeleteImage();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
 
-  const aiDataDisplay = image.aiData ? JSON.stringify(image.aiData, null, 2) : "No analysis data available.";
-  const variants = Array.isArray(image.variants) ? image.variants as { name: string; values: string[] }[] : [];
-  const backgrounds = Array.isArray(image.generatedBackgrounds) ? image.generatedBackgrounds as string[] : [];
+  const aiDataDisplay = useMemo(() => image.aiData ? JSON.stringify(image.aiData, null, 2) : "No analysis data available.", [image.aiData]);
+  const variants = useMemo(() => Array.isArray(image.variants) ? image.variants as { name: string; values: string[] }[] : [], [image.variants]);
+  const backgrounds = useMemo(() => Array.isArray(image.generatedBackgrounds) ? image.generatedBackgrounds as string[] : [], [image.generatedBackgrounds]);
+  const dateLabel = useMemo(() => image.createdAt ? formatDistanceToNow(new Date(image.createdAt), { addSuffix: true }) : 'Just now', [image.createdAt]);
 
   const handleSave = () => {
     updateMutation.mutate({
@@ -108,12 +108,10 @@ export function ImageCard({ image, index, selected, onSelect, instagramConnected
         : "Pending";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.03 }}
-      className="group relative flex flex-col overflow-hidden rounded-2xl glass-card"
+    <div
+      className="group relative flex flex-col overflow-hidden rounded-2xl glass-card animate-in fade-in duration-300"
       data-testid={`card-product-${image.id}`}
+      style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
     >
       <div className="relative h-40 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center border-b border-white/5">
         <img
@@ -548,6 +546,6 @@ export function ImageCard({ image, index, selected, onSelect, instagramConnected
           </>
         )}
       </div>
-    </motion.div>
+    </div>
   );
-}
+});
