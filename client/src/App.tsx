@@ -3,15 +3,18 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ClerkProvider, SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
+import { ClerkProvider, SignedIn, SignedOut } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import { Loader2 } from "lucide-react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
+
+// Clerk publishable key — baked in at build time via Vite env var.
+// Falls back to fetching from the server API for environments where
+// the env var isn't set (e.g. legacy deploys).
+const VITE_CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 function AuthScreen() {
   return <Landing />;
@@ -48,6 +51,20 @@ function ClerkApp() {
 }
 
 function AppWithClerk() {
+  // If the env var is present (recommended), mount immediately — no network round-trip.
+  if (VITE_CLERK_KEY) {
+    return (
+      <ClerkProvider publishableKey={VITE_CLERK_KEY}>
+        <ClerkApp />
+      </ClerkProvider>
+    );
+  }
+
+  // Legacy fallback: fetch the key from the server API.
+  return <AppWithClerkFallback />;
+}
+
+function AppWithClerkFallback() {
   const { data: config, isLoading, error } = useQuery<{ publishableKey: string }>({
     queryKey: ["/api/auth/clerk-config"],
     retry: 3,

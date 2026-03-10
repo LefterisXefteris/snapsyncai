@@ -151,7 +151,7 @@ export const ImageCard = memo(function ImageCard({ image, index, selected, onSel
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {image.createdAt ? formatDistanceToNow(new Date(image.createdAt), { addSuffix: true }) : 'Just now'}
+                  {dateLabel}
                 </span>
               </div>
             </div>
