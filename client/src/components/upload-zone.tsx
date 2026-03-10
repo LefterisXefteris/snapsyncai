@@ -101,37 +101,32 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       <div
         {...getRootProps()}
         className={cn(
-          "relative group cursor-pointer overflow-hidden rounded-3xl border-2 border-dashed transition-all duration-300 p-10 md:p-16 text-center",
+          "relative group cursor-pointer overflow-hidden rounded-xl border border-dashed transition-all duration-200 p-4 text-center",
           isDragActive
-            ? "border-primary bg-primary/5 scale-[1.01]"
-            : "border-white/10 hover:border-primary/50 hover:bg-white/5 bg-black/20"
+            ? "border-primary bg-primary/10 scale-[1.01]"
+            : "border-border hover:border-primary/50 hover:bg-muted/50 bg-muted/20"
         )}
       >
         <input {...getInputProps()} data-testid="input-file-upload" />
-        <div className="relative z-10 flex flex-col items-center gap-4">
+        <div className="relative z-10 flex flex-col items-center gap-2.5">
           <div className={cn(
-            "p-4 rounded-full bg-gradient-to-br from-gray-800 to-black border border-white/10 shadow-xl transition-transform duration-300",
+            "p-2.5 rounded-lg bg-muted border border-border transition-transform duration-200",
             isDragActive ? "scale-110" : "group-hover:scale-105"
           )}>
             <UploadCloud className={cn(
-              "w-10 h-10 transition-colors",
-              isDragActive ? "text-primary" : "text-muted-foreground group-hover:text-white"
+              "w-5 h-5 transition-colors",
+              isDragActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
             )} />
           </div>
           <div>
-            <h3 className="text-xl font-display font-bold text-white mb-2">
-              {isDragActive
-                ? "Drop product images here"
-                : "Upload Product Images"
-              }
-            </h3>
-            <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-              Drag & drop 1-100 product images. Subscribers get full AI analysis automatically. Free users get a quick preview.
+            <p className="text-xs font-medium text-foreground">
+              {isDragActive ? "Drop images here" : "Drag & drop or click to upload"}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              1–100 images · PNG, JPG, WEBP
             </p>
           </div>
         </div>
-
-        <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       </div>
 
       <AnimatePresence>
