@@ -28,14 +28,9 @@ function AuthenticatedRouter() {
 
 function AuthenticatedLayout() {
   return (
-    <SidebarProvider defaultOpen={false}>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar />
-        <main className="flex-1 min-w-0">
-          <AuthenticatedRouter />
-        </main>
-      </div>
-    </SidebarProvider>
+    <main className="flex-1 min-w-0 w-full min-h-screen">
+      <AuthenticatedRouter />
+    </main>
   );
 }
 

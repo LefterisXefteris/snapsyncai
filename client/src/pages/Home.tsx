@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store } from "lucide-react";
 import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
-import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart } from "@/hooks/use-images";
+import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart, usePaymentConfig, useCreateSubscriptionCheckout, useCancelSubscription } from "@/hooks/use-images";
 import { UploadZone } from "@/components/upload-zone";
 import { ImageCard } from "@/components/image-card";
 import { ReviewQueueModal } from "@/components/review-queue-modal";
@@ -54,7 +54,7 @@ export default function Home() {
   const verifySubscription = useVerifySubscription();
   const unlockImages = useUnlockImages();
   const { toast } = useToast();
-  const { toggleSidebar } = useSidebar();
+  const createSubscriptionCheckout = useCreateSubscriptionCheckout();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showReviewQueue, setShowReviewQueue] = useState(false);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
@@ -327,10 +327,6 @@ export default function Home() {
 
   const handleUnlockAll = () => {
     if (!unpaidImages || unpaidImages.length === 0) return;
-    if (!isSubscribed) {
-      toggleSidebar();
-      return;
-    }
     const ids = unpaidImages.map((img: Image) => img.id);
     unlockImages.mutate({ imageIds: ids });
   };
@@ -405,15 +401,6 @@ export default function Home() {
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
       <header className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 relative">
         <div className="flex items-center gap-2.5">
-          <Button
-            data-testid="button-sidebar-toggle"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={toggleSidebar}
-          >
-            <PanelLeft className="w-4 h-4" />
-          </Button>
           <img src={listaiLogo} alt="ListAI" className="w-7 h-7 rounded-sm" />
           <span className="font-display text-base font-bold tracking-tight">ListAI workspace</span>
           {isSubscribed && (
@@ -424,18 +411,6 @@ export default function Home() {
           )}
         </div>
         <div className="flex items-center gap-2" data-testid="user-button-container">
-          {!isSubscribed && (
-            <Button
-              data-testid="button-upgrade-header"
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20"
-              onClick={toggleSidebar}
-            >
-              <Crown className="w-3.5 h-3.5 mr-1.5" />
-              Upgrade to Pro
-            </Button>
-          )}
           <ModeToggle />
           <UserButton
             appearance={{
@@ -509,6 +484,44 @@ export default function Home() {
                 </section>
               </div>
             </ScrollArea>
+
+            {/* Subscribe footer pinned at bottom */}
+            <div className="p-3 border-t border-border shrink-0">
+              {isSubscribed ? (
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/20">
+                  <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium">ListAI Pro</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {subscriptionStatus?.currentPeriodEnd
+                        ? `Renews ${new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()}`
+                        : 'Active'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  data-testid="button-sidebar-subscribe"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
+                  onClick={() => {
+                    createSubscriptionCheckout.mutate(undefined, {
+                      onSuccess: (data: any) => {
+                        if (data.checkoutUrl) {
+                          if (data.sessionId) localStorage.setItem('listai_checkout_session_id', data.sessionId);
+                          window.location.href = data.checkoutUrl;
+                        }
+                      },
+                    });
+                  }}
+                  disabled={createSubscriptionCheckout.isPending}
+                >
+                  {createSubscriptionCheckout.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Crown className="w-3.5 h-3.5" />}
+                  <span>Upgrade to Pro · £30/mo</span>
+                </button>
+              )}
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
