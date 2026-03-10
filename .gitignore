@@ -15,3 +15,5 @@ vite.config.ts.*
 .config
 .local
 .gemini
+.env.vercel.prod
+.env.vercel.local

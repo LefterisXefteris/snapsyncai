@@ -23,6 +23,8 @@ import listaiLogo from "../assets/listai-logo.png";
 import { dark } from "@clerk/themes";
 import type { Image } from "@shared/schema";
 import { ModeToggle } from "@/components/mode-toggle";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Home() {
   const { data: images, isLoading } = useImages();
@@ -399,456 +401,311 @@ export default function Home() {
   }, [images]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-8">
-
-        <header className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2.5">
+    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+      <header className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 relative">
+        <div className="flex items-center gap-2.5">
+          <Button
+            data-testid="button-sidebar-toggle"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={toggleSidebar}
+          >
+            <PanelLeft className="w-4 h-4" />
+          </Button>
+          <img src={listaiLogo} alt="ListAI" className="w-7 h-7 rounded-sm" />
+          <span className="font-display text-base font-bold tracking-tight">ListAI workspace</span>
+          {isSubscribed && (
+            <Badge variant="outline" className="no-default-active-elevate text-[10px] h-5 py-0 px-1.5" data-testid="badge-pro">
+              <Crown className="w-2.5 h-2.5 mr-0.5" />
+              Pro
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2" data-testid="user-button-container">
+          {!isSubscribed && (
             <Button
-              data-testid="button-sidebar-toggle"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+              data-testid="button-upgrade-header"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20"
               onClick={toggleSidebar}
             >
-              <PanelLeft className="w-4 h-4" />
+              <Crown className="w-3.5 h-3.5 mr-1.5" />
+              Upgrade to Pro
             </Button>
-            <img src={listaiLogo} alt="ListAI" className="w-8 h-8 rounded-md" />
-            <span className="font-display text-lg font-bold tracking-tight">ListAI</span>
-            {isSubscribed && (
-              <Badge variant="outline" className="no-default-active-elevate" data-testid="badge-pro">
-                <Crown className="w-3 h-3 mr-1" />
-                Pro
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-3" data-testid="user-button-container">
-            {!isSubscribed && (
-              <Button
-                data-testid="button-upgrade-header"
-                variant="outline"
-                size="sm"
-                onClick={toggleSidebar}
-              >
-                <Crown className="w-3.5 h-3.5 mr-1.5" />
-                Upgrade to Pro
-              </Button>
-            )}
-            <UserButton
-              appearance={{
-                baseTheme: dark,
-                elements: {
-                  avatarBox: "w-8 h-8",
-                },
-              }}
-            />
-            <ModeToggle />
-          </div>
-        </header>
-
-        <Separator />
-
-        <section className="text-center space-y-4">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-3xl md:text-4xl font-display font-bold tracking-tight"
-          >
-            From Photo to Product{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">in Seconds.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="max-w-2xl mx-auto text-sm text-muted-foreground"
-          >
-            Drop your product photos and let AI build ready-to-sell listings for Shopify, Etsy & Amazon.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center justify-center gap-3 flex-wrap"
-          >
-            {shopifyStatus?.connected ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="no-default-active-elevate">
-                  <Store className="w-3 h-3 mr-1.5" />
-                  Shopify: {shopifyStatus.shopName}
-                </Badge>
-                <Button
-                  data-testid="button-disconnect-shopify"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDisconnect}
-                  disabled={shopifyDisconnect.isPending}
-                >
-                  <Unplug className="w-3.5 h-3.5 mr-1" />
-                  Disconnect
-                </Button>
-              </div>
-            ) : (
-              <Button
-                data-testid="button-connect-shopify"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowConnectDialog(true)}
-              >
-                <Store className="w-4 h-4 mr-2" />
-                Connect Shopify
-              </Button>
-            )}
-
-            {etsyStatus?.connected ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="no-default-active-elevate">
-                  <Store className="w-3 h-3 mr-1.5" />
-                  Etsy: {etsyStatus.shopName}
-                </Badge>
-                <Button
-                  data-testid="button-disconnect-etsy"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleEtsyDisconnect}
-                  disabled={etsyDisconnect.isPending}
-                >
-                  <Unplug className="w-3.5 h-3.5 mr-1" />
-                  Disconnect
-                </Button>
-              </div>
-            ) : (
-              <Button
-                data-testid="button-connect-etsy"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowEtsyConnectDialog(true)}
-              >
-                <Store className="w-4 h-4 mr-2" />
-                Connect Etsy
-              </Button>
-            )}
-
-            {amazonStatus?.connected ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="no-default-active-elevate">
-                  <Store className="w-3 h-3 mr-1.5" />
-                  Amazon: {amazonStatus.sellerName}
-                </Badge>
-                <Button
-                  data-testid="button-disconnect-amazon"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleAmazonDisconnect}
-                  disabled={amazonDisconnect.isPending}
-                >
-                  <Unplug className="w-3.5 h-3.5 mr-1" />
-                  Disconnect
-                </Button>
-              </div>
-            ) : (
-              <Button
-                data-testid="button-connect-amazon"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAmazonConnectDialog(true)}
-              >
-                <Store className="w-4 h-4 mr-2" />
-                Connect Amazon
-              </Button>
-            )}
-
-            {instagramStatus?.connected ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="no-default-active-elevate">
-                  <Instagram className="w-3 h-3 mr-1.5" />
-                  @{instagramStatus.username}
-                </Badge>
-                <Button
-                  data-testid="button-import-instagram"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleInstagramImport}
-                  disabled={instagramImport.isPending}
-                >
-                  {instagramImport.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <ImageDown className="w-3.5 h-3.5 mr-1" />
-                  )}
-                  Import Posts
-                </Button>
-                <Button
-                  data-testid="button-disconnect-instagram"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleInstagramDisconnect}
-                  disabled={instagramDisconnect.isPending}
-                >
-                  <Unplug className="w-3.5 h-3.5 mr-1" />
-                  Disconnect
-                </Button>
-              </div>
-            ) : (
-              <Button
-                data-testid="button-connect-instagram"
-                variant="outline"
-                size="sm"
-                onClick={instagramOAuthConfig?.configured ? handleInstagramOAuth : () => setShowInstagramConnectDialog(true)}
-                disabled={instagramOAuthStart.isPending}
-              >
-                {instagramOAuthStart.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Instagram className="w-4 h-4 mr-2" />
-                )}
-                Connect Instagram
-              </Button>
-            )}
-          </motion.div>
-        </section>
-
-        <motion.section
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <UploadZone onUploadingChange={setUploadingFiles} />
-        </motion.section>
-
-        {unlockImages.isPending && (
-          <Card data-testid="card-unlocking-progress">
-            <CardContent className="flex items-center gap-3 pt-6">
-              <Loader2 className="w-5 h-5 animate-spin shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">Running Full AI Analysis...</p>
-                <p className="text-xs text-muted-foreground">
-                  Generating detailed descriptions, pricing, SEO data, and variants for your products. This may take a moment.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {isSubscribed && unpaidImages.length > 0 && (
-          <Card data-testid="card-unlock-banner">
-            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">
-                    {unpaidImages.length} Product{unpaidImages.length !== 1 ? 's' : ''} Need Full Analysis
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    These products were uploaded before your subscription. Analyze them now to get full descriptions, pricing, SEO & variants.
-                  </p>
-                </div>
-              </div>
-              <Button
-                data-testid="button-unlock-all"
-                onClick={handleUnlockAll}
-                disabled={unlockImages.isPending}
-                className="shrink-0"
-              >
-                {unlockImages.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Analyze All
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        <section className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
-                <History className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-display font-semibold">Products</h2>
-                <p className="text-xs text-muted-foreground">
-                  {images?.length || 0} total &middot; {unpaidImages.length} locked &middot; {pendingCount} pending review &middot; {syncedCount} Shopify &middot; {etsySyncedCount} Etsy &middot; {amazonSyncedCount} Amazon &middot; {instagramPostedCount} Instagram
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {images && images.length > 0 && (
-                <>
-                  {pendingCount > 0 && (
-                    <Button
-                      data-testid="button-review-queue"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowReviewQueue(true)}
-                    >
-                      <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
-                      Review Queue ({pendingCount})
-                    </Button>
-                  )}
-
-                  <Button
-                    data-testid="button-select-all"
-                    variant="outline"
-                    size="sm"
-                    onClick={selectedIds.size === images.length ? deselectAll : selectAll}
-                  >
-                    <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
-                    {selectedIds.size === images.length ? "Deselect All" : "Select All"}
-                  </Button>
-
-                  <Button
-                    data-testid="button-download-json"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadAllJson}
-                  >
-                    <Download className="w-3.5 h-3.5 mr-1.5" />
-                    Export JSON
-                  </Button>
-
-                  <Button
-                    data-testid="button-push-shopify"
-                    size="sm"
-                    onClick={handlePushToShopify}
-                    disabled={selectedIds.size === 0 || pushToShopify.isPending || !shopifyStatus?.connected}
-                  >
-                    {pushToShopify.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Store className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Push to Shopify ({selectedIds.size})
-                  </Button>
-
-                  <Button
-                    data-testid="button-push-etsy"
-                    size="sm"
-                    variant="secondary"
-                    onClick={handlePushToEtsy}
-                    disabled={selectedIds.size === 0 || pushToEtsy.isPending || !etsyStatus?.connected}
-                  >
-                    {pushToEtsy.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Store className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Push to Etsy ({selectedIds.size})
-                  </Button>
-
-                  <Button
-                    data-testid="button-push-amazon"
-                    size="sm"
-                    variant="secondary"
-                    onClick={handlePushToAmazon}
-                    disabled={selectedIds.size === 0 || pushToAmazon.isPending || !amazonStatus?.connected}
-                  >
-                    {pushToAmazon.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Store className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Push to Amazon ({selectedIds.size})
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <Separator />
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i}>
-                  <CardContent className="p-0">
-                    <Skeleton className="h-40 w-full rounded-t-md rounded-b-none" />
-                    <div className="p-4 space-y-3">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                      <Skeleton className="h-3 w-full" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : images && images.length > 0 ? (
-            <div className="space-y-12">
-              {uploadingFiles.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-xl font-display font-semibold flex items-center gap-2">
-                    <Badge variant="secondary" className="px-2 py-0.5 text-sm bg-primary/20 text-primary hover:bg-primary/30 border-primary/20">
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      Uploading
-                    </Badge>
-                    <span className="text-muted-foreground text-sm font-normal">
-                      {uploadingFiles.length} item{uploadingFiles.length !== 1 ? 's' : ''}
-                    </span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {uploadingFiles.map((file, idx) => (
-                      <Card key={`uploading-${idx}`} className="overflow-hidden border-primary/20 bg-primary/5">
-                        <CardContent className="p-0">
-                          <div className="h-40 w-full flex items-center justify-center bg-black/40">
-                            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                          </div>
-                          <div className="p-4 space-y-3">
-                            <Skeleton className="h-4 w-3/4 opacity-50" />
-                            <Skeleton className="h-3 w-1/2 opacity-50" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {Object.entries(groupedImages).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryImages]) => (
-                <div key={category} className="space-y-4">
-                  <h3 className="text-xl font-display font-semibold flex items-center gap-2">
-                    <Badge variant="secondary" className="px-2 py-0.5 text-sm">{category}</Badge>
-                    <span className="text-muted-foreground text-sm font-normal">{(categoryImages as Image[]).length} item{(categoryImages as Image[]).length !== 1 ? 's' : ''}</span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {(categoryImages as Image[]).map((image: Image, idx: number) => (
-                      <ImageCard
-                        key={image.id}
-                        image={image}
-                        index={idx}
-                        selected={selectedIds.has(image.id)}
-                        onSelect={handleSelect}
-                        instagramConnected={!!instagramStatus?.connected}
-                        onInstagramPost={openInstagramPostDialog}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Card data-testid="card-empty-state">
-              <CardContent className="text-center py-16">
-                <div className="w-14 h-14 rounded-md bg-muted flex items-center justify-center mx-auto mb-4">
-                  <BrainCircuit className="w-7 h-7 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium mb-1">No products yet</h3>
-                <p className="text-sm text-muted-foreground">Upload product images above to get started.</p>
-              </CardContent>
-            </Card>
           )}
-        </section>
+          <ModeToggle />
+          <UserButton
+            appearance={{
+              baseTheme: dark,
+              elements: {
+                avatarBox: "w-7 h-7",
+              },
+            }}
+          />
+        </div>
+      </header>
+
+      <div className="flex-1 min-h-0 relative">
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="flex flex-col border-r h-full bg-muted/20">
+            <ScrollArea className="flex-1 h-full">
+              <div className="p-4 space-y-6">
+
+                <section className="space-y-4">
+                  <h2 className="text-sm font-semibold tracking-tight">Upload Product Image</h2>
+                  <UploadZone onUploadingChange={setUploadingFiles} />
+                </section>
+
+                <Separator />
+
+                <section className="space-y-4">
+                  <h2 className="text-sm font-semibold tracking-tight">Integrations</h2>
+                  <div className="grid grid-cols-1 gap-2">
+                    {shopifyStatus?.connected ? (
+                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center"><Store className="w-3 h-3 mr-1.5" /> Shopify</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleDisconnect} disabled={shopifyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => setShowConnectDialog(true)}>
+                        <Store className="w-3.5 h-3.5 mr-2" /> Connect Shopify
+                      </Button>
+                    )}
+
+                    {etsyStatus?.connected ? (
+                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center"><Store className="w-3 h-3 mr-1.5" /> Etsy</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleEtsyDisconnect} disabled={etsyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => setShowEtsyConnectDialog(true)}>
+                        <Store className="w-3.5 h-3.5 mr-2" /> Connect Etsy
+                      </Button>
+                    )}
+
+                    {amazonStatus?.connected ? (
+                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center"><Store className="w-3 h-3 mr-1.5" /> Amazon</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleAmazonDisconnect} disabled={amazonDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => setShowAmazonConnectDialog(true)}>
+                        <Store className="w-3.5 h-3.5 mr-2" /> Connect Amazon
+                      </Button>
+                    )}
+
+                    {instagramStatus?.connected ? (
+                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center"><Instagram className="w-3 h-3 mr-1.5" /> @{instagramStatus.username}</span>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleInstagramImport} disabled={instagramImport.isPending} title="Import Posts"><ImageDown className="w-3 h-3" /></Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleInstagramDisconnect} disabled={instagramDisconnect.isPending} title="Disconnect"><Unplug className="w-3 h-3" /></Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={instagramOAuthConfig?.configured ? handleInstagramOAuth : () => setShowInstagramConnectDialog(true)} disabled={instagramOAuthStart.isPending}>
+                        {instagramOAuthStart.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Instagram className="w-3.5 h-3.5 mr-2" />} Connect Instagram
+                      </Button>
+                    )}
+                  </div>
+                </section>
+              </div>
+            </ScrollArea>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize={75}>
+            <div className="flex flex-col h-full bg-background overflow-hidden relative">
+
+              <div className="p-3 border-b bg-background z-10 sticky top-0">
+                {unlockImages.isPending && (
+                  <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border-primary/20 border p-2 rounded-md mb-2">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span>Running AI Analysis on {unpaidImages.length} products...</span>
+                  </div>
+                )}
+                {isSubscribed && unpaidImages.length > 0 && !unlockImages.isPending && (
+                  <div className="flex items-center justify-between p-2 rounded-md bg-amber-500/10 border border-amber-500/20 mb-2">
+                    <span className="text-xs font-medium flex items-center gap-1.5 text-amber-500">
+                      <Lock className="w-3.5 h-3.5" />
+                      {unpaidImages.length} unanalyzed items
+                    </span>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleUnlockAll}
+                    >
+                      <Zap className="w-3 h-3 mr-1" /> Analyze All
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 no-scrollbar flex-nowrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap hidden lg:inline-block">
+                      {images?.length || 0} items &middot; {selectedIds.size} selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar pb-1">
+                    {images && images.length > 0 && (
+                      <>
+                        {pendingCount > 0 && (
+                          <Button
+                            data-testid="button-review-queue"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowReviewQueue(true)}
+                          >
+                            <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
+                            Review Queue ({pendingCount})
+                          </Button>
+                        )}
+
+                        <Button
+                          data-testid="button-select-all"
+                          variant="outline"
+                          size="sm"
+                          onClick={selectedIds.size === images.length ? deselectAll : selectAll}
+                        >
+                          <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                          {selectedIds.size === images.length ? "Deselect All" : "Select All"}
+                        </Button>
+
+                        <Button
+                          data-testid="button-download-json"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDownloadAllJson}
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1.5" />
+                          Export JSON
+                        </Button>
+
+                        <Button
+                          data-testid="button-push-shopify"
+                          size="sm"
+                          onClick={handlePushToShopify}
+                          disabled={selectedIds.size === 0 || pushToShopify.isPending || !shopifyStatus?.connected}
+                        >
+                          {pushToShopify.isPending ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Store className="w-3.5 h-3.5 mr-1.5" />
+                          )}
+                          Push to Shopify ({selectedIds.size})
+                        </Button>
+
+                        <Button
+                          data-testid="button-push-etsy"
+                          size="sm"
+                          variant="secondary"
+                          onClick={handlePushToEtsy}
+                          disabled={selectedIds.size === 0 || pushToEtsy.isPending || !etsyStatus?.connected}
+                        >
+                          {pushToEtsy.isPending ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Store className="w-3.5 h-3.5 mr-1.5" />
+                          )}
+                          Push to Etsy ({selectedIds.size})
+                        </Button>
+
+                        <Button
+                          data-testid="button-push-amazon"
+                          size="sm"
+                          variant="secondary"
+                          onClick={handlePushToAmazon}
+                          disabled={selectedIds.size === 0 || pushToAmazon.isPending || !amazonStatus?.connected}
+                        >
+                          {pushToAmazon.isPending ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Store className="w-3.5 h-3.5 mr-1.5" />
+                          )}
+                          Push to Amazon ({selectedIds.size})
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 h-full w-full bg-muted/5">
+                <div className="p-4">
+                  {isLoading ? (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                      {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <Card key={i} className="border-border">
+                          <CardContent className="p-0">
+                            <Skeleton className="h-32 w-full rounded-t-md rounded-b-none" />
+                            <div className="p-2 space-y-2">
+                              <Skeleton className="h-3 w-3/4" />
+                              <Skeleton className="h-2 w-1/2" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : images && images.length > 0 ? (
+                    <div className="space-y-6 pb-20">
+                      {uploadingFiles.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                            Uploading ({uploadingFiles.length})
+                          </h3>
+                          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                            {uploadingFiles.map((file, idx) => (
+                              <Card key={`uploading-${idx}`} className="overflow-hidden border-primary/20 bg-primary/5">
+                                <CardContent className="p-0">
+                                  <div className="h-24 w-full flex items-center justify-center bg-black/40">
+                                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {Object.entries(groupedImages).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryImages]) => (
+                        <div key={category} className="space-y-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sticky top-0 py-1 bg-background/80 backdrop-blur z-10 border-b border-white/5">
+                            {category} <span className="opacity-50">({(categoryImages as Image[]).length})</span>
+                          </h3>
+                          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                            {(categoryImages as Image[]).map((image: Image, idx: number) => (
+                              <ImageCard
+                                key={image.id}
+                                image={image}
+                                index={idx}
+                                selected={selectedIds.has(image.id)}
+                                onSelect={handleSelect}
+                                instagramConnected={!!instagramStatus?.connected}
+                                onInstagramPost={openInstagramPostDialog}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-[40vh] flex flex-col items-center justify-center text-center">
+                      <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center mx-auto mb-3">
+                        <BrainCircuit className="w-6 h-6 text-muted-foreground/50" />
+                      </div>
+                      <h3 className="text-sm font-medium">Empty Workspace</h3>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">Upload product images in the left panel to get started.</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
       {images && (
@@ -1282,6 +1139,6 @@ export default function Home() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
