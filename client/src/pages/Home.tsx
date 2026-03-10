@@ -410,17 +410,6 @@ export default function Home() {
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2" data-testid="user-button-container">
-          <ModeToggle />
-          <UserButton
-            appearance={{
-              baseTheme: dark,
-              elements: {
-                avatarBox: "w-7 h-7",
-              },
-            }}
-          />
-        </div>
       </header>
 
       <div className="flex-1 min-h-0 relative">
@@ -498,28 +487,38 @@ export default function Home() {
                         : 'Active'}
                     </p>
                   </div>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <ModeToggle />
+                    <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
+                  </div>
                 </div>
               ) : (
-                <button
-                  data-testid="button-sidebar-subscribe"
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
-                  onClick={() => {
-                    createSubscriptionCheckout.mutate(undefined, {
-                      onSuccess: (data: any) => {
-                        if (data.checkoutUrl) {
-                          if (data.sessionId) localStorage.setItem('listai_checkout_session_id', data.sessionId);
-                          window.location.href = data.checkoutUrl;
-                        }
-                      },
-                    });
-                  }}
-                  disabled={createSubscriptionCheckout.isPending}
-                >
-                  {createSubscriptionCheckout.isPending
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Crown className="w-3.5 h-3.5" />}
-                  <span>Upgrade to Pro · £30/mo</span>
-                </button>
+                <div className="space-y-2">
+                  <button
+                    data-testid="button-sidebar-subscribe"
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
+                    onClick={() => {
+                      createSubscriptionCheckout.mutate(undefined, {
+                        onSuccess: (data: any) => {
+                          if (data.checkoutUrl) {
+                            if (data.sessionId) localStorage.setItem('listai_checkout_session_id', data.sessionId);
+                            window.location.href = data.checkoutUrl;
+                          }
+                        },
+                      });
+                    }}
+                    disabled={createSubscriptionCheckout.isPending}
+                  >
+                    {createSubscriptionCheckout.isPending
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Crown className="w-3.5 h-3.5" />}
+                    <span>Upgrade to Pro · £30/mo</span>
+                  </button>
+                  <div className="flex items-center justify-between px-1">
+                    <ModeToggle />
+                    <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
+                  </div>
+                </div>
               )}
             </div>
           </ResizablePanel>
