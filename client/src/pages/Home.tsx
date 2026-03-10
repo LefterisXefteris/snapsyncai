@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Store, History, BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send } from "lucide-react";
+import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store } from "lucide-react";
+import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
 import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart } from "@/hooks/use-images";
 import { UploadZone } from "@/components/upload-zone";
 import { ImageCard } from "@/components/image-card";
@@ -460,53 +461,48 @@ export default function Home() {
 
                 <Separator />
 
-                <section className="space-y-4">
-                  <h2 className="text-sm font-semibold tracking-tight">Integrations</h2>
-                  <div className="grid grid-cols-1 gap-2">
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold tracking-tight text-muted-foreground uppercase">Integrations</h2>
+                  <div className="grid grid-cols-1 gap-1.5">
                     {shopifyStatus?.connected ? (
-                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center"><Store className="w-3 h-3 mr-1.5" /> Shopify</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleDisconnect} disabled={shopifyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
+                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center gap-1.5">
+                          <SiShopify className="w-3.5 h-3.5 text-[#96BF48]" /> Shopify
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={handleDisconnect} disabled={shopifyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
                       </div>
                     ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => setShowConnectDialog(true)}>
-                        <Store className="w-3.5 h-3.5 mr-2" /> Connect Shopify
+                      <Button variant="outline" size="sm" className="w-full justify-start h-7 text-xs gap-2 px-2.5" onClick={() => setShowConnectDialog(true)}>
+                        <SiShopify className="w-3.5 h-3.5 text-[#96BF48]" /> Shopify
                       </Button>
                     )}
 
                     {etsyStatus?.connected ? (
-                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center"><Store className="w-3 h-3 mr-1.5" /> Etsy</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleEtsyDisconnect} disabled={etsyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
+                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center gap-1.5">
+                          <SiEtsy className="w-3.5 h-3.5 text-[#F56400]" /> Etsy
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={handleEtsyDisconnect} disabled={etsyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
                       </div>
                     ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => setShowEtsyConnectDialog(true)}>
-                        <Store className="w-3.5 h-3.5 mr-2" /> Connect Etsy
-                      </Button>
-                    )}
-
-                    {amazonStatus?.connected ? (
-                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center"><Store className="w-3 h-3 mr-1.5" /> Amazon</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleAmazonDisconnect} disabled={amazonDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => setShowAmazonConnectDialog(true)}>
-                        <Store className="w-3.5 h-3.5 mr-2" /> Connect Amazon
+                      <Button variant="outline" size="sm" className="w-full justify-start h-7 text-xs gap-2 px-2.5" onClick={() => setShowEtsyConnectDialog(true)}>
+                        <SiEtsy className="w-3.5 h-3.5 text-[#F56400]" /> Etsy
                       </Button>
                     )}
 
                     {instagramStatus?.connected ? (
-                      <div className="flex items-center justify-between p-2 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center"><Instagram className="w-3 h-3 mr-1.5" /> @{instagramStatus.username}</span>
+                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/50 border">
+                        <span className="text-xs font-medium flex items-center gap-1.5">
+                          <SiInstagram className="w-3.5 h-3.5 text-[#E1306C]" /> @{instagramStatus.username}
+                        </span>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleInstagramImport} disabled={instagramImport.isPending} title="Import Posts"><ImageDown className="w-3 h-3" /></Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleInstagramDisconnect} disabled={instagramDisconnect.isPending} title="Disconnect"><Unplug className="w-3 h-3" /></Button>
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleInstagramImport} disabled={instagramImport.isPending} title="Import Posts"><ImageDown className="w-3 h-3" /></Button>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={handleInstagramDisconnect} disabled={instagramDisconnect.isPending} title="Disconnect"><Unplug className="w-3 h-3" /></Button>
                         </div>
                       </div>
                     ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={instagramOAuthConfig?.configured ? handleInstagramOAuth : () => setShowInstagramConnectDialog(true)} disabled={instagramOAuthStart.isPending}>
-                        {instagramOAuthStart.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Instagram className="w-3.5 h-3.5 mr-2" />} Connect Instagram
+                      <Button variant="outline" size="sm" className="w-full justify-start h-7 text-xs gap-2 px-2.5" onClick={instagramOAuthConfig?.configured ? handleInstagramOAuth : () => setShowInstagramConnectDialog(true)} disabled={instagramOAuthStart.isPending}>
+                        {instagramOAuthStart.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SiInstagram className="w-3.5 h-3.5 text-[#E1306C]" />} Instagram
                       </Button>
                     )}
                   </div>
