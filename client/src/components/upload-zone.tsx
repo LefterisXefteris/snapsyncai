@@ -129,6 +129,39 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       </div>
 
+      <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-white">
+          <MessageSquare className="w-4 h-4 text-primary" />
+          Custom AI Prompt
+        </div>
+        <Textarea
+          data-testid="input-product-context"
+          value={productContext}
+          onChange={(e) => setProductContext(e.target.value)}
+          placeholder="Custom instructions for SEO, AEO tags, descriptions, etc. E.g., 'Target audience: men 25-45. Focus on durability and classic style.'"
+          className="bg-black/30 border-white/10 text-white text-sm resize-none min-h-[80px]"
+          rows={3}
+        />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Mic className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Voice:</span>
+          </div>
+          <Select value={brandTone} onValueChange={setBrandTone}>
+            <SelectTrigger data-testid="select-brand-tone" className="w-[140px] h-8 bg-black/30 border-white/10 text-white text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TONES.map(t => (
+                <SelectItem key={t.value} value={t.value} className="text-xs">
+                  {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <AnimatePresence>
         {(files.length > 0 || isUploading) && (
           <motion.div
@@ -137,39 +170,6 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             exit={{ opacity: 0, height: 0 }}
             className="space-y-4"
           >
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-white">
-                <MessageSquare className="w-4 h-4 text-primary" />
-                Describe Your Products
-              </div>
-              <Textarea
-                data-testid="input-product-context"
-                value={productContext}
-                onChange={(e) => setProductContext(e.target.value)}
-                placeholder="Tell the AI about your products to get better results. E.g., 'Handmade leather wallets made from Italian full-grain leather. Target audience: men 25-45 who appreciate craftsmanship. Price range $80-$150. Emphasize durability and classic style.'"
-                className="bg-black/30 border-white/10 text-white text-sm resize-none min-h-[80px]"
-                rows={3}
-              />
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Mic className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Brand Voice:</span>
-                </div>
-                <Select value={brandTone} onValueChange={setBrandTone}>
-                  <SelectTrigger data-testid="select-brand-tone" className="w-[180px] bg-black/30 border-white/10 text-white text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TONES.map(t => (
-                      <SelectItem key={t.value} value={t.value}>
-                        <span>{t.label}</span>
-                        <span className="text-muted-foreground ml-1.5 text-xs">- {t.desc}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
             <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
               <div className="flex-1">
