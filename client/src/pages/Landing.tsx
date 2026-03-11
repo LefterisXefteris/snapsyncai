@@ -249,7 +249,7 @@ export default function Landing() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
       {/* ── NAV ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/80" aria-label="Main navigation">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={snapsyncaiLogo} alt="SnapSync AI logo" className="w-8 h-8 rounded-md" width="32" height="32" />

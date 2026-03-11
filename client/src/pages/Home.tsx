@@ -399,7 +399,7 @@ export default function Home() {
 
   return (
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
-      <header className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 relative">
+      <header className="h-14 flex items-center justify-between px-4 shrink-0 bg-transparent z-10 relative">
         <div className="flex items-center gap-2.5">
           <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-7 h-7 rounded-sm" />
           <span className="font-display text-base font-bold tracking-tight">SnapSync AI workspace</span>
