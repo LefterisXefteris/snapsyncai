@@ -2052,6 +2052,9 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
 
       // Fetch the raw image buffer
       let imageBuffer = imageBuffers.get(id);
+      if (!imageBuffer && image.imageData) {
+        imageBuffer = Buffer.from(image.imageData, 'base64');
+      }
       if (!imageBuffer) {
         return res.status(404).json({ message: "Image file not available on this server instance. Please re-upload." });
       }
