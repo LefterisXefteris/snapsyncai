@@ -56,6 +56,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [bgEditUrl, setBgEditUrl] = useState<string | null>(null);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [photoshootStyle, setPhotoshootStyle] = useState(VALID_STYLES[0]);
+  const [imageKey, setImageKey] = useState(Date.now());
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -124,13 +125,18 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         onSuccess: () => {
           setBgEditKey(null);
           setBgEditUrl(null);
+          setImageKey(Date.now());
         }
       }
     );
   };
 
   const handleApplyConcept = (url: string) => {
-    applyImageMutation.mutate({ id: image.id, imageUrl: url });
+    applyImageMutation.mutate({ id: image.id, imageUrl: url }, {
+      onSuccess: () => {
+        setImageKey(Date.now());
+      }
+    });
   };
 
   const handleSave = () => {
@@ -470,7 +476,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               <CardContent className="p-4 flex flex-col items-center justify-center">
                 <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
                   <img
-                    src={bgEditUrl ?? `/api/images/${image.id}/file?t=${new Date(image.createdAt || Date.now()).getTime()}`}
+                    src={bgEditUrl ?? `/api/images/${image.id}/file?t=${imageKey}`}
                     alt={image.altText || image.title || "Product Image"}
                     className="w-full h-full object-contain"
                   />

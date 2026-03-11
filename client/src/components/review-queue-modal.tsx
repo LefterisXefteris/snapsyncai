@@ -250,7 +250,7 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                     <div className="flex items-start gap-4">
                       <div className="w-24 h-24 rounded-md bg-muted/30 border border-border flex items-center justify-center flex-shrink-0 overflow-hidden relative">
                         <img
-                          src={`/api/images/${currentImage.id}/file`}
+                          src={`/api/images/${currentImage.id}/file?sz=${currentImage.size}&t=${new Date(currentImage.createdAt || Date.now()).getTime()}`}
                           alt={currentImage.altText || currentImage.title || currentImage.originalName}
                           className="absolute inset-0 w-full h-full object-cover"
                           loading="lazy"
