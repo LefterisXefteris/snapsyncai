@@ -1,13 +1,25 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useUpdateImage } from "@/hooks/use-images";
+import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, Lock, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download } from "lucide-react";
+
+const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
+
+const BG_STYLES = [
+  { key: "studio",    label: "Studio",    color: "#f8f8f8" },
+  { key: "gradient",  label: "Gradient",  color: "#9333ea" },
+  { key: "lifestyle", label: "Lifestyle", color: "#84cc16" },
+  { key: "minimal",   label: "Minimal",   color: "#e5e5e5" },
+  { key: "dark",      label: "Dark",      color: "#1c1c1c" },
+] as const;
 
 export default function ProductDetails({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
@@ -23,6 +35,12 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [seoDescription, setSeoDescription] = useState("");
   const [altText, setAltText] = useState("");
   const [aeoSnippet, setAeoSnippet] = useState("");
+
+  const editBackgroundMutation = useEditBackground();
+  const generatePhotoshootMutation = useGeneratePhotoshoot();
+  const [bgEditUrl, setBgEditUrl] = useState<string | null>(null);
+  const [showBgPicker, setShowBgPicker] = useState(false);
+  const [photoshootStyle, setPhotoshootStyle] = useState(VALID_STYLES[0]);
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -59,6 +77,19 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   }
 
   const isUnpaid = image.paymentStatus !== "paid";
+  const backgrounds = Array.isArray(image?.generatedBackgrounds) ? (image.generatedBackgrounds as string[]) : [];
+
+  const handleEditBackground = (style: string) => {
+    setShowBgPicker(false);
+    editBackgroundMutation.mutate(
+      { id: image.id, style },
+      {
+        onSuccess: (data) => {
+          setBgEditUrl(data.url);
+        },
+      }
+    );
+  };
 
   const handleSave = () => {
     updateMutation.mutate(
@@ -164,13 +195,115 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 <CardTitle className="text-base font-medium">Media</CardTitle>
               </CardHeader>
               <CardContent className="p-6 pt-0">
-                <div className="border rounded-md border-dashed border-muted-foreground/30 p-2 text-center bg-muted/5">
+                <div className="border rounded-md border-dashed border-muted-foreground/30 p-2 text-center bg-muted/5 relative overflow-hidden group">
                   <img
-                    src={`/api/images/${image.id}/file`}
+                    src={bgEditUrl ?? `/api/images/${image.id}/file`}
                     alt={altText || title}
                     className="max-h-[300px] mx-auto rounded-sm object-contain"
                   />
+
+                  {/* AI editing spinner overlay */}
+                  {editBackgroundMutation.isPending && (
+                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 gap-2">
+                      <Wand2 className="w-6 h-6 text-primary animate-pulse" />
+                      <span className="text-xs font-medium">Editing background…</span>
+                    </div>
+                  )}
+
+                  {/* Background style picker */}
+                  {showBgPicker && !editBackgroundMutation.isPending && (
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 p-3">
+                      <p className="text-sm font-semibold">Select Background</p>
+                      <div className="flex flex-wrap gap-2 justify-center max-w-[250px]">
+                        {BG_STYLES.map((s) => (
+                          <button
+                            key={s.key}
+                            onClick={() => handleEditBackground(s.key)}
+                            className="flex flex-col items-center gap-1 group/btn"
+                            title={s.label}
+                          >
+                            <span
+                              className="w-8 h-8 rounded-full border border-border group-hover/btn:border-primary group-hover/btn:scale-110 transition-all block shadow-sm"
+                              style={{ background: s.color }}
+                            />
+                            <span className="text-[10px] text-muted-foreground group-hover/btn:text-foreground">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => setShowBgPicker(false)} className="mt-2 h-7 text-xs">Cancel</Button>
+                    </div>
+                  )}
                 </div>
+                {!isUnpaid && (
+                  <div className="flex items-center gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`flex-1 ${showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''}`}
+                      onClick={() => setShowBgPicker(v => !v)}
+                      disabled={editBackgroundMutation.isPending}
+                    >
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      AI Background
+                    </Button>
+                    
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="flex-1 text-purple-600 hover:text-purple-700 hover:bg-purple-100/50">
+                          <ImageIcon className="w-4 h-4 mr-2" />
+                          AI Photoshoot
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl">
+                        <DialogHeader>
+                          <DialogTitle>AI Concept Generator</DialogTitle>
+                          <DialogDescription>
+                            Generate high-quality 4k photorealistic environments based on "{image.title}".
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="flex items-center gap-3 py-4">
+                          <Select value={photoshootStyle} onValueChange={setPhotoshootStyle}>
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue placeholder="Select Style" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {VALID_STYLES.map(style => (
+                                <SelectItem key={style} value={style}>{style}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Button
+                            onClick={() => generatePhotoshootMutation.mutate({ id: image.id, style: photoshootStyle })}
+                            disabled={generatePhotoshootMutation.isPending}
+                          >
+                            {generatePhotoshootMutation.isPending ? "Rendering (10-15s)..." : "Generate Concept"}
+                          </Button>
+                        </div>
+
+                        {backgrounds.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium mb-3 text-muted-foreground">Generated Concepts</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2">
+                              {backgrounds.map((url, i) => (
+                                <div key={i} className="relative group/concept rounded-lg overflow-hidden border aspect-square">
+                                  <img src={url} alt="Generated Concept" className="w-full h-full object-cover" loading="lazy" />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Button size="sm" variant="secondary" onClick={() => window.open(url, '_blank')}>
+                                      <Download className="w-3.5 h-3.5 mr-1.5" />
+                                      Download Hires
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
