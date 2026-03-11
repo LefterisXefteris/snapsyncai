@@ -8,6 +8,7 @@ import { dark } from "@clerk/themes";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
+import ProductDetails from "@/pages/ProductDetails";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -24,6 +25,7 @@ function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/product/:id" component={ProductDetails} />
       <Route component={NotFound} />
     </Switch>
   );
