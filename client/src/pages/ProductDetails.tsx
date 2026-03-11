@@ -163,32 +163,32 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div className="min-h-screen bg-muted/10 pb-20">
+    <div className="min-h-screen bg-muted/10 pb-12">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-lg font-semibold truncate max-w-[200px] md:max-w-md">
+            <h1 className="text-sm font-semibold truncate max-w-[200px] md:max-w-md">
               {title || "Unnamed Product"}
             </h1>
             {image.shopifyStatus === "synced" && (
-              <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20">
+              <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[10px] h-5 px-1.5">
                 Synced
               </Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setLocation("/")}>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLocation("/")}>
               Discard
             </Button>
-            <Button onClick={handleSave} disabled={updateMutation.isPending || isUnpaid}>
+            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending || isUnpaid}>
               {updateMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               ) : (
-                <Check className="w-4 h-4 mr-2" />
+                <Check className="w-3 h-3 mr-1" />
               )}
               Save
             </Button>
@@ -196,36 +196,37 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-4">
         {isUnpaid && (
-          <div className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center gap-3">
-            <Lock className="w-5 h-5 shrink-0" />
+          <div className="mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center gap-2">
+            <Lock className="w-4 h-4 shrink-0" />
             <div>
-              <p className="font-medium text-sm">This product is in preview mode.</p>
-              <p className="text-xs opacity-80">
+              <p className="font-medium text-xs">This product is in preview mode.</p>
+              <p className="text-[10px] opacity-80">
                 Subscribe to unlock full descriptions, pricing, SEO metadata, and variants.
               </p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Main Content Column */}
-          <div className="md:col-span-2 space-y-6">
+          <div className="md:col-span-2 space-y-4">
             <Card className="shadow-sm">
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Title</label>
+              <CardContent className="p-4 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Title</label>
                   <Input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={isUnpaid}
                     placeholder="Short sleeve t-shirt"
+                    className="h-8 text-sm"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Description</label>
+                    <label className="text-xs font-medium">Description</label>
                     {!isUnpaid && (
                       <div className="flex items-center gap-1">
                         <Button 
@@ -255,78 +256,78 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     disabled={isUnpaid || rewriteDescriptionMutation.isPending}
-                    rows={8}
+                    rows={5}
                     placeholder="Product description..."
-                    className="resize-y"
+                    className="resize-y text-sm"
                   />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-muted-foreground" />
+              <CardHeader className="px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
                   Pricing
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Price</label>
+              <CardContent className="p-4 pt-0 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Price</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                       <Input
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         disabled={isUnpaid}
-                        className="pl-7"
+                        className="pl-6 h-8 text-sm"
                         placeholder="0.00"
                         type="number"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Compare-at price</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Compare-at price</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                       <Input
                         value={compareAtPrice}
                         onChange={(e) => setCompareAtPrice(e.target.value)}
                         disabled={isUnpaid}
-                        className="pl-7"
+                        className="pl-6 h-8 text-sm"
                         placeholder="0.00"
                         type="number"
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground pt-1">To show a reduced price, move the original price here.</p>
+                    <p className="text-[9px] text-muted-foreground pt-0.5 leading-none">To show a reduced price, move the original price here.</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Cost per item</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Cost per item</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                       <Input
                         value={costPerItem}
                         onChange={(e) => setCostPerItem(e.target.value)}
                         disabled={isUnpaid}
-                        className="pl-7"
+                        className="pl-6 h-8 text-sm"
                         placeholder="0.00"
                         type="number"
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground pt-1">Customers won't see this.</p>
+                    <p className="text-[9px] text-muted-foreground pt-0.5 leading-none">Customers won't see this.</p>
                   </div>
                 </div>
 
                 {price && costPerItem && !isNaN(Number(price)) && !isNaN(Number(costPerItem)) && Number(price) > 0 && (
-                  <div className="flex items-center gap-4 mt-2 p-3 bg-muted/50 rounded-md border border-border/50">
+                  <div className="flex items-center gap-4 mt-2 p-2 bg-muted/50 rounded-md border border-border/50">
                     <div className="flex flex-col">
-                      <span className="text-xs text-muted-foreground">Profit</span>
-                      <span className="text-sm font-medium">${(Number(price) - Number(costPerItem)).toFixed(2)}</span>
+                      <span className="text-[10px] text-muted-foreground">Profit</span>
+                      <span className="text-xs font-medium">${(Number(price) - Number(costPerItem)).toFixed(2)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-xs text-muted-foreground">Margin</span>
-                      <span className="text-sm font-medium">{(((Number(price) - Number(costPerItem)) / Number(price)) * 100).toFixed(1)}%</span>
+                      <span className="text-[10px] text-muted-foreground">Margin</span>
+                      <span className="text-xs font-medium">{(((Number(price) - Number(costPerItem)) / Number(price)) * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 )}
@@ -334,52 +335,55 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Box className="w-4 h-4 text-muted-foreground" />
+              <CardHeader className="px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Box className="w-3.5 h-3.5 text-muted-foreground" />
                   Inventory
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-6">
-                <div className="flex items-center space-x-2 pb-2 border-b border-border/50">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center space-x-2 pb-3 border-b border-border/50">
                   <Checkbox 
                     id="trackQuantity" 
                     checked={trackQuantity} 
                     onCheckedChange={(checked) => setTrackQuantity(checked as boolean)}
                     disabled={isUnpaid}
+                    className="w-4 h-4"
                   />
                   <label
                     htmlFor="trackQuantity"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
                     Track quantity
                   </label>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">SKU (Stock Keeping Unit)</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">SKU (Stock Keeping Unit)</label>
                     <Input
                       value={sku}
                       onChange={(e) => setSku(e.target.value)}
                       disabled={isUnpaid}
                       placeholder="e.g. TSHIRT-RED-L"
+                      className="h-8 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Barcode (ISBN, UPC, GTIN, etc.)</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Barcode (ISBN, UPC, GTIN, etc.)</label>
                     <Input
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
                       disabled={isUnpaid}
                       placeholder="000000000000"
+                      className="h-8 text-sm"
                     />
                   </div>
                 </div>
 
                 {trackQuantity && (
-                  <div className="space-y-2 pt-2 border-t border-border/50 mt-4">
-                    <label className="text-sm font-medium flex items-center gap-2 text-foreground">
+                  <div className="space-y-1.5 pt-3 border-t border-border/50 mt-1">
+                    <label className="text-xs font-medium flex items-center gap-2 text-foreground">
                       Quantity available
                     </label>
                     <Input
@@ -387,7 +391,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       value={inventoryQuantity}
                       onChange={(e) => setInventoryQuantity(Number(e.target.value))}
                       disabled={isUnpaid}
-                      className="max-w-[150px]"
+                      className="max-w-[120px] h-8 text-sm"
                     />
                   </div>
                 )}
@@ -395,47 +399,47 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Box className="w-4 h-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Box className="w-3.5 h-3.5 text-muted-foreground" />
                   Variants
                 </CardTitle>
-                <Button variant="ghost" size="sm" disabled={isUnpaid} className="h-8 text-primary">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add options like size or color
+                <Button variant="ghost" size="sm" disabled={isUnpaid} className="h-6 text-[11px] text-primary px-2">
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add options
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
                 {variants.length > 0 ? (
-                  <Table>
+                  <Table className="text-xs">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Variant</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Available</TableHead>
-                        <TableHead>SKU</TableHead>
+                      <TableRow className="h-8">
+                        <TableHead className="h-8 py-1">Variant</TableHead>
+                        <TableHead className="h-8 py-1">Price</TableHead>
+                        <TableHead className="h-8 py-1">Available</TableHead>
+                        <TableHead className="h-8 py-1">SKU</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {/* Very naive combination for preview purposes */}
                       {variants.map(v => v.values).flat().map((val, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="font-medium whitespace-nowrap">{val}</TableCell>
-                          <TableCell>
-                            <Input defaultValue={price} disabled={isUnpaid} className="h-8 w-24" />
+                        <TableRow key={i} className="h-10">
+                          <TableCell className="font-medium whitespace-nowrap py-1">{val}</TableCell>
+                          <TableCell className="py-1">
+                            <Input defaultValue={price} disabled={isUnpaid} className="h-7 w-20 text-xs" />
                           </TableCell>
-                          <TableCell>
-                            <Input type="number" defaultValue={inventoryQuantity} disabled={isUnpaid} className="h-8 w-20" />
+                          <TableCell className="py-1">
+                            <Input type="number" defaultValue={inventoryQuantity} disabled={isUnpaid} className="h-7 w-16 text-xs" />
                           </TableCell>
-                          <TableCell>
-                            <Input defaultValue={`${sku}-${val.toUpperCase().replace(/\s/g, '')}`} disabled={isUnpaid} className="h-8 min-w-[120px]" />
+                          <TableCell className="py-1">
+                            <Input defaultValue={`${sku}-${val.toUpperCase().replace(/\s/g, '')}`} disabled={isUnpaid} className="h-7 min-w-[100px] text-xs" />
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-6 text-sm text-muted-foreground border-t border-border">
+                  <div className="p-4 text-xs text-muted-foreground">
                     This product has no variants. Click the button above to add options like size or color.
                   </div>
                 )}
@@ -443,8 +447,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Main Media & Gallery</CardTitle>
+              <CardHeader className="px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium">Main Media & Gallery</CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex flex-col items-center justify-center">
                 <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
@@ -589,32 +593,32 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           </div>
 
           {/* Sidebar Column */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Status</CardTitle>
+              <CardHeader className="px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium">Status</CardTitle>
               </CardHeader>
-              <CardContent className="p-6 pt-0">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isUnpaid ? 'bg-amber-400' : 'bg-green-500'}`} />
-                  <span className="text-sm">{isUnpaid ? "Preview" : "Active"}</span>
+                  <span className="text-xs font-medium">{isUnpaid ? "Preview" : "Active"}</span>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Organization</CardTitle>
+              <CardHeader className="px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium">Organization</CardTitle>
               </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Product category</label>
+              <CardContent className="p-4 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Product category</label>
                   <Select
                     value={category}
                     onValueChange={setCategory}
                     disabled={isUnpaid}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8 text-sm">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -626,61 +630,64 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Product type</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Product type</label>
                   <Input
                     value={productType}
                     onChange={(e) => setProductType(e.target.value)}
                     disabled={isUnpaid}
                     placeholder="e.g. T-Shirt"
+                    className="h-8 text-sm"
                   />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Search engine listing</CardTitle>
-                <CardDescription>Edit how your product shows up in search results.</CardDescription>
+              <CardHeader className="px-4 py-3 border-b border-border/50">
+                <CardTitle className="text-sm font-medium">Search engine listing</CardTitle>
+                <CardDescription className="text-[10px]">Edit how your product shows up in search results.</CardDescription>
               </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-4">
+              <CardContent className="p-4 space-y-3">
                 {/* Google Snippet Preview */}
-                <div className="p-4 bg-background border rounded-md font-sans mb-4">
-                  <div className="text-xs text-[#202124] mb-1 flex items-center gap-1 opacity-70">
-                    <span className="w-3 h-3 rounded-full bg-primary/20 flex items-center justify-center text-[8px]">S</span>
+                <div className="p-3 bg-background border rounded-md font-sans mb-2">
+                  <div className="text-[10px] text-[#202124] mb-1 flex items-center gap-1 opacity-70">
+                    <span className="w-2.5 h-2.5 rounded-full bg-primary/20 flex items-center justify-center text-[6px]">S</span>
                     yourstore.com › products › {title.toLowerCase().replace(/[^a-z0-9]/g, '-')}
                   </div>
-                  <div className="text-[#1a0dab] text-[18px] leading-[1.2] hover:underline cursor-pointer truncate">
+                  <div className="text-[#1a0dab] text-[15px] leading-[1.2] hover:underline cursor-pointer truncate">
                     {seoTitle || title || "Your Product Title"}
                   </div>
-                  <div className="text-[#4d5156] text-[13px] leading-[1.58] mt-1 line-clamp-2">
+                  <div className="text-[#4d5156] text-[11px] leading-[1.5] mt-1 line-clamp-2">
                     {seoDescription || description?.slice(0, 160) || "Add a description to see how it will display to customers in search results. This helps click-through rates."}
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Page Title</label>
-                    <span className="text-xs text-muted-foreground">{seoTitle.length} / 70</span>
+                    <label className="text-xs font-medium">Page Title</label>
+                    <span className="text-[10px] text-muted-foreground">{seoTitle.length} / 70</span>
                   </div>
                   <Input
                     value={seoTitle}
                     onChange={(e) => setSeoTitle(e.target.value)}
                     disabled={isUnpaid}
                     maxLength={70}
+                    className="h-8 text-sm"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Meta Description</label>
-                    <span className="text-xs text-muted-foreground">{seoDescription.length} / 320</span>
+                    <label className="text-xs font-medium">Meta Description</label>
+                    <span className="text-[10px] text-muted-foreground">{seoDescription.length} / 320</span>
                   </div>
                   <Textarea
                     value={seoDescription}
                     onChange={(e) => setSeoDescription(e.target.value)}
                     disabled={isUnpaid}
-                    rows={4}
+                    rows={3}
                     maxLength={320}
+                    className="resize-none text-sm"
                   />
                 </div>
               </CardContent>
