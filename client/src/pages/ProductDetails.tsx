@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription } from "@/hooks/use-images";
+import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus } from "lucide-react";
+import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store } from "lucide-react";
 
 const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
 
@@ -27,6 +27,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
   const { data: images, isLoading } = useImages();
   const updateMutation = useUpdateImage();
+  const pushToShopifyMutation = usePushToShopify();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -181,6 +182,22 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {!isUnpaid && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === 'synced' ? 'bg-secondary/50 text-muted-foreground' : 'bg-[#95bf46]/10 text-[#5e8e3e] border-[#95bf46]/30 hover:bg-[#95bf46]/20'}`}
+                onClick={() => pushToShopifyMutation.mutate([image.id])}
+                disabled={pushToShopifyMutation.isPending || image.shopifyStatus === "synced"}
+              >
+                {pushToShopifyMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Store className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                {image.shopifyStatus === "synced" ? "Synced to Shopify" : "Push to Shopify"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLocation("/")}>
               Discard
             </Button>
