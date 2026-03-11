@@ -107,6 +107,14 @@ const updateSchema = z.object({
   aeoFaqs: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
   aeoSnippet: z.string().optional(),
   variants: z.any().optional(),
+  compareAtPrice: z.string().optional(),
+  costPerItem: z.string().optional(),
+  sku: z.string().optional(),
+  barcode: z.string().optional(),
+  trackQuantity: z.string().optional(),
+  inventoryQuantity: z.number().optional(),
+  mediaGallery: z.array(z.string()).optional(),
+  collections: z.array(z.string()).optional(),
   paymentStatus: z.string().optional(),
   instagramCaption: z.string().optional(),
   instagramStatus: z.string().optional(),
@@ -2137,8 +2145,50 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
 
       res.json(updatedImage);
     } catch (error: any) {
-      console.error("Apply image error:", error);
       res.status(500).json({ message: "Failed to apply image", error: error.message });
+    }
+  });
+
+  app.post("/api/images/:id/rewrite-description", requireAuth(), async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid image ID" });
+
+      const image = await storage.getImage(id);
+      if (!image) return res.status(404).json({ message: "Image not found" });
+
+      const { tone } = req.body;
+      if (!tone) return res.status(400).json({ message: "Tone is required" });
+
+      const tonePrompt = toneInstructions[tone] || `Write in a ${tone} tone.`;
+
+      const prompt = `
+        Rewrite the following product description to be engaging, high-converting, and optimized for an e-commerce store. 
+        ${tonePrompt}
+
+        Original Description:
+        "${image.description || 'A product being sold online.'}"
+
+        Product Title: "${image.title || 'Unknown Product'}"
+        Product Tags: ${image.tags?.join(', ') || 'None'}
+
+        Output ONLY the rewritten description text. Do not include any intro, outro, or emojis unless appropriate for the requested tone.
+        Format heavily with paragraphs to make it readable.
+      `;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview", // Use a fast text model
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      const rewrittenDescription = response.choices[0].message.content?.trim() || "";
+
+      res.json({ description: rewrittenDescription });
+    } catch (error: any) {
+      console.error("Rewrite description error:", error);
+      res.status(500).json({ message: "Failed to rewrite description", error: error.message });
     }
   });
 

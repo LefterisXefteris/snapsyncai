@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot, useApplyImage } from "@/hooks/use-images";
+import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus } from "lucide-react";
 
 const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
 
@@ -35,10 +37,19 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [seoDescription, setSeoDescription] = useState("");
   const [altText, setAltText] = useState("");
   const [aeoSnippet, setAeoSnippet] = useState("");
+  
+  // New e-commerce fields
+  const [compareAtPrice, setCompareAtPrice] = useState("");
+  const [costPerItem, setCostPerItem] = useState("");
+  const [sku, setSku] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [trackQuantity, setTrackQuantity] = useState(true);
+  const [inventoryQuantity, setInventoryQuantity] = useState(0);
 
   const editBackgroundMutation = useEditBackground();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
   const applyImageMutation = useApplyImage();
+  const rewriteDescriptionMutation = useRewriteDescription();
   
   const [bgEditKey, setBgEditKey] = useState<string | null>(null);
   const [bgEditUrl, setBgEditUrl] = useState<string | null>(null);
@@ -59,8 +70,17 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       setSeoDescription(image.seoDescription || "");
       setAltText(image.altText || "");
       setAeoSnippet(image.aeoSnippet || "");
+      setCompareAtPrice(image.compareAtPrice || "");
+      setCostPerItem(image.costPerItem || "");
+      setSku(image.sku || "");
+      setBarcode(image.barcode || "");
+      setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
+      setInventoryQuantity(image.inventoryQuantity || 0);
     }
   }, [image]);
+
+  const variants = Array.isArray(image?.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
+  const mediaGallery = Array.isArray(image?.mediaGallery) ? (image.mediaGallery as string[]) : [];
 
   if (isLoading) {
     return (
@@ -126,6 +146,12 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           seoDescription,
           altText,
           aeoSnippet,
+          compareAtPrice,
+          costPerItem,
+          sku,
+          barcode,
+          trackQuantity: trackQuantity.toString(),
+          inventoryQuantity,
         },
       },
       {
@@ -198,11 +224,37 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Description</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Description</label>
+                    {!isUnpaid && (
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-[10px] px-2 text-primary hover:text-primary hover:bg-primary/10"
+                          onClick={() => rewriteDescriptionMutation.mutate({ id: image.id, tone: "professional" })}
+                          disabled={rewriteDescriptionMutation.isPending}
+                        >
+                          {rewriteDescriptionMutation.isPending && rewriteDescriptionMutation.variables?.tone === 'professional' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                          Professional
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-[10px] px-2 text-primary hover:text-primary hover:bg-primary/10"
+                          onClick={() => rewriteDescriptionMutation.mutate({ id: image.id, tone: "playful" })}
+                          disabled={rewriteDescriptionMutation.isPending}
+                        >
+                          {rewriteDescriptionMutation.isPending && rewriteDescriptionMutation.variables?.tone === 'playful' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                          Fun
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <Textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    disabled={isUnpaid}
+                    disabled={isUnpaid || rewriteDescriptionMutation.isPending}
                     rows={8}
                     placeholder="Product description..."
                     className="resize-y"
@@ -213,7 +265,186 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base font-medium">Media</CardTitle>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-muted-foreground" />
+                  Pricing
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <Input
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        disabled={isUnpaid}
+                        className="pl-7"
+                        placeholder="0.00"
+                        type="number"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Compare-at price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <Input
+                        value={compareAtPrice}
+                        onChange={(e) => setCompareAtPrice(e.target.value)}
+                        disabled={isUnpaid}
+                        className="pl-7"
+                        placeholder="0.00"
+                        type="number"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground pt-1">To show a reduced price, move the original price here.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Cost per item</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <Input
+                        value={costPerItem}
+                        onChange={(e) => setCostPerItem(e.target.value)}
+                        disabled={isUnpaid}
+                        className="pl-7"
+                        placeholder="0.00"
+                        type="number"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground pt-1">Customers won't see this.</p>
+                  </div>
+                </div>
+
+                {price && costPerItem && !isNaN(Number(price)) && !isNaN(Number(costPerItem)) && Number(price) > 0 && (
+                  <div className="flex items-center gap-4 mt-2 p-3 bg-muted/50 rounded-md border border-border/50">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Profit</span>
+                      <span className="text-sm font-medium">${(Number(price) - Number(costPerItem)).toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Margin</span>
+                      <span className="text-sm font-medium">{(((Number(price) - Number(costPerItem)) / Number(price)) * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Box className="w-4 h-4 text-muted-foreground" />
+                  Inventory
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-0 space-y-6">
+                <div className="flex items-center space-x-2 pb-2 border-b border-border/50">
+                  <Checkbox 
+                    id="trackQuantity" 
+                    checked={trackQuantity} 
+                    onCheckedChange={(checked) => setTrackQuantity(checked as boolean)}
+                    disabled={isUnpaid}
+                  />
+                  <label
+                    htmlFor="trackQuantity"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Track quantity
+                  </label>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">SKU (Stock Keeping Unit)</label>
+                    <Input
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                      disabled={isUnpaid}
+                      placeholder="e.g. TSHIRT-RED-L"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Barcode (ISBN, UPC, GTIN, etc.)</label>
+                    <Input
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
+                      disabled={isUnpaid}
+                      placeholder="000000000000"
+                    />
+                  </div>
+                </div>
+
+                {trackQuantity && (
+                  <div className="space-y-2 pt-2 border-t border-border/50 mt-4">
+                    <label className="text-sm font-medium flex items-center gap-2 text-foreground">
+                      Quantity available
+                    </label>
+                    <Input
+                      type="number"
+                      value={inventoryQuantity}
+                      onChange={(e) => setInventoryQuantity(Number(e.target.value))}
+                      disabled={isUnpaid}
+                      className="max-w-[150px]"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Box className="w-4 h-4 text-muted-foreground" />
+                  Variants
+                </CardTitle>
+                <Button variant="ghost" size="sm" disabled={isUnpaid} className="h-8 text-primary">
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add options like size or color
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {variants.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Variant</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Available</TableHead>
+                        <TableHead>SKU</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* Very naive combination for preview purposes */}
+                      {variants.map(v => v.values).flat().map((val, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium whitespace-nowrap">{val}</TableCell>
+                          <TableCell>
+                            <Input defaultValue={price} disabled={isUnpaid} className="h-8 w-24" />
+                          </TableCell>
+                          <TableCell>
+                            <Input type="number" defaultValue={inventoryQuantity} disabled={isUnpaid} className="h-8 w-20" />
+                          </TableCell>
+                          <TableCell>
+                            <Input defaultValue={`${sku}-${val.toUpperCase().replace(/\s/g, '')}`} disabled={isUnpaid} className="h-8 min-w-[120px]" />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground border-t border-border">
+                    This product has no variants. Click the button above to add options like size or color.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-medium">Main Media & Gallery</CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex flex-col items-center justify-center">
                 <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
@@ -304,7 +535,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
                         <div className="flex items-center gap-3 py-4">
                           <Select value={photoshootStyle} onValueChange={setPhotoshootStyle}>
-                            <SelectTrigger className="w-[200px]">
+                            <SelectTrigger className="w-[200px] border">
                               <SelectValue placeholder="Select Style" />
                             </SelectTrigger>
                             <SelectContent>
@@ -355,32 +586,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 )}
               </CardContent>
             </Card>
-
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Search engine listing</CardTitle>
-                <CardDescription>Add a title and description to see how this product might appear in a search engine listing.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Page Title</label>
-                  <Input
-                    value={seoTitle}
-                    onChange={(e) => setSeoTitle(e.target.value)}
-                    disabled={isUnpaid}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Meta Description</label>
-                  <Textarea
-                    value={seoDescription}
-                    onChange={(e) => setSeoDescription(e.target.value)}
-                    disabled={isUnpaid}
-                    rows={4}
-                  />
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Sidebar Column */}
@@ -399,47 +604,83 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base font-medium">Pricing</CardTitle>
+                <CardTitle className="text-base font-medium">Organization</CardTitle>
               </CardHeader>
               <CardContent className="p-6 pt-0 space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Price</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      className="pl-8"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      disabled={isUnpaid}
-                    />
-                  </div>
+                  <label className="text-sm font-medium">Product category</label>
+                  <Select
+                    value={category}
+                    onValueChange={setCategory}
+                    disabled={isUnpaid}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Apparel & Accessories">Apparel & Accessories</SelectItem>
+                      <SelectItem value="Home & Garden">Home & Garden</SelectItem>
+                      <SelectItem value="Electronics">Electronics</SelectItem>
+                      <SelectItem value="Health & Beauty">Health & Beauty</SelectItem>
+                      <SelectItem value="Toys & Games">Toys & Games</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Product type</label>
+                  <Input
+                    value={productType}
+                    onChange={(e) => setProductType(e.target.value)}
+                    disabled={isUnpaid}
+                    placeholder="e.g. T-Shirt"
+                  />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base font-medium">Organization</CardTitle>
+                <CardTitle className="text-base font-medium">Search engine listing</CardTitle>
+                <CardDescription>Edit how your product shows up in search results.</CardDescription>
               </CardHeader>
               <CardContent className="p-6 pt-0 space-y-4">
+                {/* Google Snippet Preview */}
+                <div className="p-4 bg-background border rounded-md font-sans mb-4">
+                  <div className="text-xs text-[#202124] mb-1 flex items-center gap-1 opacity-70">
+                    <span className="w-3 h-3 rounded-full bg-primary/20 flex items-center justify-center text-[8px]">S</span>
+                    yourstore.com › products › {title.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                  </div>
+                  <div className="text-[#1a0dab] text-[18px] leading-[1.2] hover:underline cursor-pointer truncate">
+                    {seoTitle || title || "Your Product Title"}
+                  </div>
+                  <div className="text-[#4d5156] text-[13px] leading-[1.58] mt-1 line-clamp-2">
+                    {seoDescription || description?.slice(0, 160) || "Add a description to see how it will display to customers in search results. This helps click-through rates."}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Product Category</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Page Title</label>
+                    <span className="text-xs text-muted-foreground">{seoTitle.length} / 70</span>
+                  </div>
                   <Input
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    value={seoTitle}
+                    onChange={(e) => setSeoTitle(e.target.value)}
                     disabled={isUnpaid}
-                    placeholder="Apparel & Accessories..."
+                    maxLength={70}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Product Type</label>
-                  <Input
-                    value={productType}
-                    onChange={(e) => setProductType(e.target.value)}
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Meta Description</label>
+                    <span className="text-xs text-muted-foreground">{seoDescription.length} / 320</span>
+                  </div>
+                  <Textarea
+                    value={seoDescription}
+                    onChange={(e) => setSeoDescription(e.target.value)}
                     disabled={isUnpaid}
-                    placeholder="e.g. Shirts"
+                    rows={4}
+                    maxLength={320}
                   />
                 </div>
               </CardContent>

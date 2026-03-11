@@ -660,3 +660,26 @@ export function useApplyImage() {
     },
   });
 }
+
+export function useRewriteDescription() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, tone }: { id: number; tone: string }) => {
+      const res = await apiRequest("POST", `/api/images/${id}/rewrite-description`, { tone });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as any).message || "Failed to rewrite description");
+      }
+      return res.json() as Promise<{ description: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      toast({ title: "Description Rewritten", description: "Successfully generated a new description based on the selected tone." });
+    },
+    onError: (error) => {
+      toast({ title: "Rewrite Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}
