@@ -97,7 +97,7 @@ async function getOrCreateSubscriptionPriceId(): Promise<string> {
 const updateSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
-  price: z.string().optional(),
+  price: z.string().nullable().optional(),
   category: z.string().optional(),
   productType: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -107,8 +107,8 @@ const updateSchema = z.object({
   aeoFaqs: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
   aeoSnippet: z.string().optional(),
   variants: z.any().optional(),
-  compareAtPrice: z.string().optional(),
-  costPerItem: z.string().optional(),
+  compareAtPrice: z.string().nullable().optional(),
+  costPerItem: z.string().nullable().optional(),
   sku: z.string().optional(),
   barcode: z.string().optional(),
   trackQuantity: z.string().optional(),
@@ -1056,13 +1056,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid update data", field: parsed.error.errors[0]?.path.join('.') });
       }
-      const updated = await storage.updateImage(id, parsed.data);
+
+      // Convert empty strings to null for numeric fields to prevent Postgres syntax errors
+      const updatePayload = { ...parsed.data };
+      if (updatePayload.price === "") updatePayload.price = null;
+      if (updatePayload.compareAtPrice === "") updatePayload.compareAtPrice = null;
+      if (updatePayload.costPerItem === "") updatePayload.costPerItem = null;
+
+      const updated = await storage.updateImage(id, updatePayload);
       if (!updated) {
         return res.status(404).json({ message: "Image not found" });
       }
       res.json(updated);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update image" });
+    } catch (error: any) {
+      console.error("Update image error:", error);
+      res.status(500).json({ message: "Failed to update image", details: error.message || String(error) });
     }
   });
 
