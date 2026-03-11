@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot } from "@/hooks/use-images";
+import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot, useApplyImage } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const editBackgroundMutation = useEditBackground();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
+  const applyImageMutation = useApplyImage();
+  
+  const [bgEditKey, setBgEditKey] = useState<string | null>(null);
   const [bgEditUrl, setBgEditUrl] = useState<string | null>(null);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [photoshootStyle, setPhotoshootStyle] = useState(VALID_STYLES[0]);
@@ -85,10 +88,28 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       { id: image.id, style },
       {
         onSuccess: (data) => {
+          setBgEditKey(data.key);
           setBgEditUrl(data.url);
         },
       }
     );
+  };
+
+  const handleApplyBackground = () => {
+    if (!bgEditKey) return;
+    applyImageMutation.mutate(
+      { id: image.id, bgKey: bgEditKey },
+      {
+        onSuccess: () => {
+          setBgEditKey(null);
+          setBgEditUrl(null);
+        }
+      }
+    );
+  };
+
+  const handleApplyConcept = (url: string) => {
+    applyImageMutation.mutate({ id: image.id, imageUrl: url });
   };
 
   const handleSave = () => {
@@ -211,7 +232,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   )}
 
                   {/* Background style picker */}
-                  {showBgPicker && !editBackgroundMutation.isPending && (
+                  {showBgPicker && !editBackgroundMutation.isPending && !applyImageMutation.isPending && (
                     <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 p-3">
                       <p className="text-sm font-semibold">Select Background</p>
                       <div className="flex flex-wrap gap-2 justify-center max-w-[250px]">
@@ -233,6 +254,25 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <Button variant="ghost" size="sm" onClick={() => setShowBgPicker(false)} className="mt-2 h-7 text-xs">Cancel</Button>
                     </div>
                   )}
+
+                  {/* Apply background overlay */}
+                  {bgEditUrl && !showBgPicker && !editBackgroundMutation.isPending && (
+                    <div className="absolute bottom-2 left-0 w-full flex justify-center z-20">
+                      <Button 
+                        size="sm" 
+                        onClick={handleApplyBackground}
+                        disabled={applyImageMutation.isPending}
+                        className="shadow-lg"
+                      >
+                        {applyImageMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4 mr-2" />
+                        )}
+                        Save as Product Image
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 {!isUnpaid && (
                   <div className="flex items-center gap-2 mt-4">
@@ -241,7 +281,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       size="sm"
                       className={`flex-1 ${showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''}`}
                       onClick={() => setShowBgPicker(v => !v)}
-                      disabled={editBackgroundMutation.isPending}
+                      disabled={editBackgroundMutation.isPending || applyImageMutation.isPending}
                     >
                       <Wand2 className="w-4 h-4 mr-2" />
                       AI Background
@@ -289,8 +329,17 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                               {backgrounds.map((url, i) => (
                                 <div key={i} className="relative group/concept rounded-lg overflow-hidden border aspect-square">
                                   <img src={url} alt="Generated Concept" className="w-full h-full object-cover" loading="lazy" />
-                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Button size="sm" variant="secondary" onClick={() => window.open(url, '_blank')}>
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                    <Button 
+                                      size="sm" 
+                                      className="w-[140px]"
+                                      onClick={() => handleApplyConcept(url)}
+                                      disabled={applyImageMutation.isPending}
+                                    >
+                                      <Check className="w-3.5 h-3.5 mr-1.5" />
+                                      Set as Product
+                                    </Button>
+                                    <Button size="sm" variant="secondary" onClick={() => window.open(url, '_blank')} className="w-[140px]">
                                       <Download className="w-3.5 h-3.5 mr-1.5" />
                                       Download Hires
                                     </Button>

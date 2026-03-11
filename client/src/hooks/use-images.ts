@@ -637,3 +637,26 @@ export function useEditBackground() {
     },
   });
 }
+
+export function useApplyImage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, bgKey, imageUrl }: { id: number; bgKey?: string; imageUrl?: string }) => {
+      const res = await apiRequest("POST", `/api/images/${id}/apply-image`, { bgKey, imageUrl });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as any).message || "Failed to apply image");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      toast({ title: "Image Applied", description: "Product image has been updated successfully." });
+    },
+    onError: (error) => {
+      toast({ title: "Apply Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}

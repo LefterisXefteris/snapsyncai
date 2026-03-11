@@ -2093,5 +2093,51 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
     res.send(entry.buffer);
   });
 
+  app.post("/api/images/:id/apply-image", requireAuth(), async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid image ID" });
+
+      const image = await storage.getImage(id);
+      if (!image) return res.status(404).json({ message: "Image not found" });
+
+      const { bgKey, imageUrl } = req.body;
+      
+      let newImageBuffer: Buffer;
+      let newMimeType: string;
+
+      if (bgKey) {
+        const entry = bgEditBuffers.get(bgKey);
+        if (!entry) return res.status(400).json({ message: "Edited background not found or expired" });
+        newImageBuffer = entry.buffer;
+        newMimeType = entry.mimeType;
+      } else if (imageUrl) {
+        const fetchRes = await fetch(imageUrl);
+        if (!fetchRes.ok) return res.status(400).json({ message: "Failed to fetch image from URL" });
+        const arrayBuffer = await fetchRes.arrayBuffer();
+        newImageBuffer = Buffer.from(arrayBuffer);
+        newMimeType = fetchRes.headers.get("content-type") || "image/png";
+      } else {
+        return res.status(400).json({ message: "Must provide either bgKey or imageUrl" });
+      }
+
+      const base64 = newImageBuffer.toString("base64");
+      
+      const updatedImage = await storage.updateImage(id, {
+        imageData: base64,
+        mimeType: newMimeType,
+        size: newImageBuffer.length,
+      });
+
+      // Update the in-memory buffer so /api/images/:id/file serves the new image immediately
+      imageBuffers.set(id, newImageBuffer);
+
+      res.json(updatedImage);
+    } catch (error: any) {
+      console.error("Apply image error:", error);
+      res.status(500).json({ message: "Failed to apply image", error: error.message });
+    }
+  });
+
   return httpServer;
 }
