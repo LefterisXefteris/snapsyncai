@@ -215,12 +215,12 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               <CardHeader>
                 <CardTitle className="text-base font-medium">Media</CardTitle>
               </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="border rounded-md border-dashed border-muted-foreground/30 p-2 text-center bg-muted/5 relative overflow-hidden group">
+              <CardContent className="p-4 flex flex-col items-center justify-center">
+                <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
                   <img
-                    src={bgEditUrl ?? `/api/images/${image.id}/file`}
-                    alt={altText || title}
-                    className="max-h-[300px] mx-auto rounded-sm object-contain"
+                    src={bgEditUrl ?? `/api/images/${image.id}/file?t=${new Date(image.createdAt || Date.now()).getTime()}`}
+                    alt={image.altText || image.title || "Product Image"}
+                    className="w-full h-full object-contain"
                   />
 
                   {/* AI editing spinner overlay */}

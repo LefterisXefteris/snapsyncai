@@ -117,7 +117,7 @@ export const ImageCard = memo(function ImageCard({ image, index, selected, onSel
     >
       <div className="relative h-44 bg-muted flex items-center justify-center border-b">
         <img
-          src={bgEditUrl ?? `/api/images/${image.id}/file`}
+          src={bgEditUrl ?? `/api/images/${image.id}/file?t=${new Date(image.createdAt || Date.now()).getTime()}`}
           alt={image.altText || image.title || image.originalName}
           className="absolute inset-0 w-full h-full object-contain bg-muted"
           loading="lazy"
