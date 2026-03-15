@@ -18,7 +18,7 @@
   --popover: 0 0% 100%;
   --popover-foreground: 240 10% 3.9%;
 
-  --primary: 263 70% 50%;
+  --primary: 90 45% 45%;
   --primary-foreground: 210 40% 98%;
 
   --secondary: 240 4.8% 95.9%;
@@ -27,7 +27,7 @@
   --muted: 240 4.8% 95.9%;
   --muted-foreground: 240 3.8% 46.1%;
 
-  --accent: 263 70% 50%;
+  --accent: 90 45% 45%;
   --accent-foreground: 240 5.9% 10%;
 
   --destructive: 0 84.2% 60.2%;
@@ -35,7 +35,7 @@
 
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
-  --ring: 263 70% 50%;
+  --ring: 90 45% 45%;
 
   --radius: 0.75rem;
 }
@@ -51,7 +51,7 @@
   --popover: 240 10% 3.9%;
   --popover-foreground: 0 0% 98%;
 
-  --primary: 263 70% 50%;
+  --primary: 90 55% 45%;
   --primary-foreground: 210 40% 98%;
 
   --secondary: 240 3.7% 15.9%;
@@ -60,7 +60,7 @@
   --muted: 240 3.7% 15.9%;
   --muted-foreground: 240 5% 64.9%;
 
-  --accent: 263 70% 50%;
+  --accent: 90 55% 45%;
   --accent-foreground: 0 0% 98%;
 
   --destructive: 0 62.8% 30.6%;
@@ -68,7 +68,7 @@
 
   --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
-  --ring: 263 70% 50%;
+  --ring: 90 55% 45%;
 }
 
 @layer base {
@@ -110,7 +110,7 @@
   @apply bg-clip-text text-transparent bg-gradient-to-r from-white via-white/80 to-white/60;
 }
 .text-gradient-primary {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-emerald-400;
 }
 
 /* Animation Utilities */
@@ -163,3 +163,36 @@ pre {
 .reveal.delay-3 { transition-delay: 0.30s; }
 .reveal.delay-4 { transition-delay: 0.40s; }
 .reveal.delay-5 { transition-delay: 0.50s; }
+
+/* ── Premium UI Animations & Effects ── */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out 3s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 4s ease-in-out infinite;
+}

@@ -56,7 +56,7 @@ function AppWithClerk() {
   // If the env var is present (recommended), mount immediately — no network round-trip.
   if (VITE_CLERK_KEY) {
     return (
-      <ClerkProvider publishableKey={VITE_CLERK_KEY}>
+      <ClerkProvider publishableKey={VITE_CLERK_KEY} appearance={{ baseTheme: dark }}>
         <ClerkApp />
       </ClerkProvider>
     );
@@ -95,7 +95,7 @@ function AppWithClerkFallback() {
   }
 
   return (
-    <ClerkProvider publishableKey={config.publishableKey}>
+    <ClerkProvider publishableKey={config.publishableKey} appearance={{ baseTheme: dark }}>
       <ClerkApp />
     </ClerkProvider>
   );
@@ -103,7 +103,7 @@ function AppWithClerkFallback() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="snapsyncai-theme">
+    <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AppWithClerk />

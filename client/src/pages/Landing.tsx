@@ -249,8 +249,8 @@ export default function Landing() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
       {/* ── NAV ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent" aria-label="Main navigation">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-white/5 shadow-sm transition-all duration-300" aria-label="Main navigation">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={snapsyncaiLogo} alt="SnapSync AI logo" className="w-8 h-8 rounded-md" width="32" height="32" />
             <span className="font-display text-lg font-bold tracking-tight">SnapSync AI</span>
@@ -277,16 +277,19 @@ export default function Landing() {
           {/* ✨ Particles */}
           <ParticleField />
 
-          <div className="max-w-5xl mx-auto px-6 py-28 md:py-40 relative text-center">
-            <Badge variant="outline" className="mb-6 no-default-active-elevate gap-1.5 px-3 py-1 text-xs animate-in fade-in duration-500">
-              <Sparkles className="w-3 h-3 text-primary" />
-              AI-Powered E-Commerce Listing Tool
+          <div className="max-w-5xl mx-auto px-6 py-28 md:py-40 relative text-center z-10">
+            <Badge variant="outline" className="mb-6 no-default-active-elevate gap-1.5 px-4 py-1.5 text-xs animate-in fade-in duration-500 rounded-full border-primary/40 bg-primary/10 text-primary shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="font-semibold tracking-wide">AI-Powered E-Commerce Listing Tool</span>
             </Badge>
 
-            <h1 id="hero-heading" className="text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.08] mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h1 id="hero-heading" className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold tracking-tight leading-[1.08] mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
               From Photo to Product{" "}
-              <span className="bg-gradient-to-r from-purple-400 via-purple-500 to-purple-700 bg-clip-text text-transparent">
-                in Seconds
+              <span className="relative inline-block mt-2 md:mt-0">
+                <span className="bg-gradient-to-r from-emerald-400 via-lime-500 to-primary bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(16,185,129,0.4)]">
+                  in Seconds
+                </span>
+                <Sparkles className="absolute -top-4 -right-8 w-8 h-8 text-lime-400 opacity-60 animate-pulse" />
               </span>
             </h1>
 
@@ -300,12 +303,12 @@ export default function Landing() {
               Trusted by e-commerce sellers in the UK. No credit card required to start.
             </p>
 
-            <div className="flex items-center justify-center gap-3 flex-wrap mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <Button size="lg" className="h-12 px-8 text-base gap-2 shadow-lg shadow-primary/20" data-testid="button-get-started" onClick={() => openSignIn()}>
+            <div className="flex items-center justify-center gap-4 flex-wrap mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+              <Button size="lg" className="h-14 px-8 text-base gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] transition-all duration-300 hover:scale-105 group" data-testid="button-get-started" onClick={() => openSignIn()}>
                 Get Started Free
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="lg" variant="outline" className="h-12 px-8 text-base" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} data-testid="button-learn-more">
+              <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-xl border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} data-testid="button-learn-more">
                 See How It Works
               </Button>
             </div>
@@ -315,29 +318,38 @@ export default function Landing() {
             </p>
 
             {/* Platform logos */}
-            <div className="mt-12 flex items-center justify-center gap-8 flex-wrap animate-in fade-in duration-700 delay-300">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Works with</span>
+            <div className="mt-16 flex items-center justify-center gap-8 flex-wrap animate-in fade-in duration-700 delay-300 relative z-10 p-6 rounded-2xl bg-black/20 backdrop-blur-md border border-white/5 shadow-xl max-w-3xl mx-auto">
+              <span className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">Works seamlessly with</span>
               <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <SiShopify className="w-5 h-5 text-[#96BF48]" />
-                  <span className="text-sm font-medium text-muted-foreground">Shopify</span>
+                <div className="flex items-center gap-2 group cursor-pointer">
+                  <SiShopify className="w-6 h-6 text-[#96BF48] group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Shopify</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <SiEtsy className="w-5 h-5 text-[#F56400]" />
-                  <span className="text-sm font-medium text-muted-foreground">Etsy</span>
+                <div className="flex items-center gap-2 group cursor-pointer">
+                  <SiEtsy className="w-6 h-6 text-[#F56400] group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Etsy</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <SiAmazon className="w-5 h-5 text-[#FF9900]" />
-                  <span className="text-sm font-medium text-muted-foreground">Amazon</span>
+                <div className="flex items-center gap-2 group cursor-pointer">
+                  <SiAmazon className="w-6 h-6 text-[#FF9900] group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Amazon</span>
                 </div>
               </div>
+            </div>
+
+            {/* Scroll Down Indicator */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center animate-bounce opacity-70 z-10 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">Scroll to explore</span>
+                <div className="w-5 h-8 border-2 border-muted-foreground/50 rounded-full flex justify-center pt-1.5 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                    <div className="w-1 h-2 bg-primary rounded-full animate-pulse" />
+                </div>
             </div>
           </div>
         </section>
 
         {/* ── STATS BAR ── */}
-        <div className="border-y border-border bg-muted/20">
-          <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="relative border-y border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-lime-500/10 opacity-60" />
+          <div className="max-w-5xl mx-auto px-6 py-12 relative z-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
               {STATS.map((stat, i) => (
                 <div key={i} className={`space-y-1 reveal delay-${i + 1}`}>
@@ -363,32 +375,93 @@ export default function Landing() {
               AI handles the heavy lifting so you can focus on selling — not writing listings.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[300px] bg-primary/5 blur-[100px] rounded-full pointer-events-none" />
+            
             {FEATURES.map((feature, i) => (
-              <Card key={i} className={`hover-elevate relative overflow-hidden group border-border/80 hover:border-primary/30 transition-colors reveal delay-${i + 1}`} data-testid={`card-feature-${i}`}>
-                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <CardHeader>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <feature.icon className="w-5 h-5 text-primary" />
+              <Card key={i} className={`hover-elevate relative overflow-hidden group border-white/10 hover:border-primary/40 bg-background/50 backdrop-blur-sm transition-all duration-500 reveal delay-${i + 1} hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1`} data-testid={`card-feature-${i}`}>
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <CardHeader className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
+                      <feature.icon className="w-6 h-6 text-primary" />
                     </div>
-                    <Badge variant={feature.badge === "Free" ? "secondary" : "default"} className="text-[10px]">
+                    <Badge variant={feature.badge === "Free" ? "secondary" : "default"} className="text-[10px] font-semibold tracking-wide">
                       {feature.badge}
                     </Badge>
                   </div>
-                  <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  <CardTitle className="text-xl font-bold">{feature.title}</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <CardDescription className="leading-relaxed text-sm">{feature.description}</CardDescription>
+                <CardContent className="relative z-10">
+                  <CardDescription className="leading-relaxed text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors">
+                    {feature.description}
+                  </CardDescription>
                 </CardContent>
               </Card>
             ))}
           </div>
         </section>
 
+        {/* ── AI IMAGE EDITING SHOWCASE ── */}
+        <section className="max-w-6xl mx-auto px-6 py-24 border-t border-border" aria-labelledby="ai-editing-heading">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div className="order-2 lg:order-1 relative reveal">
+              <div className="absolute -inset-4 bg-gradient-to-tr from-emerald-600/30 to-lime-500/30 blur-3xl rounded-[3rem] opacity-70 animate-pulse-glow" />
+              <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black/40 backdrop-blur-xl aspect-[4/3] flex items-center justify-center animate-float">
+                {/* IMPORTANT: Placeholder for the dashboard image uploaded by the user */}
+                <img
+                  src="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1200&auto=format&fit=crop"
+                  alt="AI Image Editing Dashboard"
+                  className="w-full h-full object-cover mix-blend-overlay opacity-80 scale-105"
+                  id="ai-editor-hero-image"
+                />
+                
+                {/* Floating UI Element to add premium feel */}
+                <div className="absolute bottom-6 left-6 right-6 p-5 rounded-2xl bg-background/80 backdrop-blur-xl border border-white/10 animate-float-delayed shadow-2xl">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 via-lime-500 to-primary flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(132,204,22,0.4)]">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Multiple Variants Generated</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Experiment with backgrounds, lighting &amp; styles.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2 space-y-6 reveal delay-1">
+              <Badge variant="outline" className="no-default-active-elevate gap-1.5 text-primary border-primary/30 bg-primary/5">
+                <Sparkles className="w-3 h-3" /> New Feature
+              </Badge>
+              <h2 id="ai-editing-heading" className="text-4xl font-display font-bold tracking-tight">
+                Edit Images with AI &amp; Generate Stunning Variants
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Take your product photography to the next level. Our new AI Image Editor allows you to instantly generate beautiful lifestyle variants for your products—all without leaving the SnapSync AI workspace.
+              </p>
+              <ul className="space-y-4 pt-4">
+                {[
+                  "Instantly swap backgrounds to match your brand aesthetic",
+                  "Generate multiple product variants in a single click",
+                  "Enhance image quality and adjust lighting automatically",
+                  "Perfect for creating fresh content for social media and ads"
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-foreground">
+                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* ── SEO & AEO ── */}
-        <section className="bg-muted/30 py-24 border-y border-border" aria-labelledby="seo-aeo-heading">
-          <div className="max-w-6xl mx-auto px-6">
+        <section className="relative bg-black/40 py-24 border-y border-white/10 overflow-hidden" aria-labelledby="seo-aeo-heading">
+          <div className="absolute inset-0 bg-gradient-to-br from-lime-500/5 via-transparent to-primary/5 pointer-events-none" />
+          <div className="max-w-6xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
                 <Search className="w-3 h-3" /> SEO &amp; AEO
@@ -418,14 +491,14 @@ export default function Landing() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SEO_AEO_FEATURES.map((feature, i) => (
-                <Card key={i} className={`hover-elevate group hover:border-primary/30 transition-colors reveal delay-${(i % 3) + 1}`} data-testid={`card-seo-${i}`}>
-                  <CardContent className="flex items-start gap-3 pt-6 pb-5">
-                    <div className="w-9 h-9 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center flex-shrink-0 transition-colors">
-                      <feature.icon className="w-4 h-4 group-hover:text-primary transition-colors" />
+                <Card key={i} className={`hover-elevate group border-white/5 hover:border-primary/40 bg-background/40 backdrop-blur-sm transition-all duration-300 reveal delay-${(i % 3) + 1} hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]`} data-testid={`card-seo-${i}`}>
+                  <CardContent className="flex items-start gap-3 pt-6 pb-5 relative z-10">
+                    <div className="w-10 h-10 rounded-xl bg-primary/5 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors shadow-inner border border-white/5">
+                      <feature.icon className="w-4 h-4 group-hover:text-primary transition-colors text-muted-foreground" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm mb-1">{feature.title}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
+                      <p className="font-semibold text-sm mb-1 text-foreground/90">{feature.title}</p>
+                      <p className="text-xs text-muted-foreground/80 leading-relaxed group-hover:text-muted-foreground transition-colors">{feature.description}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -435,8 +508,9 @@ export default function Landing() {
         </section>
 
         {/* ── HOW IT WORKS ── */}
-        <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24" aria-labelledby="how-heading">
-          <div className="text-center mb-16 reveal">
+        <section id="how-it-works" className="relative max-w-6xl mx-auto px-6 py-24" aria-labelledby="how-heading">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
+          <div className="text-center mb-16 reveal relative z-10">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">How It Works</Badge>
             <h2 id="how-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
               Three Steps to Live Listings
@@ -463,8 +537,10 @@ export default function Landing() {
         </section>
 
         {/* ── PRICING ── */}
-        <section id="pricing" className="bg-muted/30 border-y border-border py-24" aria-labelledby="pricing-heading">
-          <div className="max-w-4xl mx-auto px-6">
+        <section id="pricing" className="relative bg-black/40 border-y border-white/10 py-24 overflow-hidden" aria-labelledby="pricing-heading">
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-background to-emerald-900/10 pointer-events-none" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-lime-500/10 blur-[100px] rounded-full pointer-events-none" />
+          <div className="max-w-4xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate">Pricing</Badge>
               <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
@@ -474,8 +550,8 @@ export default function Landing() {
                 Start completely free. Upgrade when you're ready for full AI-powered listings.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-              <Card className="flex flex-col reveal delay-1" data-testid="card-pricing-free">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto items-center">
+              <Card className="flex flex-col reveal delay-1 bg-background/50 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl" data-testid="card-pricing-free">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl">Free</CardTitle>
                   <CardDescription>AI previews for every image</CardDescription>
@@ -485,22 +561,23 @@ export default function Landing() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1">
-                  <Separator className="mb-5" />
+                  <Separator className="mb-5 border-white/10" />
                   <ul className="space-y-3">
                     {["Upload up to 100 images per batch", "AI-generated titles & categories", "Auto-tagging for every product", "Connect Shopify, Etsy & Amazon", "No credit card required"].map((item, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-muted-foreground mt-0 flex-shrink-0" />
                         <span className="text-muted-foreground">{item}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button variant="outline" className="w-full mt-6" onClick={() => openSignIn()} data-testid="button-pricing-free-start">Start Free</Button>
+                  <Button variant="outline" className="w-full mt-8 rounded-xl border-border/60 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300" onClick={() => openSignIn()} data-testid="button-pricing-free-start">Start Free</Button>
                 </CardContent>
               </Card>
 
-              <Card className="flex flex-col border-primary/50 shadow-lg shadow-primary/5 relative overflow-hidden reveal delay-2" data-testid="card-pricing-pro">
-                <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-purple-500 to-purple-700" />
-                <CardHeader className="pb-4">
+              <Card className="flex flex-col border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden reveal delay-2 bg-background/60 backdrop-blur-xl hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] transition-all duration-300 md:scale-105 z-10" data-testid="card-pricing-pro">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-lime-500 via-emerald-500 to-primary" />
+                <CardHeader className="pb-4 relative z-10">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-xl">Pro</CardTitle>
                     <Badge className="text-[10px]">Most Popular</Badge>
@@ -544,11 +621,11 @@ export default function Landing() {
             </p>
           </div>
           <div className="reveal">
-            <Accordion type="single" collapsible className="w-full space-y-2" data-testid="faq-list">
+            <Accordion type="single" collapsible className="w-full space-y-3" data-testid="faq-list">
               {FAQ_DATA.map((faq, index) => (
-                <AccordionItem key={index} value={`faq-${index}`} data-testid={`faq-item-${index}`} className="border border-border rounded-xl px-4 data-[state=open]:border-primary/30">
-                  <AccordionTrigger className="text-left text-sm font-medium py-4 hover:no-underline">{faq.question}</AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground leading-relaxed text-sm pb-4">{faq.answer}</AccordionContent>
+                <AccordionItem key={index} value={`faq-${index}`} data-testid={`faq-item-${index}`} className="border border-white/10 bg-background/30 backdrop-blur-md rounded-xl px-4 md:px-6 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:bg-primary/5 transition-colors overflow-hidden">
+                  <AccordionTrigger className="text-left text-sm md:text-base font-semibold py-5 hover:no-underline hover:text-primary transition-colors">{faq.question}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground leading-relaxed text-sm md:text-base pb-5">{faq.answer}</AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>
@@ -557,30 +634,33 @@ export default function Landing() {
 
         {/* ── BOTTOM CTA ── */}
         <section className="max-w-6xl mx-auto px-6 pb-24" aria-labelledby="cta-heading">
-          <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-purple-900/10 p-12 md:p-16 text-center overflow-hidden reveal" data-testid="card-cta-bottom">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
-            <div className="relative">
-              <Badge variant="outline" className="mb-6 no-default-active-elevate gap-1.5">
-                <Sparkles className="w-3 h-3 text-primary" />
-                Start in 60 seconds
+          <div className="relative rounded-3xl border border-white/10 bg-black/40 backdrop-blur-md p-12 md:p-20 text-center overflow-hidden reveal shadow-2xl" data-testid="card-cta-bottom">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-lime-900/20" />
+            <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-primary/20 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-lime-500/20 blur-[120px] rounded-full pointer-events-none" />
+            
+            <div className="relative z-10">
+              <Badge variant="outline" className="mb-8 no-default-active-elevate gap-1.5 px-4 py-1.5 rounded-full border-primary/30 bg-primary/10 text-primary">
+                <Sparkles className="w-4 h-4" />
+                <span className="font-semibold tracking-wide uppercase text-xs">Start in 60 seconds</span>
               </Badge>
-              <h2 id="cta-heading" className="text-4xl md:text-5xl font-display font-bold tracking-tight mb-4">
-                Start Listing Products with AI Today
+              <h2 id="cta-heading" className="text-4xl md:text-5xl lg:text-6xl font-display font-extrabold tracking-tight mb-6">
+                Ready to Supercharge <br className="hidden md:block" /> Your Listings?
               </h2>
-              <p className="text-muted-foreground max-w-xl mx-auto mb-8 text-lg leading-relaxed">
+              <p className="text-muted-foreground max-w-2xl mx-auto mb-10 text-lg md:text-xl leading-relaxed">
                 Upload your first product photos for free. See how AI transforms images into complete, SEO- and AEO-optimised
-                listings in seconds — then publish to Shopify, Etsy, and Amazon with one click.
+                listings in seconds — then publish everywhere with one click.
               </p>
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                <Button size="lg" className="h-12 px-8 text-base shadow-lg shadow-primary/25 gap-2" data-testid="button-cta-bottom" onClick={() => openSignIn()}>
+              <div className="flex items-center justify-center gap-4 flex-wrap">
+                <Button size="lg" className="h-14 px-10 text-base shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] gap-3 rounded-xl hover:scale-105 transition-all duration-300 group" data-testid="button-cta-bottom" onClick={() => openSignIn()}>
                   Get Started Free
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
-                <Button size="lg" variant="outline" className="h-12 px-8 text-base" onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}>
+                <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-xl border-border/60 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300" onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}>
                   View Pricing
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-4">No credit card required · Cancel anytime · Free AI previews included</p>
+              <p className="text-sm text-muted-foreground mt-8 font-medium">No credit card required · Cancel anytime · Free AI previews included</p>
             </div>
           </div>
         </section>

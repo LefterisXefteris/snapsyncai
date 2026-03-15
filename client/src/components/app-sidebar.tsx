@@ -77,10 +77,10 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <div className="px-2 space-y-3">
                 {isSubscribed ? (
-                  <Card className="border-purple-500/20 bg-purple-500/5" data-testid="card-subscription-active">
+                  <Card className="border-emerald-500/20 bg-emerald-500/5" data-testid="card-subscription-active">
                     <CardContent className="p-3 space-y-3">
                       <div className="flex items-center gap-2">
-                        <Crown className="w-4 h-4 text-purple-400" />
+                        <Crown className="w-4 h-4 text-emerald-400" />
                         <span className="text-sm font-medium" data-testid="text-subscription-status">SnapSync AI Pro Active</span>
                       </div>
                       <p className="text-xs text-muted-foreground">

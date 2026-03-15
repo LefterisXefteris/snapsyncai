@@ -325,7 +325,7 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                           </div>
                         ) : currentImage.category ? (
                           <div className="flex items-center gap-1.5 mt-2 text-xs">
-                            <FolderTree className="w-3 h-3 text-purple-400 shrink-0" />
+                            <FolderTree className="w-3 h-3 text-emerald-400 shrink-0" />
                             <span className="text-muted-foreground truncate" title={currentImage.category}>{currentImage.category}</span>
                           </div>
                         ) : null}
@@ -497,7 +497,7 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                             <div className="space-y-2">
                               {(currentImage.aeoFaqs as { question: string; answer: string }[]).map((faq, i) => (
                                 <div key={i} className="p-3 rounded-md bg-muted/20 border border-border space-y-1">
-                                  <p className="text-sm font-medium text-purple-400" data-testid={`text-review-faq-q-${i}`}>{faq.question}</p>
+                                  <p className="text-sm font-medium text-emerald-400" data-testid={`text-review-faq-q-${i}`}>{faq.question}</p>
                                   <p className="text-sm text-muted-foreground" data-testid={`text-review-faq-a-${i}`}>{faq.answer}</p>
                                 </div>
                               ))}
@@ -505,9 +505,9 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                           </div>
                         )}
 
-                        <div className="p-3 rounded-md bg-purple-500/5 border border-purple-500/20 space-y-1.5">
+                        <div className="p-3 rounded-md bg-emerald-500/5 border border-emerald-500/20 space-y-1.5">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">AI Assistant Preview</p>
-                          <p className="text-xs italic text-purple-300/80">
+                          <p className="text-xs italic text-emerald-300/80">
                             "{(isEditing ? editState?.aeoSnippet : currentImage.aeoSnippet) || "Tell me about this product..."}"
                           </p>
                         </div>

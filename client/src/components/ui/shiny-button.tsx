@@ -9,7 +9,7 @@ interface ShinyButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 export const ShinyButton = React.forwardRef<HTMLButtonElement, ShinyButtonProps>(
-  ({ children, className, gradient = "from-primary via-purple-500 to-primary", ...props }, ref) => {
+  ({ children, className, gradient = "from-primary via-emerald-500 to-primary", ...props }, ref) => {
     return (
       <motion.button
         ref={ref}

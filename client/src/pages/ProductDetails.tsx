@@ -547,7 +547,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="flex-1 text-purple-600 hover:text-purple-700 hover:bg-purple-100/50">
+                        <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50">
                           <ImageIcon className="w-4 h-4 mr-2" />
                           AI Photoshoot
                         </Button>
