@@ -264,14 +264,16 @@ Identify the EXACT product: brand, model, material, color, size. Use specific ta
   "category": "Shopify taxonomy path with ' > ' separators, 2-4 levels deep",
   "mainCategory": "One broad, top-level product grouping (e.g. 'Shoes', 'Outerwear', 'Accessories', 'Electronics', 'Home Decor', 'Jewelry')",
   "productType": "Short Shopify product_type label",
-  "tags": ["8 specific tags: brand, type, material, color, use case, audience, style, occasion"],
+  "tags": ["8 specific tags: brand, type, material, color, use case, audience, style, occupation"],
   "seoTitle": "SEO title (50-60 chars) with brand and product name",
   "seoDescription": "Meta description (140-160 chars) with brand, product, benefit, CTA",
   "altText": "Alt text (max 125 chars) describing what's visible in the image",
   "aeoFaqs": [{"question":"...","answer":"1-2 sentence factual answer"}] (3-5 FAQ pairs for AI answer engines),
   "aeoSnippet": "2-3 sentence conversational summary as if answering 'Tell me about [product]'",
-  "variants": [{"name":"Size","values":["S","M","L"]}] (logical variants or empty array)
-}`
+  "variants": VARIANT_RULES
+}
+
+VARIANT_RULES: Always detect the exact color(s) visible in the image. For apparel/clothing/footwear always include both a Color option and a Size option. Sizes default to ["S","M","L","XL"] unless the product clearly uses a different sizing system (e.g. shoe sizes, numeric waist sizes). Non-apparel items: only include variants that make sense (e.g. storage capacity for electronics, material for furniture). Example for a purple t-shirt: [{"name":"Color","values":["Purple"]},{"name":"Size","values":["S","M","L","XL"]}]. If no variants apply, use [].`
         },
         {
           role: "user",
@@ -381,8 +383,10 @@ You are given ${files.length} images of the SAME product from different angles/v
   "altText": "Alt text (max 125 chars) describing what's visible across all images",
   "aeoFaqs": [{"question":"...","answer":"1-2 sentence factual answer"}] (3-5 FAQ pairs for AI answer engines),
   "aeoSnippet": "2-3 sentence conversational summary as if answering 'Tell me about [product]'",
-  "variants": [{"name":"Size","values":["S","M","L"]}] (logical variants or empty array)
-}`
+  "variants": VARIANT_RULES
+}
+
+VARIANT_RULES: Always detect the exact color(s) visible across all images. For apparel/clothing/footwear always include both a Color option and a Size option. Sizes default to ["S","M","L","XL"] unless the product clearly uses a different sizing system (e.g. shoe sizes, numeric waist sizes). Non-apparel items: only include variants that make sense. Example for a purple t-shirt: [{"name":"Color","values":["Purple"]},{"name":"Size","values":["S","M","L","XL"]}]. If no variants apply, use [].`
           },
           {
             role: "user",

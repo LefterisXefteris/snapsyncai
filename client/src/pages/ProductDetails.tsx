@@ -434,33 +434,55 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               </CardHeader>
               <CardContent className="p-0">
                 {variants.length > 0 ? (
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow className="h-8">
-                        <TableHead className="h-8 py-1">Variant</TableHead>
-                        <TableHead className="h-8 py-1">Price</TableHead>
-                        <TableHead className="h-8 py-1">Available</TableHead>
-                        <TableHead className="h-8 py-1">SKU</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {/* Very naive combination for preview purposes */}
-                      {variants.map(v => v.values).flat().map((val, i) => (
-                        <TableRow key={i} className="h-10">
-                          <TableCell className="font-medium whitespace-nowrap py-1">{val}</TableCell>
-                          <TableCell className="py-1">
-                            <Input defaultValue={price} disabled={isUnpaid} className="h-7 w-20 text-xs" />
-                          </TableCell>
-                          <TableCell className="py-1">
-                            <Input type="number" defaultValue={inventoryQuantity} disabled={isUnpaid} className="h-7 w-16 text-xs" />
-                          </TableCell>
-                          <TableCell className="py-1">
-                            <Input defaultValue={`${sku}-${val.toUpperCase().replace(/\s/g, '')}`} disabled={isUnpaid} className="h-7 min-w-[100px] text-xs" />
-                          </TableCell>
-                        </TableRow>
+                  <>
+                    {/* Option groups summary */}
+                    <div className="px-4 py-3 space-y-2 border-b border-border/50">
+                      {variants.map((v, i) => (
+                        <div key={i} className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-medium text-muted-foreground w-12 shrink-0">{v.name}</span>
+                          <div className="flex flex-wrap gap-1">
+                            {v.values.map((val: string) => (
+                              <Badge key={val} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal">{val}</Badge>
+                            ))}
+                          </div>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                    {/* Combinations table */}
+                    <Table className="text-xs">
+                      <TableHeader>
+                        <TableRow className="h-8">
+                          <TableHead className="h-8 py-1">Variant</TableHead>
+                          <TableHead className="h-8 py-1">Price</TableHead>
+                          <TableHead className="h-8 py-1">Available</TableHead>
+                          <TableHead className="h-8 py-1">SKU</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {variants.reduce<string[][]>((acc, v) => {
+                          if (acc.length === 0) return v.values.map((val: string) => [val]);
+                          return acc.flatMap((combo: string[]) => v.values.map((val: string) => [...combo, val]));
+                        }, []).map((combo, i) => {
+                          const label = combo.join(" / ");
+                          const skuSuffix = combo.map((v: string) => v.toUpperCase().replace(/\s/g, '')).join('-');
+                          return (
+                            <TableRow key={i} className="h-10">
+                              <TableCell className="font-medium whitespace-nowrap py-1">{label}</TableCell>
+                              <TableCell className="py-1">
+                                <Input defaultValue={price} disabled={isUnpaid} className="h-7 w-20 text-xs" />
+                              </TableCell>
+                              <TableCell className="py-1">
+                                <Input type="number" defaultValue={inventoryQuantity} disabled={isUnpaid} className="h-7 w-16 text-xs" />
+                              </TableCell>
+                              <TableCell className="py-1">
+                                <Input defaultValue={sku ? `${sku}-${skuSuffix}` : skuSuffix} disabled={isUnpaid} className="h-7 min-w-[100px] text-xs" />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </>
                 ) : (
                   <div className="p-4 text-xs text-muted-foreground">
                     This product has no variants. Click the button above to add options like size or color.
