@@ -912,7 +912,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/subscription/status", requireAuth(), async (req, res) => {
     try {
       const userId = getUserId(req);
-      const sub = await storage.getSubscription(userId);
+      let sub = await storage.getSubscription(userId);
+
+      // Auto-recover: if no subscription found by userId, try to find one in Stripe
+      // by the user's email and re-link it. This handles the case where the user
+      // subscribed under a different Clerk account (e.g. Google vs email sign-in).
+      if (!sub) {
+        try {
+          const clerkUser = await clerkClient.users.getUser(userId);
+          const email = clerkUser.emailAddresses?.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
+            ?? clerkUser.emailAddresses?.[0]?.emailAddress;
+
+          if (email) {
+            const stripe = await getUncachableStripeClient();
+            const customers = await stripe.customers.list({ email, limit: 5 });
+            for (const customer of customers.data) {
+              const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 3 });
+              const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+              if (activeSub) {
+                const periodEnd = activeSub.current_period_end
+                  ? new Date(activeSub.current_period_end * 1000) : null;
+                sub = await storage.upsertSubscription({
+                  userId,
+                  stripeCustomerId: customer.id,
+                  stripeSubscriptionId: activeSub.id,
+                  status: activeSub.status,
+                  currentPeriodEnd: periodEnd,
+                });
+                console.log(`Auto-recovered subscription ${activeSub.id} for user ${userId} via email ${email}`);
+                break;
+              }
+            }
+          }
+        } catch (recoverErr: any) {
+          // Non-fatal — log and fall through to subscribed: false
+          console.warn('Auto-recover subscription failed (non-fatal):', recoverErr.message);
+        }
+      }
+
       if (sub) {
         const isActive = sub.status === 'active' || sub.status === 'trialing';
         const periodEnd = sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null;
