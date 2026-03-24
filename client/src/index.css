@@ -75,11 +75,18 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
     font-family: var(--font-body);
   }
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
   }
 }
@@ -89,9 +96,11 @@
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-border rounded-full hover:bg-muted-foreground/50 transition-colors;
 }
@@ -109,6 +118,7 @@
 .text-gradient {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-white via-white/80 to-white/60;
 }
+
 .text-gradient-primary {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-emerald-400;
 }
@@ -119,8 +129,15 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Code block styling */
@@ -131,10 +148,23 @@ pre {
 /* ── Lightweight particle field ── */
 /* Uses GPU-composited transform + opacity only. No JS update loop. */
 @keyframes particle-drift {
-  0%   { transform: translateY(0)      translateX(0)    scale(1);   opacity: 0; }
-  12%  { opacity: 1; }
-  88%  { opacity: 1; }
-  100% { transform: translateY(-140px) translateX(24px) scale(0.6); opacity: 0; }
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  88% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-140px) translateX(24px) scale(0.6);
+    opacity: 0;
+  }
 }
 
 .particle {
@@ -151,24 +181,43 @@ pre {
   opacity: 0;
   transform: translateY(28px);
   transition:
-    opacity  0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 .reveal.revealed {
   opacity: 1;
   transform: translateY(0);
 }
-.reveal.delay-1 { transition-delay: 0.10s; }
-.reveal.delay-2 { transition-delay: 0.20s; }
-.reveal.delay-3 { transition-delay: 0.30s; }
-.reveal.delay-4 { transition-delay: 0.40s; }
-.reveal.delay-5 { transition-delay: 0.50s; }
+
+.reveal.delay-1 {
+  transition-delay: 0.10s;
+}
+
+.reveal.delay-2 {
+  transition-delay: 0.20s;
+}
+
+.reveal.delay-3 {
+  transition-delay: 0.30s;
+}
+
+.reveal.delay-4 {
+  transition-delay: 0.40s;
+}
+
+.reveal.delay-5 {
+  transition-delay: 0.50s;
+}
 
 /* ── Premium UI Animations & Effects ── */
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-12px);
   }
@@ -183,10 +232,13 @@ pre {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.5;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.05);

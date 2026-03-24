@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
+import { pool } from './db';
 
 const app = express();
 const httpServer = createServer(app);
@@ -131,9 +132,19 @@ app.use((req, res, next) => {
 
 let setupPromise: Promise<void> | null = null;
 
+async function runAppMigrations() {
+  try {
+    await pool.query(`ALTER TABLE images ADD COLUMN IF NOT EXISTS product_group_id TEXT`);
+    console.log('App migrations complete');
+  } catch (err) {
+    console.error('App migration error (non-fatal):', err);
+  }
+}
+
 export const setupApp = async () => {
   if (!setupPromise) {
     setupPromise = (async () => {
+      await runAppMigrations();
       await initStripe();
       await registerRoutes(httpServer, app);
 

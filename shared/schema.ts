@@ -43,6 +43,7 @@ export const images = pgTable("images", {
   productContext: text("product_context"),
   brandTone: text("brand_tone").default("professional"),
   aiData: jsonb("ai_data"),
+  productGroupId: text("product_group_id"),
   sessionId: text("session_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });

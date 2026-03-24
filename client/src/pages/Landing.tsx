@@ -6,9 +6,9 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Sparkles, Upload, Store, Zap, Shield, BrainCircuit, Image, Tags, FileText,
-  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers
+  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart
 } from "lucide-react";
-import { SiShopify, SiEtsy, SiAmazon } from "react-icons/si";
+import { SiShopify, SiEtsy } from "react-icons/si";
 import { useClerk } from "@clerk/clerk-react";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 
@@ -330,7 +330,7 @@ export default function Landing() {
                   <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Etsy</span>
                 </div>
                 <div className="flex items-center gap-2 group cursor-pointer">
-                  <SiAmazon className="w-6 h-6 text-[#FF9900] group-hover:scale-110 transition-transform" />
+                  <ShoppingCart className="w-6 h-6 text-[#FF9900] group-hover:scale-110 transition-transform" />
                   <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Amazon</span>
                 </div>
               </div>

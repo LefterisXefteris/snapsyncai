@@ -114,13 +114,14 @@ export function useUploadImages() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ files, productContext, brandTone, hideToast }: { files: File[]; productContext?: string; brandTone?: string; hideToast?: boolean }) => {
+    mutationFn: async ({ files, productContext, brandTone, groupAsOne, hideToast }: { files: File[]; productContext?: string; brandTone?: string; groupAsOne?: boolean; hideToast?: boolean }) => {
       const formData = new FormData();
       files.forEach((file) => {
         formData.append("images", file);
       });
       if (productContext) formData.append("productContext", productContext);
       if (brandTone) formData.append("brandTone", brandTone);
+      if (groupAsOne) formData.append("groupAsOne", "true");
 
       const res = await fetch(api.images.upload.path, {
         method: api.images.upload.method,

@@ -11,6 +11,7 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { clerkMiddleware, requireAuth, getAuth } from "@clerk/express";
+import memoizee from "memoizee";
 
 const MIN_IMAGE_COUNT = 1;
 
@@ -153,7 +154,17 @@ interface QuickPreview {
   tags: string[];
 }
 
-async function quickPreviewImage(buffer: Buffer, mimeType: string, originalName: string, productContext?: string, brandTone?: string): Promise<QuickPreview> {
+function imageHashNormalizer(args: any[]) {
+  const buffer: Buffer = args[0];
+  const stringsToHash = args.slice(1).map((arg: any) => String(arg)).join('|');
+  const hash = crypto.createHash('sha256');
+  hash.update(buffer);
+  hash.update(stringsToHash);
+  return hash.digest('hex');
+}
+
+const quickPreviewImage = memoizee(
+  async function _quickPreviewImage(buffer: Buffer, mimeType: string, originalName: string, productContext?: string, brandTone?: string): Promise<QuickPreview> {
   try {
     const base64Image = buffer.toString('base64');
     const contextHint = productContext
@@ -221,9 +232,15 @@ Respond with JSON:
       tags: [],
     };
   }
-}
+}, {
+  promise: true,
+  normalizer: imageHashNormalizer,
+  maxAge: 24 * 60 * 60 * 1000, // Cache for 24 hours
+  max: 1000 // Keep up to 1000 items in memory
+});
 
-async function fullAnalyzeImage(buffer: Buffer, mimeType: string, originalName: string, tone: string = "professional", productContext?: string, attempt: number = 1): Promise<ProductAnalysis> {
+const fullAnalyzeImage = memoizee(
+  async function _fullAnalyzeImage(buffer: Buffer, mimeType: string, originalName: string, tone: string = "professional", productContext?: string, attempt: number = 1): Promise<ProductAnalysis> {
   const MAX_RETRIES = 2;
   const toneGuide = toneInstructions[tone] || toneInstructions.professional;
   const contextGuide = productContext
@@ -317,6 +334,192 @@ Identify the EXACT product: brand, model, material, color, size. Use specific ta
       aeoFaqs: [],
       aeoSnippet: "",
       variants: [],
+    };
+  }
+}, {
+  promise: true,
+  normalizer: imageHashNormalizer,
+  maxAge: 24 * 60 * 60 * 1000,
+  max: 1000
+});
+
+// Analyzes multiple images of the SAME product in one AI call — returns a single listing
+async function fullAnalyzeMultipleImages(
+  files: { buffer: Buffer; mimeType: string; originalName: string }[],
+  tone: string = "professional",
+  productContext?: string
+): Promise<ProductAnalysis> {
+  const MAX_RETRIES = 2;
+  const toneGuide = toneInstructions[tone] || toneInstructions.professional;
+  const contextGuide = productContext ? `\nSeller context: "${productContext}".` : "";
+
+  async function attempt(n: number): Promise<ProductAnalysis> {
+    try {
+      const imageContent = files.map(f => ({
+        type: "image_url" as const,
+        image_url: { url: `data:${f.mimeType};base64,${f.buffer.toString('base64')}` }
+      }));
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        messages: [
+          {
+            role: "system",
+            content: `E-commerce product listing expert for Shopify/Etsy/Amazon. ${toneGuide}${contextGuide}
+
+You are given ${files.length} images of the SAME product from different angles/views. Use ALL images together to fully understand the product. Identify the EXACT product: brand, model, material, color, size. Generate ONE unified product listing. Respond with JSON:
+{
+  "title": "Specific title (max 80 chars) with brand, type, key attribute",
+  "description": "3-4 sentence HTML description with <p>, <ul>, <li>. Include brand, materials, dimensions, target buyer.",
+  "price": "Retail price string e.g. '29.99'",
+  "category": "Shopify taxonomy path with ' > ' separators, 2-4 levels deep",
+  "mainCategory": "One broad, top-level product grouping (e.g. 'Shoes', 'Outerwear', 'Accessories', 'Electronics', 'Home Decor', 'Jewelry')",
+  "productType": "Short Shopify product_type label",
+  "tags": ["8 specific tags: brand, type, material, color, use case, audience, style, occasion"],
+  "seoTitle": "SEO title (50-60 chars) with brand and product name",
+  "seoDescription": "Meta description (140-160 chars) with brand, product, benefit, CTA",
+  "altText": "Alt text (max 125 chars) describing what's visible across all images",
+  "aeoFaqs": [{"question":"...","answer":"1-2 sentence factual answer"}] (3-5 FAQ pairs for AI answer engines),
+  "aeoSnippet": "2-3 sentence conversational summary as if answering 'Tell me about [product]'",
+  "variants": [{"name":"Size","values":["S","M","L"]}] (logical variants or empty array)
+}`
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `Analyze these ${files.length} images of the same product (${files.map(f => f.originalName).join(', ')}). JSON only.` },
+              ...imageContent,
+            ],
+          },
+        ],
+        max_completion_tokens: 2000,
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0].message.content || "";
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        const cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+      }
+      if (parsed && parsed.title && parsed.description && parsed.description.length > 20) {
+        return {
+          title: parsed.title,
+          description: parsed.description,
+          price: String(parsed.price || "0.00"),
+          category: parsed.category || "Other",
+          mainCategory: parsed.mainCategory || "Uncategorized",
+          productType: parsed.productType || "",
+          tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
+          seoTitle: parsed.seoTitle || parsed.title,
+          seoDescription: parsed.seoDescription || "",
+          altText: parsed.altText || "",
+          aeoFaqs: Array.isArray(parsed.aeoFaqs) ? parsed.aeoFaqs : [],
+          aeoSnippet: parsed.aeoSnippet || "",
+          variants: Array.isArray(parsed.variants) ? parsed.variants : [],
+        };
+      }
+      throw new Error("Incomplete AI response: " + content.substring(0, 200));
+    } catch (error) {
+      console.error(`Multi-image full analysis error (attempt ${n}/${MAX_RETRIES}):`, error);
+      if (n < MAX_RETRIES) return attempt(n + 1);
+      return {
+        title: files[0].originalName.replace(/\.[^/.]+$/, ""),
+        description: "Failed to analyze images.",
+        price: "0.00",
+        category: "Other",
+        mainCategory: "Uncategorized",
+        productType: "",
+        tags: [],
+        seoTitle: "",
+        seoDescription: "",
+        altText: "",
+        aeoFaqs: [],
+        aeoSnippet: "",
+        variants: [],
+      };
+    }
+  }
+
+  return attempt(1);
+}
+
+async function quickPreviewMultipleImages(
+  files: { buffer: Buffer; mimeType: string; originalName: string }[],
+  productContext?: string,
+  brandTone?: string
+): Promise<QuickPreview> {
+  const contextHint = productContext
+    ? `\n\nThe seller describes these products as: "${productContext}". Use this to more accurately classify the product.`
+    : "";
+  const toneHint = brandTone && toneInstructions[brandTone]
+    ? `\nBrand voice: ${toneInstructions[brandTone]}`
+    : "";
+
+  try {
+    const imageContent = files.map(f => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${f.mimeType};base64,${f.buffer.toString('base64')}` }
+    }));
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      messages: [
+        {
+          role: "system",
+          content: `Product image classifier for Shopify/Etsy/Amazon. You are given ${files.length} images of the SAME product. Identify the EXACT product including brand, model, material, color from all images combined.${contextHint}${toneHint}
+
+Respond with JSON:
+{
+  "title": "Specific title (max 80 chars) with brand, type, key attribute",
+  "category": "Shopify taxonomy path with ' > ' separators, 2-4 levels deep",
+  "mainCategory": "One broad, top-level product grouping (e.g. 'Shoes', 'Outerwear', 'Accessories', 'Electronics', 'Home Decor', 'Jewelry')",
+  "productType": "Short Shopify product_type label",
+  "tags": ["5 specific tags: brand, type, material, color, use case"]
+}`
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Classify this product from ${files.length} images. JSON only.` },
+            ...imageContent,
+          ],
+        },
+      ],
+      max_completion_tokens: 300,
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0].message.content || "";
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      const cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+    }
+    if (parsed) {
+      return {
+        title: parsed.title || files[0].originalName.replace(/\.[^/.]+$/, ""),
+        category: parsed.category || "Other",
+        mainCategory: parsed.mainCategory || "Uncategorized",
+        productType: parsed.productType || "",
+        tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
+      };
+    }
+    throw new Error("No JSON in multi-image quick preview");
+  } catch (error) {
+    console.error("Multi-image quick preview error:", error);
+    return {
+      title: files[0].originalName.replace(/\.[^/.]+$/, ""),
+      category: "Other",
+      mainCategory: "Uncategorized",
+      productType: "",
+      tags: [],
     };
   }
 }
@@ -920,10 +1123,110 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const sessionId = getUserId(req);
       const productContext = (req.body?.productContext as string) || "";
       const brandTone = (req.body?.brandTone as string) || "professional";
+      const groupAsOne = req.body?.groupAsOne === "true" || req.body?.groupAsOne === true;
 
       const sub = await storage.getSubscription(sessionId);
       const hasActiveSubscription = sub && (sub.status === 'active' || sub.status === 'trialing');
 
+      // When groupAsOne=true and multiple files: analyze all images together as one product
+      if (groupAsOne && files.length > 1) {
+        const groupId = crypto.randomUUID();
+        const fileInputs = files.map(f => ({ buffer: f.buffer, mimeType: f.mimetype, originalName: f.originalname }));
+
+        let analysis: ProductAnalysis | QuickPreview | null = null;
+        let analysisSucceeded = false;
+
+        if (hasActiveSubscription) {
+          const fullAnalysis = await fullAnalyzeMultipleImages(fileInputs, brandTone, productContext || undefined);
+          analysis = fullAnalysis;
+          analysisSucceeded = fullAnalysis.description !== "Failed to analyze images.";
+        } else {
+          analysis = await quickPreviewMultipleImages(fileInputs, productContext || undefined, brandTone);
+          analysisSucceeded = true;
+        }
+
+        const results = await Promise.all(files.map(async (file, idx) => {
+          const imageDataBase64 = file.buffer.toString('base64');
+          const isPrimary = idx === 0;
+
+          try {
+            let image;
+            if (hasActiveSubscription && analysisSucceeded) {
+              const a = analysis as ProductAnalysis;
+              image = await storage.createImage({
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+                imageData: imageDataBase64,
+                title: isPrimary ? a.title : `${a.title} (view ${idx + 1})`,
+                description: isPrimary ? a.description : undefined,
+                price: isPrimary ? a.price : undefined,
+                category: a.category,
+                mainCategory: (a as any).mainCategory,
+                productType: a.productType,
+                tags: isPrimary ? a.tags : [],
+                seoTitle: isPrimary ? a.seoTitle : undefined,
+                seoDescription: isPrimary ? a.seoDescription : undefined,
+                altText: a.altText,
+                aeoFaqs: isPrimary ? a.aeoFaqs : undefined,
+                aeoSnippet: isPrimary ? a.aeoSnippet : undefined,
+                variants: isPrimary ? a.variants : undefined,
+                aiData: isPrimary ? a : undefined,
+                shopifyStatus: "pending",
+                paymentStatus: "paid",
+                productContext: productContext || null,
+                brandTone,
+                productGroupId: groupId,
+                sessionId,
+              });
+            } else {
+              const a = analysis as QuickPreview;
+              image = await storage.createImage({
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+                imageData: imageDataBase64,
+                title: isPrimary ? a.title : `${a.title} (view ${idx + 1})`,
+                category: a.category,
+                mainCategory: (a as any).mainCategory,
+                productType: a.productType,
+                tags: isPrimary ? a.tags : [],
+                shopifyStatus: "pending",
+                paymentStatus: hasActiveSubscription ? "paid" : "unpaid",
+                productContext: productContext || null,
+                brandTone,
+                productGroupId: groupId,
+                sessionId,
+              });
+            }
+            imageBuffers.set(image.id, file.buffer);
+            return image;
+          } catch (err) {
+            console.error(`Failed to store grouped image ${file.originalname}:`, err);
+            const fallback = await storage.createImage({
+              originalName: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              imageData: imageDataBase64,
+              title: file.originalname.replace(/\.[^/.]+$/, ""),
+              category: "Other",
+              tags: [],
+              shopifyStatus: "pending",
+              paymentStatus: hasActiveSubscription ? "paid" : "unpaid",
+              productContext: productContext || null,
+              brandTone,
+              productGroupId: groupId,
+              sessionId,
+            });
+            imageBuffers.set(fallback.id, file.buffer);
+            return fallback;
+          }
+        }));
+
+        return res.status(200).json(results);
+      }
+
+      // Default: process each image independently
       const results = await runWithConcurrency(files, CONCURRENCY_LIMIT, async (file) => {
         try {
           const imageDataBase64 = file.buffer.toString('base64');
