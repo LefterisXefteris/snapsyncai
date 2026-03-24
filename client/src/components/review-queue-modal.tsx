@@ -33,7 +33,39 @@ interface EditState {
 }
 
 export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected }: ReviewQueueModalProps) {
-  const pendingImages = useMemo(() => images.filter(img => img.shopifyStatus === "pending"), [images]);
+  // Only show primary images in the queue — deduplicate by productGroupId
+  // and filter out secondary view images (those without a description in a group)
+  const pendingImages = useMemo(() => {
+    const pending = images
+      .filter(img => img.shopifyStatus === "pending")
+      .sort((a, b) => {
+        if (a.description && !b.description) return -1;
+        if (!a.description && b.description) return 1;
+        return a.id - b.id;
+      });
+    const seen = new Set<string>();
+    return pending.filter(img => {
+      if (!img.productGroupId) return true;
+      if (seen.has(img.productGroupId)) return false;
+      seen.add(img.productGroupId);
+      return true;
+    });
+  }, [images]);
+
+  // Map each primary to its companion view images
+  const viewsMap = useMemo(() => {
+    const map = new Map<number, Image[]>();
+    for (const primary of pendingImages) {
+      if (primary.productGroupId) {
+        map.set(primary.id, images.filter(
+          img => img.productGroupId === primary.productGroupId && img.id !== primary.id
+        ));
+      } else {
+        map.set(primary.id, []);
+      }
+    }
+    return map;
+  }, [pendingImages, images]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [approvedIds, setApprovedIds] = useState<Set<number>>(new Set());
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -168,27 +200,35 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-1">
-                {pendingImages.map((img, idx) => (
-                  <button
-                    key={img.id}
-                    data-testid={`button-queue-item-${img.id}`}
-                    onClick={() => { setCurrentIndex(idx); cancelEditing(); }}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
-                      idx === currentIndex ? "bg-primary/10 text-primary" : "text-muted-foreground hover-elevate"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={approvedIds.has(img.id)}
-                      onCheckedChange={() => toggleApprove(img.id)}
-                      className="flex-shrink-0"
-                      data-testid={`checkbox-approve-${img.id}`}
-                    />
-                    <span className="truncate flex-1 text-xs">{img.title || img.originalName}</span>
-                    {approvedIds.has(img.id) && (
-                      <Check className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
-                    )}
-                  </button>
-                ))}
+                {pendingImages.map((img, idx) => {
+                  const viewCount = viewsMap.get(img.id)?.length ?? 0;
+                  return (
+                    <button
+                      key={img.id}
+                      data-testid={`button-queue-item-${img.id}`}
+                      onClick={() => { setCurrentIndex(idx); cancelEditing(); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                        idx === currentIndex ? "bg-primary/10 text-primary" : "text-muted-foreground hover-elevate"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={approvedIds.has(img.id)}
+                        onCheckedChange={() => toggleApprove(img.id)}
+                        className="flex-shrink-0"
+                        data-testid={`checkbox-approve-${img.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="truncate block text-xs">{img.title || img.originalName}</span>
+                        {viewCount > 0 && (
+                          <span className="text-[10px] opacity-60">{viewCount + 1} images</span>
+                        )}
+                      </div>
+                      {approvedIds.has(img.id) && (
+                        <Check className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
           </div>
@@ -248,16 +288,39 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-5 max-w-2xl mx-auto">
                     <div className="flex items-start gap-4">
-                      <div className="w-24 h-24 rounded-md bg-muted/30 border border-border flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-                        <img
-                          src={`/api/images/${currentImage.id}/file?sz=${currentImage.size}&t=${new Date(currentImage.createdAt || Date.now()).getTime()}`}
-                          alt={currentImage.altText || currentImage.title || currentImage.originalName}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          data-testid={`img-review-product-${currentImage.id}`}
-                        />
-                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                      <div className="flex flex-col gap-1.5 flex-shrink-0">
+                        <div className="w-24 h-24 rounded-md bg-muted/30 border border-border flex items-center justify-center overflow-hidden relative">
+                          <img
+                            src={`/api/images/${currentImage.id}/file?sz=${currentImage.size}&t=${new Date(currentImage.createdAt || Date.now()).getTime()}`}
+                            alt={currentImage.altText || currentImage.title || currentImage.originalName}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            data-testid={`img-review-product-${currentImage.id}`}
+                          />
+                          <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        {/* View images strip */}
+                        {(viewsMap.get(currentImage.id)?.length ?? 0) > 0 && (
+                          <div className="flex gap-1">
+                            {viewsMap.get(currentImage.id)!.slice(0, 3).map(v => (
+                              <div key={v.id} className="w-7 h-7 rounded overflow-hidden border border-white/10 relative bg-muted/30">
+                                <img
+                                  src={`/api/images/${v.id}/file?sz=${v.size}`}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              </div>
+                            ))}
+                            {(viewsMap.get(currentImage.id)?.length ?? 0) > 3 && (
+                              <div className="w-7 h-7 rounded bg-white/5 border border-white/10 flex items-center justify-center">
+                                <span className="text-[8px] text-muted-foreground">+{(viewsMap.get(currentImage.id)?.length ?? 0) - 3}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground mb-1">{currentImage.originalName}</p>

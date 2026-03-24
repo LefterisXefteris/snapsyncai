@@ -532,7 +532,8 @@ async function pushProductToShopify(
   image: any,
   accessToken: string,
   shopDomain: string,
-  imageBuffer?: Buffer
+  imageBuffer?: Buffer,
+  viewImages?: { image: any; buffer?: Buffer }[]
 ): Promise<{ shopifyProductId?: string; error?: string }> {
   const apiUrl = `https://${shopDomain}/admin/api/2024-01/products.json`;
 
@@ -587,13 +588,17 @@ async function pushProductToShopify(
       productPayload.product.options = shopifyOptions;
     }
 
+    const allImages: any[] = [];
     if (imageBuffer) {
-      productPayload.product.images = [
-        {
-          attachment: imageBuffer.toString('base64'),
-          alt: image.altText || image.title || "",
-        }
-      ];
+      allImages.push({ attachment: imageBuffer.toString('base64'), alt: image.altText || image.title || "" });
+    }
+    for (const v of viewImages || []) {
+      if (v.buffer) {
+        allImages.push({ attachment: v.buffer.toString('base64'), alt: v.image.altText || v.image.originalName || "" });
+      }
+    }
+    if (allImages.length > 0) {
+      productPayload.product.images = allImages;
     }
 
     const response = await fetch(apiUrl, {
@@ -1466,8 +1471,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const accessToken = connection.accessToken;
       const shopDomain = connection.shopDomain;
 
-      const allImages = await storage.getImagesByIds(ids);
-      const imagesToPush = allImages.filter(img => img.sessionId === getUserId(req));
+      const selectedImages = await storage.getImagesByIds(ids);
+      const imagesToPush = selectedImages.filter(img => img.sessionId === getUserId(req));
       if (imagesToPush.length === 0) {
         return res.status(400).json({ message: "No images found for given IDs" });
       }
@@ -1480,26 +1485,53 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
 
+      // Load all user images to find companion views for grouped products
+      const allUserImages = await storage.getAllImages(getUserId(req));
+
+      // Build product list — group by productGroupId so views become extra images
+      const processedGroups = new Set<string>();
+      type ProductEntry = { primary: typeof imagesToPush[0]; views: typeof allUserImages };
+      const productsToPush: ProductEntry[] = [];
+
+      for (const img of imagesToPush) {
+        if (img.productGroupId) {
+          if (processedGroups.has(img.productGroupId)) continue;
+          processedGroups.add(img.productGroupId);
+          const allInGroup = allUserImages
+            .filter(i => i.productGroupId === img.productGroupId)
+            .sort((a, b) => {
+              if (a.description && !b.description) return -1;
+              if (!a.description && b.description) return 1;
+              return a.id - b.id;
+            });
+          productsToPush.push({ primary: allInGroup[0], views: allInGroup.slice(1) });
+        } else {
+          productsToPush.push({ primary: img, views: [] });
+        }
+      }
+
       let successCount = 0;
       let failCount = 0;
       const results: { id: number; shopifyProductId?: string; error?: string }[] = [];
 
-      for (const image of imagesToPush) {
-        const buffer = imageBuffers.get(image.id) || (image.imageData ? Buffer.from(image.imageData, 'base64') : null);
-        const result = await pushProductToShopify(image, accessToken, shopDomain, buffer || undefined);
+      for (const { primary, views } of productsToPush) {
+        const buffer = imageBuffers.get(primary.id) || (primary.imageData ? Buffer.from(primary.imageData, 'base64') : null);
+        const viewData = views.map(v => ({
+          image: v,
+          buffer: imageBuffers.get(v.id) || (v.imageData ? Buffer.from(v.imageData, 'base64') : undefined),
+        }));
+        const result = await pushProductToShopify(primary, accessToken, shopDomain, buffer || undefined, viewData);
         if (result.shopifyProductId) {
-          await storage.updateImage(image.id, {
-            shopifyProductId: result.shopifyProductId,
-            shopifyStatus: "synced",
-          });
+          await storage.updateImage(primary.id, { shopifyProductId: result.shopifyProductId, shopifyStatus: "synced" });
+          for (const v of views) {
+            await storage.updateImage(v.id, { shopifyProductId: result.shopifyProductId, shopifyStatus: "synced" });
+          }
           successCount++;
-          results.push({ id: image.id, shopifyProductId: result.shopifyProductId });
+          results.push({ id: primary.id, shopifyProductId: result.shopifyProductId });
         } else {
-          await storage.updateImage(image.id, {
-            shopifyStatus: "failed",
-          });
+          await storage.updateImage(primary.id, { shopifyStatus: "failed" });
           failCount++;
-          results.push({ id: image.id, error: result.error });
+          results.push({ id: primary.id, error: result.error });
         }
         await delay(500);
       }
