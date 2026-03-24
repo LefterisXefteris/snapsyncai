@@ -11,6 +11,7 @@ export function useImages() {
       if (!res.ok) throw new Error("Failed to fetch images");
       return res.json();
     },
+    staleTime: 30_000, // treat data as fresh for 30s — avoids refetch on every component mount
   });
 }
 

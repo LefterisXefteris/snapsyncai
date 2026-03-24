@@ -2,12 +2,60 @@ import { images, shopifyConnections, etsyConnections, amazonConnections, instagr
 import { db } from "./db";
 import { eq, desc, inArray, sql } from "drizzle-orm";
 
+// Columns returned for list queries — excludes imageData (large base64 blob)
+const listColumns = {
+  id: images.id,
+  originalName: images.originalName,
+  mimeType: images.mimeType,
+  size: images.size,
+  title: images.title,
+  description: images.description,
+  price: images.price,
+  category: images.category,
+  mainCategory: images.mainCategory,
+  generatedBackgrounds: images.generatedBackgrounds,
+  productType: images.productType,
+  tags: images.tags,
+  seoTitle: images.seoTitle,
+  seoDescription: images.seoDescription,
+  altText: images.altText,
+  aeoFaqs: images.aeoFaqs,
+  aeoSnippet: images.aeoSnippet,
+  variants: images.variants,
+  compareAtPrice: images.compareAtPrice,
+  costPerItem: images.costPerItem,
+  sku: images.sku,
+  barcode: images.barcode,
+  trackQuantity: images.trackQuantity,
+  inventoryQuantity: images.inventoryQuantity,
+  mediaGallery: images.mediaGallery,
+  collections: images.collections,
+  shopifyProductId: images.shopifyProductId,
+  shopifyStatus: images.shopifyStatus,
+  etsyListingId: images.etsyListingId,
+  etsyStatus: images.etsyStatus,
+  amazonListingId: images.amazonListingId,
+  amazonStatus: images.amazonStatus,
+  instagramPostId: images.instagramPostId,
+  instagramStatus: images.instagramStatus,
+  instagramCaption: images.instagramCaption,
+  paymentStatus: images.paymentStatus,
+  productContext: images.productContext,
+  brandTone: images.brandTone,
+  aiData: images.aiData,
+  productGroupId: images.productGroupId,
+  sessionId: images.sessionId,
+  createdAt: images.createdAt,
+} as const;
+
 export interface IStorage {
   createImage(image: InsertImage): Promise<Image>;
+  listImages(sessionId?: string): Promise<Omit<Image, 'imageData'>[]>;
   getAllImages(sessionId?: string): Promise<Image[]>;
   getImage(id: number): Promise<Image | undefined>;
   getImagesByIds(ids: number[]): Promise<Image[]>;
   updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined>;
+  updateImagesByGroupId(groupId: string, updates: Partial<InsertImage>): Promise<void>;
   deleteImage(id: number): Promise<void>;
   getShopifyConnection(sessionId: string): Promise<ShopifyConnection | undefined>;
   upsertShopifyConnection(connection: InsertShopifyConnection): Promise<ShopifyConnection>;
@@ -36,6 +84,14 @@ export class DatabaseStorage implements IStorage {
     return newImage;
   }
 
+  // List without imageData — use for API responses where the blob is not needed
+  async listImages(sessionId?: string): Promise<Omit<Image, 'imageData'>[]> {
+    if (sessionId) {
+      return db.select(listColumns).from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
+    }
+    return db.select(listColumns).from(images).orderBy(desc(images.createdAt));
+  }
+
   async getAllImages(sessionId?: string): Promise<Image[]> {
     if (sessionId) {
       return db.select().from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
@@ -56,6 +112,10 @@ export class DatabaseStorage implements IStorage {
   async updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined> {
     const [updated] = await db.update(images).set(updates).where(eq(images.id, id)).returning();
     return updated;
+  }
+
+  async updateImagesByGroupId(groupId: string, updates: Partial<InsertImage>): Promise<void> {
+    await db.update(images).set(updates).where(eq(images.productGroupId, groupId));
   }
 
   async deleteImage(id: number): Promise<void> {

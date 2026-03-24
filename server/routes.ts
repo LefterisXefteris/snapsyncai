@@ -25,7 +25,17 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+// LRU-capped buffer store: keeps at most MAX_BUFFER_ENTRIES recent image buffers in memory.
+// On overflow the oldest entry (first inserted) is evicted.
+const MAX_BUFFER_ENTRIES = 500;
 const imageBuffers = new Map<number, Buffer>();
+function setImageBuffer(id: number, buf: Buffer) {
+  if (imageBuffers.size >= MAX_BUFFER_ENTRIES && !imageBuffers.has(id)) {
+    const oldest = imageBuffers.keys().next().value;
+    if (oldest !== undefined) imageBuffers.delete(oldest);
+  }
+  setImageBuffer(id, buf);
+}
 
 const CONCURRENCY_LIMIT = 10;
 
@@ -1264,7 +1274,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 sessionId,
               });
             }
-            imageBuffers.set(image.id, file.buffer);
+            setImageBuffer(image.id, file.buffer);
             return image;
           } catch (err) {
             console.error(`Failed to store grouped image ${file.originalname}:`, err);
@@ -1283,7 +1293,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               productGroupId: groupId,
               sessionId,
             });
-            imageBuffers.set(fallback.id, file.buffer);
+            setImageBuffer(fallback.id, file.buffer);
             return fallback;
           }
         }));
@@ -1325,7 +1335,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               sessionId,
             });
 
-            imageBuffers.set(image.id, file.buffer);
+            setImageBuffer(image.id, file.buffer);
             return image;
           }
 
@@ -1347,7 +1357,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             sessionId,
           });
 
-          imageBuffers.set(image.id, file.buffer);
+          setImageBuffer(image.id, file.buffer);
           return image;
         } catch (err) {
           console.error(`Failed to process ${file.originalname}:`, err);
@@ -1366,7 +1376,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             brandTone,
             sessionId,
           });
-          imageBuffers.set(fallbackImage.id, file.buffer);
+          setImageBuffer(fallbackImage.id, file.buffer);
           return fallbackImage;
         }
       });
@@ -1381,9 +1391,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/images", requireAuth(), async (req, res) => {
     try {
       const sessionId = getUserId(req);
-      const allImages = await storage.getAllImages(sessionId);
-      const imagesWithoutData = allImages.map(({ imageData, ...rest }) => rest);
-      res.json(imagesWithoutData);
+      const allImages = await storage.listImages(sessionId);
+      res.json(allImages);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch images" });
     }
@@ -1545,28 +1554,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
 
-      // Load all user images to find companion views for grouped products
-      const allUserImages = await storage.getAllImages(getUserId(req));
+      // Load all user images (without imageData blob) to find companion views
+      const allUserImages = await storage.listImages(getUserId(req));
 
-      // Build product list — group by productGroupId so views become extra images
+      type ListedImage = typeof allUserImages[0];
+      // Pre-build groupId → sorted members map in one pass — O(n) not O(n²)
+      const groupMap = new Map<string, ListedImage[]>();
+      for (const img of allUserImages) {
+        if (img.productGroupId) {
+          const arr = groupMap.get(img.productGroupId) ?? [];
+          arr.push(img);
+          groupMap.set(img.productGroupId, arr);
+        }
+      }
+      // Sort each group: primary (has description) first, then by id
+      groupMap.forEach((arr) => {
+        arr.sort((a: ListedImage, b: ListedImage) => {
+          if (a.description && !b.description) return -1;
+          if (!a.description && b.description) return 1;
+          return a.id - b.id;
+        });
+      });
+
       const processedGroups = new Set<string>();
-      type ProductEntry = { primary: typeof imagesToPush[0]; views: typeof allUserImages };
+      type ProductEntry = { primary: ListedImage; views: ListedImage[] };
       const productsToPush: ProductEntry[] = [];
 
       for (const img of imagesToPush) {
         if (img.productGroupId) {
           if (processedGroups.has(img.productGroupId)) continue;
           processedGroups.add(img.productGroupId);
-          const allInGroup = allUserImages
-            .filter(i => i.productGroupId === img.productGroupId)
-            .sort((a, b) => {
-              if (a.description && !b.description) return -1;
-              if (!a.description && b.description) return 1;
-              return a.id - b.id;
-            });
-          productsToPush.push({ primary: allInGroup[0], views: allInGroup.slice(1) });
+          const group: ListedImage[] = groupMap.get(img.productGroupId) ?? [img as unknown as ListedImage];
+          productsToPush.push({ primary: group[0], views: group.slice(1) });
         } else {
-          productsToPush.push({ primary: img, views: [] });
+          productsToPush.push({ primary: img as unknown as ListedImage, views: [] });
         }
       }
 
@@ -1575,16 +1596,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const results: { id: number; shopifyProductId?: string; error?: string }[] = [];
 
       for (const { primary, views } of productsToPush) {
-        const buffer = imageBuffers.get(primary.id) || (primary.imageData ? Buffer.from(primary.imageData, 'base64') : null);
+        const buffer = imageBuffers.get(primary.id) || ((primary as any).imageData ? Buffer.from((primary as any).imageData, 'base64') : null);
         const viewData = views.map(v => ({
           image: v,
-          buffer: imageBuffers.get(v.id) || (v.imageData ? Buffer.from(v.imageData, 'base64') : undefined),
+          buffer: imageBuffers.get(v.id) || ((v as any).imageData ? Buffer.from((v as any).imageData, 'base64') : undefined),
         }));
         const result = await pushProductToShopify(primary, accessToken, shopDomain, buffer || undefined, viewData);
         if (result.shopifyProductId) {
-          await storage.updateImage(primary.id, { shopifyProductId: result.shopifyProductId, shopifyStatus: "synced" });
-          for (const v of views) {
-            await storage.updateImage(v.id, { shopifyProductId: result.shopifyProductId, shopifyStatus: "synced" });
+          // Batch-update all images in the group in one query
+          if (primary.productGroupId) {
+            await storage.updateImagesByGroupId(primary.productGroupId, {
+              shopifyProductId: result.shopifyProductId,
+              shopifyStatus: "synced",
+            });
+          } else {
+            await storage.updateImage(primary.id, { shopifyProductId: result.shopifyProductId, shopifyStatus: "synced" });
           }
           successCount++;
           results.push({ id: primary.id, shopifyProductId: result.shopifyProductId });
@@ -1593,7 +1619,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           failCount++;
           results.push({ id: primary.id, error: result.error });
         }
-        await delay(500);
+        // No artificial delay — 429s from Shopify are handled inside pushProductToShopify
       }
 
       res.json({ success: successCount, failed: failCount, results });
@@ -1768,7 +1794,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           failCount++;
           results.push({ id: image.id, error: result.error });
         }
-        await delay(500);
       }
 
       res.json({ success: successCount, failed: failCount, results });
@@ -2089,7 +2114,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               aiData: analysis,
               sessionId: userId,
             });
-            imageBuffers.set(newImage.id, imgBuffer);
+            setImageBuffer(newImage.id, imgBuffer);
             importedImages.push(newImage);
           } else {
             const preview = await quickPreviewImage(imgBuffer, mimeType, originalName, productContext || media.caption, brandTone);
@@ -2107,7 +2132,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               brandTone: brandTone || 'professional',
               sessionId: userId,
             });
-            imageBuffers.set(newImage.id, imgBuffer);
+            setImageBuffer(newImage.id, imgBuffer);
             importedImages.push(newImage);
           }
         } catch (imgErr) {
@@ -2367,7 +2392,6 @@ Tags: ${(image.tags || []).join(', ')}`
           failCount++;
           results.push({ id: image.id, error: result.error });
         }
-        await delay(500);
       }
 
       res.json({ success: successCount, failed: failCount, results });
@@ -2544,7 +2568,7 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
       });
 
       // Update the in-memory buffer so /api/images/:id/file serves the new image immediately
-      imageBuffers.set(id, newImageBuffer);
+      setImageBuffer(id, newImageBuffer);
 
       res.json(updatedImage);
     } catch (error: any) {
