@@ -136,6 +136,7 @@ interface ProductAnalysis {
   aeoFaqs: { question: string; answer: string }[];
   aeoSnippet: string;
   variants: { name: string; values: string[] }[];
+  imageColors?: string[]; // per-image detected color (index matches files[] order)
 }
 
 const toneInstructions: Record<string, string> = {
@@ -369,24 +370,25 @@ async function fullAnalyzeMultipleImages(
             role: "system",
             content: `E-commerce product listing expert for Shopify/Etsy/Amazon. ${toneGuide}${contextGuide}
 
-You are given ${files.length} images of the SAME product from different angles/views. Use ALL images together to fully understand the product. Identify the EXACT product: brand, model, material, color, size. Generate ONE unified product listing. Respond with JSON:
+You are given ${files.length} images of the SAME product. The images may be different angles of one color, OR different color versions of the same product (e.g. purple, black, brown). Analyze ALL images and generate ONE unified product listing. Respond with JSON:
 {
-  "title": "Specific title (max 80 chars) with brand, type, key attribute",
+  "title": "Specific title (max 80 chars) — omit specific color, use brand+type (e.g. 'Cotton Crew-Neck T-Shirt')",
   "description": "3-4 sentence HTML description with <p>, <ul>, <li>. Include brand, materials, dimensions, target buyer.",
   "price": "Retail price string e.g. '29.99'",
   "category": "Shopify taxonomy path with ' > ' separators, 2-4 levels deep",
   "mainCategory": "One broad, top-level product grouping (e.g. 'Shoes', 'Outerwear', 'Accessories', 'Electronics', 'Home Decor', 'Jewelry')",
   "productType": "Short Shopify product_type label",
-  "tags": ["8 specific tags: brand, type, material, color, use case, audience, style, occasion"],
+  "tags": ["8 specific tags: brand, type, material, colors, use case, audience, style, occasion"],
   "seoTitle": "SEO title (50-60 chars) with brand and product name",
   "seoDescription": "Meta description (140-160 chars) with brand, product, benefit, CTA",
-  "altText": "Alt text (max 125 chars) describing what's visible across all images",
+  "altText": "Alt text (max 125 chars) describing the product across all images",
   "aeoFaqs": [{"question":"...","answer":"1-2 sentence factual answer"}] (3-5 FAQ pairs for AI answer engines),
   "aeoSnippet": "2-3 sentence conversational summary as if answering 'Tell me about [product]'",
+  "imageColors": ["color of image 0", "color of image 1", ...] — detect the EXACT dominant color for EACH image in order (e.g. ["Purple","Black","Brown"]),
   "variants": VARIANT_RULES
 }
 
-VARIANT_RULES: Always detect the exact color(s) visible across all images. For apparel/clothing/footwear always include both a Color option and a Size option. Sizes default to ["S","M","L","XL"] unless the product clearly uses a different sizing system (e.g. shoe sizes, numeric waist sizes). Non-apparel items: only include variants that make sense. Example for a purple t-shirt: [{"name":"Color","values":["Purple"]},{"name":"Size","values":["S","M","L","XL"]}]. If no variants apply, use [].`
+VARIANT_RULES: For apparel/clothing/footwear always include Color AND Size variants. Color values = deduplicated list of all colors from imageColors (e.g. ["Purple","Black","Brown"]). Size defaults to ["S","M","L","XL"] unless product uses a different system (shoe sizes, numeric waist, etc.). Non-apparel: only include variants that make sense. Example: [{"name":"Color","values":["Purple","Black","Brown"]},{"name":"Size","values":["S","M","L","XL"]}]. If no variants apply, use [].`
           },
           {
             role: "user",
@@ -424,6 +426,7 @@ VARIANT_RULES: Always detect the exact color(s) visible across all images. For a
           aeoFaqs: Array.isArray(parsed.aeoFaqs) ? parsed.aeoFaqs : [],
           aeoSnippet: parsed.aeoSnippet || "",
           variants: Array.isArray(parsed.variants) ? parsed.variants : [],
+          imageColors: Array.isArray(parsed.imageColors) ? parsed.imageColors.map(String) : [],
         };
       }
       throw new Error("Incomplete AI response: " + content.substring(0, 200));
@@ -592,19 +595,7 @@ async function pushProductToShopify(
       productPayload.product.options = shopifyOptions;
     }
 
-    const allImages: any[] = [];
-    if (imageBuffer) {
-      allImages.push({ attachment: imageBuffer.toString('base64'), alt: image.altText || image.title || "" });
-    }
-    for (const v of viewImages || []) {
-      if (v.buffer) {
-        allImages.push({ attachment: v.buffer.toString('base64'), alt: v.image.altText || v.image.originalName || "" });
-      }
-    }
-    if (allImages.length > 0) {
-      productPayload.product.images = allImages;
-    }
-
+    // Step 1: Create product WITHOUT images so we can get variant IDs first
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -618,7 +609,7 @@ async function pushProductToShopify(
       const retryAfter = response.headers.get('Retry-After');
       const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
       await delay(waitMs);
-      return pushProductToShopify(image, accessToken, shopDomain, imageBuffer);
+      return pushProductToShopify(image, accessToken, shopDomain, imageBuffer, viewImages);
     }
 
     if (!response.ok) {
@@ -628,7 +619,71 @@ async function pushProductToShopify(
     }
 
     const result = await response.json();
-    return { shopifyProductId: String(result.product.id) };
+    const productId = result.product.id;
+    const createdVariants: any[] = result.product.variants || [];
+
+    // Find which option position is "Color" (option1, option2, etc.)
+    const colorOptionIdx = shopifyOptions.findIndex((o: any) => o.name === "Color");
+    const colorOptionKey = colorOptionIdx >= 0 ? `option${colorOptionIdx + 1}` : null;
+
+    // Helper: get variant_ids for a given color value
+    const variantIdsForColor = (color: string | null): number[] => {
+      if (!colorOptionKey || !color) return [];
+      return createdVariants
+        .filter(v => v[colorOptionKey]?.toLowerCase() === color.toLowerCase())
+        .map(v => v.id);
+    };
+
+    // Step 2: Add images one-by-one with variant_ids for their color
+    const imagesApiUrl = `https://${shopDomain}/admin/api/2024-01/products/${productId}/images.json`;
+
+    // Derive primary color: from imageColors[0], detectedColor, or the Color variant value
+    const colorVariant = imageVariants.find((v: any) => v.name === "Color");
+    const primaryColor = (image.aiData as any)?.imageColors?.[0]
+      || (image.aiData as any)?.detectedColor
+      || (colorVariant?.values?.length === 1 ? colorVariant.values[0] : null);
+    const allImagesData: { buffer: Buffer | undefined; color: string | null; alt: string }[] = [
+      { buffer: imageBuffer, color: primaryColor, alt: image.altText || image.title || "" },
+      ...(viewImages || []).map(v => ({
+        buffer: v.buffer,
+        color: (v.image.aiData as any)?.detectedColor || null,
+        alt: v.image.altText || v.image.originalName || "",
+      })),
+    ];
+
+    for (const img of allImagesData) {
+      if (!img.buffer) continue;
+      const variantIds = variantIdsForColor(img.color);
+      const imagePayload: any = {
+        image: {
+          attachment: img.buffer.toString('base64'),
+          alt: img.alt,
+        }
+      };
+      if (variantIds.length > 0) {
+        imagePayload.image.variant_ids = variantIds;
+      }
+      const imgRes = await fetch(imagesApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": accessToken,
+        },
+        body: JSON.stringify(imagePayload),
+      });
+      if (imgRes.status === 429) {
+        const waitMs = parseInt(imgRes.headers.get('Retry-After') || '2') * 1000;
+        await delay(waitMs);
+        // Retry this image
+        await fetch(imagesApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+          body: JSON.stringify(imagePayload),
+        });
+      }
+    }
+
+    return { shopifyProductId: String(productId) };
   } catch (error: any) {
     console.error("Shopify push error:", error);
     return { error: error.message || "Failed to push to Shopify" };
@@ -1162,6 +1217,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             let image;
             if (hasActiveSubscription && analysisSucceeded) {
               const a = analysis as ProductAnalysis;
+              const detectedColor = a.imageColors?.[idx] || null;
               image = await storage.createImage({
                 originalName: file.originalname,
                 mimeType: file.mimetype,
@@ -1176,11 +1232,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 tags: isPrimary ? a.tags : [],
                 seoTitle: isPrimary ? a.seoTitle : undefined,
                 seoDescription: isPrimary ? a.seoDescription : undefined,
-                altText: a.altText,
+                altText: detectedColor ? `${detectedColor} ${a.altText || a.title}` : a.altText,
                 aeoFaqs: isPrimary ? a.aeoFaqs : undefined,
                 aeoSnippet: isPrimary ? a.aeoSnippet : undefined,
                 variants: isPrimary ? a.variants : undefined,
-                aiData: isPrimary ? a : undefined,
+                aiData: isPrimary ? a : (detectedColor ? { detectedColor } : undefined),
                 shopifyStatus: "pending",
                 paymentStatus: "paid",
                 productContext: productContext || null,
