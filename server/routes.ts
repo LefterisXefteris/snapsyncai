@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { clerkMiddleware, requireAuth, getAuth } from "@clerk/express";
+import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 
 const MIN_IMAGE_COUNT = 1;
@@ -971,6 +971,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ recovered: true, subscribed: fullSub.status === 'active' || fullSub.status === 'trialing' });
     } catch (error: any) {
       console.error("Subscription recovery error:", error);
+      res.status(500).json({ message: "Failed to recover subscription" });
+    }
+  });
+
+  // Recover subscription by looking up the user's email in Stripe.
+  // Useful when a user re-signs up with a different Clerk account but used the same email.
+  app.post("/api/subscription/recover-by-email", requireAuth(), async (req, res) => {
+    try {
+      const userId = getUserId(req);
+
+      // Already has an active subscription under this userId — nothing to do
+      const existingSub = await storage.getSubscription(userId);
+      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+        return res.json({ recovered: true, subscribed: true, message: "Subscription already active" });
+      }
+
+      // Get user's primary email from Clerk
+      const clerkUser = await clerkClient.users.getUser(userId);
+      const primaryEmail = clerkUser.emailAddresses?.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
+        ?? clerkUser.emailAddresses?.[0]?.emailAddress;
+
+      if (!primaryEmail) {
+        return res.status(400).json({ message: "No email address found on your account" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+
+      // Find Stripe customers matching this email
+      const customers = await stripe.customers.list({ email: primaryEmail, limit: 10 });
+      if (customers.data.length === 0) {
+        return res.json({ recovered: false, message: "No Stripe customer found for your email" });
+      }
+
+      // Look for an active/trialing subscription across all matching customers
+      for (const customer of customers.data) {
+        const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 5 });
+        const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+        if (activeSub) {
+          const periodEnd = activeSub.current_period_end
+            ? new Date(activeSub.current_period_end * 1000)
+            : null;
+          await storage.upsertSubscription({
+            userId,
+            stripeCustomerId: customer.id,
+            stripeSubscriptionId: activeSub.id,
+            status: activeSub.status,
+            currentPeriodEnd: periodEnd,
+          });
+          console.log(`recover-by-email: linked sub ${activeSub.id} to user ${userId} via email ${primaryEmail}`);
+          return res.json({ recovered: true, subscribed: true });
+        }
+      }
+
+      return res.json({ recovered: false, message: "No active subscription found for your email" });
+    } catch (error: any) {
+      console.error("recover-by-email error:", error);
       res.status(500).json({ message: "Failed to recover subscription" });
     }
   });

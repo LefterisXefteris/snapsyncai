@@ -11,7 +11,7 @@ export function useImages() {
     // Scoped by userId so different users never share the same cache entry
     queryKey: [api.images.list.path, userId],
     queryFn: async () => {
-      const res = await fetch(api.images.list.path);
+      const res = await fetch(api.images.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch images");
       return res.json();
     },
@@ -24,7 +24,7 @@ export function usePaymentConfig() {
   return useQuery({
     queryKey: ['/api/payments/config'],
     queryFn: async () => {
-      const res = await fetch('/api/payments/config');
+      const res = await fetch('/api/payments/config', { credentials: "include" });
       if (!res.ok) throw new Error("Payment system not available");
       return res.json() as Promise<{ publishableKey: string; subscriptionPricePence: number }>;
     },
@@ -32,13 +32,16 @@ export function usePaymentConfig() {
 }
 
 export function useSubscriptionStatus() {
+  const { user } = useUser();
+  const userId = user?.id;
   return useQuery({
-    queryKey: ['/api/subscription/status'],
+    queryKey: ['/api/subscription/status', userId],
     queryFn: async () => {
-      const res = await fetch('/api/subscription/status');
+      const res = await fetch('/api/subscription/status', { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check subscription");
       return res.json() as Promise<{ subscribed: boolean; status?: string; currentPeriodEnd?: string; stripeSubscriptionId?: string }>;
     },
+    enabled: !!userId,
   });
 }
 
@@ -56,6 +59,31 @@ export function useCreateSubscriptionCheckout() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+}
+
+export function useRecoverSubscriptionByEmail() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/recover-by-email", {});
+      return res.json() as Promise<{ recovered: boolean; subscribed?: boolean; message?: string }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription/status'] });
+      if (data.recovered && data.subscribed) {
+        toast({ title: "Subscription Restored", description: "Your Pro subscription has been linked to this account." });
+      } else if (data.recovered) {
+        toast({ title: "Account Linked", description: data.message || "Your account has been updated." });
+      } else {
+        toast({ title: "No Subscription Found", description: "No active subscription was found for your email address.", variant: "destructive" });
+      }
+    },
+    onError: (error) => {
+      toast({ title: "Recovery Failed", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -258,7 +286,7 @@ export function useEtsyStatus() {
   return useQuery({
     queryKey: [api.etsy.status.path],
     queryFn: async () => {
-      const res = await fetch(api.etsy.status.path);
+      const res = await fetch(api.etsy.status.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check Etsy status");
       return res.json();
     },
@@ -333,7 +361,7 @@ export function useShopifyStatus() {
   return useQuery({
     queryKey: [api.shopify.status.path],
     queryFn: async () => {
-      const res = await fetch(api.shopify.status.path);
+      const res = await fetch(api.shopify.status.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check Shopify status");
       return res.json();
     },
@@ -386,7 +414,7 @@ export function useAmazonStatus() {
   return useQuery({
     queryKey: [api.amazon.status.path],
     queryFn: async () => {
-      const res = await fetch(api.amazon.status.path);
+      const res = await fetch(api.amazon.status.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check Amazon status");
       return res.json();
     },
@@ -441,7 +469,7 @@ export function useInstagramStatus() {
   return useQuery({
     queryKey: [api.instagram.status.path],
     queryFn: async () => {
-      const res = await fetch(api.instagram.status.path);
+      const res = await fetch(api.instagram.status.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check Instagram status");
       return res.json() as Promise<{ connected: boolean; username?: string; igUserId?: string }>;
     },
@@ -452,7 +480,7 @@ export function useInstagramOAuthConfig() {
   return useQuery({
     queryKey: [api.instagram.oauthConfig.path],
     queryFn: async () => {
-      const res = await fetch(api.instagram.oauthConfig.path);
+      const res = await fetch(api.instagram.oauthConfig.path, { credentials: "include" });
       if (!res.ok) return { configured: false };
       return res.json() as Promise<{ configured: boolean }>;
     },
@@ -462,7 +490,7 @@ export function useInstagramOAuthConfig() {
 export function useInstagramOAuthStart() {
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch(api.instagram.oauthStart.path);
+      const res = await fetch(api.instagram.oauthStart.path, { credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || "Failed to start Instagram connection");
@@ -518,7 +546,7 @@ export function useInstagramMedia() {
   return useQuery({
     queryKey: ['/api/instagram/media'],
     queryFn: async () => {
-      const res = await fetch('/api/instagram/media');
+      const res = await fetch('/api/instagram/media', { credentials: "include" });
       if (!res.ok) return { media: [] };
       return res.json() as Promise<{ media: { id: string; caption?: string; media_type: string; media_url: string; thumbnail_url?: string; timestamp: string }[] }>;
     },

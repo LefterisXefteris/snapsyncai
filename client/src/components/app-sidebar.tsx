@@ -17,14 +17,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { usePaymentConfig, useSubscriptionStatus, useCreateSubscriptionCheckout, useCancelSubscription } from "@/hooks/use-images";
+import { usePaymentConfig, useSubscriptionStatus, useCreateSubscriptionCheckout, useCancelSubscription, useRecoverSubscriptionByEmail } from "@/hooks/use-images";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 
 export function AppSidebar() {
   const { data: paymentConfig } = usePaymentConfig();
-  const { data: subscriptionStatus } = useSubscriptionStatus();
+  const { data: subscriptionStatus, isLoading: subLoading } = useSubscriptionStatus();
   const createSubscriptionCheckout = useCreateSubscriptionCheckout();
   const cancelSubscription = useCancelSubscription();
+  const recoverSubscription = useRecoverSubscriptionByEmail();
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
@@ -132,6 +133,22 @@ export function AppSidebar() {
                         <CreditCard className="w-3.5 h-3.5 mr-1.5" />
                         Subscribe - {"\u00A3"}{subscriptionPrice}/mo
                       </Button>
+                      {!subLoading && (
+                        <Button
+                          data-testid="button-restore-subscription"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-muted-foreground text-xs"
+                          onClick={() => recoverSubscription.mutate()}
+                          disabled={recoverSubscription.isPending}
+                        >
+                          {recoverSubscription.isPending ? (
+                            <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Checking...</>
+                          ) : (
+                            "Already subscribed? Restore access"
+                          )}
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 )}
