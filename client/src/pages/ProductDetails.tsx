@@ -170,7 +170,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div className="min-h-screen bg-muted/10 pb-12">
+    <div className="min-h-screen bg-background pb-12">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">

@@ -235,7 +235,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
 
   // ── Auto-arrange stepper ─────────────────────────────────────────────────────
   const setGroupSizeAndRechunk = (newSize: number) => {
-    const clamped = Math.max(1, Math.min(10, newSize));
+    const clamped = Math.max(1, Math.min(20, newSize));
     setGroupSize(clamped);
     setGroups(prev => chunkArray(prev.flat(), clamped));
   };
