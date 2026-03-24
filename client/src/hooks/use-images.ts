@@ -2,16 +2,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@clerk/clerk-react";
 
 export function useImages() {
+  const { user } = useUser();
+  const userId = user?.id;
   return useQuery({
-    queryKey: [api.images.list.path],
+    // Scoped by userId so different users never share the same cache entry
+    queryKey: [api.images.list.path, userId],
     queryFn: async () => {
       const res = await fetch(api.images.list.path);
       if (!res.ok) throw new Error("Failed to fetch images");
       return res.json();
     },
-    staleTime: 30_000, // treat data as fresh for 30s — avoids refetch on every component mount
+    enabled: !!userId, // never fetch if not authenticated
+    staleTime: 30_000,
   });
 }
 

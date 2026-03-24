@@ -17,7 +17,8 @@ const MIN_IMAGE_COUNT = 1;
 
 function getUserId(req: Request): string {
   const auth = getAuth(req);
-  return auth.userId!;
+  if (!auth.userId) throw new Error("Authenticated route missing userId — this should never happen");
+  return auth.userId;
 }
 
 const upload = multer({

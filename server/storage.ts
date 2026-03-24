@@ -50,8 +50,8 @@ const listColumns = {
 
 export interface IStorage {
   createImage(image: InsertImage): Promise<Image>;
-  listImages(sessionId?: string): Promise<Omit<Image, 'imageData'>[]>;
-  getAllImages(sessionId?: string): Promise<Image[]>;
+  listImages(sessionId: string): Promise<Omit<Image, 'imageData'>[]>;
+  getAllImages(sessionId: string): Promise<Image[]>;
   getImage(id: number): Promise<Image | undefined>;
   getImagesByIds(ids: number[]): Promise<Image[]>;
   updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined>;
@@ -84,19 +84,16 @@ export class DatabaseStorage implements IStorage {
     return newImage;
   }
 
-  // List without imageData — use for API responses where the blob is not needed
-  async listImages(sessionId?: string): Promise<Omit<Image, 'imageData'>[]> {
-    if (sessionId) {
-      return db.select(listColumns).from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
-    }
-    return db.select(listColumns).from(images).orderBy(desc(images.createdAt));
+  // List without imageData — use for API responses where the blob is not needed.
+  // sessionId is required; passing a falsy value is a programming error.
+  async listImages(sessionId: string): Promise<Omit<Image, 'imageData'>[]> {
+    if (!sessionId) throw new Error("listImages called without a sessionId — would return all users' data");
+    return db.select(listColumns).from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
   }
 
-  async getAllImages(sessionId?: string): Promise<Image[]> {
-    if (sessionId) {
-      return db.select().from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
-    }
-    return db.select().from(images).orderBy(desc(images.createdAt));
+  async getAllImages(sessionId: string): Promise<Image[]> {
+    if (!sessionId) throw new Error("getAllImages called without a sessionId — would return all users' data");
+    return db.select().from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
   }
 
   async getImage(id: number): Promise<Image | undefined> {

@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ClerkProvider, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { ClerkProvider, SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
@@ -11,6 +11,7 @@ import Landing from "@/pages/Landing";
 import ProductDetails from "@/pages/ProductDetails";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
+import { useEffect, useRef } from "react";
 
 // Clerk publishable key — baked in at build time via Vite env var.
 // Falls back to fetching from the server API for environments where
@@ -31,6 +32,24 @@ function AuthenticatedRouter() {
   );
 }
 
+// Clears all cached query data whenever the authenticated user changes.
+// Prevents user A's data from being visible to user B after an account switch.
+function CacheFlusher() {
+  const { user } = useUser();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const currentId = user?.id ?? null;
+    // undefined = first render (skip); null = signed out; string = signed in
+    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentId) {
+      queryClient.clear();
+    }
+    prevUserIdRef.current = currentId;
+  }, [user?.id]);
+
+  return null;
+}
+
 function AuthenticatedLayout() {
   return (
     <main className="flex-1 min-w-0 w-full min-h-screen">
@@ -42,6 +61,7 @@ function AuthenticatedLayout() {
 function ClerkApp() {
   return (
     <>
+      <CacheFlusher />
       <SignedOut>
         <AuthScreen />
       </SignedOut>
