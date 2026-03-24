@@ -15,7 +15,8 @@ export const pool = new Pool({
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-  // Vercel serverless: use SSL to Supabase and keep connections alive longer
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 0,
   ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
 });
 export const db = drizzle(pool, { schema });

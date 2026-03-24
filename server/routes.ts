@@ -35,7 +35,7 @@ function setImageBuffer(id: number, buf: Buffer) {
     const oldest = imageBuffers.keys().next().value;
     if (oldest !== undefined) imageBuffers.delete(oldest);
   }
-  setImageBuffer(id, buf);
+  imageBuffers.set(id, buf);
 }
 
 const CONCURRENCY_LIMIT = 10;

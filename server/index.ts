@@ -153,7 +153,9 @@ export const setupApp = async () => {
   if (!setupPromise) {
     setupPromise = (async () => {
       await runAppMigrations();
-      await initStripe();
+      // initStripe does schema migrations + Stripe HTTP calls — don't block routes on it.
+      // Fire it in the background so the first request is served immediately.
+      initStripe().catch((err: any) => console.error('initStripe background error:', err));
       await registerRoutes(httpServer, app);
 
       app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

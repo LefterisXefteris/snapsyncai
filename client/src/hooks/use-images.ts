@@ -16,7 +16,7 @@ export function useImages() {
       return res.json();
     },
     enabled: !!userId, // never fetch if not authenticated
-    staleTime: 30_000,
+    staleTime: 60_000, // cache for 1 min — mutations invalidate as needed
   });
 }
 
