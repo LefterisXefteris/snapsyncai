@@ -2,7 +2,9 @@ import { images, shopifyConnections, etsyConnections, amazonConnections, instagr
 import { db } from "./db";
 import { eq, desc, inArray, sql } from "drizzle-orm";
 
-// Columns returned for list queries — excludes imageData (large base64 blob)
+// Columns returned for list/dashboard queries.
+// Excludes imageData (base64 blob), aiData (large JSONB), aeoFaqs, generatedBackgrounds,
+// mediaGallery, instagramCaption — these are only needed on the detail page, not the list.
 const listColumns = {
   id: images.id,
   originalName: images.originalName,
@@ -13,13 +15,11 @@ const listColumns = {
   price: images.price,
   category: images.category,
   mainCategory: images.mainCategory,
-  generatedBackgrounds: images.generatedBackgrounds,
   productType: images.productType,
   tags: images.tags,
   seoTitle: images.seoTitle,
   seoDescription: images.seoDescription,
   altText: images.altText,
-  aeoFaqs: images.aeoFaqs,
   aeoSnippet: images.aeoSnippet,
   variants: images.variants,
   compareAtPrice: images.compareAtPrice,
@@ -28,7 +28,6 @@ const listColumns = {
   barcode: images.barcode,
   trackQuantity: images.trackQuantity,
   inventoryQuantity: images.inventoryQuantity,
-  mediaGallery: images.mediaGallery,
   collections: images.collections,
   shopifyProductId: images.shopifyProductId,
   shopifyStatus: images.shopifyStatus,
@@ -38,11 +37,7 @@ const listColumns = {
   amazonStatus: images.amazonStatus,
   instagramPostId: images.instagramPostId,
   instagramStatus: images.instagramStatus,
-  instagramCaption: images.instagramCaption,
   paymentStatus: images.paymentStatus,
-  productContext: images.productContext,
-  brandTone: images.brandTone,
-  aiData: images.aiData,
   productGroupId: images.productGroupId,
   sessionId: images.sessionId,
   createdAt: images.createdAt,
@@ -50,7 +45,7 @@ const listColumns = {
 
 export interface IStorage {
   createImage(image: InsertImage): Promise<Image>;
-  listImages(sessionId: string): Promise<Omit<Image, 'imageData'>[]>;
+  listImages(sessionId: string): Promise<Record<string, any>[]>;
   getAllImages(sessionId: string): Promise<Image[]>;
   getImage(id: number): Promise<Image | undefined>;
   getImagesByIds(ids: number[]): Promise<Image[]>;
@@ -86,7 +81,7 @@ export class DatabaseStorage implements IStorage {
 
   // List without imageData — use for API responses where the blob is not needed.
   // sessionId is required; passing a falsy value is a programming error.
-  async listImages(sessionId: string): Promise<Omit<Image, 'imageData'>[]> {
+  async listImages(sessionId: string): Promise<Record<string, any>[]> {
     if (!sessionId) throw new Error("listImages called without a sessionId — would return all users' data");
     return db.select(listColumns).from(images).where(eq(images.sessionId, sessionId)).orderBy(desc(images.createdAt));
   }

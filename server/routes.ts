@@ -1395,6 +1395,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const allImages = await storage.listImages(sessionId);
       res.json(allImages);
     } catch (error) {
+      console.error("GET /api/images error for user", (error as any)?.message || error);
       res.status(500).json({ message: "Failed to fetch images" });
     }
   });
@@ -1402,20 +1403,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/images/:id/file", requireAuth(), async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const image = await storage.getImage(id);
-      if (!image || image.sessionId !== getUserId(req)) {
-        return res.status(404).json({ message: "Image not found" });
+      const userId = getUserId(req);
+
+      // Fast path: serve from in-memory buffer if available (avoids DB round-trip entirely)
+      const cached = imageBuffers.get(id);
+      if (cached) {
+        // Still need to verify ownership — use a lightweight query
+        const image = await storage.getImage(id);
+        if (!image || image.sessionId !== userId) {
+          return res.status(404).json({ message: "Image not found" });
+        }
+        res.set({
+          'Content-Type': image.mimeType,
+          'Content-Length': cached.length.toString(),
+          'Cache-Control': 'public, max-age=604800, immutable',
+        });
+        return res.send(cached);
       }
 
-      const buffer = imageBuffers.get(id) || (image.imageData ? Buffer.from(image.imageData, 'base64') : null);
-      if (!buffer) {
+      // Slow path: load from DB
+      const image = await storage.getImage(id);
+      if (!image || image.sessionId !== userId) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      if (!image.imageData) {
         return res.status(404).json({ message: "Image data not found" });
       }
+      const buffer = Buffer.from(image.imageData, 'base64');
+      setImageBuffer(id, buffer); // cache for next time (within this server lifetime)
 
       res.set({
         'Content-Type': image.mimeType,
         'Content-Length': buffer.length.toString(),
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'public, max-age=604800, immutable',
       });
       res.send(buffer);
     } catch (error) {

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -10,6 +11,9 @@ import { pool } from './db';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Compress all JSON/text responses — cuts payload size 60-80%
+app.use(compression());
 
 declare module "http" {
   interface IncomingMessage {
