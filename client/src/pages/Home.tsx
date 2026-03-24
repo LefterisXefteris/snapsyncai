@@ -359,15 +359,53 @@ export default function Home() {
     el.remove();
   };
 
-  const groupedImages = useMemo(() => {
-    if (!images) return {};
-    return images.reduce((acc: Record<string, Image[]>, img: Image) => {
-      const cat = img.mainCategory || "Uncategorized";
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(img);
-      return acc;
-    }, {});
+  // Consolidate images that share a productGroupId into one product entry
+  const productEntries = useMemo(() => {
+    if (!images) return [];
+    const grouped = new Map<string, Image[]>();
+    const singles: Image[] = [];
+
+    for (const img of images as Image[]) {
+      if (img.productGroupId) {
+        const arr = grouped.get(img.productGroupId) ?? [];
+        arr.push(img);
+        grouped.set(img.productGroupId, arr);
+      } else {
+        singles.push(img);
+      }
+    }
+
+    const entries: { primary: Image; views: Image[] }[] = [];
+
+    grouped.forEach((imgs) => {
+      // Primary = the one with a description (fully analyzed), fallback to lowest id
+      const sorted = [...imgs].sort((a, b) => {
+        if (a.description && !b.description) return -1;
+        if (!a.description && b.description) return 1;
+        return a.id - b.id;
+      });
+      entries.push({ primary: sorted[0], views: sorted.slice(1) });
+    });
+
+    for (const img of singles) {
+      entries.push({ primary: img, views: [] });
+    }
+
+    // Sort entries newest first
+    return entries.sort((a, b) =>
+      new Date(b.primary.createdAt || 0).getTime() - new Date(a.primary.createdAt || 0).getTime()
+    );
   }, [images]);
+
+  // Group product entries by mainCategory
+  const groupedImages = useMemo(() => {
+    return productEntries.reduce((acc, entry) => {
+      const cat = entry.primary.mainCategory || "Uncategorized";
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(entry);
+      return acc;
+    }, {} as Record<string, { primary: Image; views: Image[] }[]>);
+  }, [productEntries]);
 
   const unpaidImages = useMemo(() => {
     return images?.filter((img: Image) => img.paymentStatus !== 'paid') || [];
@@ -679,18 +717,19 @@ export default function Home() {
                         </div>
                       )}
 
-                      {Object.entries(groupedImages).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryImages]) => (
+                      {Object.entries(groupedImages).sort(([a], [b]) => a.localeCompare(b)).map(([category, entries]) => (
                         <div key={category} className="space-y-3">
                           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sticky top-0 py-1 bg-background/80 backdrop-blur z-10 border-b border-white/5">
-                            {category} <span className="opacity-50">({(categoryImages as Image[]).length})</span>
+                            {category} <span className="opacity-50">({entries.length} product{entries.length !== 1 ? "s" : ""})</span>
                           </h3>
                           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                            {(categoryImages as Image[]).map((image: Image, idx: number) => (
+                            {entries.map((entry, idx) => (
                               <ImageCard
-                                key={image.id}
-                                image={image}
+                                key={entry.primary.id}
+                                image={entry.primary}
+                                views={entry.views}
                                 index={idx}
-                                selected={selectedIds.has(image.id)}
+                                selected={selectedIds.has(entry.primary.id)}
                                 onSelect={handleSelect}
                                 instagramConnected={!!instagramStatus?.connected}
                                 onInstagramPost={openInstagramPostDialog}
