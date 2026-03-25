@@ -1705,17 +1705,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
+      // Build a lookup of full image rows (with imageData + aiData) from the selected IDs
+      const fullImageMap = new Map<number, typeof selectedImages[0]>();
+      for (const img of selectedImages) fullImageMap.set(img.id, img);
+
       let successCount = 0;
       let failCount = 0;
       const results: { id: number; shopifyProductId?: string; error?: string }[] = [];
 
       for (const { primary, views } of productsToPush) {
-        const buffer = imageBuffers.get(primary.id) || ((primary as any).imageData ? Buffer.from((primary as any).imageData, 'base64') : null);
-        const viewData = views.map(v => ({
-          image: v,
-          buffer: imageBuffers.get(v.id) || ((v as any).imageData ? Buffer.from((v as any).imageData, 'base64') : undefined),
-        }));
-        const result = await pushProductToShopify(primary, accessToken, shopDomain, buffer || undefined, viewData);
+        // Fetch full row (with imageData & aiData) for primary and views if not already loaded
+        const allNeededIds = [primary.id, ...views.map(v => v.id)];
+        const missingIds = allNeededIds.filter(id => !fullImageMap.has(id));
+        if (missingIds.length > 0) {
+          const missingImages = await storage.getImagesByIds(missingIds);
+          for (const img of missingImages) fullImageMap.set(img.id, img);
+        }
+
+        const fullPrimary = fullImageMap.get(primary.id) || primary;
+        const buffer = imageBuffers.get(primary.id) || (fullPrimary.imageData ? Buffer.from(fullPrimary.imageData, 'base64') : null);
+        const viewData = views.map(v => {
+          const fullView = fullImageMap.get(v.id) || v;
+          return {
+            image: fullView,
+            buffer: imageBuffers.get(v.id) || (fullView.imageData ? Buffer.from(fullView.imageData, 'base64') : undefined),
+          };
+        });
+        const result = await pushProductToShopify(fullPrimary, accessToken, shopDomain, buffer || undefined, viewData);
         if (result.shopifyProductId) {
           // Batch-update all images in the group in one query
           if (primary.productGroupId) {
