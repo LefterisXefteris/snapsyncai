@@ -1554,6 +1554,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Batch-assign multiple images to a product group in one request
+  app.post("/api/images/assign-group-batch", requireAuth(), async (req, res) => {
+    try {
+      const sessionId = getUserId(req);
+      const { imageIds, productGroupId, primaryImageId } = req.body as { imageIds: number[]; productGroupId: string; primaryImageId?: number };
+      if (!productGroupId || !Array.isArray(imageIds) || imageIds.length === 0) {
+        return res.status(400).json({ message: "imageIds array and productGroupId required" });
+      }
+      // Verify ownership and update each image
+      for (const id of imageIds) {
+        const img = await storage.getImage(id);
+        if (img && img.sessionId === sessionId) {
+          await storage.updateImage(id, { productGroupId } as any);
+        }
+      }
+      // Also assign the primary image to the group if it wasn't already in one
+      if (primaryImageId) {
+        const primary = await storage.getImage(primaryImageId);
+        if (primary && primary.sessionId === sessionId && !primary.productGroupId) {
+          await storage.updateImage(primaryImageId, { productGroupId } as any);
+        }
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to assign images to group" });
+    }
+  });
+
   // Assign an existing image to a product group (share/move to current product)
   app.post("/api/images/:id/assign-group", requireAuth(), async (req, res) => {
     try {

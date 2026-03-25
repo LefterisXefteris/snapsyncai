@@ -245,6 +245,26 @@ export function useUnlinkFromGroup() {
   });
 }
 
+export function useAssignMultipleToGroup() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ imageIds, productGroupId, primaryImageId }: { imageIds: number[]; productGroupId: string; primaryImageId?: number }) => {
+      const res = await apiRequest("POST", "/api/images/assign-group-batch", { imageIds, productGroupId, primaryImageId });
+      if (!res.ok) throw new Error("Failed to assign images");
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
+      toast({ title: "Images added", description: `${vars.imageIds.length} image${vars.imageIds.length !== 1 ? "s" : ""} added to this product.` });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to add images", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useAssignToGroup() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useProductGroup, useAssignToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const deleteImageMutation = useDeleteImage();
   const unlinkFromGroupMutation = useUnlinkFromGroup();
   const assignToGroupMutation = useAssignToGroup();
+  const assignMultipleMutation = useAssignMultipleToGroup();
   const uploadImagesMutation = useUploadImages();
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState<"library" | "upload">("library");
@@ -156,11 +157,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const handleAddSelected = () => {
     const groupId = image.productGroupId ?? crypto.randomUUID();
     const primaryImageId = image.productGroupId ? undefined : image.id;
-    pickerSelected.forEach(imageId => {
-      assignToGroupMutation.mutate({ imageId, productGroupId: groupId, primaryImageId });
-    });
-    setPickerSelected(new Set());
-    setShowLibraryPicker(false);
+    assignMultipleMutation.mutate(
+      { imageIds: Array.from(pickerSelected), productGroupId: groupId, primaryImageId },
+      { onSuccess: () => { setPickerSelected(new Set()); setShowLibraryPicker(false); } }
+    );
   };
 
   const handlePickerFiles = async (files: File[]) => {
@@ -170,8 +170,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       const groupId = image.productGroupId ?? crypto.randomUUID();
       const primaryImageId = image.productGroupId ? undefined : image.id;
       const uploaded = await uploadImagesMutation.mutateAsync({ files, groupAsOne: false, hideToast: true });
-      for (const img of uploaded) {
-        await assignToGroupMutation.mutateAsync({ imageId: img.id, productGroupId: groupId, primaryImageId });
+      const imageIds = (uploaded as { id: number }[]).map(img => img.id);
+      if (imageIds.length > 0) {
+        await assignMultipleMutation.mutateAsync({ imageIds, productGroupId: groupId, primaryImageId });
       }
       setShowLibraryPicker(false);
     } finally {
@@ -679,11 +680,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                             <Button variant="outline" size="sm" onClick={() => setShowLibraryPicker(false)}>Cancel</Button>
                             <Button
                               size="sm"
-                              disabled={pickerSelected.size === 0 || assignToGroupMutation.isPending}
+                              disabled={pickerSelected.size === 0 || assignMultipleMutation.isPending}
                               onClick={handleAddSelected}
                               className="min-w-[100px]"
                             >
-                              {assignToGroupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>
+                              {assignMultipleMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>
                                 <Plus className="w-3.5 h-3.5 mr-1" />
                                 Add {pickerSelected.size > 0 ? `${pickerSelected.size} ` : ""}image{pickerSelected.size !== 1 ? "s" : ""}
                               </>}
