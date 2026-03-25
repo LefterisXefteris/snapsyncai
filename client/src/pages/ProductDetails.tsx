@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useProductGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [inventoryQuantity, setInventoryQuantity] = useState(0);
 
   const deleteImageMutation = useDeleteImage();
+  const assignToGroupMutation = useAssignToGroup();
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const editBackgroundMutation = useEditBackground();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
   const applyImageMutation = useApplyImage();
@@ -509,11 +511,63 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50">
+              <CardHeader className="px-4 py-3 border-b border-border/50 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium">
                   Media ({productImages.length} {productImages.length === 1 ? "image" : "images"})
                 </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-[11px] px-2 text-primary hover:text-primary hover:bg-primary/10"
+                  onClick={() => setShowLibraryPicker(true)}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Add from Library
+                </Button>
               </CardHeader>
+
+              {/* Library picker dialog */}
+              <Dialog open={showLibraryPicker} onOpenChange={setShowLibraryPicker}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Add image to this product</DialogTitle>
+                    <DialogDescription>
+                      Pick any image from your library to add it to this product's media gallery.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto py-2 pr-1">
+                    {(images as Image[] | undefined)
+                      ?.filter(img => img.productGroupId !== image.productGroupId || !img.productGroupId)
+                      .filter(img => !productImages.some(p => p.id === img.id))
+                      .map(img => (
+                        <div
+                          key={img.id}
+                          className="relative group/pick aspect-square rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary hover:ring-1 hover:ring-primary/30 transition-all"
+                          onClick={() => {
+                            const groupId = image.productGroupId ?? crypto.randomUUID();
+                            const primaryImageId = image.productGroupId ? undefined : image.id;
+                            assignToGroupMutation.mutate({ imageId: img.id, productGroupId: groupId, primaryImageId });
+                            setShowLibraryPicker(false);
+                          }}
+                        >
+                          <img
+                            src={`/api/images/${img.id}/file`}
+                            alt={img.originalName || "Image"}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/pick:opacity-100 transition-opacity flex items-center justify-center">
+                            <Plus className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover/pick:opacity-100 transition-opacity">
+                            <p className="text-[9px] text-white truncate">{img.originalName || `Image ${img.id}`}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               <CardContent className="p-4 space-y-4">
                 {/* All product images grid — always visible */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

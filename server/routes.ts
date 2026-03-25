@@ -1540,6 +1540,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Assign an existing image to a product group (share/move to current product)
+  app.post("/api/images/:id/assign-group", requireAuth(), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const sessionId = getUserId(req);
+      const { productGroupId, primaryImageId } = req.body as { productGroupId: string; primaryImageId?: number };
+      if (!productGroupId) return res.status(400).json({ message: "productGroupId required" });
+      const image = await storage.getImage(id);
+      if (!image || image.sessionId !== sessionId) return res.status(404).json({ message: "Image not found" });
+      await storage.updateImage(id, { productGroupId } as any);
+      // Also assign the primary image to the group if it wasn't already in one
+      if (primaryImageId && primaryImageId !== id) {
+        const primary = await storage.getImage(primaryImageId);
+        if (primary && primary.sessionId === sessionId && !primary.productGroupId) {
+          await storage.updateImage(primaryImageId, { productGroupId } as any);
+        }
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to assign image to group" });
+    }
+  });
+
   app.get("/api/images/:id/file", requireAuth(), async (req, res) => {
     try {
       const id = Number(req.params.id);

@@ -225,6 +225,26 @@ export function useUnlockImages() {
   });
 }
 
+export function useAssignToGroup() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ imageId, productGroupId, primaryImageId }: { imageId: number; productGroupId: string; primaryImageId?: number }) => {
+      const res = await apiRequest("POST", `/api/images/${imageId}/assign-group`, { productGroupId, primaryImageId });
+      if (!res.ok) throw new Error("Failed to assign image");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
+      toast({ title: "Image added", description: "Image added to this product." });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to add image", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useProductGroup(imageId: number | undefined) {
   return useQuery({
     queryKey: ['/api/images/group', imageId],
