@@ -60,6 +60,18 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
+  // Find all sibling images in the same product group
+  const productImages = (() => {
+    if (!images || !image) return [image].filter(Boolean) as Image[];
+    if (!image.productGroupId) return [image];
+    return (images as Image[])
+      .filter((img) => img.productGroupId === image.productGroupId)
+      .sort((a, b) => a.id - b.id);
+  })();
+
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
+  const displayImageId = selectedImageId ?? image?.id;
+
   // Initialize form when image data is available
   useEffect(() => {
     if (image) {
@@ -493,12 +505,14 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
             <Card className="shadow-sm">
               <CardHeader className="px-4 py-3 border-b border-border/50">
-                <CardTitle className="text-sm font-medium">Main Media & Gallery</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Media{productImages.length > 1 ? ` (${productImages.length} images)` : ""}
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex flex-col items-center justify-center">
                 <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
                   <img
-                    src={bgEditUrl ?? `/api/images/${image.id}/file?t=${imageKey}`}
+                    src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
                     alt={image.altText || image.title || "Product Image"}
                     className="w-full h-full object-contain"
                   />
@@ -631,6 +645,30 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         )}
                       </DialogContent>
                     </Dialog>
+                  </div>
+                )}
+
+                {/* Thumbnail strip for all product images */}
+                {productImages.length > 1 && (
+                  <div className="flex gap-2 mt-4 overflow-x-auto pb-1 w-full">
+                    {productImages.map((img) => (
+                      <button
+                        key={img.id}
+                        onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
+                        className={`relative shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-all ${
+                          displayImageId === img.id
+                            ? "border-primary ring-1 ring-primary/30"
+                            : "border-border hover:border-foreground/30"
+                        }`}
+                      >
+                        <img
+                          src={`/api/images/${img.id}/file`}
+                          alt={img.originalName || "Product view"}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
                   </div>
                 )}
               </CardContent>
