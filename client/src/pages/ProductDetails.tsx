@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useProductGroup, useAssignToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search } from "lucide-react";
 
 const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
 
@@ -50,7 +50,13 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const deleteImageMutation = useDeleteImage();
   const unlinkFromGroupMutation = useUnlinkFromGroup();
   const assignToGroupMutation = useAssignToGroup();
+  const uploadImagesMutation = useUploadImages();
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [pickerTab, setPickerTab] = useState<"library" | "upload">("library");
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
+  const [pickerUploading, setPickerUploading] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const editBackgroundMutation = useEditBackground();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
   const applyImageMutation = useApplyImage();
@@ -135,6 +141,42 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         },
       }
     );
+  };
+
+  // ── Library picker helpers ─────────────────────────────────────────────────
+  const togglePickerSelect = (id: number) => {
+    setPickerSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAddSelected = () => {
+    const groupId = image.productGroupId ?? crypto.randomUUID();
+    const primaryImageId = image.productGroupId ? undefined : image.id;
+    pickerSelected.forEach(imageId => {
+      assignToGroupMutation.mutate({ imageId, productGroupId: groupId, primaryImageId });
+    });
+    setPickerSelected(new Set());
+    setShowLibraryPicker(false);
+  };
+
+  const handlePickerFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setPickerUploading(true);
+    try {
+      const groupId = image.productGroupId ?? crypto.randomUUID();
+      const primaryImageId = image.productGroupId ? undefined : image.id;
+      const uploaded = await uploadImagesMutation.mutateAsync({ files, groupAsOne: false, hideToast: true });
+      for (const img of uploaded) {
+        await assignToGroupMutation.mutateAsync({ imageId: img.id, productGroupId: groupId, primaryImageId });
+      }
+      setShowLibraryPicker(false);
+    } finally {
+      setPickerUploading(false);
+    }
   };
 
   const handleApplyBackground = () => {
@@ -527,44 +569,182 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 </Button>
               </CardHeader>
 
-              {/* Library picker dialog */}
-              <Dialog open={showLibraryPicker} onOpenChange={setShowLibraryPicker}>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Add image to this product</DialogTitle>
-                    <DialogDescription>
-                      Pick any image from your library to add it to this product's media gallery.
+              {/* Library picker dialog — redesigned */}
+              <Dialog open={showLibraryPicker} onOpenChange={(open) => { setShowLibraryPicker(open); if (!open) { setPickerSelected(new Set()); setPickerSearch(""); setPickerTab("library"); } }}>
+                <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                  {/* Header */}
+                  <div className="px-6 pt-5 pb-4 border-b border-border/50 shrink-0">
+                    <DialogTitle className="text-base font-semibold">Add images to this product</DialogTitle>
+                    <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                      Pick from your library or upload new images — they'll be added instantly.
                     </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto py-2 pr-1">
-                    {(images as Image[] | undefined)
-                      ?.filter(img => !productImages.some(p => p.id === img.id))
-                      .map(img => (
-                        <div
-                          key={img.id}
-                          className="relative group/pick aspect-square rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary hover:ring-1 hover:ring-primary/30 transition-all"
-                          onClick={() => {
-                            const groupId = image.productGroupId ?? crypto.randomUUID();
-                            const primaryImageId = image.productGroupId ? undefined : image.id;
-                            assignToGroupMutation.mutate({ imageId: img.id, productGroupId: groupId, primaryImageId });
-                            setShowLibraryPicker(false);
-                          }}
-                        >
-                          <img
-                            src={`/api/images/${img.id}/file`}
-                            alt={img.originalName || "Image"}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/pick:opacity-100 transition-opacity flex items-center justify-center">
-                            <Plus className="w-6 h-6 text-white" />
-                          </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover/pick:opacity-100 transition-opacity">
-                            <p className="text-[9px] text-white truncate">{img.originalName || `Image ${img.id}`}</p>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="flex border-b border-border/50 shrink-0 bg-muted/20">
+                    <button
+                      onClick={() => setPickerTab("library")}
+                      className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${pickerTab === "library" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Library
+                      {(images as Image[] | undefined)?.filter(img => !productImages.some(p => p.id === img.id)).length
+                        ? <span className="ml-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{(images as Image[] | undefined)?.filter(img => !productImages.some(p => p.id === img.id)).length}</span>
+                        : null}
+                    </button>
+                    <button
+                      onClick={() => setPickerTab("upload")}
+                      className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${pickerTab === "upload" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                      Upload New
+                    </button>
+                  </div>
+
+                  {/* Library tab */}
+                  {pickerTab === "library" && (() => {
+                    const availableImages = (images as Image[] | undefined)?.filter(img => !productImages.some(p => p.id === img.id)) ?? [];
+                    const filtered = pickerSearch.trim()
+                      ? availableImages.filter(img => (img.originalName || "").toLowerCase().includes(pickerSearch.toLowerCase()) || (img.title || "").toLowerCase().includes(pickerSearch.toLowerCase()))
+                      : availableImages;
+                    return (
+                      <>
+                        {/* Search bar */}
+                        <div className="px-4 py-3 shrink-0 border-b border-border/30">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Search images by name or title…"
+                              value={pickerSearch}
+                              onChange={e => setPickerSearch(e.target.value)}
+                              className="w-full h-9 pl-9 pr-3 bg-muted/50 border border-border rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                            />
                           </div>
                         </div>
-                      ))}
-                  </div>
+
+                        {/* Grid */}
+                        <div className="flex-1 overflow-y-auto px-4 py-4">
+                          {filtered.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center gap-3">
+                              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                                <ImageIcon className="w-7 h-7 text-muted-foreground/40" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{pickerSearch ? "No results" : "Library is empty"}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{pickerSearch ? "Try a different search" : "Switch to Upload to add new images"}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                              {filtered.map(img => {
+                                const isSel = pickerSelected.has(img.id);
+                                return (
+                                  <div
+                                    key={img.id}
+                                    onClick={() => togglePickerSelect(img.id)}
+                                    className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all select-none ${isSel ? "border-primary ring-2 ring-primary/40 scale-[0.97]" : "border-border hover:border-primary/50 hover:scale-[0.98]"}`}
+                                  >
+                                    <img
+                                      src={`/api/images/${img.id}/file`}
+                                      alt={img.originalName || "Image"}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                    {/* Checkmark overlay */}
+                                    {isSel && (
+                                      <div className="absolute inset-0 bg-primary/20 flex items-start justify-end p-1.5">
+                                        <div className="w-5 h-5 rounded-full bg-primary shadow flex items-center justify-center">
+                                          <Check className="w-3 h-3 text-white" />
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Name label */}
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-2 py-2">
+                                      <p className="text-[9px] text-white font-medium truncate leading-tight">{img.title || img.originalName || `Image ${img.id}`}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-4 py-3 border-t border-border/50 shrink-0 flex items-center justify-between bg-muted/10">
+                          <span className="text-xs text-muted-foreground">
+                            {pickerSelected.size > 0 ? `${pickerSelected.size} image${pickerSelected.size !== 1 ? "s" : ""} selected` : "Click images to select"}
+                          </span>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setShowLibraryPicker(false)}>Cancel</Button>
+                            <Button
+                              size="sm"
+                              disabled={pickerSelected.size === 0 || assignToGroupMutation.isPending}
+                              onClick={handleAddSelected}
+                              className="min-w-[100px]"
+                            >
+                              {assignToGroupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>
+                                <Plus className="w-3.5 h-3.5 mr-1" />
+                                Add {pickerSelected.size > 0 ? `${pickerSelected.size} ` : ""}image{pickerSelected.size !== 1 ? "s" : ""}
+                              </>}
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  {/* Upload tab */}
+                  {pickerTab === "upload" && (
+                    <div className="flex-1 flex flex-col items-center justify-center px-8 py-8 gap-5">
+                      <input
+                        ref={uploadInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const files = Array.from(e.target.files ?? []);
+                          if (files.length) handlePickerFiles(files);
+                          e.target.value = "";
+                        }}
+                      />
+                      <div
+                        className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${pickerUploading ? "border-primary/50 bg-primary/5 cursor-default" : "border-border hover:border-primary/60 hover:bg-primary/5"}`}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/")); if (files.length && !pickerUploading) handlePickerFiles(files); }}
+                        onClick={() => { if (!pickerUploading) uploadInputRef.current?.click(); }}
+                      >
+                        {pickerUploading ? (
+                          <div className="flex flex-col items-center gap-4">
+                            <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                            <div>
+                              <p className="text-sm font-medium">Uploading & analyzing…</p>
+                              <p className="text-xs text-muted-foreground mt-1">Adding to this product when done</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                              <UploadCloud className="w-8 h-8 text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold">Drop images here</p>
+                              <p className="text-xs text-muted-foreground mt-1">or click to browse your device</p>
+                            </div>
+                            <Button size="sm" variant="outline" className="pointer-events-none">
+                              <ImagePlus className="w-3.5 h-3.5 mr-1.5" />
+                              Choose Files
+                            </Button>
+                            <p className="text-[10px] text-muted-foreground">PNG, JPG, WEBP · up to 10 MB each</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center max-w-xs">
+                        Images are uploaded with AI analysis and automatically added to this product's media gallery.
+                      </p>
+                    </div>
+                  )}
                 </DialogContent>
               </Dialog>
 
