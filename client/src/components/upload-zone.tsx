@@ -5,7 +5,7 @@ import {
   MouseSensor, TouchSensor, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { UploadCloud, Loader2, X, MessageSquare, Mic, Minus, Plus, Package, GripVertical, PlusCircle } from "lucide-react";
+import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, GripVertical, Plus, Ungroup, Images, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
@@ -21,6 +21,8 @@ const TONES = [
   { value: "technical", label: "Technical" },
 ];
 
+const PRESETS = [1, 2, 3, 4, 5];
+
 interface FileItem {
   id: string;
   file: File;
@@ -35,96 +37,132 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 // ── Draggable thumbnail ──────────────────────────────────────────────────────
-function DraggableThumbnail({ item, onRemove }: { item: FileItem; onRemove: () => void }) {
+function DraggableThumbnail({ item, onRemove, isHero }: { item: FileItem; onRemove: () => void; isHero?: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
-  const shortName = item.file.name.replace(/\.[^/.]+$/, "").slice(0, 14);
+  const size = isHero ? "w-20 h-20" : "w-14 h-14";
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "relative group/thumb shrink-0 touch-none flex flex-col items-center gap-1",
-        isDragging ? "opacity-25 cursor-grabbing" : "cursor-grab"
+        "relative group/thumb shrink-0 touch-none",
+        isDragging ? "opacity-20 scale-95" : "cursor-grab active:cursor-grabbing"
       )}
       {...listeners}
       {...attributes}
     >
-      {/* image */}
-      <div className="relative w-16 h-16">
+      <div className={cn("relative", size)}>
         <img
           src={item.url}
           alt={item.file.name}
-          className="w-16 h-16 rounded-xl object-cover border border-white/15 select-none shadow-md"
+          className={cn(size, "rounded-lg object-cover select-none ring-1 ring-white/10 transition-all",
+            !isDragging && "group-hover/thumb:ring-primary/50 group-hover/thumb:ring-2"
+          )}
           draggable={false}
         />
-        {/* drag indicator overlay */}
-        <div className="absolute inset-0 rounded-xl bg-black/0 group-hover/thumb:bg-black/20 transition-colors flex items-center justify-center">
-          <GripVertical className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-70 transition-opacity" />
+        <div className="absolute inset-0 rounded-lg bg-black/0 group-hover/thumb:bg-black/30 transition-colors flex items-center justify-center">
+          <GripVertical className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-80 transition-opacity drop-shadow" />
         </div>
-        {/* remove button */}
         <button
           onPointerDown={e => e.stopPropagation()}
           onClick={onRemove}
-          className="absolute -top-2 -right-2 w-5 h-5 bg-black/90 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-red-500 z-10 shadow-md"
+          className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500/90 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-all hover:bg-red-500 hover:scale-110 z-10 shadow-lg"
         >
-          <X className="w-3 h-3 text-white" />
+          <X className="w-2.5 h-2.5 text-white" />
         </button>
       </div>
-      {/* filename */}
-      <span className="text-[10px] text-muted-foreground text-center w-16 truncate leading-tight">
-        {shortName}
-      </span>
     </div>
   );
 }
 
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
-  groupId, groupIdx, items, onRemoveItem,
+  groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
 }: {
   groupId: string;
   groupIdx: number;
   items: FileItem[];
   onRemoveItem: (itemId: string) => void;
+  onSplit: () => void;
+  onDeleteGroup: () => void;
+  totalGroups: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
+  const hero = items[0];
+  const rest = items.slice(1);
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "rounded-xl border p-3 transition-all duration-150",
+        "rounded-xl border transition-all duration-200 overflow-hidden",
         isOver
-          ? "border-primary/70 bg-primary/8 shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
-          : "border-white/10 bg-white/3 hover:bg-white/[0.04]"
+          ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)]"
+          : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
       )}
     >
-      {/* card header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-primary/20 flex items-center justify-center">
-            <span className="text-[10px] font-bold text-primary">{groupIdx + 1}</span>
-          </div>
-          <span className="text-xs font-semibold text-white">Product {groupIdx + 1}</span>
+      {/* Card header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
+        <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
+          <span className="text-[10px] font-bold text-primary">{groupIdx + 1}</span>
         </div>
-        <span className="text-[11px] text-muted-foreground">
-          {items.length} image{items.length !== 1 ? "s" : ""}
+        <span className="text-xs font-medium text-white/90">Product {groupIdx + 1}</span>
+        <span className="text-[10px] text-white/40 ml-0.5">
+          {items.length} {items.length === 1 ? "image" : "images"}
         </span>
+        <div className="ml-auto flex items-center gap-1">
+          {items.length > 1 && (
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={onSplit}
+              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/80 transition-colors px-1.5 py-0.5 rounded hover:bg-white/5"
+              title="Split into individual products"
+            >
+              <Ungroup className="w-3 h-3" />
+              <span className="hidden sm:inline">Split</span>
+            </button>
+          )}
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={onDeleteGroup}
+            className="flex items-center gap-1 text-[10px] text-white/40 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10"
+            title="Remove this product"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
-      {/* thumbnails grid */}
-      <div className="flex flex-wrap gap-2 min-h-[72px]">
-        {items.map(item => (
-          <DraggableThumbnail
-            key={item.id}
-            item={item}
-            onRemove={() => onRemoveItem(item.id)}
-          />
-        ))}
-        {isOver && (
-          <div className="w-16 h-16 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 flex items-center justify-center shrink-0">
-            <Plus className="w-4 h-4 text-primary/70" />
-          </div>
-        )}
+      {/* Images area */}
+      <div className="p-3">
+        <div className="flex items-start gap-2.5">
+          {/* Hero image */}
+          {hero && (
+            <DraggableThumbnail
+              key={hero.id}
+              item={hero}
+              onRemove={() => onRemoveItem(hero.id)}
+              isHero
+            />
+          )}
+          {/* Rest of images + drop placeholder */}
+          {(rest.length > 0 || isOver) && (
+            <div className="flex flex-wrap gap-2 flex-1 min-h-[56px] items-start">
+              {rest.map(item => (
+                <DraggableThumbnail
+                  key={item.id}
+                  item={item}
+                  onRemove={() => onRemoveItem(item.id)}
+                />
+              ))}
+              {isOver && (
+                <div className="w-14 h-14 rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center shrink-0 animate-pulse">
+                  <Plus className="w-3.5 h-3.5 text-primary/60" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -137,14 +175,14 @@ function DroppableNewGroup() {
     <div
       ref={setNodeRef}
       className={cn(
-        "flex items-center justify-center gap-2 px-3 py-4 rounded-xl border border-dashed transition-all duration-150",
+        "flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed transition-all duration-200",
         isOver
-          ? "border-primary bg-primary/10 text-primary scale-[1.01]"
-          : "border-white/15 text-muted-foreground hover:border-white/30 hover:text-white/60"
+          ? "border-primary bg-primary/10 text-primary shadow-[0_0_16px_-4px_hsl(var(--primary)/0.3)]"
+          : "border-white/10 text-white/30 hover:border-white/20 hover:text-white/50"
       )}
     >
-      <PlusCircle className="w-4 h-4" />
-      <span className="text-sm">Drop here to create a new product</span>
+      <Plus className="w-3.5 h-3.5" />
+      <span className="text-xs">Drop here to create a new product</span>
     </div>
   );
 }
@@ -196,11 +234,9 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       const item = next[fromIdx].find(i => i.id === active.id)!;
 
       if (over.id === "new-group") {
-        // Move to brand new group
         next[fromIdx] = next[fromIdx].filter(i => i.id !== active.id);
         next.push([item]);
       } else {
-        // Move to existing group
         const toIdx = next.findIndex((_, idx) => `group-${idx}` === over.id);
         if (toIdx === -1 || toIdx === fromIdx) return prev;
         next[fromIdx] = next[fromIdx].filter(i => i.id !== active.id);
@@ -233,11 +269,27 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     noClick: totalFiles > 0,
   });
 
-  // ── Auto-arrange stepper ─────────────────────────────────────────────────────
+  // ── Auto-arrange ───────────────────────────────────────────────────────────
   const setGroupSizeAndRechunk = (newSize: number) => {
     const clamped = Math.max(1, Math.min(20, newSize));
     setGroupSize(clamped);
     setGroups(prev => chunkArray(prev.flat(), clamped));
+  };
+
+  // ── Split a group into individual products ─────────────────────────────────
+  const splitGroup = (groupIdx: number) => {
+    setGroups(prev => {
+      const next = [...prev];
+      const items = next.splice(groupIdx, 1)[0];
+      const singles = items.map(i => [i]);
+      next.splice(groupIdx, 0, ...singles);
+      return next;
+    });
+  };
+
+  // ── Delete entire group ────────────────────────────────────────────────────
+  const deleteGroup = (groupIdx: number) => {
+    setGroups(prev => prev.filter((_, i) => i !== groupIdx));
   };
 
   // ── Remove item ──────────────────────────────────────────────────────────────
@@ -337,48 +389,64 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       {/* Groups section */}
       {totalFiles > 0 && !isUploading && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          {/* Header: summary + auto-arrange stepper */}
-          <div className="flex items-center justify-between px-1">
-            <div>
-              <p className="text-sm font-semibold text-white">
-                {totalFiles} image{totalFiles !== 1 ? "s" : ""} · {groups.length} product{groups.length !== 1 ? "s" : ""}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Drag thumbnails between products to regroup · or auto-arrange below
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground hidden sm:block">Auto-arrange:</span>
-              <div className="flex items-center gap-0.5 bg-black/40 rounded-lg border border-white/10 p-0.5">
-                <button
-                  onClick={() => setGroupSizeAndRechunk(groupSize - 1)}
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
-                >
-                  <Minus className="w-3 h-3" />
-                </button>
-                <span className="w-6 text-center text-xs font-semibold text-white">{groupSize}</span>
-                <button
-                  onClick={() => setGroupSizeAndRechunk(groupSize + 1)}
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              </div>
-              <span className="text-[11px] text-muted-foreground">per product</span>
-            </div>
-          </div>
 
-          {/* Product groups list */}
-          <div className="rounded-xl border border-white/10 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
-              <Package className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-semibold text-white">{groups.length} product{groups.length !== 1 ? "s" : ""} to analyze</span>
-              <button onClick={open} className="ml-auto text-[11px] text-primary hover:text-primary/80 transition-colors">
-                + Add more images
+          {/* ── Toolbar ─────────────────────────────────────────────────── */}
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
+            <div className="flex items-center gap-3 px-3.5 py-2.5 border-b border-white/[0.06]">
+              {/* Summary pills */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1">
+                  <Images className="w-3 h-3 text-primary" />
+                  <span className="text-[11px] font-medium text-white/80">{totalFiles}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1">
+                  <Package className="w-3 h-3 text-primary" />
+                  <span className="text-[11px] font-medium text-white/80">{groups.length}</span>
+                </div>
+              </div>
+
+              <div className="h-4 w-px bg-white/10" />
+
+              {/* Preset buttons */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-white/40 uppercase tracking-wider font-medium hidden sm:block">Per product:</span>
+                <div className="flex gap-0.5">
+                  {PRESETS.map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setGroupSizeAndRechunk(n)}
+                      className={cn(
+                        "w-7 h-7 rounded-md text-xs font-medium transition-all duration-150",
+                        groupSize === n
+                          ? "bg-primary text-white shadow-sm shadow-primary/30"
+                          : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add more */}
+              <button
+                onClick={open}
+                className="ml-auto flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                <span className="hidden sm:inline">Add more</span>
               </button>
             </div>
 
-            <div className="max-h-[460px] overflow-y-auto p-2.5 space-y-2">
+            {/* Hint */}
+            <div className="px-3.5 py-1.5 bg-white/[0.015] border-b border-white/[0.04]">
+              <p className="text-[10px] text-white/30">
+                Drag images between products to regroup — or use the presets above to auto-arrange
+              </p>
+            </div>
+
+            {/* ── Product groups list ─────────────────────────────────── */}
+            <div className="max-h-[480px] overflow-y-auto p-2.5 space-y-2">
               {groups.map((group, idx) => (
                 <DroppableGroup
                   key={`group-${idx}`}
@@ -386,6 +454,9 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   groupIdx={idx}
                   items={group}
                   onRemoveItem={removeItem}
+                  onSplit={() => splitGroup(idx)}
+                  onDeleteGroup={() => deleteGroup(idx)}
+                  totalGroups={groups.length}
                 />
               ))}
               <DroppableNewGroup />
@@ -395,11 +466,11 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           {/* Drag overlay — floating thumbnail */}
           <DragOverlay>
             {activeItem ? (
-              <div className="flex flex-col items-center gap-1 rotate-3 scale-110 drop-shadow-2xl">
-                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-primary shadow-2xl">
+              <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
+                <div className="w-16 h-16 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20">
                   <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
                 </div>
-                <span className="text-[10px] text-white bg-black/70 px-1.5 py-0.5 rounded-md backdrop-blur-sm">
+                <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">
                   {activeItem.file.name.replace(/\.[^/.]+$/, "").slice(0, 14)}
                 </span>
               </div>
