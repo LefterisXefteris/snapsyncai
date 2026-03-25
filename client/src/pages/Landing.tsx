@@ -83,7 +83,7 @@ const FAQ_DATA = [
   },
   {
     question: "How do I create product listings from photos?",
-    answer: "Simply drag and drop up to 100 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to SnapSync AI Pro (£30/month) to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, AEO FAQ content, and variant options for every product."
+    answer: "Simply drag and drop up to 200 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to SnapSync AI Pro (£30/month) to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, AEO FAQ content, and variant options for every product."
   },
   {
     question: "Which e-commerce platforms does SnapSync AI support?",
@@ -115,15 +115,15 @@ const FAQ_DATA = [
   },
   {
     question: "Can SnapSync AI handle bulk product uploads?",
-    answer: "Yes. SnapSync AI supports batch uploads of up to 100 product images at once. All images are processed in parallel, so you can go from 100 photos to 100 AI-generated listings in minutes rather than days."
+    answer: "Yes. SnapSync AI supports batch uploads of up to 200 product images at once. All images are processed in parallel, so you can go from 200 photos to 200 AI-generated listings in minutes rather than days."
   }
 ];
 
 const FEATURES = [
   {
     icon: Upload,
-    title: "Batch Upload 100 Images",
-    description: "Drag and drop up to 100 product photos at once. Get free AI-generated previews with titles, categories, and tags instantly — no subscription needed.",
+    title: "Batch Upload 200 Images",
+    description: "Drag and drop up to 200 product photos at once. Get free AI-generated previews with titles, categories, and tags instantly — no subscription needed.",
     badge: "Free"
   },
   {
@@ -153,7 +153,7 @@ const STEPS = [
   {
     number: "01",
     title: "Upload Your Product Photos",
-    description: "Drag and drop up to 100 product images. Add optional brand context and choose your preferred tone of voice.",
+    description: "Drag and drop up to 200 product images. Add optional brand context and choose your preferred tone of voice.",
     icon: Upload
   },
   {
@@ -172,7 +172,7 @@ const STEPS = [
 
 const STATS = [
   { value: "90%",  label: "Faster than manual listing",       icon: TrendingUp },
-  { value: "100",  label: "Images per batch upload",          icon: Layers },
+  { value: "200",  label: "Images per batch upload",          icon: Layers },
   { value: "3",    label: "Marketplaces supported",           icon: Globe },
   { value: "10s",  label: "Average listing generation time",  icon: Clock },
 ];
@@ -224,7 +224,7 @@ export default function Landing() {
       "bestRating": "5"
     },
     "featureList": [
-      "AI product image analysis", "Batch upload up to 100 images",
+      "AI product image analysis", "Batch upload up to 200 images",
       "Auto-generated product titles and descriptions", "AI-suggested pricing",
       "SEO title and meta description generation", "Image alt text generation",
       "AEO FAQ pairs", "Conversational product snippets for AI assistants",
@@ -563,7 +563,7 @@ export default function Landing() {
                 <CardContent className="flex-1">
                   <Separator className="mb-5 border-white/10" />
                   <ul className="space-y-3">
-                    {["Upload up to 100 images per batch", "AI-generated titles & categories", "Auto-tagging for every product", "Connect Shopify, Etsy & Amazon", "No credit card required"].map((item, i) => (
+                    {["Upload up to 200 images per batch", "AI-generated titles & categories", "Auto-tagging for every product", "Connect Shopify, Etsy & Amazon", "No credit card required"].map((item, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
                         <CheckCircle2 className="w-5 h-5 text-muted-foreground mt-0 flex-shrink-0" />
                         <span className="text-muted-foreground">{item}</span>

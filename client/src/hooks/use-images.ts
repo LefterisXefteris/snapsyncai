@@ -160,6 +160,7 @@ export function useUploadImages() {
       const res = await fetch(api.images.upload.path, {
         method: api.images.upload.method,
         body: formData,
+        credentials: "include",
       });
 
       if (!res.ok) {

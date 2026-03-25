@@ -69,6 +69,7 @@ export interface IStorage {
   getPaidSession(checkoutSessionId: string): Promise<PaidSession | undefined>;
   markPaidSessionUsed(checkoutSessionId: string, usedCount: number): Promise<void>;
   getSubscription(userId: string): Promise<Subscription | undefined>;
+  getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined>;
   upsertSubscription(sub: InsertSubscription): Promise<Subscription>;
   updateSubscriptionStatus(stripeSubscriptionId: string, status: string, currentPeriodEnd?: Date): Promise<void>;
 }
@@ -204,11 +205,14 @@ export class DatabaseStorage implements IStorage {
 
   async migrateSession(oldSessionId: string, newSessionId: string): Promise<void> {
     if (oldSessionId === newSessionId) return;
+    console.log(`migrateSession: moving all data from ${oldSessionId} to ${newSessionId}`);
     await db.update(images).set({ sessionId: newSessionId }).where(eq(images.sessionId, oldSessionId));
     await db.update(shopifyConnections).set({ sessionId: newSessionId }).where(eq(shopifyConnections.sessionId, oldSessionId));
     await db.update(etsyConnections).set({ sessionId: newSessionId }).where(eq(etsyConnections.sessionId, oldSessionId));
     await db.update(amazonConnections).set({ sessionId: newSessionId }).where(eq(amazonConnections.sessionId, oldSessionId));
     await db.update(instagramConnections).set({ sessionId: newSessionId }).where(eq(instagramConnections.sessionId, oldSessionId));
+    // Also migrate subscription record — update userId so the old record doesn't become orphaned
+    await db.update(subscriptions).set({ userId: newSessionId }).where(eq(subscriptions.userId, oldSessionId));
   }
 
   async createPaidSession(session: InsertPaidSession): Promise<PaidSession> {
@@ -232,12 +236,28 @@ export class DatabaseStorage implements IStorage {
     return sub;
   }
 
+  async getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined> {
+    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
+    return sub;
+  }
+
   async upsertSubscription(sub: InsertSubscription): Promise<Subscription> {
-    const existing = await this.getSubscription(sub.userId);
-    if (existing) {
+    // First check if there's already a record for this userId
+    const existingByUser = await this.getSubscription(sub.userId);
+    if (existingByUser) {
       const [updated] = await db.update(subscriptions)
         .set(sub)
         .where(eq(subscriptions.userId, sub.userId))
+        .returning();
+      return updated;
+    }
+    // Also check if the same Stripe subscription is linked to a different userId
+    // (happens when user switches Clerk auth method). Update in place to avoid duplicates.
+    const existingByStripe = await this.getSubscriptionByStripeId(sub.stripeSubscriptionId);
+    if (existingByStripe) {
+      const [updated] = await db.update(subscriptions)
+        .set(sub)
+        .where(eq(subscriptions.stripeSubscriptionId, sub.stripeSubscriptionId))
         .returning();
       return updated;
     }

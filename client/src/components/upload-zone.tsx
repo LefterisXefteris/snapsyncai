@@ -222,7 +222,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     setGroups(prev => {
       const all = [...prev.flat(), ...newItems];
       const total = all.length;
-      if (total > 100) return prev; // cap
+      if (total > 200) return prev; // cap
       return chunkArray(all, groupSize);
     });
   }, [groupSize]);
@@ -329,7 +329,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             {isDragActive ? "Drop images here" : totalFiles > 0 ? "Drop more images" : "Drag & drop or click to upload"}
           </p>
           {totalFiles === 0 && (
-            <p className="text-[11px] text-muted-foreground">Up to 100 images · PNG, JPG, WEBP</p>
+            <p className="text-[11px] text-muted-foreground">Up to 200 images · PNG, JPG, WEBP</p>
           )}
         </div>
       </div>

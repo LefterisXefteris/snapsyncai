@@ -917,6 +917,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Auto-recover: if no subscription found by userId, try to find one in Stripe
       // by the user's email and re-link it. This handles the case where the user
       // subscribed under a different Clerk account (e.g. Google vs email sign-in).
+      // Also migrates images & connections from the old userId so data isn't orphaned.
       if (!sub) {
         try {
           const clerkUser = await clerkClient.users.getUser(userId);
@@ -930,6 +931,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 3 });
               const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
               if (activeSub) {
+                // Check if subscription was previously linked to a different userId
+                // and migrate their images + connections to the current userId
+                const oldSubRecord = await storage.getSubscriptionByStripeId(activeSub.id);
+                if (oldSubRecord && oldSubRecord.userId !== userId) {
+                  console.log(`Migrating data from old userId ${oldSubRecord.userId} to new userId ${userId}`);
+                  await storage.migrateSession(oldSubRecord.userId, userId);
+                }
+
                 const periodEnd = activeSub.current_period_end
                   ? new Date(activeSub.current_period_end * 1000) : null;
                 sub = await storage.upsertSubscription({
@@ -951,7 +960,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       if (sub) {
-        const isActive = sub.status === 'active' || sub.status === 'trialing';
+        // 'canceling' = user cancelled but still has access until period end
+        const isActive = sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling';
         const periodEnd = sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null;
         return res.json({ subscribed: isActive, status: sub.status, currentPeriodEnd: periodEnd, stripeSubscriptionId: sub.stripeSubscriptionId });
       }
@@ -968,7 +978,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { checkoutSessionId } = req.body;
 
       const existingSub = await storage.getSubscription(userId);
-      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing' || existingSub.status === 'canceling')) {
         return res.json({ recovered: true, alreadyActive: true });
       }
 
@@ -996,6 +1006,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         periodEnd = new Date(fullSub.current_period_end * 1000);
       }
 
+      // Migrate images & connections from old userId if subscription was under a different account
+      const oldSubRecord = await storage.getSubscriptionByStripeId(subId);
+      if (oldSubRecord && oldSubRecord.userId !== userId) {
+        console.log(`recover: migrating data from old userId ${oldSubRecord.userId} to ${userId}`);
+        await storage.migrateSession(oldSubRecord.userId, userId);
+      }
+
       await storage.upsertSubscription({
         userId,
         stripeCustomerId: customerId,
@@ -1020,7 +1037,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Already has an active subscription under this userId — nothing to do
       const existingSub = await storage.getSubscription(userId);
-      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing' || existingSub.status === 'canceling')) {
         return res.json({ recovered: true, subscribed: true, message: "Subscription already active" });
       }
 
@@ -1046,6 +1063,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 5 });
         const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
         if (activeSub) {
+          // Migrate images & connections from old userId if subscription was under a different account
+          const oldSubRecord = await storage.getSubscriptionByStripeId(activeSub.id);
+          if (oldSubRecord && oldSubRecord.userId !== userId) {
+            console.log(`recover-by-email: migrating data from old userId ${oldSubRecord.userId} to ${userId}`);
+            await storage.migrateSession(oldSubRecord.userId, userId);
+          }
+
           const periodEnd = activeSub.current_period_end
             ? new Date(activeSub.current_period_end * 1000)
             : null;
@@ -1072,7 +1096,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const userId = getUserId(req);
       const existingSub = await storage.getSubscription(userId);
-      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing' || existingSub.status === 'canceling')) {
         return res.status(400).json({ message: "You already have an active subscription" });
       }
 
@@ -1113,7 +1137,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const userId = getUserId(req);
       const existingSub = await storage.getSubscription(userId);
-      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing' || existingSub.status === 'canceling')) {
         return res.json({ verified: true, alreadyActive: true });
       }
 
@@ -1201,7 +1225,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const userId = getUserId(req);
       const sub = await storage.getSubscription(userId);
-      if (!sub || (sub.status !== 'active' && sub.status !== 'trialing')) {
+      if (!sub || (sub.status !== 'active' && sub.status !== 'trialing' && sub.status !== 'canceling')) {
         return res.status(403).json({ message: "Active subscription required to unlock images" });
       }
 
@@ -1274,7 +1298,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/images/upload", requireAuth(), upload.array("images", 100), async (req, res) => {
+  app.post("/api/images/upload", requireAuth(), upload.array("images", 200), async (req, res) => {
     try {
       if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
         return res.status(400).json({ message: "No files uploaded" });
@@ -1284,8 +1308,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (files.length < MIN_IMAGE_COUNT) {
         return res.status(400).json({ message: `Minimum ${MIN_IMAGE_COUNT} images required. You uploaded ${files.length}.` });
       }
-      if (files.length > 100) {
-        return res.status(400).json({ message: "Maximum 100 images per upload." });
+      if (files.length > 200) {
+        return res.status(400).json({ message: "Maximum 200 images per upload." });
       }
 
       const sessionId = getUserId(req);
@@ -1294,7 +1318,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const groupAsOne = req.body?.groupAsOne === "true" || req.body?.groupAsOne === true;
 
       const sub = await storage.getSubscription(sessionId);
-      const hasActiveSubscription = sub && (sub.status === 'active' || sub.status === 'trialing');
+      const hasActiveSubscription = sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling');
 
       // When groupAsOne=true and multiple files: analyze all images together as one product
       if (groupAsOne && files.length > 1) {
