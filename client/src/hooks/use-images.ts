@@ -4,9 +4,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 
+const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+
 export function useImages() {
   const { user } = useUser();
-  const userId = user?.id;
+  const userId = DEV_BYPASS_AUTH ? "dev_local_user" : user?.id;
   return useQuery({
     // Scoped by userId so different users never share the same cache entry
     queryKey: [api.images.list.path, userId],
@@ -15,7 +17,7 @@ export function useImages() {
       if (!res.ok) throw new Error("Failed to fetch images");
       return res.json();
     },
-    enabled: !!userId, // never fetch if not authenticated
+    enabled: !!userId,
     staleTime: 60_000, // cache for 1 min — mutations invalidate as needed
   });
 }
@@ -33,10 +35,11 @@ export function usePaymentConfig() {
 
 export function useSubscriptionStatus() {
   const { user } = useUser();
-  const userId = user?.id;
+  const userId = DEV_BYPASS_AUTH ? "dev_local_user" : user?.id;
   return useQuery({
     queryKey: ['/api/subscription/status', userId],
     queryFn: async () => {
+      if (DEV_BYPASS_AUTH) return { subscribed: true, status: "active" };
       const res = await fetch('/api/subscription/status', { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check subscription");
       return res.json() as Promise<{ subscribed: boolean; status?: string; currentPeriodEnd?: string; stripeSubscriptionId?: string }>;

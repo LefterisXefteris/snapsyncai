@@ -60,6 +60,10 @@ function AuthenticatedLayout() {
 }
 
 function ClerkApp() {
+  // In dev bypass mode, skip Clerk sign-in gates and go straight to the app.
+  if (DEV_BYPASS_AUTH) {
+    return <AuthenticatedLayout />;
+  }
   return (
     <>
       <CacheFlusher />
@@ -122,20 +126,12 @@ function AppWithClerkFallback() {
   );
 }
 
-function DevBypassApp() {
-  return (
-    <main className="flex-1 min-w-0 w-full min-h-screen">
-      <AuthenticatedRouter />
-    </main>
-  );
-}
-
 function App() {
   return (
     <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          {DEV_BYPASS_AUTH ? <DevBypassApp /> : <AppWithClerk />}
+          <AppWithClerk />
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
