@@ -10,12 +10,20 @@ import crypto from "crypto";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";
+import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 
 const MIN_IMAGE_COUNT = 1;
+const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
+const DEV_USER_ID = "dev_local_user";
+
+function requireAuth() {
+  if (DEV_BYPASS_AUTH) return (_req: any, _res: any, next: any) => next();
+  return clerkRequireAuth();
+}
 
 function getUserId(req: Request): string {
+  if (DEV_BYPASS_AUTH) return DEV_USER_ID;
   const auth = getAuth(req);
   if (!auth.userId) throw new Error("Authenticated route missing userId — this should never happen");
   return auth.userId;
@@ -889,7 +897,11 @@ function verifyShopifyHmac(query: Record<string, string>, secret: string): boole
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
-  app.use(clerkMiddleware());
+  if (!DEV_BYPASS_AUTH) {
+    app.use(clerkMiddleware());
+  } else {
+    console.log("⚠️  DEV_BYPASS_AUTH enabled — Clerk auth is disabled, using dev user");
+  }
 
   app.get("/api/auth/clerk-config", (_req, res) => {
     const publishableKey = process.env.CLERK_PUBLISHABLE_KEY;

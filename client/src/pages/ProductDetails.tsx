@@ -507,197 +507,191 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             <Card className="shadow-sm">
               <CardHeader className="px-4 py-3 border-b border-border/50">
                 <CardTitle className="text-sm font-medium">
-                  Media{productImages.length > 1 ? ` (${productImages.length} images)` : ""}
+                  Media ({productImages.length} {productImages.length === 1 ? "image" : "images"})
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
-                {/* Selected / main image preview */}
-                <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
-                  <img
-                    src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
-                    alt={image.altText || image.title || "Product Image"}
-                    className="w-full h-full object-contain"
-                  />
-
-                  {/* AI editing spinner overlay */}
-                  {editBackgroundMutation.isPending && (
-                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 gap-2">
-                      <Wand2 className="w-6 h-6 text-primary animate-pulse" />
-                      <span className="text-xs font-medium">Editing background…</span>
-                    </div>
-                  )}
-
-                  {/* Background style picker */}
-                  {showBgPicker && !editBackgroundMutation.isPending && !applyImageMutation.isPending && (
-                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 p-3">
-                      <p className="text-sm font-semibold">Select Background</p>
-                      <div className="flex flex-wrap gap-2 justify-center max-w-[250px]">
-                        {BG_STYLES.map((s) => (
-                          <button
-                            key={s.key}
-                            onClick={() => handleEditBackground(s.key)}
-                            className="flex flex-col items-center gap-1 group/btn"
-                            title={s.label}
-                          >
-                            <span
-                              className="w-8 h-8 rounded-full border border-border group-hover/btn:border-primary group-hover/btn:scale-110 transition-all block shadow-sm"
-                              style={{ background: s.color }}
-                            />
-                            <span className="text-[10px] text-muted-foreground group-hover/btn:text-foreground">{s.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => setShowBgPicker(false)} className="mt-2 h-7 text-xs">Cancel</Button>
-                    </div>
-                  )}
-
-                  {/* Apply background overlay */}
-                  {bgEditUrl && !showBgPicker && !editBackgroundMutation.isPending && (
-                    <div className="absolute bottom-2 left-0 w-full flex justify-center z-20">
-                      <Button
-                        size="sm"
-                        onClick={handleApplyBackground}
-                        disabled={applyImageMutation.isPending}
-                        className="shadow-lg"
+                {/* All product images grid — always visible */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {productImages.map((img) => (
+                    <div
+                      key={img.id}
+                      className={`relative group/thumb rounded-lg overflow-hidden border-2 aspect-square cursor-pointer transition-all ${
+                        displayImageId === img.id
+                          ? "border-primary ring-2 ring-primary/30"
+                          : "border-border hover:border-foreground/30"
+                      }`}
+                      onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
+                    >
+                      <img
+                        src={`/api/images/${img.id}/file`}
+                        alt={img.originalName || "Product view"}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {/* Delete button on hover */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (displayImageId === img.id) {
+                            const next = productImages.find((p) => p.id !== img.id);
+                            if (next) setSelectedImageId(next.id);
+                          }
+                          deleteImageMutation.mutate(img.id);
+                        }}
+                        disabled={deleteImageMutation.isPending}
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-destructive shadow-sm"
+                        title="Remove this image"
                       >
-                        {applyImageMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Check className="w-4 h-4 mr-2" />
-                        )}
-                        Save as Product Image
-                      </Button>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      {/* File name label */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                        <p className="text-[9px] text-white truncate">{img.originalName || `Image ${img.id}`}</p>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
 
-                {!isUnpaid && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={`flex-1 ${showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''}`}
-                      onClick={() => setShowBgPicker(v => !v)}
-                      disabled={editBackgroundMutation.isPending || applyImageMutation.isPending}
-                    >
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      AI Background
-                    </Button>
+                {/* Selected image large preview with AI tools */}
+                {displayImageId && (
+                  <>
+                    <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
+                      <img
+                        src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
+                        alt={image.altText || image.title || "Product Image"}
+                        className="w-full h-full object-contain"
+                      />
 
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50">
-                          <ImageIcon className="w-4 h-4 mr-2" />
-                          AI Photoshoot
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-3xl">
-                        <DialogHeader>
-                          <DialogTitle>AI Concept Generator</DialogTitle>
-                          <DialogDescription>
-                            Generate high-quality 4k photorealistic environments based on "{image.title}".
-                          </DialogDescription>
-                        </DialogHeader>
+                      {editBackgroundMutation.isPending && (
+                        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 gap-2">
+                          <Wand2 className="w-6 h-6 text-primary animate-pulse" />
+                          <span className="text-xs font-medium">Editing background…</span>
+                        </div>
+                      )}
 
-                        <div className="flex items-center gap-3 py-4">
-                          <Select value={photoshootStyle} onValueChange={setPhotoshootStyle}>
-                            <SelectTrigger className="w-[200px] border">
-                              <SelectValue placeholder="Select Style" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {VALID_STYLES.map(style => (
-                                <SelectItem key={style} value={style}>{style}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {showBgPicker && !editBackgroundMutation.isPending && !applyImageMutation.isPending && (
+                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 p-3">
+                          <p className="text-sm font-semibold">Select Background</p>
+                          <div className="flex flex-wrap gap-2 justify-center max-w-[250px]">
+                            {BG_STYLES.map((s) => (
+                              <button
+                                key={s.key}
+                                onClick={() => handleEditBackground(s.key)}
+                                className="flex flex-col items-center gap-1 group/btn"
+                                title={s.label}
+                              >
+                                <span
+                                  className="w-8 h-8 rounded-full border border-border group-hover/btn:border-primary group-hover/btn:scale-110 transition-all block shadow-sm"
+                                  style={{ background: s.color }}
+                                />
+                                <span className="text-[10px] text-muted-foreground group-hover/btn:text-foreground">{s.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => setShowBgPicker(false)} className="mt-2 h-7 text-xs">Cancel</Button>
+                        </div>
+                      )}
 
+                      {bgEditUrl && !showBgPicker && !editBackgroundMutation.isPending && (
+                        <div className="absolute bottom-2 left-0 w-full flex justify-center z-20">
                           <Button
-                            onClick={() => generatePhotoshootMutation.mutate({ id: image.id, style: photoshootStyle })}
-                            disabled={generatePhotoshootMutation.isPending}
+                            size="sm"
+                            onClick={handleApplyBackground}
+                            disabled={applyImageMutation.isPending}
+                            className="shadow-lg"
                           >
-                            {generatePhotoshootMutation.isPending ? "Rendering (10-15s)..." : "Generate Concept"}
+                            {applyImageMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4 mr-2" />
+                            )}
+                            Save as Product Image
                           </Button>
                         </div>
-
-                        {backgrounds.length > 0 && (
-                          <div className="mt-4">
-                            <h4 className="text-sm font-medium mb-3 text-muted-foreground">Generated Concepts</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2">
-                              {backgrounds.map((url, i) => (
-                                <div key={i} className="relative group/concept rounded-lg overflow-hidden border aspect-square">
-                                  <img src={url} alt="Generated Concept" className="w-full h-full object-cover" loading="lazy" />
-                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      className="w-[140px]"
-                                      onClick={() => handleApplyConcept(url)}
-                                      disabled={applyImageMutation.isPending}
-                                    >
-                                      <Check className="w-3.5 h-3.5 mr-1.5" />
-                                      Set as Product
-                                    </Button>
-                                    <Button size="sm" variant="secondary" onClick={() => window.open(url, '_blank')} className="w-[140px]">
-                                      <Download className="w-3.5 h-3.5 mr-1.5" />
-                                      Download Hires
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                )}
-
-                {/* All product images grid */}
-                {productImages.length > 1 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">All product images</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {productImages.map((img) => (
-                        <div
-                          key={img.id}
-                          className={`relative group/thumb rounded-lg overflow-hidden border-2 aspect-square cursor-pointer transition-all ${
-                            displayImageId === img.id
-                              ? "border-primary ring-1 ring-primary/30"
-                              : "border-border hover:border-foreground/30"
-                          }`}
-                          onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
-                        >
-                          <img
-                            src={`/api/images/${img.id}/file`}
-                            alt={img.originalName || "Product view"}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          {/* Delete button on hover */}
-                          {productImages.length > 1 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (displayImageId === img.id) {
-                                  const next = productImages.find((p) => p.id !== img.id);
-                                  if (next) setSelectedImageId(next.id);
-                                }
-                                deleteImageMutation.mutate(img.id);
-                              }}
-                              disabled={deleteImageMutation.isPending}
-                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-destructive"
-                              title="Remove this image"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {/* File name label */}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
-                            <p className="text-[9px] text-white truncate">{img.originalName || `Image ${img.id}`}</p>
-                          </div>
-                        </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
+
+                    {!isUnpaid && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`flex-1 ${showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''}`}
+                          onClick={() => setShowBgPicker(v => !v)}
+                          disabled={editBackgroundMutation.isPending || applyImageMutation.isPending}
+                        >
+                          <Wand2 className="w-4 h-4 mr-2" />
+                          AI Background
+                        </Button>
+
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50">
+                              <ImageIcon className="w-4 h-4 mr-2" />
+                              AI Photoshoot
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-3xl">
+                            <DialogHeader>
+                              <DialogTitle>AI Concept Generator</DialogTitle>
+                              <DialogDescription>
+                                Generate high-quality 4k photorealistic environments based on "{image.title}".
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="flex items-center gap-3 py-4">
+                              <Select value={photoshootStyle} onValueChange={setPhotoshootStyle}>
+                                <SelectTrigger className="w-[200px] border">
+                                  <SelectValue placeholder="Select Style" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {VALID_STYLES.map(style => (
+                                    <SelectItem key={style} value={style}>{style}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <Button
+                                onClick={() => generatePhotoshootMutation.mutate({ id: image.id, style: photoshootStyle })}
+                                disabled={generatePhotoshootMutation.isPending}
+                              >
+                                {generatePhotoshootMutation.isPending ? "Rendering (10-15s)..." : "Generate Concept"}
+                              </Button>
+                            </div>
+
+                            {backgrounds.length > 0 && (
+                              <div className="mt-4">
+                                <h4 className="text-sm font-medium mb-3 text-muted-foreground">Generated Concepts</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2">
+                                  {backgrounds.map((url, i) => (
+                                    <div key={i} className="relative group/concept rounded-lg overflow-hidden border aspect-square">
+                                      <img src={url} alt="Generated Concept" className="w-full h-full object-cover" loading="lazy" />
+                                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                        <Button
+                                          size="sm"
+                                          className="w-[140px]"
+                                          onClick={() => handleApplyConcept(url)}
+                                          disabled={applyImageMutation.isPending}
+                                        >
+                                          <Check className="w-3.5 h-3.5 mr-1.5" />
+                                          Set as Product
+                                        </Button>
+                                        <Button size="sm" variant="secondary" onClick={() => window.open(url, '_blank')} className="w-[140px]">
+                                          <Download className="w-3.5 h-3.5 mr-1.5" />
+                                          Download Hires
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

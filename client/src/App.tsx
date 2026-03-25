@@ -17,6 +17,7 @@ import { useEffect, useRef } from "react";
 // Falls back to fetching from the server API for environments where
 // the env var isn't set (e.g. legacy deploys).
 const VITE_CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
 function AuthScreen() {
   return <Landing />;
@@ -121,12 +122,20 @@ function AppWithClerkFallback() {
   );
 }
 
+function DevBypassApp() {
+  return (
+    <main className="flex-1 min-w-0 w-full min-h-screen">
+      <AuthenticatedRouter />
+    </main>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <AppWithClerk />
+          {DEV_BYPASS_AUTH ? <DevBypassApp /> : <AppWithClerk />}
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
