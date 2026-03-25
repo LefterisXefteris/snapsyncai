@@ -224,30 +224,25 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         )}
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-end gap-1 pt-1">
-          {image.productGroupId && views.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-1.5 text-[10px] no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              onClick={(e) => { e.stopPropagation(); deleteProductMutation.mutate(image.productGroupId!); }}
-              disabled={deleteProductMutation.isPending}
-              title="Remove product and all its images"
-            >
-              <Trash2 className="w-3 h-3 mr-0.5" />
-              All
-            </Button>
-          )}
+        <div className="flex items-center justify-end pt-1">
           <Button
             data-testid={`button-delete-${image.id}`}
             variant="ghost"
-            size="icon"
-            className="h-6 w-6 no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(image.id); }}
-            disabled={deleteMutation.isPending}
-            title="Delete image"
+            size="sm"
+            className="h-6 px-1.5 text-[10px] no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (image.productGroupId) {
+                deleteProductMutation.mutate(image.productGroupId);
+              } else {
+                deleteMutation.mutate(image.id);
+              }
+            }}
+            disabled={deleteMutation.isPending || deleteProductMutation.isPending}
+            title="Remove product"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 h-3 mr-0.5" />
+            Remove
           </Button>
         </div>
       </div>
