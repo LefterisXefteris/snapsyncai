@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useProductGroup, useAssignToGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [inventoryQuantity, setInventoryQuantity] = useState(0);
 
   const deleteImageMutation = useDeleteImage();
+  const unlinkFromGroupMutation = useUnlinkFromGroup();
   const assignToGroupMutation = useAssignToGroup();
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const editBackgroundMutation = useEditBackground();
@@ -537,8 +538,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   </DialogHeader>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto py-2 pr-1">
                     {(images as Image[] | undefined)
-                      ?.filter(img => img.productGroupId !== image.productGroupId || !img.productGroupId)
-                      .filter(img => !productImages.some(p => p.id === img.id))
+                      ?.filter(img => !productImages.some(p => p.id === img.id))
                       .map(img => (
                         <div
                           key={img.id}
@@ -587,19 +587,20 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
-                      {/* Delete button on hover */}
+                      {/* Remove from product button on hover — unlinks image back to library */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (displayImageId === img.id) {
                             const next = productImages.find((p) => p.id !== img.id);
                             if (next) setSelectedImageId(next.id);
+                            else setLocation("/"); // last image removed — go back to library
                           }
-                          deleteImageMutation.mutate(img.id);
+                          unlinkFromGroupMutation.mutate(img.id);
                         }}
-                        disabled={deleteImageMutation.isPending}
-                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-destructive shadow-sm"
-                        title="Remove this image"
+                        disabled={unlinkFromGroupMutation.isPending}
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-destructive/90 shadow-sm"
+                        title="Remove from product (returns to library)"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>

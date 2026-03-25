@@ -1540,6 +1540,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Unlink an image from its product group — sends it back to the library as a standalone image
+  app.post("/api/images/:id/unlink-from-group", requireAuth(), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const sessionId = getUserId(req);
+      const image = await storage.getImage(id);
+      if (!image || image.sessionId !== sessionId) return res.status(404).json({ message: "Image not found" });
+      await storage.updateImage(id, { productGroupId: null } as any);
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unlink image" });
+    }
+  });
+
   // Assign an existing image to a product group (share/move to current product)
   app.post("/api/images/:id/assign-group", requireAuth(), async (req, res) => {
     try {

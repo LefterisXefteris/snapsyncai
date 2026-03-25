@@ -225,6 +225,26 @@ export function useUnlockImages() {
   });
 }
 
+export function useUnlinkFromGroup() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (imageId: number) => {
+      const res = await apiRequest("POST", `/api/images/${imageId}/unlink-from-group`, {});
+      if (!res.ok) throw new Error("Failed to unlink image");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
+      toast({ title: "Removed from product", description: "Image is now in your library." });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to remove image", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useAssignToGroup() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
