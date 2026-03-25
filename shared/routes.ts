@@ -49,6 +49,14 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    deleteGroup: {
+      method: 'DELETE' as const,
+      path: '/api/images/group/:groupId' as const,
+      responses: {
+        200: z.object({ deleted: z.number() }),
+        404: errorSchemas.notFound,
+      },
+    },
     pushToShopify: {
       method: 'POST' as const,
       path: '/api/images/push-to-shopify' as const,

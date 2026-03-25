@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDeleteImage } from "@/hooks/use-images";
+import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
 import { api, buildUrl } from "@shared/routes";
 
 const CURRENCIES = [
@@ -43,6 +43,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const deleteMutation = useDeleteImage();
+  const deleteProductMutation = useDeleteProduct();
 
   // ── Price editing ─────────────────────────────────────────────────────────
   const [editingPrice, setEditingPrice] = useState(false);
@@ -223,7 +224,20 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         )}
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-end pt-1">
+        <div className="flex items-center justify-end gap-1 pt-1">
+          {image.productGroupId && views.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[10px] no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => { e.stopPropagation(); deleteProductMutation.mutate(image.productGroupId!); }}
+              disabled={deleteProductMutation.isPending}
+              title="Remove product and all its images"
+            >
+              <Trash2 className="w-3 h-3 mr-0.5" />
+              All
+            </Button>
+          )}
           <Button
             data-testid={`button-delete-${image.id}`}
             variant="ghost"
@@ -231,7 +245,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             className="h-6 w-6 no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(image.id); }}
             disabled={deleteMutation.isPending}
-            title="Delete"
+            title="Delete image"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>

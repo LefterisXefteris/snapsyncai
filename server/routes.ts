@@ -1604,6 +1604,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.delete("/api/images/group/:groupId", requireAuth(), async (req, res) => {
+    try {
+      const groupId = req.params.groupId;
+      const sessionId = getUserId(req);
+      const count = await storage.deleteImagesByGroupId(groupId, sessionId);
+      if (count === 0) {
+        return res.status(404).json({ message: "No images found for this product group" });
+      }
+      res.status(200).json({ deleted: count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete product group" });
+    }
+  });
+
   app.post("/api/shopify/connect", requireAuth(), async (req, res) => {
     try {
       const { shopDomain, accessToken } = req.body;

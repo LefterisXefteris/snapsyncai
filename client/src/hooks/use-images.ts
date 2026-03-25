@@ -261,6 +261,25 @@ export function useDeleteImage() {
   });
 }
 
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (groupId: string) => {
+      const url = buildUrl(api.images.deleteGroup.path, { groupId });
+      await apiRequest("DELETE", url);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      toast({ title: "Product Removed" });
+    },
+    onError: (error) => {
+      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function usePushToShopify() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

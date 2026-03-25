@@ -1,6 +1,6 @@
 import { images, shopifyConnections, etsyConnections, amazonConnections, instagramConnections, paidSessions, subscriptions, type InsertImage, type Image, type InsertShopifyConnection, type ShopifyConnection, type InsertEtsyConnection, type EtsyConnection, type InsertAmazonConnection, type AmazonConnection, type InsertInstagramConnection, type InstagramConnection, type InsertPaidSession, type PaidSession, type InsertSubscription, type Subscription } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
 // Columns returned for list/dashboard queries.
 // Excludes imageData (base64 blob), aiData (large JSONB), aeoFaqs, generatedBackgrounds,
@@ -52,6 +52,7 @@ export interface IStorage {
   updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined>;
   updateImagesByGroupId(groupId: string, updates: Partial<InsertImage>): Promise<void>;
   deleteImage(id: number): Promise<void>;
+  deleteImagesByGroupId(groupId: string, sessionId: string): Promise<number>;
   getShopifyConnection(sessionId: string): Promise<ShopifyConnection | undefined>;
   upsertShopifyConnection(connection: InsertShopifyConnection): Promise<ShopifyConnection>;
   deleteShopifyConnection(sessionId: string): Promise<void>;
@@ -113,6 +114,13 @@ export class DatabaseStorage implements IStorage {
 
   async deleteImage(id: number): Promise<void> {
     await db.delete(images).where(eq(images.id, id));
+  }
+
+  async deleteImagesByGroupId(groupId: string, sessionId: string): Promise<number> {
+    const deleted = await db.delete(images)
+      .where(and(eq(images.productGroupId, groupId), eq(images.sessionId, sessionId)))
+      .returning({ id: images.id });
+    return deleted.length;
   }
 
   async getShopifyConnection(sessionId: string): Promise<ShopifyConnection | undefined> {
