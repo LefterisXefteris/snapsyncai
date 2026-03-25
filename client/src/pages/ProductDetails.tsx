@@ -63,9 +63,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   // Fetch all images in the product group directly from the server
   const { data: groupImages } = useProductGroup(image?.id);
-  const productImages: Image[] = groupImages && groupImages.length > 0
-    ? groupImages as Image[]
-    : image ? [image] : [];
+
+  // productImages: prefer server group result, fall back to client-side filtering, then just primary
+  const productImages: Image[] = (() => {
+    if (groupImages && groupImages.length > 0) return groupImages as Image[];
+    if (images && image?.productGroupId) {
+      const siblings = (images as Image[]).filter(img => img.productGroupId === image.productGroupId).sort((a, b) => a.id - b.id);
+      if (siblings.length > 0) return siblings;
+    }
+    return image ? [image] : [];
+  })();
 
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const displayImageId = selectedImageId ?? image?.id;

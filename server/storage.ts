@@ -105,13 +105,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getImageGroup(imageId: number, sessionId: string): Promise<Record<string, any>[]> {
-    // Find the productGroupId for this image, then return all siblings
+    // Find the productGroupId for this image, scoped to the user's session
     const [img] = await db.select({ id: images.id, productGroupId: images.productGroupId, sessionId: images.sessionId })
-      .from(images).where(eq(images.id, imageId));
-    if (!img || img.sessionId !== sessionId) return [];
+      .from(images).where(and(eq(images.id, imageId), eq(images.sessionId, sessionId)));
+    if (!img) return [];
     if (!img.productGroupId) {
       // Single image — return just itself using listColumns
-      return db.select(listColumns).from(images).where(eq(images.id, imageId));
+      return db.select(listColumns).from(images)
+        .where(and(eq(images.id, imageId), eq(images.sessionId, sessionId)));
     }
     return db.select(listColumns).from(images)
       .where(and(eq(images.productGroupId, img.productGroupId), eq(images.sessionId, sessionId)))
