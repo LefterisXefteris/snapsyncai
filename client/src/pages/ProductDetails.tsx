@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
+import { useImages, useProductGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,14 +61,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
-  // Find all sibling images in the same product group
-  const productImages = (() => {
-    if (!images || !image) return [image].filter(Boolean) as Image[];
-    if (!image.productGroupId) return [image];
-    return (images as Image[])
-      .filter((img) => img.productGroupId === image.productGroupId)
-      .sort((a, b) => a.id - b.id);
-  })();
+  // Fetch all images in the product group directly from the server
+  const { data: groupImages } = useProductGroup(image?.id);
+  const productImages: Image[] = groupImages && groupImages.length > 0
+    ? groupImages as Image[]
+    : image ? [image] : [];
 
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const displayImageId = selectedImageId ?? image?.id;

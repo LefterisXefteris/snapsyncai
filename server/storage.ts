@@ -49,6 +49,7 @@ export interface IStorage {
   getAllImages(sessionId: string): Promise<Image[]>;
   getImage(id: number): Promise<Image | undefined>;
   getImagesByIds(ids: number[]): Promise<Image[]>;
+  getImageGroup(imageId: number, sessionId: string): Promise<Record<string, any>[]>;
   updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined>;
   updateImagesByGroupId(groupId: string, updates: Partial<InsertImage>): Promise<void>;
   deleteImage(id: number): Promise<void>;
@@ -101,6 +102,20 @@ export class DatabaseStorage implements IStorage {
   async getImagesByIds(ids: number[]): Promise<Image[]> {
     if (ids.length === 0) return [];
     return db.select().from(images).where(inArray(images.id, ids));
+  }
+
+  async getImageGroup(imageId: number, sessionId: string): Promise<Record<string, any>[]> {
+    // Find the productGroupId for this image, then return all siblings
+    const [img] = await db.select({ id: images.id, productGroupId: images.productGroupId, sessionId: images.sessionId })
+      .from(images).where(eq(images.id, imageId));
+    if (!img || img.sessionId !== sessionId) return [];
+    if (!img.productGroupId) {
+      // Single image — return just itself using listColumns
+      return db.select(listColumns).from(images).where(eq(images.id, imageId));
+    }
+    return db.select(listColumns).from(images)
+      .where(and(eq(images.productGroupId, img.productGroupId), eq(images.sessionId, sessionId)))
+      .orderBy(images.id);
   }
 
   async updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined> {

@@ -1529,6 +1529,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.get("/api/images/:id/group", requireAuth(), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const sessionId = getUserId(req);
+      const group = await storage.getImageGroup(id, sessionId);
+      res.json(group);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product group" });
+    }
+  });
+
   app.get("/api/images/:id/file", requireAuth(), async (req, res) => {
     try {
       const id = Number(req.params.id);

@@ -225,6 +225,19 @@ export function useUnlockImages() {
   });
 }
 
+export function useProductGroup(imageId: number | undefined) {
+  return useQuery({
+    queryKey: ['/api/images/group', imageId],
+    queryFn: async () => {
+      const res = await fetch(`/api/images/${imageId}/group`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch product group");
+      return res.json();
+    },
+    enabled: !!imageId,
+    staleTime: 30_000,
+  });
+}
+
 export function useUpdateImage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -256,6 +269,7 @@ export function useDeleteImage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
       toast({ title: "Product Removed" });
     },
     onError: (error) => {
