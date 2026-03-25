@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useImages, useUpdateImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
+import { useImages, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify } from "@/hooks/use-images";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store } from "lucide-react";
+import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X } from "lucide-react";
 
 const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
 
@@ -47,6 +47,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [trackQuantity, setTrackQuantity] = useState(true);
   const [inventoryQuantity, setInventoryQuantity] = useState(0);
 
+  const deleteImageMutation = useDeleteImage();
   const editBackgroundMutation = useEditBackground();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
   const applyImageMutation = useApplyImage();
@@ -509,7 +510,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   Media{productImages.length > 1 ? ` (${productImages.length} images)` : ""}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 flex flex-col items-center justify-center">
+              <CardContent className="p-4 space-y-4">
+                {/* Selected / main image preview */}
                 <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
                   <img
                     src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
@@ -552,8 +554,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   {/* Apply background overlay */}
                   {bgEditUrl && !showBgPicker && !editBackgroundMutation.isPending && (
                     <div className="absolute bottom-2 left-0 w-full flex justify-center z-20">
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={handleApplyBackground}
                         disabled={applyImageMutation.isPending}
                         className="shadow-lg"
@@ -568,8 +570,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     </div>
                   )}
                 </div>
+
                 {!isUnpaid && (
-                  <div className="flex items-center gap-2 mt-4">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -580,7 +583,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <Wand2 className="w-4 h-4 mr-2" />
                       AI Background
                     </Button>
-                    
+
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50">
@@ -624,8 +627,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                                 <div key={i} className="relative group/concept rounded-lg overflow-hidden border aspect-square">
                                   <img src={url} alt="Generated Concept" className="w-full h-full object-cover" loading="lazy" />
                                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                                    <Button 
-                                      size="sm" 
+                                    <Button
+                                      size="sm"
                                       className="w-[140px]"
                                       onClick={() => handleApplyConcept(url)}
                                       disabled={applyImageMutation.isPending}
@@ -648,27 +651,52 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   </div>
                 )}
 
-                {/* Thumbnail strip for all product images */}
+                {/* All product images grid */}
                 {productImages.length > 1 && (
-                  <div className="flex gap-2 mt-4 overflow-x-auto pb-1 w-full">
-                    {productImages.map((img) => (
-                      <button
-                        key={img.id}
-                        onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
-                        className={`relative shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-all ${
-                          displayImageId === img.id
-                            ? "border-primary ring-1 ring-primary/30"
-                            : "border-border hover:border-foreground/30"
-                        }`}
-                      >
-                        <img
-                          src={`/api/images/${img.id}/file`}
-                          alt={img.originalName || "Product view"}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </button>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">All product images</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {productImages.map((img) => (
+                        <div
+                          key={img.id}
+                          className={`relative group/thumb rounded-lg overflow-hidden border-2 aspect-square cursor-pointer transition-all ${
+                            displayImageId === img.id
+                              ? "border-primary ring-1 ring-primary/30"
+                              : "border-border hover:border-foreground/30"
+                          }`}
+                          onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
+                        >
+                          <img
+                            src={`/api/images/${img.id}/file`}
+                            alt={img.originalName || "Product view"}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          {/* Delete button on hover */}
+                          {productImages.length > 1 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (displayImageId === img.id) {
+                                  const next = productImages.find((p) => p.id !== img.id);
+                                  if (next) setSelectedImageId(next.id);
+                                }
+                                deleteImageMutation.mutate(img.id);
+                              }}
+                              disabled={deleteImageMutation.isPending}
+                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-destructive"
+                              title="Remove this image"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {/* File name label */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                            <p className="text-[9px] text-white truncate">{img.originalName || `Image ${img.id}`}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
