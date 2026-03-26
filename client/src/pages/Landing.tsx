@@ -406,8 +406,7 @@ export default function Landing() {
                   preload="metadata"
                   poster="/screenshot-workspace.png"
                 >
-                  <source src="/demo.mov" type="video/quicktime" />
-                  <source src="/demo.mov" type="video/mp4" />
+                  <source src="/demo.mp4" type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
               </div>
