@@ -139,6 +139,7 @@ const updateSchema = z.object({
   instagramCaption: z.string().optional(),
   instagramStatus: z.string().optional(),
   instagramPostId: z.string().optional(),
+  productGroupId: z.string().nullable().optional(),
 });
 
 interface ProductAnalysis {
@@ -1562,11 +1563,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!productGroupId || !Array.isArray(imageIds) || imageIds.length === 0) {
         return res.status(400).json({ message: "imageIds array and productGroupId required" });
       }
-      // Verify ownership and update each image
+      let updated = 0;
       for (const id of imageIds) {
         const img = await storage.getImage(id);
         if (img && img.sessionId === sessionId) {
           await storage.updateImage(id, { productGroupId } as any);
+          updated++;
+        } else {
+          console.warn(`assign-group-batch: skipped image ${id} — not found or sessionId mismatch (expected ${sessionId}, got ${img?.sessionId})`);
         }
       }
       // Also assign the primary image to the group if it wasn't already in one
@@ -1574,11 +1578,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const primary = await storage.getImage(primaryImageId);
         if (primary && primary.sessionId === sessionId && !primary.productGroupId) {
           await storage.updateImage(primaryImageId, { productGroupId } as any);
+          updated++;
         }
       }
-      res.json({ ok: true });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to assign images to group" });
+      res.json({ ok: true, updated });
+    } catch (error: any) {
+      console.error("assign-group-batch error:", error);
+      res.status(500).json({ message: "Failed to assign images to group", details: error?.message });
     }
   });
 

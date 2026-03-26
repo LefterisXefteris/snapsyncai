@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { api, buildUrl } from "@shared/routes";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +29,8 @@ const BG_STYLES = [
 
 export default function ProductDetails({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: images, isLoading } = useImages();
   const updateMutation = useUpdateImage();
   const pushToShopifyMutation = usePushToShopify();
@@ -154,13 +160,29 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     });
   };
 
-  const handleAddSelected = () => {
-    const groupId = image.productGroupId ?? crypto.randomUUID();
-    const primaryImageId = image.productGroupId ? undefined : image.id;
-    assignMultipleMutation.mutate(
-      { imageIds: Array.from(pickerSelected), productGroupId: groupId, primaryImageId },
-      { onSuccess: () => { setPickerSelected(new Set()); setShowLibraryPicker(false); } }
-    );
+  const handleAddSelected = async () => {
+    if (pickerSelected.size === 0) return;
+    setPickerUploading(true);
+    try {
+      const groupId = image.productGroupId ?? crypto.randomUUID();
+      // Update each selected library image via PUT (uses the battle-tested update endpoint)
+      await Promise.all(Array.from(pickerSelected).map(id =>
+        apiRequest("PUT", buildUrl(api.images.update.path, { id }), { productGroupId: groupId })
+      ));
+      // If the primary product had no group yet, assign it too
+      if (!image.productGroupId) {
+        await apiRequest("PUT", buildUrl(api.images.update.path, { id: image.id }), { productGroupId: groupId });
+      }
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
+      setPickerSelected(new Set());
+      setShowLibraryPicker(false);
+      toast({ title: "Images added", description: `${pickerSelected.size} image${pickerSelected.size !== 1 ? "s" : ""} added to this product.` });
+    } catch (err: any) {
+      toast({ title: "Failed to add images", description: err.message, variant: "destructive" });
+    } finally {
+      setPickerUploading(false);
+    }
   };
 
   const handlePickerFiles = async (files: File[]) => {
@@ -168,13 +190,22 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     setPickerUploading(true);
     try {
       const groupId = image.productGroupId ?? crypto.randomUUID();
-      const primaryImageId = image.productGroupId ? undefined : image.id;
       const uploaded = await uploadImagesMutation.mutateAsync({ files, groupAsOne: false, hideToast: true });
-      const imageIds = (uploaded as { id: number }[]).map(img => img.id);
-      if (imageIds.length > 0) {
-        await assignMultipleMutation.mutateAsync({ imageIds, productGroupId: groupId, primaryImageId });
+      const uploadedIds = (uploaded as { id: number }[]).map(img => img.id);
+      if (uploadedIds.length > 0) {
+        await Promise.all(uploadedIds.map(id =>
+          apiRequest("PUT", buildUrl(api.images.update.path, { id }), { productGroupId: groupId })
+        ));
+        if (!image.productGroupId) {
+          await apiRequest("PUT", buildUrl(api.images.update.path, { id: image.id }), { productGroupId: groupId });
+        }
+        queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+        queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
       }
       setShowLibraryPicker(false);
+      toast({ title: "Images uploaded", description: `${uploadedIds.length} image${uploadedIds.length !== 1 ? "s" : ""} added to this product.` });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
       setPickerUploading(false);
     }
