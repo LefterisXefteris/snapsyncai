@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Sparkles, Upload, Store, Zap, Shield, BrainCircuit, Image, Tags, FileText,
-  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart
+  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart, Coins, Play
 } from "lucide-react";
 import { SiShopify, SiEtsy } from "react-icons/si";
 import { useClerk } from "@clerk/clerk-react";
@@ -22,19 +22,16 @@ function ParticleField() {
         id: i,
         left: `${(i * 5.7 + Math.sin(i * 1.3) * 8 + 50) % 100}%`,
         top:  `${(i * 7.2 + Math.cos(i * 1.7) * 10 + 20) % 90}%`,
-        size: (i % 4) + 2,                      // 2–5 px
-        duration: 14 + (i % 7) * 2.5,           // 14–30 s
-        delay: -(i * 2.1),                       // stagger so they don't burst at once
-        opacity: 0.12 + (i % 5) * 0.06,         // 0.12–0.36
+        size: (i % 4) + 2,
+        duration: 14 + (i % 7) * 2.5,
+        delay: -(i * 2.1),
+        opacity: 0.12 + (i % 5) * 0.06,
       })),
     []
   );
 
   return (
-    <div
-      className="absolute inset-0 overflow-hidden pointer-events-none select-none"
-      aria-hidden="true"
-    >
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden="true">
       {particles.map((p) => (
         <div
           key={p.id}
@@ -54,9 +51,7 @@ function ParticleField() {
   );
 }
 
-/* ─── Scroll-reveal hook ─────────────────────────────────────────────────────
-   Adds 'revealed' class when .reveal elements enter the viewport.
-   Uses IntersectionObserver (zero scroll-listener overhead).             */
+/* ─── Scroll-reveal hook ──────────────────────────────────────────────────── */
 function useScrollReveal() {
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -64,17 +59,50 @@ function useScrollReveal() {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add("revealed");
-            observer.unobserve(entry.target); // fire once, then stop watching
+            observer.unobserve(entry.target);
           }
         });
       },
       { threshold: 0.12, rootMargin: "0px 0px -48px 0px" }
     );
-
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 }
+
+const CREDIT_PACKS = [
+  {
+    id: "starter",
+    name: "Starter",
+    credits: 10,
+    price: "£9",
+    description: "Perfect for trying it out",
+    perCredit: "90p per product",
+    highlight: false,
+    features: ["10 product analyses", "Full AI descriptions", "SEO + AEO content", "Shopify, Etsy & Amazon push", "Credits never expire"],
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    credits: 50,
+    price: "£35",
+    description: "Best for regular sellers",
+    perCredit: "70p per product",
+    highlight: true,
+    badge: "Most Popular",
+    features: ["50 product analyses", "Full AI descriptions", "SEO + AEO content", "Shopify, Etsy & Amazon push", "Credits never expire"],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    credits: 150,
+    price: "£79",
+    description: "For high-volume stores",
+    perCredit: "53p per product",
+    highlight: false,
+    features: ["150 product analyses", "Full AI descriptions", "SEO + AEO content", "Shopify, Etsy & Amazon push", "Credits never expire"],
+  },
+];
 
 const FAQ_DATA = [
   {
@@ -82,8 +110,12 @@ const FAQ_DATA = [
     answer: "SnapSync AI is an AI-powered product listing generator built for e-commerce sellers. You upload product photos, and our AI analyses each image to generate complete listings — including titles, descriptions, pricing, categories, SEO metadata, and AEO content. You can then review, edit, and push listings to Shopify, Etsy, or Amazon with one click."
   },
   {
+    question: "How do credits work?",
+    answer: "Each credit unlocks full AI analysis for one product. A product can have multiple images (e.g. front, back, detail shots) — they all count as 1 credit. Buy a credit pack once and use them whenever you need — credits never expire. No subscriptions, no recurring charges."
+  },
+  {
     question: "How do I create product listings from photos?",
-    answer: "Simply drag and drop up to 200 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to SnapSync AI Pro (£30/month) to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, AEO FAQ content, and variant options for every product."
+    answer: "Simply drag and drop up to 200 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Buy credits to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, AEO FAQ content, and variant options for every product."
   },
   {
     question: "Which e-commerce platforms does SnapSync AI support?",
@@ -95,7 +127,7 @@ const FAQ_DATA = [
   },
   {
     question: "How much does SnapSync AI cost?",
-    answer: "Uploading images and getting AI previews is completely free — no credit card required. To unlock full AI-generated descriptions, pricing, SEO, AEO content, and variants, subscribe to SnapSync AI Pro for £30 per month. This gives you unlimited image analysis with no per-image charges and no usage limits."
+    answer: "Uploading images and getting AI previews is completely free — no credit card required. To unlock full AI-generated descriptions, pricing, SEO, AEO content, and variants, buy a credit pack: Starter (10 credits / £9), Growth (50 credits / £35), or Pro (150 credits / £79). Credits never expire — pay once, use whenever."
   },
   {
     question: "Can I edit AI-generated product listings before publishing?",
@@ -110,10 +142,6 @@ const FAQ_DATA = [
     answer: "Yes. Every listing includes an SEO title, meta description, alt text for images, keyword-rich product descriptions, and structured category taxonomy. SnapSync AI also generates AEO content (FAQs and conversational snippets) to maximise visibility across both traditional search engines like Google and AI assistants like ChatGPT."
   },
   {
-    question: "How do I push products to Shopify with SnapSync AI?",
-    answer: "Connect your Shopify store by entering your store URL and a custom app access token (takes under 2 minutes). Once connected, select the products you want to publish from the SnapSync AI workspace, then click 'Push to Shopify'. Your listings — complete with titles, descriptions, pricing, and images — are published instantly."
-  },
-  {
     question: "Can SnapSync AI handle bulk product uploads?",
     answer: "Yes. SnapSync AI supports batch uploads of up to 200 product images at once. All images are processed in parallel, so you can go from 200 photos to 200 AI-generated listings in minutes rather than days."
   }
@@ -123,20 +151,20 @@ const FEATURES = [
   {
     icon: Upload,
     title: "Batch Upload 200 Images",
-    description: "Drag and drop up to 200 product photos at once. Get free AI-generated previews with titles, categories, and tags instantly — no subscription needed.",
+    description: "Drag and drop up to 200 product photos at once. Get free AI-generated previews with titles, categories, and tags instantly — no credit card needed.",
     badge: "Free"
   },
   {
     icon: BrainCircuit,
     title: "AI-Generated Listings",
     description: "Complete product titles, descriptions, suggested pricing, variant options, and full category taxonomy — all generated from a single product photo in seconds.",
-    badge: "Pro"
+    badge: "Credits"
   },
   {
     icon: Store,
     title: "Push to 3 Marketplaces",
     description: "Connect Shopify, Etsy, and Amazon. Review and edit in the built-in queue, then publish to all platforms simultaneously with one click.",
-    badge: "Pro"
+    badge: "Credits"
   }
 ];
 
@@ -185,7 +213,7 @@ export default function Landing() {
     document.title = "SnapSync AI — AI Product Listing Generator for Shopify, Etsy & Amazon";
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute("content", "Upload product photos and let AI generate complete e-commerce listings in seconds. Titles, descriptions, pricing, SEO metadata, and AEO content — then push to Shopify, Etsy, or Amazon with one click. Try free today.");
+      metaDesc.setAttribute("content", "Upload product photos and let AI generate complete e-commerce listings in seconds. Titles, descriptions, pricing, SEO metadata, and AEO content — then push to Shopify, Etsy, or Amazon with one click. Pay as you go with credits, never expire.");
     }
   }, []);
 
@@ -209,14 +237,11 @@ export default function Landing() {
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
-    "offers": {
-      "@type": "Offer",
-      "price": "30.00",
-      "priceCurrency": "GBP",
-      "priceValidUntil": "2027-12-31",
-      "description": "SnapSync AI Pro — unlimited AI product listing generation",
-      "url": "https://snapsyncai.co.uk"
-    },
+    "offers": [
+      { "@type": "Offer", "price": "9.00", "priceCurrency": "GBP", "name": "Starter — 10 credits" },
+      { "@type": "Offer", "price": "35.00", "priceCurrency": "GBP", "name": "Growth — 50 credits" },
+      { "@type": "Offer", "price": "79.00", "priceCurrency": "GBP", "name": "Pro — 150 credits" },
+    ],
     "aggregateRating": {
       "@type": "AggregateRating",
       "ratingValue": "4.9",
@@ -256,25 +281,22 @@ export default function Landing() {
             <span className="font-display text-lg font-bold tracking-tight">SnapSync AI</span>
           </div>
           <div className="flex items-center gap-6 flex-wrap">
-            <a href="#features"     className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-features">Features</a>
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-how-it-works">How It Works</a>
-            <a href="#pricing"      className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-pricing">Pricing</a>
-            <a href="#faq"          className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline" data-testid="link-faq">FAQ</a>
-            <Button variant="outline" size="sm" data-testid="button-login-nav" onClick={() => openSignIn()}>Sign In</Button>
-            <Button size="sm" className="hidden sm:flex" onClick={() => openSignIn()} data-testid="button-nav-cta">Start Free</Button>
+            <a href="#features"     className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">Features</a>
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">How It Works</a>
+            <a href="#pricing"      className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">Pricing</a>
+            <a href="#faq"          className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">FAQ</a>
+            <Button variant="outline" size="sm" onClick={() => openSignIn()}>Sign In</Button>
+            <Button size="sm" className="hidden sm:flex" onClick={() => openSignIn()}>Start Free</Button>
           </div>
         </div>
       </nav>
 
       <main className="pt-14">
 
-        {/* ── HERO (particles live here) ── */}
+        {/* ── HERO ── */}
         <section className="relative overflow-hidden" aria-labelledby="hero-heading">
-          {/* Glow blobs */}
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/[0.03] to-transparent pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
-
-          {/* ✨ Particles */}
           <ParticleField />
 
           <div className="max-w-5xl mx-auto px-6 py-28 md:py-40 relative text-center z-10">
@@ -300,21 +322,22 @@ export default function Landing() {
             </p>
 
             <p className="text-sm text-muted-foreground mb-10 animate-in fade-in duration-700 delay-150">
-              Trusted by e-commerce sellers in the UK. No credit card required to start.
+              Trusted by e-commerce sellers in the UK. Free previews, no card required.
             </p>
 
             <div className="flex items-center justify-center gap-4 flex-wrap mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <Button size="lg" className="h-14 px-8 text-base gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] transition-all duration-300 hover:scale-105 group" data-testid="button-get-started" onClick={() => openSignIn()}>
+              <Button size="lg" className="h-14 px-8 text-base gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] transition-all duration-300 hover:scale-105 group" onClick={() => openSignIn()}>
                 Get Started Free
                 <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-xl border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} data-testid="button-learn-more">
-                See How It Works
+              <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-xl border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300" onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}>
+                <Play className="w-4 h-4 mr-2" />
+                Watch Demo
               </Button>
             </div>
 
             <p className="text-xs text-muted-foreground animate-in fade-in duration-700 delay-300">
-              Free AI preview for every image · £30/month for full AI analysis · Cancel anytime
+              Free AI preview for every image · Pay per product with credits · Credits never expire
             </p>
 
             {/* Platform logos */}
@@ -334,14 +357,6 @@ export default function Landing() {
                   <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Amazon</span>
                 </div>
               </div>
-            </div>
-
-            {/* Scroll Down Indicator */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center animate-bounce opacity-70 z-10 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}>
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">Scroll to explore</span>
-                <div className="w-5 h-8 border-2 border-muted-foreground/50 rounded-full flex justify-center pt-1.5 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                    <div className="w-1 h-2 bg-primary rounded-full animate-pulse" />
-                </div>
             </div>
           </div>
         </section>
@@ -364,8 +379,78 @@ export default function Landing() {
           </div>
         </div>
 
+        {/* ── VIDEO DEMO ── */}
+        <section id="demo" className="relative py-24 overflow-hidden" aria-labelledby="demo-heading">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/[0.03] to-transparent pointer-events-none" />
+          <div className="max-w-6xl mx-auto px-6 relative z-10">
+            <div className="text-center mb-12 reveal">
+              <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
+                <Play className="w-3 h-3" /> Live Demo
+              </Badge>
+              <h2 id="demo-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
+                See SnapSync AI in Action
+              </h2>
+              <p className="text-muted-foreground max-w-xl mx-auto text-lg">
+                From uploading product photos to a publish-ready listing — watch the full workflow in under 2 minutes.
+              </p>
+            </div>
+
+            {/* Video player */}
+            <div className="reveal relative max-w-5xl mx-auto">
+              <div className="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-lime-500/20 blur-3xl rounded-[3rem] opacity-50" />
+              <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_80px_rgba(16,185,129,0.15)] bg-black/60">
+                <video
+                  className="w-full aspect-video object-cover"
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster="/screenshot-workspace.png"
+                >
+                  <source src="/demo.mov" type="video/quicktime" />
+                  <source src="/demo.mov" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
+
+            {/* Screenshots grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12 reveal">
+              <div className="relative group">
+                <div className="absolute -inset-2 bg-gradient-to-tr from-primary/15 to-transparent blur-2xl rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl hover:shadow-[0_0_40px_rgba(16,185,129,0.15)] transition-all duration-500 hover:-translate-y-1 bg-black/20">
+                  <div className="absolute top-3 left-3 z-10">
+                    <Badge className="text-[10px] bg-primary/90 text-primary-foreground backdrop-blur-md border-0 shadow-lg">Library Picker</Badge>
+                  </div>
+                  <img
+                    src="/screenshot-workspace2.png"
+                    alt="SnapSync AI workspace showing AI-generated product listings"
+                    className="w-full h-auto object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <p className="text-center text-xs text-muted-foreground mt-3">Browse &amp; select from your full image library</p>
+              </div>
+              <div className="relative group">
+                <div className="absolute -inset-2 bg-gradient-to-tr from-lime-500/15 to-transparent blur-2xl rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl hover:shadow-[0_0_40px_rgba(132,204,22,0.15)] transition-all duration-500 hover:-translate-y-1 bg-black/20">
+                  <div className="absolute top-3 left-3 z-10">
+                    <Badge variant="outline" className="text-[10px] backdrop-blur-md border-primary/40 bg-background/80 shadow-lg">Review Queue</Badge>
+                  </div>
+                  <img
+                    src="/screenshot-workspace.png"
+                    alt="SnapSync AI review queue with AI-generated product listing ready to publish"
+                    className="w-full h-auto object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <p className="text-center text-xs text-muted-foreground mt-3">Review, edit and approve before publishing</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── FEATURES ── */}
-        <section id="features" className="max-w-6xl mx-auto px-6 py-24" aria-labelledby="features-heading">
+        <section id="features" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50" aria-labelledby="features-heading">
           <div className="text-center mb-16 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">Features</Badge>
             <h2 id="features-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
@@ -377,9 +462,8 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[300px] bg-primary/5 blur-[100px] rounded-full pointer-events-none" />
-            
             {FEATURES.map((feature, i) => (
-              <Card key={i} className={`hover-elevate relative overflow-hidden group border-white/10 hover:border-primary/40 bg-background/50 backdrop-blur-sm transition-all duration-500 reveal delay-${i + 1} hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1`} data-testid={`card-feature-${i}`}>
+              <Card key={i} className={`hover-elevate relative overflow-hidden group border-white/10 hover:border-primary/40 bg-background/50 backdrop-blur-sm transition-all duration-500 reveal delay-${i + 1} hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1`}>
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <CardHeader className="relative z-10">
@@ -404,20 +488,17 @@ export default function Landing() {
         </section>
 
         {/* ── AI IMAGE EDITING SHOWCASE ── */}
-        <section className="max-w-6xl mx-auto px-6 py-24 border-t border-border" aria-labelledby="ai-editing-heading">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <section className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50" aria-labelledby="ai-editing-heading">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1 relative reveal">
               <div className="absolute -inset-4 bg-gradient-to-tr from-emerald-600/30 to-lime-500/30 blur-3xl rounded-[3rem] opacity-70 animate-pulse-glow" />
-              <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black/40 backdrop-blur-xl aspect-[4/3] flex items-center justify-center animate-float">
-                {/* IMPORTANT: Placeholder for the dashboard image uploaded by the user */}
+              <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black/40 backdrop-blur-xl animate-float">
                 <img
-                  src="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1200&auto=format&fit=crop"
-                  alt="AI Image Editing Dashboard"
-                  className="w-full h-full object-cover mix-blend-overlay opacity-80 scale-105"
-                  id="ai-editor-hero-image"
+                  src="/screenshot-workspace2.png"
+                  alt="SnapSync AI workspace with AI-generated product listings"
+                  className="w-full h-auto object-cover"
+                  loading="lazy"
                 />
-                
-                {/* Floating UI Element to add premium feel */}
                 <div className="absolute bottom-6 left-6 right-6 p-5 rounded-2xl bg-background/80 backdrop-blur-xl border border-white/10 animate-float-delayed shadow-2xl">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 via-lime-500 to-primary flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(132,204,22,0.4)]">
@@ -433,13 +514,13 @@ export default function Landing() {
             </div>
             <div className="order-1 lg:order-2 space-y-6 reveal delay-1">
               <Badge variant="outline" className="no-default-active-elevate gap-1.5 text-primary border-primary/30 bg-primary/5">
-                <Sparkles className="w-3 h-3" /> New Feature
+                <Sparkles className="w-3 h-3" /> AI Image Editing
               </Badge>
               <h2 id="ai-editing-heading" className="text-4xl font-display font-bold tracking-tight">
                 Edit Images with AI &amp; Generate Stunning Variants
               </h2>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Take your product photography to the next level. Our new AI Image Editor allows you to instantly generate beautiful lifestyle variants for your products—all without leaving the SnapSync AI workspace.
+                Take your product photography to the next level. Our AI Image Editor lets you instantly generate beautiful lifestyle variants — all without leaving the SnapSync AI workspace.
               </p>
               <ul className="space-y-4 pt-4">
                 {[
@@ -491,7 +572,7 @@ export default function Landing() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SEO_AEO_FEATURES.map((feature, i) => (
-                <Card key={i} className={`hover-elevate group border-white/5 hover:border-primary/40 bg-background/40 backdrop-blur-sm transition-all duration-300 reveal delay-${(i % 3) + 1} hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]`} data-testid={`card-seo-${i}`}>
+                <Card key={i} className={`hover-elevate group border-white/5 hover:border-primary/40 bg-background/40 backdrop-blur-sm transition-all duration-300 reveal delay-${(i % 3) + 1} hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]`}>
                   <CardContent className="flex items-start gap-3 pt-6 pb-5 relative z-10">
                     <div className="w-10 h-10 rounded-xl bg-primary/5 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors shadow-inner border border-white/5">
                       <feature.icon className="w-4 h-4 group-hover:text-primary transition-colors text-muted-foreground" />
@@ -522,7 +603,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
             <div className="hidden md:block absolute top-7 left-[calc(33%+1rem)] right-[calc(33%+1rem)] h-px bg-gradient-to-r from-border via-primary/30 to-border" />
             {STEPS.map((step, i) => (
-              <div key={i} className={`flex flex-col items-center text-center group reveal delay-${i + 1}`} data-testid={`step-${i}`}>
+              <div key={i} className={`flex flex-col items-center text-center group reveal delay-${i + 1}`}>
                 <div className="w-14 h-14 rounded-2xl bg-muted group-hover:bg-primary/10 border border-border group-hover:border-primary/30 flex items-center justify-center mb-5 transition-all duration-300 relative z-10">
                   <step.icon className="w-6 h-6 group-hover:text-primary transition-colors" />
                 </div>
@@ -540,18 +621,28 @@ export default function Landing() {
         <section id="pricing" className="relative bg-black/40 border-y border-white/10 py-24 overflow-hidden" aria-labelledby="pricing-heading">
           <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-background to-emerald-900/10 pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-lime-500/10 blur-[100px] rounded-full pointer-events-none" />
-          <div className="max-w-4xl mx-auto px-6 relative z-10">
+          <div className="max-w-6xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
-              <Badge variant="outline" className="mb-4 no-default-active-elevate">Pricing</Badge>
+              <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
+                <Coins className="w-3 h-3" /> Pricing
+              </Badge>
               <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-                Simple, Transparent Pricing
+                Pay Once. Credits Never Expire.
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Start completely free. Upgrade when you're ready for full AI-powered listings.
+                No subscriptions. No monthly charges. Buy credits when you need them — each credit unlocks full AI analysis for one product.
               </p>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary font-medium bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                1 credit = 1 product (all views/angles included)
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto items-center">
-              <Card className="flex flex-col reveal delay-1 bg-background/50 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl" data-testid="card-pricing-free">
+
+            {/* Free tier + Credit packs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+
+              {/* Free */}
+              <Card className="flex flex-col reveal delay-1 bg-background/50 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl">Free</CardTitle>
                   <CardDescription>AI previews for every image</CardDescription>
@@ -560,52 +651,78 @@ export default function Landing() {
                     <span className="text-muted-foreground text-sm ml-2">forever</span>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1">
+                <CardContent className="flex-1 flex flex-col">
                   <Separator className="mb-5 border-white/10" />
-                  <ul className="space-y-3">
-                    {["Upload up to 200 images per batch", "AI-generated titles & categories", "Auto-tagging for every product", "Connect Shopify, Etsy & Amazon", "No credit card required"].map((item, i) => (
+                  <ul className="space-y-3 flex-1">
+                    {["Upload up to 200 images", "AI titles & categories", "Auto-tagging", "Connect Shopify, Etsy & Amazon", "No credit card required"].map((item, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
-                        <CheckCircle2 className="w-5 h-5 text-muted-foreground mt-0 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <span className="text-muted-foreground">{item}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button variant="outline" className="w-full mt-8 rounded-xl border-border/60 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300" onClick={() => openSignIn()} data-testid="button-pricing-free-start">Start Free</Button>
+                  <Button variant="outline" className="w-full mt-8 rounded-xl border-border/60 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300" onClick={() => openSignIn()}>Start Free</Button>
                 </CardContent>
               </Card>
 
-              <Card className="flex flex-col border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden reveal delay-2 bg-background/60 backdrop-blur-xl hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] transition-all duration-300 md:scale-105 z-10" data-testid="card-pricing-pro">
-                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
-                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-lime-500 via-emerald-500 to-primary" />
-                <CardHeader className="pb-4 relative z-10">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-xl">Pro</CardTitle>
-                    <Badge className="text-[10px]">Most Popular</Badge>
-                  </div>
-                  <CardDescription>Full AI analysis, unlimited</CardDescription>
-                  <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£30</span>
-                    <span className="text-muted-foreground text-sm ml-2">/month</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <Separator className="mb-5" />
-                  <ul className="space-y-3 mb-6">
-                    {["Everything in Free", "Full AI-generated product descriptions", "AI-suggested pricing & variants", "SEO title, meta description & alt text", "AEO FAQ pairs & conversational snippets", "Unlimited image analysis", "Built-in review queue", "Bulk publish to all platforms", "Priority support"].map((item, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button className="w-full h-11 shadow-md shadow-primary/20" data-testid="button-pricing-get-pro" onClick={() => openSignIn()}>
-                    Get Started — £30/mo
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                  <p className="text-xs text-center text-muted-foreground mt-3">Cancel anytime. No lock-in.</p>
-                </CardContent>
-              </Card>
+              {/* Credit packs */}
+              {CREDIT_PACKS.map((pack, i) => (
+                <Card
+                  key={pack.id}
+                  className={`flex flex-col relative overflow-hidden reveal delay-${i + 2} transition-all duration-300 ${
+                    pack.highlight
+                      ? "border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-background/60 backdrop-blur-xl hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] lg:scale-105 z-10"
+                      : "bg-background/50 backdrop-blur-md border border-white/10 hover:border-white/20 shadow-xl"
+                  }`}
+                >
+                  {pack.highlight && (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
+                      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-lime-500 via-emerald-500 to-primary" />
+                    </>
+                  )}
+                  <CardHeader className="pb-4 relative z-10">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-xl">{pack.name}</CardTitle>
+                      {pack.badge && <Badge className="text-[10px]">{pack.badge}</Badge>}
+                    </div>
+                    <CardDescription>{pack.description}</CardDescription>
+                    <div className="pt-3">
+                      <span className="text-4xl font-display font-bold">{pack.price}</span>
+                      <span className="text-muted-foreground text-sm ml-2">one-time</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <Coins className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-sm font-semibold text-primary">{pack.credits} credits</span>
+                      <span className="text-xs text-muted-foreground">· {pack.perCredit}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col relative z-10">
+                    <Separator className={`mb-5 ${pack.highlight ? "" : "border-white/10"}`} />
+                    <ul className="space-y-3 flex-1 mb-6">
+                      {pack.features.map((item, j) => (
+                        <li key={j} className="flex items-start gap-2.5 text-sm">
+                          <CheckCircle2 className={`w-4 h-4 mt-0.5 flex-shrink-0 ${pack.highlight ? "text-primary" : "text-muted-foreground"}`} />
+                          <span className={pack.highlight ? "" : "text-muted-foreground"}>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      className={`w-full h-11 rounded-xl ${pack.highlight ? "shadow-md shadow-primary/20" : ""}`}
+                      variant={pack.highlight ? "default" : "outline"}
+                      onClick={() => openSignIn()}
+                    >
+                      Buy {pack.name} — {pack.price}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
+
+            <p className="text-center text-xs text-muted-foreground mt-8 reveal">
+              Credits never expire · Secure payments via Stripe · No subscriptions, no surprises
+            </p>
           </div>
         </section>
 
@@ -617,13 +734,13 @@ export default function Landing() {
               Frequently Asked Questions
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Everything you need to know about SnapSync AI, AI product listings, SEO, and AEO for e-commerce.
+              Everything you need to know about SnapSync AI, credits, AI product listings, SEO, and AEO for e-commerce.
             </p>
           </div>
           <div className="reveal">
-            <Accordion type="single" collapsible className="w-full space-y-3" data-testid="faq-list">
+            <Accordion type="single" collapsible className="w-full space-y-3">
               {FAQ_DATA.map((faq, index) => (
-                <AccordionItem key={index} value={`faq-${index}`} data-testid={`faq-item-${index}`} className="border border-white/10 bg-background/30 backdrop-blur-md rounded-xl px-4 md:px-6 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:bg-primary/5 transition-colors overflow-hidden">
+                <AccordionItem key={index} value={`faq-${index}`} className="border border-white/10 bg-background/30 backdrop-blur-md rounded-xl px-4 md:px-6 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:bg-primary/5 transition-colors overflow-hidden">
                   <AccordionTrigger className="text-left text-sm md:text-base font-semibold py-5 hover:no-underline hover:text-primary transition-colors">{faq.question}</AccordionTrigger>
                   <AccordionContent className="text-muted-foreground leading-relaxed text-sm md:text-base pb-5">{faq.answer}</AccordionContent>
                 </AccordionItem>
@@ -634,11 +751,10 @@ export default function Landing() {
 
         {/* ── BOTTOM CTA ── */}
         <section className="max-w-6xl mx-auto px-6 pb-24" aria-labelledby="cta-heading">
-          <div className="relative rounded-3xl border border-white/10 bg-black/40 backdrop-blur-md p-12 md:p-20 text-center overflow-hidden reveal shadow-2xl" data-testid="card-cta-bottom">
+          <div className="relative rounded-3xl border border-white/10 bg-black/40 backdrop-blur-md p-12 md:p-20 text-center overflow-hidden reveal shadow-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-lime-900/20" />
             <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-primary/20 blur-[120px] rounded-full pointer-events-none" />
             <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-lime-500/20 blur-[120px] rounded-full pointer-events-none" />
-            
             <div className="relative z-10">
               <Badge variant="outline" className="mb-8 no-default-active-elevate gap-1.5 px-4 py-1.5 rounded-full border-primary/30 bg-primary/10 text-primary">
                 <Sparkles className="w-4 h-4" />
@@ -652,7 +768,7 @@ export default function Landing() {
                 listings in seconds — then publish everywhere with one click.
               </p>
               <div className="flex items-center justify-center gap-4 flex-wrap">
-                <Button size="lg" className="h-14 px-10 text-base shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] gap-3 rounded-xl hover:scale-105 transition-all duration-300 group" data-testid="button-cta-bottom" onClick={() => openSignIn()}>
+                <Button size="lg" className="h-14 px-10 text-base shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] gap-3 rounded-xl hover:scale-105 transition-all duration-300 group" onClick={() => openSignIn()}>
                   Get Started Free
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
@@ -660,7 +776,7 @@ export default function Landing() {
                   View Pricing
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground mt-8 font-medium">No credit card required · Cancel anytime · Free AI previews included</p>
+              <p className="text-sm text-muted-foreground mt-8 font-medium">No credit card required · Credits never expire · Free AI previews always included</p>
             </div>
           </div>
         </section>
