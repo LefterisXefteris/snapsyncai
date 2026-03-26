@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store } from "lucide-react";
 import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
-import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart, usePaymentConfig, useCreateSubscriptionCheckout, useCancelSubscription } from "@/hooks/use-images";
+import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart, usePaymentConfig, useCreateSubscriptionCheckout, useCancelSubscription, useCreditsBalance, usePurchaseCredits, useVerifyCredits } from "@/hooks/use-images";
 import { UploadZone } from "@/components/upload-zone";
 import { ImageCard } from "@/components/image-card";
 import { ReviewQueueModal } from "@/components/review-queue-modal";
@@ -55,6 +55,11 @@ export default function Home() {
   const unlockImages = useUnlockImages();
   const { toast } = useToast();
   const createSubscriptionCheckout = useCreateSubscriptionCheckout();
+  const { data: creditsData } = useCreditsBalance();
+  const purchaseCredits = usePurchaseCredits();
+  const verifyCredits = useVerifyCredits();
+  const { data: paymentConfig } = usePaymentConfig();
+  const [showPricingDialog, setShowPricingDialog] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showReviewQueue, setShowReviewQueue] = useState(false);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
@@ -80,6 +85,7 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const subscriptionParam = params.get('subscription');
+    const creditsParam = params.get('credits');
     const sessionId = params.get('checkout_session_id') || localStorage.getItem('snapsyncai_checkout_session_id');
 
     if (subscriptionParam === 'success' && sessionId) {
@@ -88,11 +94,14 @@ export default function Home() {
       window.history.replaceState({}, '', '/');
     } else if (subscriptionParam === 'cancelled') {
       localStorage.removeItem('snapsyncai_checkout_session_id');
-      toast({
-        title: "Subscription Cancelled",
-        description: "Your subscription checkout was cancelled. You can try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Subscription Cancelled", description: "Your subscription checkout was cancelled. You can try again.", variant: "destructive" });
+      window.history.replaceState({}, '', '/');
+    } else if (creditsParam === 'success' && sessionId) {
+      verifyCredits.mutate(sessionId);
+      localStorage.removeItem('snapsyncai_checkout_session_id');
+      window.history.replaceState({}, '', '/');
+    } else if (creditsParam === 'cancelled') {
+      toast({ title: "Purchase Cancelled", description: "Your credit purchase was cancelled. You can try again." });
       window.history.replaceState({}, '', '/');
     }
   }, []);
@@ -512,52 +521,26 @@ export default function Home() {
               </div>
             </ScrollArea>
 
-            {/* Subscribe footer pinned at bottom */}
+            {/* Footer pinned at bottom */}
             <div className="p-3 border-t border-border shrink-0">
-              {isSubscribed ? (
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/20">
-                  <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium">SnapSync AI Pro</p>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {subscriptionStatus?.currentPeriodEnd
-                        ? `Renews ${new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()}`
-                        : 'Active'}
-                    </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/40 border">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-xs font-medium">{creditsData?.balance ?? 0} credits</span>
                   </div>
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <ModeToggle />
-                    <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
                   <button
-                    data-testid="button-sidebar-subscribe"
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
-                    onClick={() => {
-                      createSubscriptionCheckout.mutate(undefined, {
-                        onSuccess: (data: any) => {
-                          if (data.checkoutUrl) {
-                            if (data.sessionId) localStorage.setItem('snapsyncai_checkout_session_id', data.sessionId);
-                            window.location.href = data.checkoutUrl;
-                          }
-                        },
-                      });
-                    }}
-                    disabled={createSubscriptionCheckout.isPending}
+                    className="text-[10px] text-primary hover:underline font-medium"
+                    onClick={() => setShowPricingDialog(true)}
                   >
-                    {createSubscriptionCheckout.isPending
-                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      : <Crown className="w-3.5 h-3.5" />}
-                    <span>Upgrade to Pro · £30/mo</span>
+                    Buy more
                   </button>
-                  <div className="flex items-center justify-between px-1">
-                    <ModeToggle />
-                    <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
-                  </div>
                 </div>
-              )}
+                <div className="flex items-center justify-between px-1">
+                  <ModeToggle />
+                  <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
+                </div>
+              </div>
             </div>
           </ResizablePanel>
 
@@ -573,7 +556,7 @@ export default function Home() {
                     <span>Running AI Analysis on {unpaidImages.length} products...</span>
                   </div>
                 )}
-                {isSubscribed && unpaidImages.length > 0 && !unlockImages.isPending && (
+                {(creditsData?.balance ?? 0) > 0 && unpaidImages.length > 0 && !unlockImages.isPending && (
                   <div className="flex items-center justify-between p-2 rounded-md bg-amber-500/10 border border-amber-500/20 mb-2">
                     <span className="text-xs font-medium flex items-center gap-1.5 text-amber-500">
                       <Lock className="w-3.5 h-3.5" />
@@ -1184,6 +1167,62 @@ export default function Home() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pricing / Credits Dialog */}
+      <Dialog open={showPricingDialog} onOpenChange={setShowPricingDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              Buy Credits
+            </DialogTitle>
+            <DialogDescription>
+              Each credit unlocks full AI analysis for one product. Pay once, credits never expire.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Current balance */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-md bg-muted/50 border">
+              <span className="text-sm text-muted-foreground">Current balance</span>
+              <span className="text-sm font-semibold flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                {creditsData?.balance ?? 0} credits
+              </span>
+            </div>
+
+            {/* Credit packs */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Choose a pack</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(paymentConfig?.creditPacks ?? [{ id: 'starter', name: 'Starter', credits: 10, pricePence: 900 }, { id: 'growth', name: 'Growth', credits: 50, pricePence: 3500 }, { id: 'pro', name: 'Pro', credits: 150, pricePence: 7900 }]).map((pack: any) => (
+                  <button
+                    key={pack.id}
+                    onClick={() => {
+                      purchaseCredits.mutate(pack.id, {
+                        onSuccess: (data: any) => {
+                          if (data.checkoutUrl) {
+                            if (data.sessionId) localStorage.setItem('snapsyncai_checkout_session_id', data.sessionId);
+                            window.location.href = data.checkoutUrl;
+                          }
+                        },
+                      });
+                    }}
+                    disabled={purchaseCredits.isPending}
+                    className="flex flex-col items-center gap-1 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-center group"
+                  >
+                    <span className="text-lg font-bold">{pack.credits}</span>
+                    <span className="text-[10px] text-muted-foreground">credits</span>
+                    <span className="text-xs font-semibold text-primary mt-1">£{(pack.pricePence / 100).toFixed(0)}</span>
+                    <span className="text-[10px] text-muted-foreground">{pack.name}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5">1 credit = 1 product. Credits never expire.</p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div >

@@ -8,6 +8,7 @@ export const images = pgTable("images", {
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull(),
   imageData: text("image_data"),
+  storageUrl: text("storage_url"),
   title: text("title"),
   description: text("description"),
   price: numeric("price"),
@@ -164,3 +165,13 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+
+export const userCredits = pgTable("user_credits", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  balance: integer("balance").notNull().default(0),
+  lifetimeCredits: integer("lifetime_credits").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UserCredits = typeof userCredits.$inferSelect;

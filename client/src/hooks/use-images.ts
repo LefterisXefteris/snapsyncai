@@ -28,7 +28,7 @@ export function usePaymentConfig() {
     queryFn: async () => {
       const res = await fetch('/api/payments/config', { credentials: "include" });
       if (!res.ok) throw new Error("Payment system not available");
-      return res.json() as Promise<{ publishableKey: string; subscriptionPricePence: number }>;
+      return res.json() as Promise<{ publishableKey: string; subscriptionPricePence: number; creditPacks: { id: string; name: string; credits: number; pricePence: number }[] }>;
     },
   });
 }
@@ -812,6 +812,56 @@ export function useRewriteDescription() {
     },
     onError: (error) => {
       toast({ title: "Rewrite Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useCreditsBalance() {
+  const { user } = useUser();
+  const userId = DEV_BYPASS_AUTH ? "dev_local_user" : user?.id;
+  return useQuery({
+    queryKey: ['/api/credits/balance', userId],
+    queryFn: async () => {
+      if (DEV_BYPASS_AUTH) return { balance: 999, lifetimeCredits: 999 };
+      const res = await fetch('/api/credits/balance', { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch credits");
+      return res.json() as Promise<{ balance: number; lifetimeCredits: number }>;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function usePurchaseCredits() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (packId: string) => {
+      const res = await apiRequest("POST", "/api/credits/purchase", { packId });
+      return res.json() as Promise<{ checkoutUrl: string; sessionId: string }>;
+    },
+    onError: (error) => {
+      toast({ title: "Purchase Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useVerifyCredits() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useUser();
+  const userId = DEV_BYPASS_AUTH ? "dev_local_user" : user?.id;
+
+  return useMutation({
+    mutationFn: async (checkoutSessionId: string) => {
+      const res = await apiRequest("POST", "/api/credits/verify", { checkoutSessionId });
+      return res.json() as Promise<{ verified: boolean; credits: number; balance: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/credits/balance', userId] });
+      toast({ title: "Credits Added!", description: `${data.credits} credits have been added to your account. Balance: ${data.balance} credits.` });
+    },
+    onError: (error) => {
+      toast({ title: "Verification Failed", description: error.message, variant: "destructive" });
     },
   });
 }

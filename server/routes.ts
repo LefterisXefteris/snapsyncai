@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
+import { uploadImageToStorage } from "./supabaseClient";
 
 const MIN_IMAGE_COUNT = 1;
 const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
@@ -46,6 +47,26 @@ function setImageBuffer(id: number, buf: Buffer) {
   imageBuffers.set(id, buf);
 }
 
+// Load an image buffer: memory cache → base64 DB column → Supabase Storage URL
+async function loadImageBuffer(image: { id: number; imageData?: string | null; storageUrl?: string | null }): Promise<Buffer | null> {
+  const cached = imageBuffers.get(image.id);
+  if (cached) return cached;
+  if (image.imageData) return Buffer.from(image.imageData, 'base64');
+  if ((image as any).storageUrl) {
+    try {
+      const resp = await fetch((image as any).storageUrl as string);
+      if (resp.ok) {
+        const buf = Buffer.from(await resp.arrayBuffer());
+        setImageBuffer(image.id, buf);
+        return buf;
+      }
+    } catch (e) {
+      console.error(`loadImageBuffer: failed to fetch storageUrl for image ${image.id}:`, e);
+    }
+  }
+  return null;
+}
+
 const CONCURRENCY_LIMIT = 10;
 
 async function runWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -65,7 +86,64 @@ async function runWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T,
   return results;
 }
 
-const SUBSCRIPTION_PRICE_PENCE = 3000;
+const SUBSCRIPTION_PRICE_PENCE = 1900;
+
+const CREDIT_PACKS = [
+  { id: 'starter', name: 'Starter', credits: 10, pricePence: 900 },
+  { id: 'growth', name: 'Growth', credits: 50, pricePence: 3500 },
+  { id: 'pro', name: 'Pro', credits: 150, pricePence: 7900 },
+] as const;
+
+const cachedCreditPriceIds = new Map<string, string>();
+
+async function getOrCreateCreditPackPriceId(packId: string): Promise<string> {
+  if (cachedCreditPriceIds.has(packId)) return cachedCreditPriceIds.get(packId)!;
+
+  const pack = CREDIT_PACKS.find(p => p.id === packId);
+  if (!pack) throw new Error(`Unknown credit pack: ${packId}`);
+
+  const stripe = await getUncachableStripeClient();
+
+  // Find existing price in Stripe DB
+  const result = await db.execute(
+    sql`SELECT pr.id as price_id, pr.unit_amount FROM stripe.products p JOIN stripe.prices pr ON pr.product = p.id WHERE p.active = true AND p.metadata->>'type' = 'credit_pack' AND p.metadata->>'packId' = ${packId} AND pr.active = true AND pr.type = 'one_time' ORDER BY pr.created DESC LIMIT 1`
+  );
+
+  if (result.rows.length > 0 && Number(result.rows[0].unit_amount) === pack.pricePence) {
+    const priceId = result.rows[0].price_id as string;
+    cachedCreditPriceIds.set(packId, priceId);
+    return priceId;
+  }
+
+  // Get or create product
+  const productResult = await db.execute(
+    sql`SELECT p.id as product_id FROM stripe.products p WHERE p.active = true AND p.metadata->>'type' = 'credit_pack' AND p.metadata->>'packId' = ${packId} LIMIT 1`
+  );
+
+  let productId: string;
+  if (productResult.rows.length > 0) {
+    productId = productResult.rows[0].product_id as string;
+    // Deactivate old price if price changed
+    if (result.rows.length > 0) {
+      try { await stripe.prices.update(result.rows[0].price_id as string, { active: false }); } catch (e) {}
+    }
+  } else {
+    const product = await stripe.products.create({
+      name: `SnapSync AI Credits — ${pack.name} (${pack.credits} credits)`,
+      description: `${pack.credits} AI product analysis credits. Each credit unlocks full AI listing generation for one product.`,
+      metadata: { type: 'credit_pack', packId, credits: String(pack.credits) },
+    });
+    productId = product.id;
+  }
+
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: pack.pricePence,
+    currency: 'gbp',
+  });
+  cachedCreditPriceIds.set(packId, price.id);
+  return price.id;
+}
 
 let cachedPriceId: string | null = null;
 
@@ -915,12 +993,89 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/payments/config", async (_req, res) => {
     try {
       const publishableKey = await getStripePublishableKey();
-      res.json({ publishableKey, subscriptionPricePence: SUBSCRIPTION_PRICE_PENCE });
+      res.json({
+        publishableKey,
+        subscriptionPricePence: SUBSCRIPTION_PRICE_PENCE,
+        creditPacks: CREDIT_PACKS,
+      });
     } catch (error) {
       console.error("Stripe config error:", error);
       res.status(500).json({ message: "Payment system not available" });
     }
   });
+
+  // ── Credits ──────────────────────────────────────────────────────────────
+
+  app.get("/api/credits/balance", requireAuth(), async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (DEV_BYPASS_AUTH) return res.json({ balance: 999, lifetimeCredits: 999 });
+      const row = await storage.getUserCredits(userId);
+      res.json({ balance: row?.balance ?? 0, lifetimeCredits: row?.lifetimeCredits ?? 0 });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch credit balance" });
+    }
+  });
+
+  app.post("/api/credits/purchase", requireAuth(), async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { packId } = req.body;
+      const pack = CREDIT_PACKS.find(p => p.id === packId);
+      if (!pack) return res.status(400).json({ message: "Invalid credit pack" });
+
+      const stripe = await getUncachableStripeClient();
+      const priceId = await getOrCreateCreditPackPriceId(packId);
+      const appUrl = getAppUrl(req);
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        mode: 'payment',
+        success_url: `${appUrl}/?credits=success&checkout_session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/?credits=cancelled`,
+        metadata: { userId, credits: String(pack.credits), packId },
+      });
+
+      res.json({ checkoutUrl: session.url, sessionId: session.id });
+    } catch (error: any) {
+      console.error("Credits purchase error:", error);
+      res.status(500).json({ message: "Failed to create checkout", detail: error?.message });
+    }
+  });
+
+  app.post("/api/credits/verify", requireAuth(), async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { checkoutSessionId } = req.body;
+      if (!checkoutSessionId) return res.status(400).json({ message: "Missing checkout session ID" });
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(402).json({ message: "Payment not completed" });
+      }
+
+      const credits = Number(session.metadata?.credits);
+      const sessionUserId = session.metadata?.userId;
+
+      if (!credits || sessionUserId !== userId) {
+        return res.status(400).json({ message: "Invalid session" });
+      }
+
+      await storage.addCredits(userId, credits);
+      const row = await storage.getUserCredits(userId);
+      console.log(`Credits verified: +${credits} for user ${userId}, new balance: ${row?.balance}`);
+
+      res.json({ verified: true, credits, balance: row?.balance ?? credits });
+    } catch (error: any) {
+      console.error("Credits verify error:", error);
+      res.status(500).json({ message: "Failed to verify purchase" });
+    }
+  });
+
+  // ── Subscription ─────────────────────────────────────────────────────────
 
   app.get("/api/subscription/status", requireAuth(), async (req, res) => {
     try {
@@ -1237,10 +1392,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/subscription/unlock-images", requireAuth(), async (req, res) => {
     try {
       const userId = getUserId(req);
-      const sub = await storage.getSubscription(userId);
-      if (!sub || (sub.status !== 'active' && sub.status !== 'trialing' && sub.status !== 'canceling')) {
-        return res.status(403).json({ message: "Active subscription required to unlock images" });
-      }
 
       const { imageIds } = req.body;
       if (!imageIds || !Array.isArray(imageIds) || imageIds.length === 0) {
@@ -1255,9 +1406,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.json({ processed: 0, message: "All selected images are already unlocked." });
       }
 
+      // Check subscription OR credits
+      const sub = await storage.getSubscription(userId);
+      const isSubscribed = sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling');
+
+      if (!isSubscribed) {
+        // Count unique products (groups count as 1 credit each)
+        const uniqueProducts = new Set(unpaidImages.map(img => img.productGroupId || `single_${img.id}`));
+        const creditCost = uniqueProducts.size;
+        const deducted = await storage.deductCredits(userId, creditCost);
+        if (!deducted) {
+          return res.status(403).json({
+            message: "Insufficient credits",
+            detail: `This will use ${creditCost} credit${creditCost !== 1 ? 's' : ''}. Please purchase more credits to continue.`,
+            creditsRequired: creditCost,
+          });
+        }
+        console.log(`Credits: deducted ${creditCost} from user ${userId} for unlock`);
+      }
+
       const results = await runWithConcurrency(unpaidImages, CONCURRENCY_LIMIT, async (image) => {
         try {
-          const buffer = imageBuffers.get(image.id) || (image.imageData ? Buffer.from(image.imageData, 'base64') : null);
+          const buffer = await loadImageBuffer(image);
           if (!buffer) {
             await storage.updateImage(image.id, {
               paymentStatus: "paid",
@@ -1311,6 +1481,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Upload a file buffer to Supabase Storage and return storageUrl (or null on failure)
+  async function uploadFileToStorage(file: Express.Multer.File, imageId: number): Promise<string | null> {
+    try {
+      return await uploadImageToStorage(file.buffer, file.mimetype, imageId, file.originalname);
+    } catch (err) {
+      console.error('uploadFileToStorage error:', err);
+      return null;
+    }
+  }
+
   app.post("/api/images/upload", requireAuth(), upload.array("images", 200), async (req, res) => {
     try {
       if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
@@ -1351,7 +1531,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
 
         const results = await Promise.all(files.map(async (file, idx) => {
-          const imageDataBase64 = file.buffer.toString('base64');
           const isPrimary = idx === 0;
 
           try {
@@ -1363,7 +1542,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 originalName: file.originalname,
                 mimeType: file.mimetype,
                 size: file.size,
-                imageData: imageDataBase64,
+                imageData: null,
                 title: isPrimary ? a.title : `${a.title} (view ${idx + 1})`,
                 description: isPrimary ? a.description : undefined,
                 price: isPrimary ? a.price : undefined,
@@ -1391,7 +1570,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 originalName: file.originalname,
                 mimeType: file.mimetype,
                 size: file.size,
-                imageData: imageDataBase64,
+                imageData: null,
                 title: isPrimary ? a.title : `${a.title} (view ${idx + 1})`,
                 category: a.category,
                 mainCategory: (a as any).mainCategory,
@@ -1406,14 +1585,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               });
             }
             setImageBuffer(image.id, file.buffer);
-            return image;
+            const storageUrl = await uploadFileToStorage(file, image.id);
+            if (storageUrl) await storage.updateImage(image.id, { storageUrl } as any);
+            return storageUrl ? { ...image, storageUrl } : image;
           } catch (err) {
             console.error(`Failed to store grouped image ${file.originalname}:`, err);
             const fallback = await storage.createImage({
               originalName: file.originalname,
               mimeType: file.mimetype,
               size: file.size,
-              imageData: imageDataBase64,
+              imageData: null,
               title: file.originalname.replace(/\.[^/.]+$/, ""),
               category: "Other",
               tags: [],
@@ -1425,7 +1606,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               sessionId,
             });
             setImageBuffer(fallback.id, file.buffer);
-            return fallback;
+            const storageUrl = await uploadFileToStorage(file, fallback.id);
+            if (storageUrl) await storage.updateImage(fallback.id, { storageUrl } as any);
+            return storageUrl ? { ...fallback, storageUrl } : fallback;
           }
         }));
 
@@ -1435,8 +1618,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Default: process each image independently
       const results = await runWithConcurrency(files, CONCURRENCY_LIMIT, async (file) => {
         try {
-          const imageDataBase64 = file.buffer.toString('base64');
-
           if (hasActiveSubscription) {
             const analysis = await fullAnalyzeImage(file.buffer, file.mimetype, file.originalname, brandTone, productContext || undefined);
             const analysisSucceeded = analysis.description !== "Failed to analyze image.";
@@ -1445,7 +1626,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               originalName: file.originalname,
               mimeType: file.mimetype,
               size: file.size,
-              imageData: imageDataBase64,
+              imageData: null,
               title: analysisSucceeded ? analysis.title : file.originalname.replace(/\.[^/.]+$/, ""),
               description: analysisSucceeded ? analysis.description : undefined,
               price: analysisSucceeded ? analysis.price : undefined,
@@ -1467,7 +1648,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             });
 
             setImageBuffer(image.id, file.buffer);
-            return image;
+            const storageUrl = await uploadFileToStorage(file, image.id);
+            if (storageUrl) await storage.updateImage(image.id, { storageUrl } as any);
+            return storageUrl ? { ...image, storageUrl } : image;
           }
 
           const preview = await quickPreviewImage(file.buffer, file.mimetype, file.originalname, productContext || undefined, brandTone);
@@ -1476,7 +1659,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             originalName: file.originalname,
             mimeType: file.mimetype,
             size: file.size,
-            imageData: imageDataBase64,
+            imageData: null,
             title: preview.title,
             category: preview.category,
             productType: preview.productType,
@@ -1489,15 +1672,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           });
 
           setImageBuffer(image.id, file.buffer);
-          return image;
+          const storageUrl = await uploadFileToStorage(file, image.id);
+          if (storageUrl) await storage.updateImage(image.id, { storageUrl } as any);
+          return storageUrl ? { ...image, storageUrl } : image;
         } catch (err) {
           console.error(`Failed to process ${file.originalname}:`, err);
-          const fallbackImageData = file.buffer.toString('base64');
           const fallbackImage = await storage.createImage({
             originalName: file.originalname,
             mimeType: file.mimetype,
             size: file.size,
-            imageData: fallbackImageData,
+            imageData: null,
             title: file.originalname.replace(/\.[^/.]+$/, ""),
             category: "Other",
             tags: [],
@@ -1508,7 +1692,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             sessionId,
           });
           setImageBuffer(fallbackImage.id, file.buffer);
-          return fallbackImage;
+          const storageUrl = await uploadFileToStorage(file, fallbackImage.id);
+          if (storageUrl) await storage.updateImage(fallbackImage.id, { storageUrl } as any);
+          return storageUrl ? { ...fallbackImage, storageUrl } : fallbackImage;
         }
       });
 
@@ -1616,14 +1802,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const id = Number(req.params.id);
       const userId = getUserId(req);
 
-      // Fast path: serve from in-memory buffer if available (avoids DB round-trip entirely)
+      // Always fetch image record to check ownership and storageUrl
+      const image = await storage.getImage(id);
+      if (!image || image.sessionId !== userId) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+
+      // Fast path: redirect to Supabase Storage URL (persistent, CDN-cached)
+      if ((image as any).storageUrl) {
+        return res.redirect(302, (image as any).storageUrl);
+      }
+
+      // Medium path: serve from in-memory buffer if available
       const cached = imageBuffers.get(id);
       if (cached) {
-        // Still need to verify ownership — use a lightweight query
-        const image = await storage.getImage(id);
-        if (!image || image.sessionId !== userId) {
-          return res.status(404).json({ message: "Image not found" });
-        }
         res.set({
           'Content-Type': image.mimeType,
           'Content-Length': cached.length.toString(),
@@ -1632,11 +1824,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.send(cached);
       }
 
-      // Slow path: load from DB
-      const image = await storage.getImage(id);
-      if (!image || image.sessionId !== userId) {
-        return res.status(404).json({ message: "Image not found" });
-      }
+      // Slow path: load base64 from DB (legacy images)
       if (!image.imageData) {
         return res.status(404).json({ message: "Image data not found" });
       }
@@ -1854,15 +2042,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           for (const img of missingImages) fullImageMap.set(img.id, img);
         }
 
-        const fullPrimary = fullImageMap.get(primary.id) || primary;
-        const buffer = imageBuffers.get(primary.id) || (fullPrimary.imageData ? Buffer.from(fullPrimary.imageData, 'base64') : null);
-        const viewData = views.map(v => {
-          const fullView = fullImageMap.get(v.id) || v;
+        const fullPrimary = (fullImageMap.get(primary.id) || primary) as any;
+        const buffer = await loadImageBuffer(fullPrimary);
+        const viewData = await Promise.all(views.map(async v => {
+          const fullView = (fullImageMap.get(v.id) || v) as any;
           return {
             image: fullView,
-            buffer: imageBuffers.get(v.id) || (fullView.imageData ? Buffer.from(fullView.imageData, 'base64') : undefined),
+            buffer: await loadImageBuffer(fullView) ?? undefined,
           };
-        });
+        }));
         const result = await pushProductToShopify(fullPrimary, accessToken, shopDomain, buffer || undefined, viewData);
         if (result.shopifyProductId) {
           // Batch-update all images in the group in one query
@@ -2042,7 +2230,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const results: { id: number; etsyListingId?: string; error?: string }[] = [];
 
       for (const image of imagesToPush) {
-        const buffer = imageBuffers.get(image.id) || (image.imageData ? Buffer.from(image.imageData, 'base64') : null);
+        const buffer = await loadImageBuffer(image);
         const result = await pushProductToEtsy(image, connection, buffer || undefined);
         if (result.etsyListingId) {
           await storage.updateImage(image.id, {
@@ -2501,7 +2689,7 @@ Tags: ${(image.tags || []).join(', ')}`
         return res.status(402).json({ message: "Product needs full AI analysis before posting to Instagram." });
       }
 
-      const buffer = imageBuffers.get(image.id) || (image.imageData ? Buffer.from(image.imageData, 'base64') : null);
+      const buffer = await loadImageBuffer(image);
       if (!buffer) {
         return res.status(400).json({ message: "Image data not available for posting." });
       }
@@ -2748,12 +2936,9 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
       const bgDescription = BG_STYLES[style] ?? BG_STYLES.studio;
 
       // Fetch the raw image buffer
-      let imageBuffer = imageBuffers.get(id);
-      if (!imageBuffer && image.imageData) {
-        imageBuffer = Buffer.from(image.imageData, 'base64');
-      }
+      const imageBuffer = await loadImageBuffer(image);
       if (!imageBuffer) {
-        return res.status(404).json({ message: "Image file not available on this server instance. Please re-upload." });
+        return res.status(404).json({ message: "Image file not available. Please re-upload." });
       }
 
       // gpt-image-1 requires PNG for edits; convert buffer to an uploadable File

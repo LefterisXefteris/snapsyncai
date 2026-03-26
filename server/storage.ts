@@ -1,4 +1,4 @@
-import { images, shopifyConnections, etsyConnections, amazonConnections, instagramConnections, paidSessions, subscriptions, type InsertImage, type Image, type InsertShopifyConnection, type ShopifyConnection, type InsertEtsyConnection, type EtsyConnection, type InsertAmazonConnection, type AmazonConnection, type InsertInstagramConnection, type InstagramConnection, type InsertPaidSession, type PaidSession, type InsertSubscription, type Subscription } from "@shared/schema";
+import { images, shopifyConnections, etsyConnections, amazonConnections, instagramConnections, paidSessions, subscriptions, userCredits, type InsertImage, type Image, type InsertShopifyConnection, type ShopifyConnection, type InsertEtsyConnection, type EtsyConnection, type InsertAmazonConnection, type AmazonConnection, type InsertInstagramConnection, type InstagramConnection, type InsertPaidSession, type PaidSession, type InsertSubscription, type Subscription, type UserCredits } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
@@ -74,6 +74,9 @@ export interface IStorage {
   getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined>;
   upsertSubscription(sub: InsertSubscription): Promise<Subscription>;
   updateSubscriptionStatus(stripeSubscriptionId: string, status: string, currentPeriodEnd?: Date): Promise<void>;
+  getUserCredits(userId: string): Promise<UserCredits | undefined>;
+  addCredits(userId: string, amount: number): Promise<void>;
+  deductCredits(userId: string, amount: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -295,6 +298,32 @@ export class DatabaseStorage implements IStorage {
     await db.update(subscriptions)
       .set(updates)
       .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
+  }
+
+  async getUserCredits(userId: string): Promise<UserCredits | undefined> {
+    const [row] = await db.select().from(userCredits).where(eq(userCredits.userId, userId));
+    return row;
+  }
+
+  async addCredits(userId: string, amount: number): Promise<void> {
+    await db.insert(userCredits)
+      .values({ userId, balance: amount, lifetimeCredits: amount })
+      .onConflictDoUpdate({
+        target: userCredits.userId,
+        set: {
+          balance: sql`${userCredits.balance} + ${amount}`,
+          lifetimeCredits: sql`${userCredits.lifetimeCredits} + ${amount}`,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  async deductCredits(userId: string, amount: number): Promise<boolean> {
+    const result = await db.update(userCredits)
+      .set({ balance: sql`${userCredits.balance} - ${amount}`, updatedAt: new Date() })
+      .where(and(eq(userCredits.userId, userId), sql`${userCredits.balance} >= ${amount}`))
+      .returning({ balance: userCredits.balance });
+    return result.length > 0;
   }
 }
 

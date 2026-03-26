@@ -29,6 +29,19 @@ export class WebhookHandlers {
 
     if (!data) return;
 
+    if (type === 'checkout.session.completed' && data.mode === 'payment') {
+      const userId = data.metadata?.userId;
+      const credits = Number(data.metadata?.credits);
+      if (userId && credits > 0) {
+        try {
+          await storage.addCredits(userId, credits);
+          console.log(`Webhook: Added ${credits} credits to user ${userId}`);
+        } catch (e) {
+          console.error("Webhook: Error adding credits:", e);
+        }
+      }
+    }
+
     if (type === 'checkout.session.completed' && data.mode === 'subscription') {
       const userId = data.metadata?.userId;
       const subscriptionId = typeof data.subscription === 'string' ? data.subscription : data.subscription?.id;

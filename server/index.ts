@@ -139,10 +139,19 @@ let setupPromise: Promise<void> | null = null;
 async function runAppMigrations() {
   try {
     await pool.query(`ALTER TABLE images ADD COLUMN IF NOT EXISTS product_group_id TEXT`);
+    await pool.query(`ALTER TABLE images ADD COLUMN IF NOT EXISTS storage_url TEXT`);
     // Performance indexes — created concurrently so they don't lock the table
     await pool.query(`CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_images_session_id ON images (session_id)`);
     await pool.query(`CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_images_product_group_id ON images (product_group_id) WHERE product_group_id IS NOT NULL`);
     await pool.query(`CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_images_session_created ON images (session_id, created_at DESC)`);
+    // Credit balance table
+    await pool.query(`CREATE TABLE IF NOT EXISTS user_credits (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      balance INTEGER NOT NULL DEFAULT 0,
+      lifetime_credits INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`);
     console.log('App migrations complete');
   } catch (err) {
     console.error('App migration error (non-fatal):', err);
