@@ -12,7 +12,7 @@ This milestone closes the active fraud vector and security gaps found in the pro
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Credit Idempotency** - Stop the active credit double-grant by making the verify and webhook paths atomic
+- [x] **Phase 1: Credit Idempotency** - Stop the active credit double-grant by making the verify and webhook paths atomic (completed 2026-03-31)
 - [ ] **Phase 2: Auth Bypass Guard** - Prevent DEV_BYPASS_AUTH from silently disabling auth in production
 - [ ] **Phase 3: Token Encryption** - Encrypt all third-party OAuth tokens at rest before writing to the DB
 - [ ] **Phase 4: Stripe SDK Fix** - Remove the `as any` cast on the Stripe API version string
@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 Plans:
 - [x] 01-01-PLAN.md — Add claimAndGrantCredits atomic storage method
-- [ ] 01-02-PLAN.md — Wire verify endpoint and webhook to claimAndGrantCredits
+- [x] 01-02-PLAN.md — Wire verify endpoint and webhook to claimAndGrantCredits
 
 ### Phase 2: Auth Bypass Guard
 **Goal**: The server hard-errors on startup if `DEV_BYPASS_AUTH=true` is set in a production environment, making misconfiguration impossible to miss
@@ -69,7 +69,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Credit Idempotency | 1/2 | In Progress|  |
+| 1. Credit Idempotency | 2/2 | Complete   | 2026-03-31 |
 | 2. Auth Bypass Guard | 0/? | Not started | - |
 | 3. Token Encryption | 0/? | Not started | - |
 | 4. Stripe SDK Fix | 0/? | Not started | - |
