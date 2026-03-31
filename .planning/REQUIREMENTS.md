@@ -55,14 +55,14 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| PAY-01 | Phase 2 | Pending |
+| PAY-01 | Phase 1 | Pending |
+| AUTH-01 | Phase 2 | Pending |
 | CRED-01 | Phase 3 | Pending |
 | CRED-02 | Phase 3 | Pending |
 | CRED-03 | Phase 3 | Pending |
 | CRED-04 | Phase 3 | Pending |
 | CRED-05 | Phase 3 | Pending |
-| INFRA-01 | Phase 1 | Pending |
+| INFRA-01 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 8 total
@@ -71,4 +71,4 @@
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after initial definition*
+*Last updated: 2026-03-31 — phase assignments finalized (PAY-01→P1, AUTH-01→P2, CRED→P3, INFRA-01→P4)*
