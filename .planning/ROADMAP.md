@@ -27,7 +27,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Calling `POST /api/credits/verify` twice with the same `checkoutSessionId` grants credits only once — the second call returns a success response but adds zero credits
   2. If the Stripe webhook fires for a session that was already processed by the verify endpoint (or vice versa), no additional credits are added
   3. The idempotency check reads and sets `paidSessions.used` atomically so concurrent calls cannot both pass the check
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Add claimAndGrantCredits atomic storage method
+- [ ] 01-02-PLAN.md — Wire verify endpoint and webhook to claimAndGrantCredits
 
 ### Phase 2: Auth Bypass Guard
 **Goal**: The server hard-errors on startup if `DEV_BYPASS_AUTH=true` is set in a production environment, making misconfiguration impossible to miss
