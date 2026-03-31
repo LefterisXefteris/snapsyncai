@@ -29,7 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The idempotency check reads and sets `paidSessions.used` atomically so concurrent calls cannot both pass the check
 **Plans**: 2 plans
 Plans:
-- [ ] 01-01-PLAN.md — Add claimAndGrantCredits atomic storage method
+- [x] 01-01-PLAN.md — Add claimAndGrantCredits atomic storage method
 - [ ] 01-02-PLAN.md — Wire verify endpoint and webhook to claimAndGrantCredits
 
 ### Phase 2: Auth Bypass Guard
@@ -69,7 +69,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Credit Idempotency | 0/? | Not started | - |
+| 1. Credit Idempotency | 1/2 | In Progress|  |
 | 2. Auth Bypass Guard | 0/? | Not started | - |
 | 3. Token Encryption | 0/? | Not started | - |
 | 4. Stripe SDK Fix | 0/? | Not started | - |

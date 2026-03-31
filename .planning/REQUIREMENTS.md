@@ -11,7 +11,7 @@
 
 ### Payments
 
-- [ ] **PAY-01**: Stripe checkout session credit grant is idempotent — `paidSessions.used` is checked and set atomically before `addCredits()` is called; repeated calls with the same `checkoutSessionId` (via verify endpoint or webhook) grant credits exactly once
+- [x] **PAY-01**: Stripe checkout session credit grant is idempotent — `paidSessions.used` is checked and set atomically before `addCredits()` is called; repeated calls with the same `checkoutSessionId` (via verify endpoint or webhook) grant credits exactly once
 
 ### Credentials
 
@@ -55,7 +55,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PAY-01 | Phase 1 | Pending |
+| PAY-01 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Pending |
 | CRED-01 | Phase 3 | Pending |
 | CRED-02 | Phase 3 | Pending |
