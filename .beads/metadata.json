@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "lisai_app",
+  "project_id": "8cd4e7ad-8e91-4fd8-891d-f5c1ef58cc05"
+}
