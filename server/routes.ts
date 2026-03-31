@@ -1064,10 +1064,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Invalid session" });
       }
 
-      await storage.addCredits(userId, credits);
+      // amountPaid: Stripe stores amount_total in cents; fall back to 0 if unavailable
+      const amountPaid = session.amount_total ?? 0;
+      const granted = await storage.claimAndGrantCredits(checkoutSessionId, userId, credits, amountPaid);
       const row = await storage.getUserCredits(userId);
-      console.log(`Credits verified: +${credits} for user ${userId}, new balance: ${row?.balance}`);
-
+      // Per D-01: return 200 whether or not this was a duplicate call — fully idempotent
       res.json({ verified: true, credits, balance: row?.balance ?? credits });
     } catch (error: any) {
       console.error("Credits verify error:", error);
