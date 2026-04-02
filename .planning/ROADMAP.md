@@ -94,11 +94,11 @@ Improvements to the core product experience — image upload flow, drag-and-drop
   6. Each group card has a +/- control to adjust max images per group
 **Plans**: 4 plans
 Plans:
-- [ ] 05-01-PLAN.md — Install idb + create use-staged-images IndexedDB hook
+- [x] 05-01-PLAN.md — Install idb + create use-staged-images IndexedDB hook
 - [ ] 05-02-PLAN.md — Migrate upload-zone to Group[] state + wire IDB persistence + restore-on-mount
 - [ ] 05-03-PLAN.md — Add multi-select drag batch move + per-group max +/- controls
 - [ ] 05-04-PLAN.md — Human verification of all 6 success criteria
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Drag-and-Drop UI | 0/4 | Planning complete | - |
+| 5. Drag-and-Drop UI | 1/4 | In Progress|  |
