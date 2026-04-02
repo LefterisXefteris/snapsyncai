@@ -73,3 +73,27 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Auth Bypass Guard | 0/? | Not started | - |
 | 3. Token Encryption | 0/? | Not started | - |
 | 4. Stripe SDK Fix | 0/? | Not started | - |
+
+---
+
+## Milestone 2: Product UX
+
+Improvements to the core product experience — image upload flow, drag-and-drop UX, and staging persistence.
+
+### Phase 5: Drag-and-Drop UI Improvements
+**Goal**: Make the pre-upload image staging UI reliable and easy to use — staged images persist across page reloads and drag-and-drop grouping is intuitive
+**Depends on**: Nothing (independent of security phases)
+**Beads**: lisai-app-pde
+**Requirements**: UX-01 (persistence), UX-02 (drag UX), UX-03 (group management)
+**Success Criteria** (what must be TRUE):
+  1. Staged images (not yet uploaded) survive a page refresh — user returns to the same groups automatically, no prompt
+  2. Staged images are stored in IndexedDB as blobs and auto-expire after 24 hours
+  3. The entire group card is a drop target (not just a narrow strip)
+  4. Users can select multiple thumbnails and drag them together as a batch
+  5. First image in a group is the hero — reordering within a group changes which image is first
+  6. Each group card has a +/- control to adjust max images per group
+**Plans**: TBD
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 5. Drag-and-Drop UI | 0/? | Context ready | - |
