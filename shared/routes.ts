@@ -108,6 +108,14 @@ export const api = {
         500: errorSchemas.internal,
       },
     },
+    generateContent: {
+      method: 'POST' as const,
+      path: '/api/images/:id/generate-content' as const,
+    },
+    regenerateField: {
+      method: 'POST' as const,
+      path: '/api/images/:id/regenerate-field' as const,
+    },
   },
   etsy: {
     status: {
