@@ -15,7 +15,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search } from "lucide-react";
+
+const AI_BG_REMOVAL_ENABLED = import.meta.env.VITE_FEATURE_AI_BG_REMOVAL === "true";
+const AI_PHOTOSHOOT_ENABLED = import.meta.env.VITE_FEATURE_AI_PHOTOSHOOT === "true";
 
 const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
 
@@ -841,7 +845,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         </div>
                       )}
 
-                      {showBgPicker && !editBackgroundMutation.isPending && !applyImageMutation.isPending && (
+                      {showBgPicker && AI_BG_REMOVAL_ENABLED && !editBackgroundMutation.isPending && !applyImageMutation.isPending && (
                         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 p-3">
                           <p className="text-sm font-semibold">Select Background</p>
                           <div className="flex flex-wrap gap-2 justify-center max-w-[250px]">
@@ -885,24 +889,57 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
                     {!isUnpaid && (
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`flex-1 ${showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''}`}
-                          onClick={() => setShowBgPicker(v => !v)}
-                          disabled={editBackgroundMutation.isPending || applyImageMutation.isPending}
-                        >
-                          <Wand2 className="w-4 h-4 mr-2" />
-                          AI Background
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`w-full ${AI_BG_REMOVAL_ENABLED && showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''} ${!AI_BG_REMOVAL_ENABLED ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  onClick={() => AI_BG_REMOVAL_ENABLED && setShowBgPicker(v => !v)}
+                                  disabled={!AI_BG_REMOVAL_ENABLED || editBackgroundMutation.isPending || applyImageMutation.isPending}
+                                >
+                                  <Wand2 className="w-4 h-4 mr-2" />
+                                  AI Background
+                                  {!AI_BG_REMOVAL_ENABLED && <span className="ml-1.5 text-[9px] font-medium text-muted-foreground">SOON</span>}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {!AI_BG_REMOVAL_ENABLED && (
+                              <TooltipContent side="top">
+                                <p className="text-xs">Coming soon</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
 
                         <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50">
-                              <ImageIcon className="w-4 h-4 mr-2" />
-                              AI Photoshoot
-                            </Button>
-                          </DialogTrigger>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex-1">
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className={`w-full text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50 ${!AI_PHOTOSHOOT_ENABLED ? 'opacity-50 cursor-not-allowed text-muted-foreground hover:text-muted-foreground hover:bg-transparent' : ''}`}
+                                      disabled={!AI_PHOTOSHOOT_ENABLED}
+                                    >
+                                      <ImageIcon className="w-4 h-4 mr-2" />
+                                      AI Photoshoot
+                                      {!AI_PHOTOSHOOT_ENABLED && <span className="ml-1.5 text-[9px] font-medium">SOON</span>}
+                                    </Button>
+                                  </DialogTrigger>
+                                </span>
+                              </TooltipTrigger>
+                              {!AI_PHOTOSHOOT_ENABLED && (
+                                <TooltipContent side="top">
+                                  <p className="text-xs">Coming soon</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                           <DialogContent className="max-w-3xl">
                             <DialogHeader>
                               <DialogTitle>AI Concept Generator</DialogTitle>
