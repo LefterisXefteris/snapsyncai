@@ -93,16 +93,18 @@ function DraggableThumbnail({
 
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
-  groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
-  selectedIds, onSelect,
+  groupId, groupIdx, items, maxImages, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
+  onAdjustMax, selectedIds, onSelect,
 }: {
   groupId: string;
   groupIdx: number;
   items: FileItem[];
+  maxImages: number;
   onRemoveItem: (itemId: string) => void;
   onSplit: () => void;
   onDeleteGroup: () => void;
   totalGroups: number;
+  onAdjustMax: (delta: number) => void;
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
 }) {
@@ -141,6 +143,26 @@ function DroppableGroup({
           {items.length} {items.length === 1 ? "image" : "images"}
         </span>
         <div className="ml-auto flex items-center gap-1">
+          {/* Per-group max control */}
+          <div className="flex items-center gap-0.5" onPointerDown={e => e.stopPropagation()}>
+            <button
+              onClick={() => onAdjustMax(-1)}
+              className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 transition-colors text-xs font-bold"
+              title="Decrease max images for this product"
+            >
+              −
+            </button>
+            <span className="text-[10px] text-white/60 font-medium w-4 text-center select-none">
+              {maxImages}
+            </span>
+            <button
+              onClick={() => onAdjustMax(+1)}
+              className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 transition-colors text-xs font-bold"
+              title="Increase max images for this product"
+            >
+              +
+            </button>
+          </div>
           {items.length > 1 && (
             <button
               onPointerDown={e => e.stopPropagation()}
@@ -389,6 +411,19 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     });
   };
 
+  // ── Adjust per-group max ───────────────────────────────────────────────────
+  const adjustGroupMax = (groupId: string, delta: number) => {
+    setGroups(prev => {
+      const next = prev.map(g =>
+        g.id === groupId
+          ? { ...g, maxImages: Math.max(1, g.maxImages + delta) }
+          : g
+      );
+      saveGroups(next); // persist the updated maxImages
+      return next;
+    });
+  };
+
   // ── Remove item ──────────────────────────────────────────────────────────────
   const removeItem = (itemId: string) => {
     deleteBlob(itemId); // fire-and-forget
@@ -553,10 +588,12 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   groupId={group.id}
                   groupIdx={idx}
                   items={group.items}
+                  maxImages={group.maxImages}
                   onRemoveItem={removeItem}
                   onSplit={() => splitGroup(group.id)}
                   onDeleteGroup={() => deleteGroup(group.id)}
                   totalGroups={groups.length}
+                  onAdjustMax={(delta) => adjustGroupMax(group.id, delta)}
                   selectedIds={selectedIds}
                   onSelect={toggleSelect}
                 />
