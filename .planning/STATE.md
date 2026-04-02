@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 05-02-PLAN.md — upload-zone migrated to Group[] with IDB write-through and UUID drag routing
-last_updated: "2026-04-02T12:17:52.342Z"
+stopped_at: Completed 05-03-PLAN.md — multi-select drag, per-group max controls, within-group sortable reordering
+last_updated: "2026-04-02T13:57:23.539Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 20
 ---
 
@@ -54,6 +54,7 @@ Progress: [██░░░░░░░░] 20%
 *Updated after each plan completion*
 | Phase 05-drag-drop-ui P01 | 2 | 1 tasks | 3 files |
 | Phase 05-drag-drop-ui P02 | 12 | 2 tasks | 1 files |
+| Phase 05-drag-drop-ui P03 | 351 | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - [Phase 05-drag-drop-ui]: Silent IDB fallback: wrap all IDB ops in try/catch, console.warn on failure — handles Safari private mode without UI crash
 - [Phase 05-drag-drop-ui]: UUID droppable IDs: all dnd-kit droppables use stable group UUIDs, not positional group-${idx} strings
 - [Phase 05-drag-drop-ui]: IDB write-through pattern: every Group[] mutation fires saveGroups as fire-and-forget side effect inside setGroups callback
+- [Phase 05-drag-drop-ui]: Array.from(set) instead of spread for TypeScript ES5 target compatibility
+- [Phase 05-drag-drop-ui]: SortableThumbnail replaces DraggableThumbnail — useSortable handles both within-group sort and between-group drag
 
 ### Pending Todos
 
@@ -82,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T12:17:52.339Z
-Stopped at: Completed 05-02-PLAN.md — upload-zone migrated to Group[] with IDB write-through and UUID drag routing
+Last session: 2026-04-02T13:57:23.535Z
+Stopped at: Completed 05-03-PLAN.md — multi-select drag, per-group max controls, within-group sortable reordering
 Resume file: None
