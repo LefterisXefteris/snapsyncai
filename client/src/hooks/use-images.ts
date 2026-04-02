@@ -865,3 +865,139 @@ export function useVerifyCredits() {
     },
   });
 }
+
+export interface GeneratedContent {
+  title: string;
+  description: string;
+  seoKeywords: string[];
+  aeoFaqs: { q: string; a: string }[];
+}
+
+export function useGenerateContent() {
+  const { toast } = useToast();
+
+  const generate = async (
+    imageId: number,
+    params: { category: string; styleTone: string; audience: string },
+    onChunk: (text: string) => void,
+    onDone: (parsed: GeneratedContent) => void,
+    onError?: (msg: string) => void
+  ): Promise<void> => {
+    const url = buildUrl(api.images.generateContent.path, { id: imageId });
+    let accumulated = "";
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(params),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ message: "Generation failed" }));
+        throw new Error((err as any).message || "Generation failed");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        // SSE lines: "data: {...}\n\n"
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const json = JSON.parse(line.slice(6));
+          if (json.done) {
+            // Parse the full accumulated JSON
+            try {
+              const parsed: GeneratedContent = JSON.parse(accumulated);
+              onDone(parsed);
+            } catch {
+              // Fallback: try to extract JSON object from accumulated text
+              const match = accumulated.match(/\{[\s\S]*\}/);
+              if (match) onDone(JSON.parse(match[0]));
+              else throw new Error("Could not parse generated content");
+            }
+            return;
+          }
+          if (json.error) throw new Error(json.error);
+          if (json.content) {
+            accumulated += json.content;
+            onChunk(accumulated);
+          }
+        }
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Content generation failed";
+      toast({ title: "Generation failed", description: msg, variant: "destructive" });
+      onError?.(msg);
+    }
+  };
+
+  return { generate };
+}
+
+export function useRegenerateField() {
+  const { toast } = useToast();
+
+  const regenerate = async (
+    imageId: number,
+    field: "title" | "description" | "seoKeywords" | "aeoFaqs",
+    params: { category?: string; styleTone?: string; audience?: string },
+    onChunk: (text: string) => void,
+    onDone: (value: string | string[] | { q: string; a: string }[]) => void,
+    onError?: (msg: string) => void
+  ): Promise<void> => {
+    const url = buildUrl(api.images.regenerateField.path, { id: imageId });
+    let accumulated = "";
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ field, ...params }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ message: "Regeneration failed" }));
+        throw new Error((err as any).message || "Regeneration failed");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const json = JSON.parse(line.slice(6));
+          if (json.done) {
+            // Parse final value based on field type
+            if (field === "seoKeywords" || field === "aeoFaqs") {
+              try {
+                const match = accumulated.match(/\[[\s\S]*\]/);
+                onDone(JSON.parse(match ? match[0] : accumulated));
+              } catch {
+                onDone(accumulated);
+              }
+            } else {
+              onDone(accumulated.trim());
+            }
+            return;
+          }
+          if (json.error) throw new Error(json.error);
+          if (json.content) {
+            accumulated += json.content;
+            onChunk(accumulated);
+          }
+        }
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Regeneration failed";
+      toast({ title: "Regeneration failed", description: msg, variant: "destructive" });
+      onError?.(msg);
+    }
+  };
+
+  return { regenerate };
+}
