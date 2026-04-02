@@ -1,11 +1,18 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import {
-  DndContext, DragOverlay, useDraggable, useDroppable,
+  DndContext, DragOverlay, useDroppable,
   MouseSensor, TouchSensor, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, GripVertical, Plus, Ungroup, Images, Trash2 } from "lucide-react";
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
@@ -31,8 +38,8 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
-// ── Draggable thumbnail (with multi-select support) ───────────────────────────
-function DraggableThumbnail({
+// ── Sortable thumbnail (handles within-group sort AND between-group drag) ─────
+function SortableThumbnail({
   item, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds,
 }: {
   item: FileItem;
@@ -42,51 +49,62 @@ function DraggableThumbnail({
   onSelect: (id: string) => void;
   selectedIds: Set<string>;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: item.id,
-    data: { selectedIds: [...allSelectedIds] },
+    data: { selectedIds: Array.from(allSelectedIds) },
   });
-  const size = isHero ? "w-20 h-20" : "w-14 h-14";
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  const size = isHero ? "w-16 h-16" : "w-10 h-10";
 
   return (
     <div
       ref={setNodeRef}
-      className={cn(
-        "relative group/thumb shrink-0 touch-none",
-        isDragging ? "opacity-20 scale-95" : "cursor-grab active:cursor-grabbing"
-      )}
-      {...listeners}
+      style={style}
+      className="relative group/thumb flex-shrink-0 cursor-grab active:cursor-grabbing"
       {...attributes}
+      {...listeners}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(item.id);
       }}
     >
-      <div className={cn("relative", size)}>
-        <img
-          src={item.url}
-          alt={item.file.name}
-          className={cn(
-            size,
-            "rounded-lg object-cover select-none ring-1 transition-all",
-            isSelected
-              ? "ring-2 ring-primary ring-offset-1 ring-offset-black/50"
-              : "ring-white/10 group-hover/thumb:ring-primary/50 group-hover/thumb:ring-2",
-            !isDragging && !isSelected && ""
-          )}
-          draggable={false}
-        />
-        <div className="absolute inset-0 rounded-lg bg-black/0 group-hover/thumb:bg-black/30 transition-colors flex items-center justify-center">
-          <GripVertical className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-80 transition-opacity drop-shadow" />
+      <img
+        src={item.url}
+        alt={item.file.name}
+        draggable={false}
+        className={cn(
+          size,
+          "rounded-lg object-cover select-none ring-1 transition-all",
+          isSelected
+            ? "ring-2 ring-primary ring-offset-1 ring-offset-black/50"
+            : "ring-white/10 group-hover/thumb:ring-primary/50 group-hover/thumb:ring-2"
+        )}
+      />
+      {isHero && (
+        <div className="absolute -top-1 -left-1 w-3.5 h-3.5 bg-primary rounded-full flex items-center justify-center shadow-sm">
+          <span className="text-[7px] font-bold text-white">1</span>
         </div>
-        <button
-          onPointerDown={e => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500/90 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-all hover:bg-red-500 hover:scale-110 z-10 shadow-lg"
-        >
-          <X className="w-2.5 h-2.5 text-white" />
-        </button>
-      </div>
+      )}
+      <button
+        className="absolute -top-1 -right-1 w-4 h-4 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-red-500/80"
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        onPointerDown={e => e.stopPropagation()}
+      >
+        <X className="w-2.5 h-2.5 text-white" />
+      </button>
     </div>
   );
 }
@@ -109,8 +127,6 @@ function DroppableGroup({
   onSelect: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
-  const hero = items[0];
-  const rest = items.slice(1);
 
   return (
     <div
@@ -121,9 +137,6 @@ function DroppableGroup({
           ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
       )}
-      onClick={() => {
-        // Clicking card background clears selection
-      }}
     >
       {isOver && (
         <div className="absolute inset-0 rounded-xl bg-primary/10 border-2 border-primary/60 pointer-events-none z-10 flex items-center justify-center">
@@ -185,43 +198,27 @@ function DroppableGroup({
         </div>
       </div>
 
-      {/* Images area */}
-      <div className="p-3 min-h-[120px]">
-        <div className="flex items-start gap-2.5">
-          {/* Hero image */}
-          {hero && (
-            <DraggableThumbnail
-              key={hero.id}
-              item={hero}
-              onRemove={() => onRemoveItem(hero.id)}
-              isHero
-              isSelected={selectedIds.has(hero.id)}
+      {/* Images area — SortableContext enables within-group reordering */}
+      <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
+        <div className="flex flex-wrap gap-2 p-3 min-h-[120px]">
+          {items.map((item, idx) => (
+            <SortableThumbnail
+              key={item.id}
+              item={item}
+              onRemove={() => onRemoveItem(item.id)}
+              isHero={idx === 0}
+              isSelected={selectedIds.has(item.id)}
               onSelect={onSelect}
               selectedIds={selectedIds}
             />
-          )}
-          {/* Rest of images + drop placeholder */}
-          {(rest.length > 0 || isOver) && (
-            <div className="flex flex-wrap gap-2 flex-1 min-h-[56px] items-start">
-              {rest.map(item => (
-                <DraggableThumbnail
-                  key={item.id}
-                  item={item}
-                  onRemove={() => onRemoveItem(item.id)}
-                  isSelected={selectedIds.has(item.id)}
-                  onSelect={onSelect}
-                  selectedIds={selectedIds}
-                />
-              ))}
-              {isOver && (
-                <div className="w-14 h-14 rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center shrink-0 animate-pulse">
-                  <Plus className="w-3.5 h-3.5 text-primary/60" />
-                </div>
-              )}
+          ))}
+          {isOver && (
+            <div className="w-10 h-10 rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center shrink-0 animate-pulse">
+              <Plus className="w-3 h-3 text-primary/60" />
             </div>
           )}
         </div>
-      </div>
+      </SortableContext>
     </div>
   );
 }
@@ -307,15 +304,39 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     if (!over) { setSelectedIds(new Set()); return; }
 
     const activeId = active.id as string;
-    // If active item is part of a selection (>1), move all selected; else move only active
+    const overId = over.id as string;
+
+    // Detect within-group reorder: both active and over are item IDs in the same group
+    const activeGroup = groups.find(g => g.items.some(i => i.id === activeId));
+    const overGroup = groups.find(g => g.items.some(i => i.id === overId));
+
+    if (activeGroup && overGroup && activeGroup.id === overGroup.id) {
+      // Within-group reorder — use arrayMove
+      setGroups(prev => {
+        const next = prev.map(g => {
+          if (g.id !== activeGroup.id) return g;
+          const oldIndex = g.items.findIndex(i => i.id === activeId);
+          const newIndex = g.items.findIndex(i => i.id === overId);
+          if (oldIndex === newIndex) return g;
+          const reordered = arrayMove(g.items, oldIndex, newIndex);
+          return { ...g, items: reordered };
+        });
+        saveGroups(next); // fire-and-forget
+        return next;
+      });
+      setSelectedIds(new Set());
+      return;
+    }
+
+    // Between-group / new-group logic with multi-select batch move
     const draggedIds: string[] = selectedIds.has(activeId) && selectedIds.size > 1
-      ? [...selectedIds]
+      ? Array.from(selectedIds)
       : [activeId];
 
     setGroups(prev => {
       const next = prev.map(g => ({ ...g, items: [...g.items] }));
 
-      if (over.id === "new-group") {
+      if (overId === "new-group") {
         const toMove: FileItem[] = [];
         for (const g of next) {
           const moved = g.items.filter(i => draggedIds.includes(i.id));
@@ -326,11 +347,11 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           next.push({ id: crypto.randomUUID(), items: toMove, maxImages: globalGroupSize });
         }
       } else {
-        const toGroup = next.find(g => g.id === over.id);
+        const toGroup = next.find(g => g.id === overId);
         if (!toGroup) return prev;
         const toMove: FileItem[] = [];
         for (const g of next) {
-          if (g.id === over.id) continue;
+          if (g.id === overId) continue;
           const moved = g.items.filter(i => draggedIds.includes(i.id));
           g.items = g.items.filter(i => !draggedIds.includes(i.id));
           toMove.push(...moved);
