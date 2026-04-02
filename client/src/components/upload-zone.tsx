@@ -347,7 +347,10 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           next.push({ id: crypto.randomUUID(), items: toMove, maxImages: globalGroupSize });
         }
       } else {
-        const toGroup = next.find(g => g.id === overId);
+        // Resolve target group: direct group-ID match OR group that owns the hovered thumbnail
+        const toGroup =
+          next.find(g => g.id === overId) ??
+          next.find(g => g.items.some(i => i.id === overId));
         if (!toGroup) return prev;
         const toMove: FileItem[] = [];
         for (const g of next) {
