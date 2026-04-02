@@ -92,13 +92,14 @@ Improvements to the core product experience — image upload flow, drag-and-drop
   4. Users can select multiple thumbnails and drag them together as a batch
   5. First image in a group is the hero — reordering within a group changes which image is first
   6. Each group card has a +/- control to adjust max images per group
-**Plans**: 4 plans
+**Plans**: 5 plans
 Plans:
 - [x] 05-01-PLAN.md — Install idb + create use-staged-images IndexedDB hook
 - [x] 05-02-PLAN.md — Migrate upload-zone to Group[] state + wire IDB persistence + restore-on-mount
 - [x] 05-03-PLAN.md — Add multi-select drag batch move + per-group max +/- controls
-- [ ] 05-04-PLAN.md — Human verification of all 6 success criteria
+- [ ] 05-04-PLAN.md — Fix full-card drop target + scale hover feedback
+- [ ] 05-05-PLAN.md — Human verification of all 6 success criteria
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Drag-and-Drop UI | 3/4 | In Progress|  |
+| 5. Drag-and-Drop UI | 3/5 | In Progress|  |
