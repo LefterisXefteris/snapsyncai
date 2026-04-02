@@ -8,7 +8,6 @@ import { batchProcess } from "./replit_integrations/batch";
 import { z } from "zod";
 import crypto from "crypto";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
-import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
@@ -104,29 +103,26 @@ async function getOrCreateCreditPackPriceId(packId: string): Promise<string> {
 
   const stripe = await getUncachableStripeClient();
 
-  // Find existing price in Stripe DB
-  const result = await db.execute(
-    sql`SELECT pr.id as price_id, pr.unit_amount FROM stripe.products p JOIN stripe.prices pr ON pr.product = p.id WHERE p.active = true AND p.metadata->>'type' = 'credit_pack' AND p.metadata->>'packId' = ${packId} AND pr.active = true AND pr.type = 'one_time' ORDER BY pr.created DESC LIMIT 1`
+  // Look up existing product+price directly from Stripe API (not stripe-replit-sync DB,
+  // which is Replit-specific and may not exist on Vercel).
+  const products = await stripe.products.list({ active: true, limit: 100 });
+  const existingProduct = products.data.find(
+    p => p.metadata?.type === 'credit_pack' && p.metadata?.packId === packId
   );
 
-  if (result.rows.length > 0 && Number(result.rows[0].unit_amount) === pack.pricePence) {
-    const priceId = result.rows[0].price_id as string;
-    cachedCreditPriceIds.set(packId, priceId);
-    return priceId;
+  if (existingProduct) {
+    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
+    const match = prices.data.find(p => p.unit_amount === pack.pricePence && p.type === 'one_time');
+    if (match) {
+      cachedCreditPriceIds.set(packId, match.id);
+      return match.id;
+    }
   }
 
-  // Get or create product
-  const productResult = await db.execute(
-    sql`SELECT p.id as product_id FROM stripe.products p WHERE p.active = true AND p.metadata->>'type' = 'credit_pack' AND p.metadata->>'packId' = ${packId} LIMIT 1`
-  );
-
+  // No matching product+price found — create them.
   let productId: string;
-  if (productResult.rows.length > 0) {
-    productId = productResult.rows[0].product_id as string;
-    // Deactivate old price if price changed
-    if (result.rows.length > 0) {
-      try { await stripe.prices.update(result.rows[0].price_id as string, { active: false }); } catch (e) {}
-    }
+  if (existingProduct) {
+    productId = existingProduct.id;
   } else {
     const product = await stripe.products.create({
       name: `SnapSync AI Credits — ${pack.name} (${pack.credits} credits)`,
@@ -150,29 +146,27 @@ let cachedPriceId: string | null = null;
 async function getOrCreateSubscriptionPriceId(): Promise<string> {
   if (cachedPriceId) return cachedPriceId;
 
-  const result = await db.execute(
-    sql`SELECT pr.id as price_id, pr.unit_amount FROM stripe.products p JOIN stripe.prices pr ON pr.product = p.id WHERE p.active = true AND p.metadata->>'type' = 'monthly_subscription' AND pr.active = true AND pr.type = 'recurring' AND pr.recurring->>'interval' = 'month' ORDER BY pr.created DESC LIMIT 1`
-  );
-  if (result.rows.length > 0 && Number(result.rows[0].unit_amount) === SUBSCRIPTION_PRICE_PENCE) {
-    cachedPriceId = result.rows[0].price_id as string;
-    return cachedPriceId;
-  }
-
   const stripe = await getUncachableStripeClient();
 
-  if (result.rows.length > 0) {
-    try {
-      await stripe.prices.update(result.rows[0].price_id as string, { active: false });
-    } catch (e) { }
+  // Look up existing product+price directly from Stripe API (not stripe-replit-sync DB).
+  const products = await stripe.products.list({ active: true, limit: 100 });
+  const existingProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
+
+  if (existingProduct) {
+    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
+    const match = prices.data.find(
+      p => p.unit_amount === SUBSCRIPTION_PRICE_PENCE && p.type === 'recurring' && (p.recurring as any)?.interval === 'month'
+    );
+    if (match) {
+      cachedPriceId = match.id;
+      return cachedPriceId;
+    }
   }
 
-  const productResult = await db.execute(
-    sql`SELECT p.id as product_id FROM stripe.products p WHERE p.active = true AND p.metadata->>'type' = 'monthly_subscription' LIMIT 1`
-  );
-
+  // No matching product+price found — create them.
   let productId: string;
-  if (productResult.rows.length > 0) {
-    productId = productResult.rows[0].product_id as string;
+  if (existingProduct) {
+    productId = existingProduct.id;
   } else {
     const product = await stripe.products.create({
       name: 'SnapSync AI Pro',
@@ -1412,9 +1406,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const isSubscribed = sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling');
 
       if (!isSubscribed) {
-        // Count unique products (groups count as 1 credit each)
-        const uniqueProducts = new Set(unpaidImages.map(img => img.productGroupId || `single_${img.id}`));
-        const creditCost = uniqueProducts.size;
+        // Count unique products (groups count as 1 credit each).
+        // Cap to the user's available balance so a partial unlock succeeds
+        // rather than failing with 403 when credits < total unpaid products.
+        const creditRow = await storage.getUserCredits(userId);
+        const availableCredits = creditRow?.balance ?? 0;
+
+        if (availableCredits === 0) {
+          return res.status(403).json({
+            message: "Insufficient credits",
+            detail: "You have no credits remaining. Please purchase more credits to continue.",
+            creditsRequired: 1,
+          });
+        }
+
+        // Build an ordered list of unique product groups, capped to availableCredits
+        const seenGroups = new Set<string>();
+        const affordableImages: typeof unpaidImages = [];
+        for (const img of unpaidImages) {
+          const key = img.productGroupId || `single_${img.id}`;
+          if (!seenGroups.has(key)) {
+            if (seenGroups.size >= availableCredits) break; // credit cap reached
+            seenGroups.add(key);
+          }
+          affordableImages.push(img);
+        }
+
+        const creditCost = seenGroups.size;
         const deducted = await storage.deductCredits(userId, creditCost);
         if (!deducted) {
           return res.status(403).json({
@@ -1423,12 +1441,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             creditsRequired: creditCost,
           });
         }
-        console.log(`Credits: deducted ${creditCost} from user ${userId} for unlock`);
+        console.log(`Credits: deducted ${creditCost} from user ${userId} for unlock (${affordableImages.length} images, ${unpaidImages.length - affordableImages.length} deferred)`);
+
+        // Replace the full list with only the affordable subset
+        unpaidImages.splice(0, unpaidImages.length, ...affordableImages);
       }
 
       const results = await runWithConcurrency(unpaidImages, CONCURRENCY_LIMIT, async (image) => {
         try {
+          console.log(`[unlock-images] Processing image ${image.id}: mimeType=${image.mimeType}, hasImageData=${!!image.imageData}, hasStorageUrl=${!!(image as any).storageUrl}`);
           const buffer = await loadImageBuffer(image);
+          console.log(`[unlock-images] loadImageBuffer for image ${image.id}: ${buffer ? `got buffer (${buffer.length} bytes)` : 'null'}`);
           if (!buffer) {
             await storage.updateImage(image.id, {
               paymentStatus: "paid",
@@ -1442,11 +1465,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           const imageTone = image.brandTone || 'professional';
-          const analysis = await fullAnalyzeImage(buffer, image.mimeType, image.originalName, imageTone, image.productContext || undefined);
+          console.log(`[unlock-images] Calling fullAnalyzeImage for image ${image.id}, tone=${imageTone}`);
+          let analysis: ProductAnalysis | null = null;
+          try {
+            analysis = await fullAnalyzeImage(buffer, image.mimeType, image.originalName, imageTone, image.productContext || undefined);
+          } catch (analysisErr) {
+            console.error(`[unlock-images] fullAnalyzeImage THREW for image ${image.id}:`, analysisErr);
+          }
+          console.log(`[unlock-images] fullAnalyzeImage result for image ${image.id}: ${analysis ? `description="${analysis.description?.substring(0, 50)}"` : 'null (threw)'}`);
 
-          const analysisSucceeded = analysis.description !== "Failed to analyze image.";
-
-          if (analysisSucceeded) {
+          if (analysis && analysis.description !== "Failed to analyze image.") {
             await storage.updateImage(image.id, {
               title: analysis.title,
               description: analysis.description,
@@ -1469,7 +1497,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             return { id: image.id, title: image.title, error: "AI analysis failed — your preview data is preserved. Please try unlocking again or edit manually." };
           }
         } catch (err) {
-          console.error(`Failed to fully analyze image ${image.id}:`, err);
+          console.error(`[unlock-images] CAUGHT ERROR for image ${image.id}:`, err);
           await storage.updateImage(image.id, { paymentStatus: "paid" });
           return { id: image.id, error: "Full analysis failed but product unlocked. You can edit details manually." };
         }

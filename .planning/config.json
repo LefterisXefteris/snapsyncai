@@ -1,5 +1,5 @@
 {
   "mode": "yolo",
-  "depth": "standard",
-  "parallelization": true
+  "parallelization": true,
+  "granularity": "standard"
 }
