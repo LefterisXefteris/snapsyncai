@@ -119,7 +119,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
       setInventoryQuantity(image.inventoryQuantity || 0);
       setTags(Array.isArray(image.tags) ? image.tags : []);
-      setAeoFaqs(Array.isArray(image.aeoFaqs) ? (image.aeoFaqs as { q: string; a: string }[]) : []);
+      setAeoFaqs(Array.isArray(image.aeoFaqs) ? (image.aeoFaqs as { question: string; answer: string }[]).map((f) => ({ q: f.question, a: f.answer })) : []);
     }
   }, [image]);
 
@@ -263,7 +263,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           trackQuantity: trackQuantity.toString(),
           inventoryQuantity,
           tags,
-          aeoFaqs,
+          aeoFaqs: aeoFaqs.map((f) => ({ question: f.q, answer: f.a })),
         },
       },
       {
