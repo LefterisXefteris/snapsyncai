@@ -3095,5 +3095,165 @@ The image must be a photorealistic, 4k ultra-detailed commercial product photogr
     }
   });
 
+  // POST /api/images/:id/generate-content — SSE stream: title, description, seoKeywords, aeoFaqs
+  app.post("/api/images/:id/generate-content", requireAuth(), async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid image ID" });
+
+      const image = await storage.getImage(id);
+      if (!image || image.sessionId !== getUserId(req)) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+
+      const buf = await loadImageBuffer(image);
+      if (!buf) {
+        return res.status(400).json({ message: "Image not available for AI analysis" });
+      }
+
+      const { category, styleTone, audience } = req.body as {
+        category?: string;
+        styleTone?: string;
+        audience?: string;
+      };
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const systemPrompt = `You are an expert e-commerce copywriter. Generate product listing content for a product shown in the image.
+Output ONLY valid JSON with this exact structure (no markdown, no code fences):
+{
+  "title": "Product title — specific, benefit-led, max 80 chars",
+  "description": "3-4 paragraph product description, engaging and conversion-optimised",
+  "seoKeywords": ["keyword1", "keyword2", ...],
+  "aeoFaqs": [{"q": "Question?", "a": "Answer."}, ...]
+}
+Rules:
+- seoKeywords: 8-12 specific keywords/phrases for Shopify/Etsy/Amazon search — brand, material, use case, style
+- aeoFaqs: 4-6 FAQ pairs that answer common buyer questions about this type of product (price not included)
+- Use the category, style/tone, and target audience provided by the user`;
+
+      const userContent: any[] = [
+        {
+          type: "text",
+          text: `Category: ${category || image.category || "General"}\nStyle/tone: ${styleTone || "professional"}\nTarget audience: ${audience || "general buyers"}\nProduct title context: ${image.title || (image as any).originalName || ""}`,
+        },
+        {
+          type: "image_url",
+          image_url: { url: `data:${(image as any).mimeType};base64,${buf.toString("base64")}` },
+        },
+      ];
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        stream: true,
+        max_completion_tokens: 1500,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("generate-content error:", error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Generation failed" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ message: "Failed to generate content", error: error.message });
+      }
+    }
+  });
+
+  // POST /api/images/:id/regenerate-field — SSE stream for a single field
+  app.post("/api/images/:id/regenerate-field", requireAuth(), async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid image ID" });
+
+      const image = await storage.getImage(id);
+      if (!image || image.sessionId !== getUserId(req)) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+
+      const buf = await loadImageBuffer(image);
+      if (!buf) {
+        return res.status(400).json({ message: "Image not available for AI analysis" });
+      }
+
+      const { field, category, styleTone, audience } = req.body as {
+        field: "title" | "description" | "seoKeywords" | "aeoFaqs";
+        category?: string;
+        styleTone?: string;
+        audience?: string;
+      };
+
+      const fieldPrompts: Record<string, string> = {
+        title: "Generate a single product title. Output only the title text, no JSON, no quotes.",
+        description: "Rewrite the product description — 3-4 engaging paragraphs. Output only the description text.",
+        seoKeywords: 'Generate SEO keywords as a JSON array of strings: ["keyword1", "keyword2", ...]. Output only the JSON array.',
+        aeoFaqs: 'Generate FAQ pairs as a JSON array: [{"q": "...", "a": "..."}]. Output only the JSON array.',
+      };
+
+      const systemPrompt = fieldPrompts[field];
+      if (!systemPrompt) {
+        return res.status(400).json({ message: `Unknown field: ${field}` });
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const userContent: any[] = [
+        {
+          type: "text",
+          text: `Category: ${category || image.category || "General"}\nStyle/tone: ${styleTone || "professional"}\nTarget audience: ${audience || "general buyers"}\nProduct title context: ${image.title || (image as any).originalName || ""}`,
+        },
+        {
+          type: "image_url",
+          image_url: { url: `data:${(image as any).mimeType};base64,${buf.toString("base64")}` },
+        },
+      ];
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        stream: true,
+        max_completion_tokens: 1000,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("regenerate-field error:", error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Generation failed" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ message: "Failed to regenerate field", error: error.message });
+      }
+    }
+  });
+
   return httpServer;
 }
