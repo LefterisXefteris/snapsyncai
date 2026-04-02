@@ -12,6 +12,7 @@ import { ShinyButton } from "@/components/ui/shiny-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 
 const TONES = [
   { value: "professional", label: "Professional" },
@@ -22,12 +23,6 @@ const TONES = [
 ];
 
 const PRESETS = [1, 2, 3, 4, 5];
-
-interface FileItem {
-  id: string;
-  file: File;
-  url: string;
-}
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   if (size <= 0) return arr.map(i => [i]);
@@ -95,12 +90,20 @@ function DroppableGroup({
     <div
       ref={setNodeRef}
       className={cn(
-        "rounded-xl border transition-all duration-200 overflow-hidden",
+        "relative rounded-xl border transition-all duration-200 overflow-hidden",
         isOver
           ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
       )}
     >
+      {isOver && (
+        <div className="absolute inset-0 rounded-xl bg-primary/10 border-2 border-primary/60 pointer-events-none z-10 flex items-center justify-center">
+          <div className="bg-primary/20 rounded-lg px-3 py-1">
+            <span className="text-xs text-primary font-medium">Drop here</span>
+          </div>
+        </div>
+      )}
+
       {/* Card header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
         <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
@@ -134,7 +137,7 @@ function DroppableGroup({
       </div>
 
       {/* Images area */}
-      <div className="p-3">
+      <div className="p-3 min-h-[120px]">
         <div className="flex items-start gap-2.5">
           {/* Hero image */}
           {hero && (
@@ -189,9 +192,9 @@ function DroppableNewGroup() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: File[]) => void }) {
-  const [groups, setGroups] = useState<FileItem[][]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
-  const [groupSize, setGroupSize] = useState(1);
+  const [globalGroupSize, setGlobalGroupSize] = useState(1);
   const [productContext, setProductContext] = useState("");
   const [brandTone, setBrandTone] = useState("professional");
   const [isUploading, setIsUploading] = useState(false);
@@ -199,14 +202,26 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   const [uploadingQueue, setUploadingQueue] = useState<File[]>([]);
   const uploadMutation = useUploadImages();
   const { toast } = useToast();
+  const { loadStaged, saveBlob, deleteBlob, saveGroups, clearAll } = useStagedImages();
 
   // Revoke object URLs on unmount
   const urlsRef = useRef<string[]>([]);
   useEffect(() => () => { urlsRef.current.forEach(URL.revokeObjectURL); }, []);
 
+  // Restore staged images on mount
+  useEffect(() => {
+    async function restore() {
+      const { groups: restored, urlsCreated } = await loadStaged();
+      if (restored.length === 0) return;
+      urlsCreated.forEach(u => urlsRef.current.push(u));
+      setGroups(restored);
+    }
+    restore();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { onUploadingChange?.(uploadingQueue); }, [uploadingQueue, onUploadingChange]);
 
-  const totalFiles = groups.flat().length;
+  const totalFiles = groups.reduce((sum, g) => sum + g.items.length, 0);
 
   // ── DnD sensors ─────────────────────────────────────────────────────────────
   const sensors = useSensors(
@@ -214,36 +229,44 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
   );
 
-  // ── Find group index by item id ──────────────────────────────────────────────
-  const findGroupIdx = (itemId: string) =>
-    groups.findIndex(g => g.some(i => i.id === itemId));
+  // ── Find group by item id ──────────────────────────────────────────────────
+  const findGroupByItemId = (itemId: string) =>
+    groups.find(g => g.items.some(i => i.id === itemId));
 
   const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveItem(groups.flat().find(i => i.id === active.id) ?? null);
+    setActiveItem(groups.flatMap(g => g.items).find(i => i.id === active.id) ?? null);
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveItem(null);
     if (!over) return;
 
-    const fromIdx = findGroupIdx(active.id as string);
-    if (fromIdx === -1) return;
-
+    const activeId = active.id as string;
     setGroups(prev => {
-      const next = prev.map(g => [...g]);
-      const item = next[fromIdx].find(i => i.id === active.id)!;
+      const next = prev.map(g => ({ ...g, items: [...g.items] }));
 
       if (over.id === "new-group") {
-        next[fromIdx] = next[fromIdx].filter(i => i.id !== active.id);
-        next.push([item]);
+        let movedItem: FileItem | undefined;
+        for (const g of next) {
+          const found = g.items.find(i => i.id === activeId);
+          if (found) { movedItem = found; g.items = g.items.filter(i => i.id !== activeId); break; }
+        }
+        if (movedItem) next.push({ id: crypto.randomUUID(), items: [movedItem], maxImages: globalGroupSize });
       } else {
-        const toIdx = next.findIndex((_, idx) => `group-${idx}` === over.id);
-        if (toIdx === -1 || toIdx === fromIdx) return prev;
-        next[fromIdx] = next[fromIdx].filter(i => i.id !== active.id);
-        next[toIdx] = [...next[toIdx], item];
+        const toGroup = next.find(g => g.id === over.id);
+        if (!toGroup) return prev;
+        let movedItem: FileItem | undefined;
+        for (const g of next) {
+          if (g.id === over.id) continue;
+          const found = g.items.find(i => i.id === activeId);
+          if (found) { movedItem = found; g.items = g.items.filter(i => i.id !== activeId); break; }
+        }
+        if (movedItem) toGroup.items = [...toGroup.items, movedItem];
       }
 
-      return next.filter(g => g.length > 0);
+      const filtered = next.filter(g => g.items.length > 0);
+      saveGroups(filtered); // fire-and-forget IDB write
+      return filtered;
     });
   };
 
@@ -256,12 +279,17 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     });
 
     setGroups(prev => {
-      const all = [...prev.flat(), ...newItems];
-      const total = all.length;
-      if (total > 200) return prev; // cap
-      return chunkArray(all, groupSize);
+      const allItems = [...prev.flatMap(g => g.items), ...newItems];
+      if (allItems.length > 200) return prev;
+      const chunks = chunkArray(allItems, globalGroupSize);
+      const newGroups = chunks.map(items => ({ id: crypto.randomUUID(), items, maxImages: globalGroupSize }));
+      // Persist new blobs and updated groups (fire-and-forget)
+      Promise.all(newItems.map(item => saveBlob(item.id, item.file)))
+        .then(() => saveGroups(newGroups))
+        .catch(err => console.warn('[upload-zone] IDB save failed:', err));
+      return newGroups;
     });
-  }, [groupSize]);
+  }, [globalGroupSize, saveBlob, saveGroups]);
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
@@ -270,47 +298,65 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   });
 
   // ── Auto-arrange ───────────────────────────────────────────────────────────
-  const setGroupSizeAndRechunk = (newSize: number) => {
+  const setGlobalGroupSizeAndRechunk = (newSize: number) => {
     const clamped = Math.max(1, Math.min(20, newSize));
-    setGroupSize(clamped);
-    setGroups(prev => chunkArray(prev.flat(), clamped));
+    setGlobalGroupSize(clamped);
+    setGroups(prev => {
+      const allItems = prev.flatMap(g => g.items);
+      const chunks = chunkArray(allItems, clamped);
+      const newGroups = chunks.map(items => ({ id: crypto.randomUUID(), items, maxImages: clamped }));
+      saveGroups(newGroups); // fire-and-forget
+      return newGroups;
+    });
   };
 
   // ── Split a group into individual products ─────────────────────────────────
-  const splitGroup = (groupIdx: number) => {
+  const splitGroup = (groupId: string) => {
     setGroups(prev => {
+      const idx = prev.findIndex(g => g.id === groupId);
+      if (idx === -1) return prev;
       const next = [...prev];
-      const items = next.splice(groupIdx, 1)[0];
-      const singles = items.map(i => [i]);
-      next.splice(groupIdx, 0, ...singles);
+      const [group] = next.splice(idx, 1);
+      const singles = group.items.map(item => ({ id: crypto.randomUUID(), items: [item], maxImages: globalGroupSize }));
+      next.splice(idx, 0, ...singles);
+      saveGroups(next);
       return next;
     });
   };
 
   // ── Delete entire group ────────────────────────────────────────────────────
-  const deleteGroup = (groupIdx: number) => {
-    setGroups(prev => prev.filter((_, i) => i !== groupIdx));
+  const deleteGroup = (groupId: string) => {
+    setGroups(prev => {
+      const group = prev.find(g => g.id === groupId);
+      if (group) group.items.forEach(i => deleteBlob(i.id));
+      const next = prev.filter(g => g.id !== groupId);
+      saveGroups(next);
+      return next;
+    });
   };
 
   // ── Remove item ──────────────────────────────────────────────────────────────
   const removeItem = (itemId: string) => {
-    setGroups(prev =>
-      prev
-        .map(g => g.filter(i => i.id !== itemId))
-        .filter(g => g.length > 0)
-    );
+    deleteBlob(itemId); // fire-and-forget
+    setGroups(prev => {
+      const next = prev.map(g => ({ ...g, items: g.items.filter(i => i.id !== itemId) }))
+        .filter(g => g.items.length > 0);
+      saveGroups(next); // fire-and-forget
+      return next;
+    });
   };
 
   // ── Upload ───────────────────────────────────────────────────────────────────
   const handleUpload = async () => {
     if (groups.length === 0) return;
 
-    const snapshot = groups.map(g => g.map(i => i.file));
+    const snapshot = groups.map(g => g.items.map(i => i.file));
     const allFiles = snapshot.flat();
 
     setIsUploading(true);
     setUploadProgress({ current: 0, total: snapshot.length });
     setGroups([]);
+    clearAll(); // fire-and-forget — images are being uploaded, no need to keep staged copies
     setUploadingQueue(allFiles);
 
     let hasPaid = false;
@@ -414,10 +460,10 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   {PRESETS.map(n => (
                     <button
                       key={n}
-                      onClick={() => setGroupSizeAndRechunk(n)}
+                      onClick={() => setGlobalGroupSizeAndRechunk(n)}
                       className={cn(
                         "w-7 h-7 rounded-md text-xs font-medium transition-all duration-150",
-                        groupSize === n
+                        globalGroupSize === n
                           ? "bg-primary text-white shadow-sm shadow-primary/30"
                           : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
                       )}
@@ -449,13 +495,13 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             <div className="max-h-[480px] overflow-y-auto p-2.5 space-y-2">
               {groups.map((group, idx) => (
                 <DroppableGroup
-                  key={`group-${idx}`}
-                  groupId={`group-${idx}`}
+                  key={group.id}
+                  groupId={group.id}
                   groupIdx={idx}
-                  items={group}
+                  items={group.items}
                   onRemoveItem={removeItem}
-                  onSplit={() => splitGroup(idx)}
-                  onDeleteGroup={() => deleteGroup(idx)}
+                  onSplit={() => splitGroup(group.id)}
+                  onDeleteGroup={() => deleteGroup(group.id)}
                   totalGroups={groups.length}
                 />
               ))}
