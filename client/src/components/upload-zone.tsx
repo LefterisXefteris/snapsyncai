@@ -134,7 +134,7 @@ function DroppableGroup({
       className={cn(
         "relative rounded-xl border transition-all duration-200 overflow-hidden",
         isOver
-          ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)]"
+          ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)] scale-[1.02]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
       )}
     >
