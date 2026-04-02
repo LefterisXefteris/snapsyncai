@@ -100,6 +100,22 @@ Plans:
 - [x] 05-04-PLAN.md — Fix full-card drop target + scale hover feedback
 - [ ] 05-05-PLAN.md — Human verification of all 6 success criteria
 
+### Phase 6: Product Detail AI Content Generation
+**Goal**: Users can prompt and generate AI-written title, description, SEO tags, and AEO tags directly within the product detail view; AI background removal and AI photoshop features are disabled
+**Depends on**: Nothing (independent of security phases)
+**Beads**: lisai-app-0kt
+**Requirements**: PROD-01 (AI content generation), PROD-02 (disable AI background), PROD-03 (disable AI photoshop)
+**Success Criteria** (what must be TRUE):
+  1. Within the product detail view, the user can enter a prompt and generate a product title
+  2. Within the product detail view, the user can enter a prompt and generate a product description
+  3. Within the product detail view, the user can generate SEO tags for the product
+  4. Within the product detail view, the user can generate AEO (Answer Engine Optimization) tags for the product
+  5. Generated content is editable before saving — user can tweak before committing
+  6. AI background removal feature is disabled (hidden from UI, not accessible)
+  7. AI photoshop feature is disabled (hidden from UI, not accessible)
+**Plans**: TBD
+
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Drag-and-Drop UI | 4/5 | In Progress|  |
+| 6. Product Detail AI Content | 0/? | Not started | - |
