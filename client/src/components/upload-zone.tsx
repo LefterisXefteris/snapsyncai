@@ -31,9 +31,21 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
-// ── Draggable thumbnail ──────────────────────────────────────────────────────
-function DraggableThumbnail({ item, onRemove, isHero }: { item: FileItem; onRemove: () => void; isHero?: boolean }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
+// ── Draggable thumbnail (with multi-select support) ───────────────────────────
+function DraggableThumbnail({
+  item, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds,
+}: {
+  item: FileItem;
+  onRemove: () => void;
+  isHero?: boolean;
+  isSelected?: boolean;
+  onSelect: (id: string) => void;
+  selectedIds: Set<string>;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: item.id,
+    data: { selectedIds: [...allSelectedIds] },
+  });
   const size = isHero ? "w-20 h-20" : "w-14 h-14";
 
   return (
@@ -45,13 +57,22 @@ function DraggableThumbnail({ item, onRemove, isHero }: { item: FileItem; onRemo
       )}
       {...listeners}
       {...attributes}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(item.id);
+      }}
     >
       <div className={cn("relative", size)}>
         <img
           src={item.url}
           alt={item.file.name}
-          className={cn(size, "rounded-lg object-cover select-none ring-1 ring-white/10 transition-all",
-            !isDragging && "group-hover/thumb:ring-primary/50 group-hover/thumb:ring-2"
+          className={cn(
+            size,
+            "rounded-lg object-cover select-none ring-1 transition-all",
+            isSelected
+              ? "ring-2 ring-primary ring-offset-1 ring-offset-black/50"
+              : "ring-white/10 group-hover/thumb:ring-primary/50 group-hover/thumb:ring-2",
+            !isDragging && !isSelected && ""
           )}
           draggable={false}
         />
@@ -60,7 +81,7 @@ function DraggableThumbnail({ item, onRemove, isHero }: { item: FileItem; onRemo
         </div>
         <button
           onPointerDown={e => e.stopPropagation()}
-          onClick={onRemove}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
           className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500/90 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-all hover:bg-red-500 hover:scale-110 z-10 shadow-lg"
         >
           <X className="w-2.5 h-2.5 text-white" />
@@ -73,6 +94,7 @@ function DraggableThumbnail({ item, onRemove, isHero }: { item: FileItem; onRemo
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
   groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
+  selectedIds, onSelect,
 }: {
   groupId: string;
   groupIdx: number;
@@ -81,6 +103,8 @@ function DroppableGroup({
   onSplit: () => void;
   onDeleteGroup: () => void;
   totalGroups: number;
+  selectedIds: Set<string>;
+  onSelect: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
   const hero = items[0];
@@ -95,6 +119,9 @@ function DroppableGroup({
           ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
       )}
+      onClick={() => {
+        // Clicking card background clears selection
+      }}
     >
       {isOver && (
         <div className="absolute inset-0 rounded-xl bg-primary/10 border-2 border-primary/60 pointer-events-none z-10 flex items-center justify-center">
@@ -146,6 +173,9 @@ function DroppableGroup({
               item={hero}
               onRemove={() => onRemoveItem(hero.id)}
               isHero
+              isSelected={selectedIds.has(hero.id)}
+              onSelect={onSelect}
+              selectedIds={selectedIds}
             />
           )}
           {/* Rest of images + drop placeholder */}
@@ -156,6 +186,9 @@ function DroppableGroup({
                   key={item.id}
                   item={item}
                   onRemove={() => onRemoveItem(item.id)}
+                  isSelected={selectedIds.has(item.id)}
+                  onSelect={onSelect}
+                  selectedIds={selectedIds}
                 />
               ))}
               {isOver && (
@@ -195,6 +228,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
   const [globalGroupSize, setGlobalGroupSize] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productContext, setProductContext] = useState("");
   const [brandTone, setBrandTone] = useState("professional");
   const [isUploading, setIsUploading] = useState(false);
@@ -237,37 +271,57 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     setActiveItem(groups.flatMap(g => g.items).find(i => i.id === active.id) ?? null);
   };
 
+  // ── Selection toggle ───────────────────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveItem(null);
-    if (!over) return;
+    if (!over) { setSelectedIds(new Set()); return; }
 
     const activeId = active.id as string;
+    // If active item is part of a selection (>1), move all selected; else move only active
+    const draggedIds: string[] = selectedIds.has(activeId) && selectedIds.size > 1
+      ? [...selectedIds]
+      : [activeId];
+
     setGroups(prev => {
       const next = prev.map(g => ({ ...g, items: [...g.items] }));
 
       if (over.id === "new-group") {
-        let movedItem: FileItem | undefined;
+        const toMove: FileItem[] = [];
         for (const g of next) {
-          const found = g.items.find(i => i.id === activeId);
-          if (found) { movedItem = found; g.items = g.items.filter(i => i.id !== activeId); break; }
+          const moved = g.items.filter(i => draggedIds.includes(i.id));
+          g.items = g.items.filter(i => !draggedIds.includes(i.id));
+          toMove.push(...moved);
         }
-        if (movedItem) next.push({ id: crypto.randomUUID(), items: [movedItem], maxImages: globalGroupSize });
+        if (toMove.length > 0) {
+          next.push({ id: crypto.randomUUID(), items: toMove, maxImages: globalGroupSize });
+        }
       } else {
         const toGroup = next.find(g => g.id === over.id);
         if (!toGroup) return prev;
-        let movedItem: FileItem | undefined;
+        const toMove: FileItem[] = [];
         for (const g of next) {
           if (g.id === over.id) continue;
-          const found = g.items.find(i => i.id === activeId);
-          if (found) { movedItem = found; g.items = g.items.filter(i => i.id !== activeId); break; }
+          const moved = g.items.filter(i => draggedIds.includes(i.id));
+          g.items = g.items.filter(i => !draggedIds.includes(i.id));
+          toMove.push(...moved);
         }
-        if (movedItem) toGroup.items = [...toGroup.items, movedItem];
+        toGroup.items = [...toGroup.items, ...toMove];
       }
 
       const filtered = next.filter(g => g.items.length > 0);
-      saveGroups(filtered); // fire-and-forget IDB write
+      saveGroups(filtered); // fire-and-forget
       return filtered;
     });
+
+    setSelectedIds(new Set()); // clear selection after drag
   };
 
   // ── File drop ────────────────────────────────────────────────────────────────
@@ -487,7 +541,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             {/* Hint */}
             <div className="px-3.5 py-1.5 bg-white/[0.015] border-b border-white/[0.04]">
               <p className="text-[10px] text-white/30">
-                Drag images between products to regroup — or use the presets above to auto-arrange
+                Drag to regroup — click thumbnails to multi-select — presets auto-arrange all products
               </p>
             </div>
 
@@ -503,23 +557,46 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   onSplit={() => splitGroup(group.id)}
                   onDeleteGroup={() => deleteGroup(group.id)}
                   totalGroups={groups.length}
+                  selectedIds={selectedIds}
+                  onSelect={toggleSelect}
                 />
               ))}
               <DroppableNewGroup />
             </div>
           </div>
 
-          {/* Drag overlay — floating thumbnail */}
+          {/* Drag overlay — floating thumbnail with count badge for multi-select */}
           <DragOverlay>
             {activeItem ? (
-              <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
-                <div className="w-16 h-16 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20">
-                  <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
+              selectedIds.size > 1 && selectedIds.has(activeItem.id) ? (
+                // Multi-select ghost: stack badge
+                <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
+                  <div className="relative w-16 h-16">
+                    <div className="absolute inset-0 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20 translate-x-1 translate-y-1 opacity-50">
+                      <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
+                    </div>
+                    <div className="absolute inset-0 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20">
+                      <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                      <span className="text-[9px] font-bold text-white">{selectedIds.size}</span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">
+                    {selectedIds.size} images
+                  </span>
                 </div>
-                <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">
-                  {activeItem.file.name.replace(/\.[^/.]+$/, "").slice(0, 14)}
-                </span>
-              </div>
+              ) : (
+                // Single item ghost (existing)
+                <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20">
+                    <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
+                  </div>
+                  <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">
+                    {activeItem.file.name.replace(/\.[^/.]+$/, "").slice(0, 14)}
+                  </span>
+                </div>
+              )
             ) : null}
           </DragOverlay>
         </DndContext>
