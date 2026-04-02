@@ -111,11 +111,15 @@ Plans:
   3. Within the product detail view, the user can generate SEO tags for the product
   4. Within the product detail view, the user can generate AEO (Answer Engine Optimization) tags for the product
   5. Generated content is editable before saving — user can tweak before committing
-  6. AI background removal feature is disabled (hidden from UI, not accessible)
-  7. AI photoshop feature is disabled (hidden from UI, not accessible)
-**Plans**: TBD
+  6. AI background removal feature is disabled (visible but greyed out with "coming soon" tooltip)
+  7. AI photoshop feature is disabled (visible but greyed out with "coming soon" tooltip)
+**Plans**: 3 plans
+Plans:
+- [ ] 06-01-PLAN.md — Add generate-content + regenerate-field SSE endpoints to server/routes.ts
+- [ ] 06-02-PLAN.md — Feature-flag disable AI Background and AI Photoshoot buttons with "coming soon" tooltips
+- [ ] 06-03-PLAN.md — Build AiContentPanel component + wire into ProductDetails.tsx
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Drag-and-Drop UI | 4/5 | In Progress|  |
-| 6. Product Detail AI Content | 0/? | Not started | - |
+| 6. Product Detail AI Content | 0/3 | Not started | - |
