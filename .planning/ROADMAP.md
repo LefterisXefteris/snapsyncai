@@ -97,9 +97,9 @@ Plans:
 - [x] 05-01-PLAN.md — Install idb + create use-staged-images IndexedDB hook
 - [x] 05-02-PLAN.md — Migrate upload-zone to Group[] state + wire IDB persistence + restore-on-mount
 - [x] 05-03-PLAN.md — Add multi-select drag batch move + per-group max +/- controls
-- [ ] 05-04-PLAN.md — Fix full-card drop target + scale hover feedback
+- [x] 05-04-PLAN.md — Fix full-card drop target + scale hover feedback
 - [ ] 05-05-PLAN.md — Human verification of all 6 success criteria
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Drag-and-Drop UI | 3/5 | In Progress|  |
+| 5. Drag-and-Drop UI | 4/5 | In Progress|  |
