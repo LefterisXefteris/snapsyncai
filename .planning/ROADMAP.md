@@ -95,10 +95,10 @@ Improvements to the core product experience — image upload flow, drag-and-drop
 **Plans**: 4 plans
 Plans:
 - [x] 05-01-PLAN.md — Install idb + create use-staged-images IndexedDB hook
-- [ ] 05-02-PLAN.md — Migrate upload-zone to Group[] state + wire IDB persistence + restore-on-mount
+- [x] 05-02-PLAN.md — Migrate upload-zone to Group[] state + wire IDB persistence + restore-on-mount
 - [ ] 05-03-PLAN.md — Add multi-select drag batch move + per-group max +/- controls
 - [ ] 05-04-PLAN.md — Human verification of all 6 success criteria
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Drag-and-Drop UI | 1/4 | In Progress|  |
+| 5. Drag-and-Drop UI | 2/4 | In Progress|  |

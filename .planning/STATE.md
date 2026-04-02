@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 05-01-PLAN.md — idb installed and use-staged-images hook created
-last_updated: "2026-04-02T12:13:57.097Z"
+stopped_at: Completed 05-02-PLAN.md — upload-zone migrated to Group[] with IDB write-through and UUID drag routing
+last_updated: "2026-04-02T12:17:52.342Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
   percent: 20
 ---
 
@@ -53,6 +53,7 @@ Progress: [██░░░░░░░░] 20%
 
 *Updated after each plan completion*
 | Phase 05-drag-drop-ui P01 | 2 | 1 tasks | 3 files |
+| Phase 05-drag-drop-ui P02 | 12 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,8 @@ Recent decisions affecting current work:
 - Ownership checks: Inline guard pattern — consistent with existing `getUserId(req)` style in routes
 - [Phase 05-drag-drop-ui]: IDB singleton pattern: module-level dbPromise avoids repeated openDB calls per render cycle
 - [Phase 05-drag-drop-ui]: Silent IDB fallback: wrap all IDB ops in try/catch, console.warn on failure — handles Safari private mode without UI crash
+- [Phase 05-drag-drop-ui]: UUID droppable IDs: all dnd-kit droppables use stable group UUIDs, not positional group-${idx} strings
+- [Phase 05-drag-drop-ui]: IDB write-through pattern: every Group[] mutation fires saveGroups as fire-and-forget side effect inside setGroups callback
 
 ### Pending Todos
 
@@ -79,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T12:13:57.093Z
-Stopped at: Completed 05-01-PLAN.md — idb installed and use-staged-images hook created
+Last session: 2026-04-02T12:17:52.339Z
+Stopped at: Completed 05-02-PLAN.md — upload-zone migrated to Group[] with IDB write-through and UUID drag routing
 Resume file: None
