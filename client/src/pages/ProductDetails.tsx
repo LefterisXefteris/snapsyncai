@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search } from "lucide-react";
+import { AiContentPanel } from "@/components/ai-content-panel";
 
 const AI_BG_REMOVAL_ENABLED = import.meta.env.VITE_FEATURE_AI_BG_REMOVAL === "true";
 const AI_PHOTOSHOOT_ENABLED = import.meta.env.VITE_FEATURE_AI_PHOTOSHOOT === "true";
@@ -48,7 +49,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [seoDescription, setSeoDescription] = useState("");
   const [altText, setAltText] = useState("");
   const [aeoSnippet, setAeoSnippet] = useState("");
-  
+  const [tags, setTags] = useState<string[]>([]);
+  const [aeoFaqs, setAeoFaqs] = useState<{ q: string; a: string }[]>([]);
+
   // New e-commerce fields
   const [compareAtPrice, setCompareAtPrice] = useState("");
   const [costPerItem, setCostPerItem] = useState("");
@@ -115,6 +118,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       setBarcode(image.barcode || "");
       setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
       setInventoryQuantity(image.inventoryQuantity || 0);
+      setTags(Array.isArray(image.tags) ? image.tags : []);
+      setAeoFaqs(Array.isArray(image.aeoFaqs) ? (image.aeoFaqs as { q: string; a: string }[]) : []);
     }
   }, [image]);
 
@@ -257,6 +262,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           barcode,
           trackQuantity: trackQuantity.toString(),
           inventoryQuantity,
+          tags,
+          aeoFaqs,
         },
       },
       {
@@ -333,6 +340,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Main Content Column */}
           <div className="md:col-span-2 space-y-4">
+            {!isUnpaid && (
+              <AiContentPanel
+                imageId={image.id}
+                defaultCategory={category}
+                onAcceptTitle={(v) => setTitle(v)}
+                onAcceptDescription={(v) => setDescription(v)}
+                onAcceptTags={(v) => setTags(v)}
+                onAcceptAeoFaqs={(v) => setAeoFaqs(v)}
+              />
+            )}
             <Card className="shadow-sm">
               <CardContent className="p-4 space-y-3">
                 <div className="space-y-1.5">
@@ -1103,6 +1120,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     className="resize-none text-sm"
                   />
                 </div>
+                {tags.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">SEO Keywords</label>
+                    <div className="flex flex-wrap gap-1">
+                      {tags.map((t, i) => (
+                        <Badge key={i} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal">{t}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
