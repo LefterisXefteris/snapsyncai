@@ -117,7 +117,7 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md — Add generate-content + regenerate-field SSE endpoints to server/routes.ts
 - [x] 06-02-PLAN.md — Feature-flag disable AI Background and AI Photoshoot buttons with "coming soon" tooltips
-- [ ] 06-03-PLAN.md — Build AiContentPanel component + wire into ProductDetails.tsx
+- [x] 06-03-PLAN.md — Build AiContentPanel component + wire into ProductDetails.tsx
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
