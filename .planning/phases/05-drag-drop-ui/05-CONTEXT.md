@@ -1,6 +1,7 @@
 # Phase 5: Drag-and-Drop UI Improvements - Context
 
 **Gathered:** 2026-04-02
+**Updated:** 2026-04-02 (drop target UX discussion)
 **Status:** Ready for planning
 
 <domain>
@@ -20,10 +21,17 @@ Improve the pre-upload image staging UI in `upload-zone.tsx`. Staged images must
 - **Group arrangements are saved too** — the full grouping (which images belong together and in what order) is persisted alongside the blobs, so the user's manual work is never lost
 
 ### Drag interaction UX
-- **Whole group card is the drop target** — dragging onto anywhere on the card drops the image there (not just a narrow strip)
+- **Whole group card is the drop target** — the entire card area (header, padding, thumbnail grid, empty space) registers as a valid drop zone; hovering anywhere on a card should trigger the drop, not just the thumbnail strip
+- **Drop position**: Claude's discretion (append to end or nearest open slot — pick what feels natural)
+- **Hover visual**: Card border highlights (glows/changes color) AND card scales up subtly when a dragged image is hovering over it — makes the target unmistakable
+- **No insertion line/placeholder** — no preview of where in the group the image will land; just highlight the card and append on drop
 - **Multi-select drag** — users can click/tap to select multiple thumbnails, then drag the whole selection to another group at once
 - Mobile/touch drag: Claude's discretion (pick best pattern for dnd-kit)
-- Drag visual feedback: Claude's discretion (ghost + highlight or similar — just make intent clear)
+
+### Current UX Problem (to fix)
+- Dropping currently requires hovering over an existing thumbnail in the target group — the card background/padding/empty space does NOT register as a drop zone
+- This forces users to aim precisely at the end of a thumbnail list, causing frustration
+- Fix: make the DroppableGroup container itself a proper useDroppable target that catches any hover over the card, independent of the individual SortableThumbnail targets
 
 ### Group management
 - **Splitting**: Drag image out to the "New group" drop zone (current behavior, keep it)
@@ -44,6 +52,8 @@ Improve the pre-upload image staging UI in `upload-zone.tsx`. Staged images must
 
 - User's core complaint: images are lost on refresh — this is the #1 priority
 - "Easy for the user" — minimize friction on grouping; big drop targets, obvious interactions
+- Drop frustration: "you need to take the image at the very end" — user has to aim at a tiny thumbnail strip instead of just dropping anywhere on the card
+- Goal: fast, frustration-free navigation — users shouldn't have to think about where to aim
 
 </specifics>
 
