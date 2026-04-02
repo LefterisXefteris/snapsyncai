@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 06-01-PLAN.md — generate-content and regenerate-field SSE endpoints
-last_updated: "2026-04-02T22:32:20.941Z"
+stopped_at: Completed 06-02-PLAN.md — AI feature flag disabled buttons
+last_updated: "2026-04-02T22:35:35.468Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 8
   percent: 20
 ---
 
@@ -57,6 +57,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 05-drag-drop-ui P03 | 351 | 3 tasks | 1 files |
 | Phase 05-drag-drop-ui P04 | 2 | 2 tasks | 1 files |
 | Phase 06-product-detail-ai-content P01 | 10 | 2 tasks | 2 files |
+| Phase 06-product-detail-ai-content P02 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,7 @@ Recent decisions affecting current work:
 - [Phase 05-drag-drop-ui]: scale-[1.02] on DroppableGroup isOver className branch for smooth card scale feedback without structural changes
 - [Phase 06-product-detail-ai-content]: Single image only for generate-content/regenerate-field: storage.getImagesByGroup unavailable, fallback to primary image
 - [Phase 06-product-detail-ai-content]: SSE streaming with gpt-5.2: no response_format json_object in stream mode, JSON enforced via system prompt
+- [Phase 06-product-detail-ai-content]: Feature flags VITE_FEATURE_AI_BG_REMOVAL and VITE_FEATURE_AI_PHOTOSHOOT: default false, buttons visible but disabled with SOON badge and Coming soon tooltip
 
 ### Pending Todos
 
@@ -91,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T22:32:20.938Z
-Stopped at: Completed 06-01-PLAN.md — generate-content and regenerate-field SSE endpoints
+Last session: 2026-04-02T22:35:35.466Z
+Stopped at: Completed 06-02-PLAN.md — AI feature flag disabled buttons
 Resume file: None
