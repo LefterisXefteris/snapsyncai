@@ -119,7 +119,20 @@ Plans:
 - [x] 06-02-PLAN.md — Feature-flag disable AI Background and AI Photoshoot buttons with "coming soon" tooltips
 - [x] 06-03-PLAN.md — Build AiContentPanel component + wire into ProductDetails.tsx
 
+### Phase 7: AI Auto-Grouping Agent
+**Goal**: When users upload up to 200 images, an AI agent visually identifies which images show the same product and auto-groups them — then runs full AI analysis per group. Users review and tweak the suggested groupings before confirming.
+**Depends on**: Phase 6
+**Beads**: lisai-app-2xh
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. Uploading multiple images triggers AI-based visual similarity detection that groups images of the same product together
+  2. Suggested groupings are presented to the user for review — user can split, merge, or rearrange before confirming
+  3. After the user confirms groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
+  4. The existing manual drag-and-drop grouping flow remains available as an alternative
+**Plans**: TBD
+
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Drag-and-Drop UI | 4/5 | In Progress|  |
 | 6. Product Detail AI Content | 3/3 | Complete | 2026-04-02 |
+| 7. AI Auto-Grouping Agent | 0/? | Not started | - |
