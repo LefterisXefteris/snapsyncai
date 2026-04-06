@@ -12,7 +12,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles } from "lucide-react";
+import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
@@ -21,6 +21,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 import { useAutoGroup } from "@/hooks/use-auto-group";
+
+interface GroupWithLabel extends Group {
+  label?: string;
+  confidence?: "high" | "medium" | "low";
+}
 
 const TONES = [
   { value: "professional", label: "Professional" },
@@ -113,7 +118,7 @@ function SortableThumbnail({
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
   groupId, groupIdx, items, maxImages, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
-  onAdjustMax, selectedIds, onSelect,
+  onAdjustMax, selectedIds, onSelect, label, confidence,
 }: {
   groupId: string;
   groupIdx: number;
@@ -126,6 +131,8 @@ function DroppableGroup({
   onAdjustMax: (delta: number) => void;
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
+  label?: string;
+  confidence?: "high" | "medium" | "low";
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
 
@@ -152,7 +159,19 @@ function DroppableGroup({
         <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
           <span className="text-[10px] font-bold text-primary">{groupIdx + 1}</span>
         </div>
-        <span className="text-xs font-medium text-white/90">Product {groupIdx + 1}</span>
+        <span className="text-xs font-medium text-white/90">
+          {label || `Product ${groupIdx + 1}`}
+        </span>
+        {confidence && (
+          <span className={cn(
+            "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
+            confidence === "high" ? "bg-green-500/20 text-green-400" :
+            confidence === "medium" ? "bg-yellow-500/20 text-yellow-400" :
+            "bg-red-500/20 text-red-400"
+          )}>
+            {confidence}
+          </span>
+        )}
         <span className="text-[10px] text-white/40 ml-0.5">
           {items.length} {items.length === 1 ? "image" : "images"}
         </span>
@@ -247,7 +266,7 @@ function DroppableNewGroup() {
 export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: File[]) => void }) {
   type GroupingMode = "choosing" | "auto" | "manual";
   const [mode, setMode] = useState<GroupingMode>("choosing");
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<GroupWithLabel[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
   const [globalGroupSize, setGlobalGroupSize] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -289,12 +308,14 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     const allItems = allItemsRef.current;
     if (allItems.length === 0) return;
 
-    const newGroups: Group[] = autoGroup.groups.map(ag => ({
+    const newGroups: GroupWithLabel[] = autoGroup.groups.map(ag => ({
       id: crypto.randomUUID(),
       items: ag.imageIndices
         .map(idx => allItems[idx])
         .filter(Boolean),
       maxImages: globalGroupSize,
+      label: ag.label,
+      confidence: ag.confidence,
     })).filter(g => g.items.length > 0);
 
     setGroups(newGroups);
@@ -643,6 +664,16 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       )}
 
+      {/* Auto-grouping completion summary */}
+      {mode === "auto" && !autoGroup.isGrouping && autoGroup.totalGroups !== null && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-500/5 border border-green-500/20">
+          <CheckCircle2 className="w-4 h-4 text-green-400" />
+          <p className="text-xs text-white/80">
+            AI identified <span className="font-medium text-white">{groups.length} products</span> — review groupings below, then confirm
+          </p>
+        </div>
+      )}
+
       {/* Groups section */}
       {totalFiles > 0 && !isUploading && (mode === "manual" || (mode === "auto" && (autoGroup.groups.length > 0 || !autoGroup.isGrouping))) && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -734,6 +765,8 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   groupIdx={idx}
                   items={group.items}
                   maxImages={group.maxImages}
+                  label={group.label}
+                  confidence={group.confidence}
                   onRemoveItem={removeItem}
                   onSplit={() => splitGroup(group.id)}
                   onDeleteGroup={() => deleteGroup(group.id)}
@@ -837,8 +870,8 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       </div>
 
-      {/* Analyze button */}
-      {!isUploading && (
+      {/* Analyze / Confirm button */}
+      {!isUploading && (mode === "manual" || (mode === "auto" && !autoGroup.isGrouping && groups.length > 0)) && (
         <div className="flex justify-center">
           <ShinyButton
             onClick={handleUpload}
@@ -847,9 +880,11 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             data-testid="button-upload-preview"
           >
             <UploadCloud className="w-4 h-4 mr-2" />
-            {groups.length > 0
-              ? `Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`
-              : "Upload & Analyze"}
+            {mode === "auto"
+              ? `Confirm & Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`
+              : groups.length > 0
+                ? `Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`
+                : "Upload & Analyze"}
           </ShinyButton>
         </div>
       )}
