@@ -43,7 +43,7 @@
 
 ### AI Auto-Grouping (Phase 7)
 
-- [ ] **GROUP-01**: AI-based visual similarity detection groups images of the same product together using GPT-5.2 vision
+- [x] **GROUP-01**: AI-based visual similarity detection groups images of the same product together using GPT-5.2 vision
 - [ ] **GROUP-02**: Suggested groupings are presented for user review — user can split, merge, or rearrange groups before confirming
 - [ ] **GROUP-03**: After confirming groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
 - [ ] **GROUP-04**: Manual drag-and-drop grouping flow remains available as an alternative to AI auto-grouping
@@ -72,7 +72,7 @@
 | CRED-04 | Phase 3 | Pending |
 | CRED-05 | Phase 3 | Pending |
 | INFRA-01 | Phase 4 | Pending |
-| GROUP-01 | Phase 7 | Pending |
+| GROUP-01 | Phase 7 | Complete |
 | GROUP-02 | Phase 7 | Pending |
 | GROUP-03 | Phase 7 | Pending |
 | GROUP-04 | Phase 7 | Pending |
