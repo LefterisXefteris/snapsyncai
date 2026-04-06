@@ -116,6 +116,10 @@ export const api = {
       method: 'POST' as const,
       path: '/api/images/:id/regenerate-field' as const,
     },
+    autoGroup: {
+      method: 'POST' as const,
+      path: '/api/images/auto-group' as const,
+    },
   },
   etsy: {
     status: {
