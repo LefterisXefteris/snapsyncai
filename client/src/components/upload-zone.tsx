@@ -12,7 +12,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2 } from "lucide-react";
+import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
+import { useAutoGroup } from "@/hooks/use-auto-group";
 
 const TONES = [
   { value: "professional", label: "Professional" },
@@ -244,6 +245,8 @@ function DroppableNewGroup() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: File[]) => void }) {
+  type GroupingMode = "choosing" | "auto" | "manual";
+  const [mode, setMode] = useState<GroupingMode>("choosing");
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
   const [globalGroupSize, setGlobalGroupSize] = useState(1);
@@ -256,6 +259,8 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   const uploadMutation = useUploadImages();
   const { toast } = useToast();
   const { loadStaged, saveBlob, deleteBlob, saveGroups, clearAll } = useStagedImages();
+  const autoGroup = useAutoGroup();
+  const allItemsRef = useRef<FileItem[]>([]);
 
   // Revoke object URLs on unmount
   const urlsRef = useRef<string[]>([]);
@@ -275,6 +280,39 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   useEffect(() => { onUploadingChange?.(uploadingQueue); }, [uploadingQueue, onUploadingChange]);
 
   const totalFiles = groups.reduce((sum, g) => sum + g.items.length, 0);
+
+  // ── Auto-group: map streamed results to Group[] state ─────────────────────
+  useEffect(() => {
+    if (mode !== "auto") return;
+    if (autoGroup.groups.length === 0) return;
+
+    const allItems = allItemsRef.current;
+    if (allItems.length === 0) return;
+
+    const newGroups: Group[] = autoGroup.groups.map(ag => ({
+      id: crypto.randomUUID(),
+      items: ag.imageIndices
+        .map(idx => allItems[idx])
+        .filter(Boolean),
+      maxImages: globalGroupSize,
+    })).filter(g => g.items.length > 0);
+
+    setGroups(newGroups);
+    saveGroups(newGroups);
+  }, [autoGroup.groups.length, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-group error → fallback to manual ─────────────────────────────────
+  useEffect(() => {
+    if (autoGroup.error) {
+      toast({ title: "Auto-grouping failed", description: autoGroup.error, variant: "destructive" });
+      setMode("manual");
+    }
+  }, [autoGroup.error]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Reset mode when all images are removed ────────────────────────────────
+  useEffect(() => {
+    if (totalFiles === 0 && mode !== "choosing") setMode("choosing");
+  }, [totalFiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── DnD sensors ─────────────────────────────────────────────────────────────
   const sensors = useSensors(
@@ -545,8 +583,68 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       </div>
 
+      {/* Mode choice UI */}
+      {totalFiles > 0 && mode === "choosing" && !isUploading && (
+        <div className="p-6 rounded-xl border border-white/[0.08] bg-white/[0.02] space-y-4">
+          <div className="text-center space-y-2">
+            <h3 className="text-sm font-medium text-white">
+              {totalFiles} images ready — how would you like to group them?
+            </h3>
+            <p className="text-xs text-white/40">
+              Each group becomes one product listing
+            </p>
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => {
+                const allItems = groups.flatMap(g => g.items);
+                allItemsRef.current = allItems;
+                setMode("auto");
+                autoGroup.startGrouping(allItems, productContext || undefined);
+              }}
+              className="flex-1 max-w-[220px] p-4 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all text-left space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-white">Auto-group with AI</span>
+              </div>
+              <p className="text-[11px] text-white/40">AI identifies products and groups images automatically</p>
+            </button>
+            <button
+              onClick={() => setMode("manual")}
+              className="flex-1 max-w-[220px] p-4 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/5 hover:border-white/20 transition-all text-left space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <Images className="w-4 h-4 text-white/60" />
+                <span className="text-sm font-medium text-white">Group manually</span>
+              </div>
+              <p className="text-[11px] text-white/40">Drag and drop images into product groups yourself</p>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-grouping progress */}
+      {mode === "auto" && autoGroup.isGrouping && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/20">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-white">
+              AI is grouping your images... {autoGroup.groups.length} product{autoGroup.groups.length !== 1 ? 's' : ''} found
+            </p>
+            <p className="text-[11px] text-white/40">Groups appear as they are identified</p>
+          </div>
+          <button
+            onClick={() => { autoGroup.cancel(); setMode("choosing"); }}
+            className="text-xs text-white/40 hover:text-white/80 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* Groups section */}
-      {totalFiles > 0 && !isUploading && (
+      {totalFiles > 0 && !isUploading && (mode === "manual" || (mode === "auto" && (autoGroup.groups.length > 0 || !autoGroup.isGrouping))) && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
 
           {/* ── Toolbar ─────────────────────────────────────────────────── */}
@@ -586,6 +684,29 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   ))}
                 </div>
               </div>
+
+              {/* Switch to manual (when in auto mode) */}
+              {mode === "auto" && (
+                <button
+                  onClick={() => {
+                    autoGroup.cancel();
+                    setMode("manual");
+                    setGroups(prev => {
+                      const allItems = prev.flatMap(g => g.items);
+                      const manualGroups = chunkArray(allItems, globalGroupSize).map(items => ({
+                        id: crypto.randomUUID(),
+                        items,
+                        maxImages: globalGroupSize,
+                      }));
+                      saveGroups(manualGroups);
+                      return manualGroups;
+                    });
+                  }}
+                  className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white/80 transition-colors"
+                >
+                  Switch to manual
+                </button>
+              )}
 
               {/* Add more */}
               <button
