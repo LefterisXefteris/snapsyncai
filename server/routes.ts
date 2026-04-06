@@ -12,10 +12,28 @@ import { db } from "./db";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 import { uploadImageToStorage } from "./supabaseClient";
+import { title } from "process";
 
 const MIN_IMAGE_COUNT = 1;
 const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
 const DEV_USER_ID = "dev_local_user";
+const DEV_FREE_EMAIL = "lefterisyilmaz96@gmail.com";
+
+/** Returns true if this user gets free unlimited AI on localhost (non-production only). */
+async function isDevFreeUser(req: Request): Promise<boolean> {
+  if (process.env.NODE_ENV === "production") return false;
+  if (DEV_BYPASS_AUTH) return false; // dev bypass already handles everything
+  try {
+    const auth = getAuth(req);
+    if (!auth.userId) return false;
+    const clerkUser = await clerkClient.users.getUser(auth.userId);
+    const email = clerkUser.emailAddresses?.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
+      ?? clerkUser.emailAddresses?.[0]?.emailAddress;
+    return email === DEV_FREE_EMAIL;
+  } catch {
+    return false;
+  }
+}
 
 function requireAuth() {
   if (DEV_BYPASS_AUTH) return (_req: any, _res: any, next: any) => next();
@@ -1004,6 +1022,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const userId = getUserId(req);
       if (DEV_BYPASS_AUTH) return res.json({ balance: 999, lifetimeCredits: 999 });
+      if (await isDevFreeUser(req)) return res.json({ balance: 999, lifetimeCredits: 999 });
       const row = await storage.getUserCredits(userId);
       res.json({ balance: row?.balance ?? 0, lifetimeCredits: row?.lifetimeCredits ?? 0 });
     } catch (error: any) {
@@ -1075,6 +1094,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/subscription/status", requireAuth(), async (req, res) => {
     try {
       const userId = getUserId(req);
+
+      // Dev-free user: fake active subscription on localhost
+      if (await isDevFreeUser(req)) {
+        return res.json({ subscribed: true, status: "active", currentPeriodEnd: null, stripeSubscriptionId: null });
+      }
+
       let sub = await storage.getSubscription(userId);
 
       // Auto-recover: if no subscription found by userId, try to find one in Stripe
@@ -1401,9 +1426,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.json({ processed: 0, message: "All selected images are already unlocked." });
       }
 
-      // Check subscription OR credits
+      // Check subscription OR credits (dev-free user bypasses payment)
+      const devFree = await isDevFreeUser(req);
       const sub = await storage.getSubscription(userId);
-      const isSubscribed = sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling');
+      const isSubscribed = devFree || (sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling'));
 
       if (!isSubscribed) {
         // Count unique products (groups count as 1 credit each).
@@ -1539,8 +1565,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const brandTone = (req.body?.brandTone as string) || "professional";
       const groupAsOne = req.body?.groupAsOne === "true" || req.body?.groupAsOne === true;
 
+      const devFree = await isDevFreeUser(req);
       const sub = await storage.getSubscription(sessionId);
-      const hasActiveSubscription = sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling');
+      const hasActiveSubscription = devFree || (sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling'));
 
       // When groupAsOne=true and multiple files: analyze all images together as one product
       if (groupAsOne && files.length > 1) {
@@ -3255,5 +3282,172 @@ Rules:
     }
   });
 
-  return httpServer;
+  // POST /api/images/auto-group — SSE: AI-powered image grouping via GPT-5.2 vision
+  app.post("/api/images/auto-group", requireAuth(), async (req, res) => {
+    try {
+      const { images: inputImages, productContext } = req.body as {
+        images: Array<{ index: number; base64: string; mimeType: string; filename: string }>;
+        productContext?: string;
+      };
+
+      // Validate input
+      if (!Array.isArray(inputImages) || inputImages.length < 2) {
+        return res.status(400).json({ message: "At least 2 images are required" });
+      }
+      if (inputImages.length > 200) {
+        return res.status(400).json({ message: "Maximum 200 images allowed" });
+      }
+
+      // Set SSE headers
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+
+      const BATCH_SIZE = 15;
+      const batches: Array<typeof inputImages> = [];
+      for (let i = 0; i < inputImages.length; i += BATCH_SIZE) {
+        batches.push(inputImages.slice(i, i + BATCH_SIZE));
+      }
+
+      // Collect all groups from all batches with global index mapping
+      const allGroups: Array<{ label: string; imageIndices: number[]; confidence: string }> = [];
+
+      for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+        const batch = batches[batchIdx];
+        const globalOffset = batchIdx * BATCH_SIZE;
+
+        const systemPrompt = `You are a product image grouping assistant for an e-commerce platform, specializing in clothing and fashion.
+
+You will receive multiple product images. Your job is to identify which images show the SAME product and group them together.
+
+Rules:
+- Same product in different colors = same group (they are variants)
+- Same product from different angles (front, back, detail, side) = same group
+- Different products = different groups
+- If an image is ambiguous or you're unsure, put it in its own solo group
+
+${productContext ? `Seller context: "${productContext}"` : ""}
+
+Respond with JSON:
+{
+  "groups": [
+    {
+      "label": "Short product description (e.g. 'Blue Denim Jacket')",
+      "imageIndices": [0, 3, 7],
+      "confidence": "high" | "medium" | "low"
+    }
+  ]
 }
+
+imageIndices are 0-based indices referring to the order images appear in this message.
+Every image index must appear in exactly one group. Do not skip any.`;
+
+        const imageContent = batch.map((img) => ({
+          type: "image_url" as const,
+          image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+        }));
+
+        const userContent = [
+          { type: "text" as const, text: `Group these ${batch.length} product images by product. Image indices are 0-${batch.length - 1} in the order shown. JSON only.` },
+          ...imageContent,
+        ];
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-5.2",
+          response_format: { type: "json_object" },
+          max_completion_tokens: 2000,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent },
+          ],
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) continue;
+
+        let parsed: { groups: Array<{ label: string; imageIndices: number[]; confidence: string }> };
+        try {
+          parsed = JSON.parse(content);
+        } catch {
+          continue;
+        }
+
+        // Map batch-local indices to global indices
+        for (const group of parsed.groups) {
+          allGroups.push({
+            label: group.label,
+            imageIndices: group.imageIndices.map((i) => i + globalOffset),
+            confidence: group.confidence,
+          });
+        }
+      }
+
+      // Merge pass: if multiple batches, ask GPT to merge groups with similar labels
+      let finalGroups = allGroups;
+
+      if (batches.length > 1 && allGroups.length > 0) {
+        const mergeSystemPrompt = `You have product groups from multiple batches. Merge groups that clearly describe the same product. Return JSON: { "mergedGroups": [{ "label": "string", "sourceGroupIds": [0, 2] }] } where sourceGroupIds reference the 0-based index of each group in the flat list provided.`;
+
+        const groupSummary = allGroups.map((g, i) => `Group ${i}: "${g.label}" (${g.imageIndices.length} images)`).join("\n");
+
+        const mergeResponse = await openai.chat.completions.create({
+          model: "gpt-5.2",
+          response_format: { type: "json_object" },
+          max_completion_tokens: 1000,
+          messages: [
+            { role: "system", content: mergeSystemPrompt },
+            { role: "user", content: `Here are the groups to merge if applicable:\n${groupSummary}\n\nJSON only.` },
+          ],
+        });
+
+        const mergeContent = mergeResponse.choices[0]?.message?.content;
+        if (mergeContent) {
+          try {
+            const mergeParsed: { mergedGroups: Array<{ label: string; sourceGroupIds: number[] }> } = JSON.parse(mergeContent);
+            // Build merged groups
+            const merged: typeof allGroups = [];
+            for (const mg of mergeParsed.mergedGroups) {
+              const combinedIndices: number[] = [];
+              let bestConfidence = "low";
+              for (const srcId of mg.sourceGroupIds) {
+                if (allGroups[srcId]) {
+                  combinedIndices.push(...allGroups[srcId].imageIndices);
+                  // Escalate confidence: high > medium > low
+                  const c = allGroups[srcId].confidence;
+                  if (c === "high") bestConfidence = "high";
+                  else if (c === "medium" && bestConfidence !== "high") bestConfidence = "medium";
+                }
+              }
+              merged.push({ label: mg.label, imageIndices: combinedIndices, confidence: bestConfidence });
+            }
+            finalGroups = merged;
+          } catch {
+            // If merge parsing fails, use unmerged groups
+          }
+        }
+      }
+
+      // Stream each final group as an SSE event
+      for (const group of finalGroups) {
+        res.write(`data: ${JSON.stringify({ type: "group", group })}\n\n`);
+      }
+
+      // Send done event
+      res.write(`data: ${JSON.stringify({ type: "done", totalGroups: finalGroups.length })}\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("auto-group error:", error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ type: "error", message: error.message || "Auto-grouping failed" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ message: "Failed to auto-group images", error: error.message });
+      }
+    }
+  });
+
+      return httpServer;
+
+}
+
