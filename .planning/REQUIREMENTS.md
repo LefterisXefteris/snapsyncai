@@ -39,6 +39,15 @@
 - **INFRA-03**: Supabase storage bucket RLS policies restrict public writes
 - **INFRA-04**: Instagram OAuth state nonce is stored in DB and invalidated on first use
 
+## Product UX Requirements
+
+### AI Auto-Grouping (Phase 7)
+
+- [ ] **GROUP-01**: AI-based visual similarity detection groups images of the same product together using GPT-5.2 vision
+- [ ] **GROUP-02**: Suggested groupings are presented for user review — user can split, merge, or rearrange groups before confirming
+- [ ] **GROUP-03**: After confirming groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
+- [ ] **GROUP-04**: Manual drag-and-drop grouping flow remains available as an alternative to AI auto-grouping
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -63,12 +72,17 @@
 | CRED-04 | Phase 3 | Pending |
 | CRED-05 | Phase 3 | Pending |
 | INFRA-01 | Phase 4 | Pending |
+| GROUP-01 | Phase 7 | Pending |
+| GROUP-02 | Phase 7 | Pending |
+| GROUP-03 | Phase 7 | Pending |
+| GROUP-04 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 8 total
-- Mapped to phases: 8
-- Unmapped: 0 ✓
+- Product UX requirements: 4 total
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 — phase assignments finalized (PAY-01→P1, AUTH-01→P2, CRED→P3, INFRA-01→P4)*
+*Last updated: 2026-04-06 — added GROUP-01 through GROUP-04 for Phase 7*

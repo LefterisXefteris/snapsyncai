@@ -123,16 +123,21 @@ Plans:
 **Goal**: When users upload up to 200 images, an AI agent visually identifies which images show the same product and auto-groups them — then runs full AI analysis per group. Users review and tweak the suggested groupings before confirming.
 **Depends on**: Phase 6
 **Beads**: lisai-app-2xh
-**Requirements**: TBD
+**Requirements**: GROUP-01 (AI visual grouping), GROUP-02 (review and tweak), GROUP-03 (confirm triggers analysis), GROUP-04 (manual mode preserved)
 **Success Criteria** (what must be TRUE):
   1. Uploading multiple images triggers AI-based visual similarity detection that groups images of the same product together
   2. Suggested groupings are presented to the user for review — user can split, merge, or rearrange before confirming
   3. After the user confirms groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
   4. The existing manual drag-and-drop grouping flow remains available as an alternative
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 07-01-PLAN.md — SSE auto-grouping endpoint with batched GPT-5.2 vision calls
+- [ ] 07-02-PLAN.md — useAutoGroup hook + mode choice UI + live group streaming
+- [ ] 07-03-PLAN.md — AI labels on group cards + Confirm & Analyze All button
+- [ ] 07-04-PLAN.md — Human verification of all 4 success criteria
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Drag-and-Drop UI | 4/5 | In Progress|  |
 | 6. Product Detail AI Content | 3/3 | Complete | 2026-04-02 |
-| 7. AI Auto-Grouping Agent | 0/? | Not started | - |
+| 7. AI Auto-Grouping Agent | 0/4 | Not started | - |
