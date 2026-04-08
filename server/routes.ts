@@ -12,6 +12,8 @@ import { db } from "./db";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 import { uploadImageToStorage } from "./supabaseClient";
+import { buildAutoGroupMergePrompt, buildAutoGroupSystemPrompt, canonicalizeAutoGroup, mergeAutoGroupsByFamily } from "./auto-group-utils";
+import { resolveUploadProcessingMode } from "./uploadLanggraph";
 import { title } from "process";
 
 const MIN_IMAGE_COUNT = 1;
@@ -1568,16 +1570,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const devFree = await isDevFreeUser(req);
       const sub = await storage.getSubscription(sessionId);
       const hasActiveSubscription = devFree || (sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling'));
+      const uploadMode = await resolveUploadProcessingMode({
+        fileCount: files.length,
+        groupAsOne,
+        hasActiveSubscription: Boolean(hasActiveSubscription),
+      });
 
       // When groupAsOne=true and multiple files: analyze all images together as one product
-      if (groupAsOne && files.length > 1) {
+      if (uploadMode === "groupedPaid" || uploadMode === "groupedPreview") {
         const groupId = crypto.randomUUID();
         const fileInputs = files.map(f => ({ buffer: f.buffer, mimeType: f.mimetype, originalName: f.originalname }));
 
         let analysis: ProductAnalysis | QuickPreview | null = null;
         let analysisSucceeded = false;
 
-        if (hasActiveSubscription) {
+        if (uploadMode === "groupedPaid") {
           const fullAnalysis = await fullAnalyzeMultipleImages(fileInputs, brandTone, productContext || undefined);
           analysis = fullAnalysis;
           analysisSucceeded = fullAnalysis.description !== "Failed to analyze images.";
@@ -1591,7 +1598,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
           try {
             let image;
-            if (hasActiveSubscription && analysisSucceeded) {
+            if (uploadMode === "groupedPaid" && analysisSucceeded) {
               const a = analysis as ProductAnalysis;
               const detectedColor = a.imageColors?.[idx] || null;
               image = await storage.createImage({
@@ -1633,7 +1640,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 productType: a.productType,
                 tags: isPrimary ? a.tags : [],
                 shopifyStatus: "pending",
-                paymentStatus: hasActiveSubscription ? "paid" : "unpaid",
+                paymentStatus: uploadMode === "groupedPaid" ? "paid" : "unpaid",
                 productContext: productContext || null,
                 brandTone,
                 productGroupId: groupId,
@@ -1674,7 +1681,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Default: process each image independently
       const results = await runWithConcurrency(files, CONCURRENCY_LIMIT, async (file) => {
         try {
-          if (hasActiveSubscription) {
+          if (uploadMode === "singlePaid") {
             const analysis = await fullAnalyzeImage(file.buffer, file.mimetype, file.originalname, brandTone, productContext || undefined);
             const analysisSucceeded = analysis.description !== "Failed to analyze image.";
 
@@ -1742,7 +1749,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             category: "Other",
             tags: [],
             shopifyStatus: "pending",
-            paymentStatus: hasActiveSubscription ? "paid" : "unpaid",
+            paymentStatus: uploadMode === "singlePaid" ? "paid" : "unpaid",
             productContext: productContext || null,
             brandTone,
             sessionId,
@@ -3285,9 +3292,10 @@ Rules:
   // POST /api/images/auto-group — SSE: AI-powered image grouping via GPT-5.2 vision
   app.post("/api/images/auto-group", requireAuth(), async (req, res) => {
     try {
-      const { images: inputImages, productContext } = req.body as {
+      const { images: inputImages, productContext, mode = "default" } = req.body as {
         images: Array<{ index: number; base64: string; mimeType: string; filename: string }>;
         productContext?: string;
+        mode?: "default" | "variant-family";
       };
 
       // Validate input
@@ -3311,37 +3319,13 @@ Rules:
       }
 
       // Collect all groups from all batches with global index mapping
-      const allGroups: Array<{ label: string; imageIndices: number[]; confidence: string }> = [];
+      const allGroups: Array<{ label: string; imageIndices: number[]; confidence: string; familyKey?: string }> = [];
 
       for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
         const batch = batches[batchIdx];
         const globalOffset = batchIdx * BATCH_SIZE;
 
-        const systemPrompt = `You are a product image grouping assistant for an e-commerce platform, specializing in clothing and fashion.
-
-You will receive multiple product images. Your job is to identify which images show the SAME product and group them together.
-
-Rules:
-- Same product in different colors = same group (they are variants)
-- Same product from different angles (front, back, detail, side) = same group
-- Different products = different groups
-- If an image is ambiguous or you're unsure, put it in its own solo group
-
-${productContext ? `Seller context: "${productContext}"` : ""}
-
-Respond with JSON:
-{
-  "groups": [
-    {
-      "label": "Short product description (e.g. 'Blue Denim Jacket')",
-      "imageIndices": [0, 3, 7],
-      "confidence": "high" | "medium" | "low"
-    }
-  ]
-}
-
-imageIndices are 0-based indices referring to the order images appear in this message.
-Every image index must appear in exactly one group. Do not skip any.`;
+        const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
 
         const imageContent = batch.map((img) => ({
           type: "image_url" as const,
@@ -3366,7 +3350,7 @@ Every image index must appear in exactly one group. Do not skip any.`;
         const content = response.choices[0]?.message?.content;
         if (!content) continue;
 
-        let parsed: { groups: Array<{ label: string; imageIndices: number[]; confidence: string }> };
+        let parsed: { groups: Array<{ label: string; familyKey?: string; imageIndices: number[]; confidence: string }> };
         try {
           parsed = JSON.parse(content);
         } catch {
@@ -3375,21 +3359,23 @@ Every image index must appear in exactly one group. Do not skip any.`;
 
         // Map batch-local indices to global indices
         for (const group of parsed.groups) {
-          allGroups.push({
+          allGroups.push(canonicalizeAutoGroup({
             label: group.label,
+            familyKey: group.familyKey,
             imageIndices: group.imageIndices.map((i) => i + globalOffset),
             confidence: group.confidence,
-          });
+          }));
         }
       }
 
-      // Merge pass: if multiple batches, ask GPT to merge groups with similar labels
-      let finalGroups = allGroups;
+      let finalGroups = mergeAutoGroupsByFamily(allGroups);
 
-      if (batches.length > 1 && allGroups.length > 0) {
-        const mergeSystemPrompt = `You have product groups from multiple batches. Merge groups that clearly describe the same product. Return JSON: { "mergedGroups": [{ "label": "string", "sourceGroupIds": [0, 2] }] } where sourceGroupIds reference the 0-based index of each group in the flat list provided.`;
+      if (batches.length > 1 && finalGroups.length > 0) {
+        const mergeSystemPrompt = buildAutoGroupMergePrompt(mode);
 
-        const groupSummary = allGroups.map((g, i) => `Group ${i}: "${g.label}" (${g.imageIndices.length} images)`).join("\n");
+        const groupSummary = finalGroups
+          .map((g, i) => `Group ${i}: label="${g.label}", familyKey="${g.familyKey || ""}" (${g.imageIndices.length} images)`)
+          .join("\n");
 
         const mergeResponse = await openai.chat.completions.create({
           model: "gpt-5.2",
@@ -3404,24 +3390,29 @@ Every image index must appear in exactly one group. Do not skip any.`;
         const mergeContent = mergeResponse.choices[0]?.message?.content;
         if (mergeContent) {
           try {
-            const mergeParsed: { mergedGroups: Array<{ label: string; sourceGroupIds: number[] }> } = JSON.parse(mergeContent);
+            const mergeParsed: { mergedGroups: Array<{ label: string; familyKey?: string; sourceGroupIds: number[] }> } = JSON.parse(mergeContent);
             // Build merged groups
-            const merged: typeof allGroups = [];
+            const merged: typeof finalGroups = [];
             for (const mg of mergeParsed.mergedGroups) {
               const combinedIndices: number[] = [];
               let bestConfidence = "low";
               for (const srcId of mg.sourceGroupIds) {
-                if (allGroups[srcId]) {
-                  combinedIndices.push(...allGroups[srcId].imageIndices);
+                if (finalGroups[srcId]) {
+                  combinedIndices.push(...finalGroups[srcId].imageIndices);
                   // Escalate confidence: high > medium > low
-                  const c = allGroups[srcId].confidence;
+                  const c = finalGroups[srcId].confidence;
                   if (c === "high") bestConfidence = "high";
                   else if (c === "medium" && bestConfidence !== "high") bestConfidence = "medium";
                 }
               }
-              merged.push({ label: mg.label, imageIndices: combinedIndices, confidence: bestConfidence });
+              merged.push(canonicalizeAutoGroup({
+                label: mg.label,
+                familyKey: mg.familyKey,
+                imageIndices: combinedIndices,
+                confidence: bestConfidence,
+              }));
             }
-            finalGroups = merged;
+            finalGroups = mergeAutoGroupsByFamily(merged);
           } catch {
             // If merge parsing fails, use unmerged groups
           }
@@ -3450,4 +3441,3 @@ Every image index must appear in exactly one group. Do not skip any.`;
       return httpServer;
 
 }
-

@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { api } from "@shared/routes";
 import type { FileItem } from "@/hooks/use-staged-images";
 
+export type AutoGroupMode = "default" | "variant-family";
+
 export interface AutoGroupResult {
   label: string;
   imageIndices: number[];
@@ -9,7 +11,7 @@ export interface AutoGroupResult {
 }
 
 export interface UseAutoGroupReturn {
-  startGrouping: (files: FileItem[], productContext?: string) => void;
+  startGrouping: (files: FileItem[], productContext?: string, mode?: AutoGroupMode) => void;
   isGrouping: boolean;
   groups: AutoGroupResult[];
   totalGroups: number | null;
@@ -58,6 +60,86 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+export async function buildAutoGroupImagePayloads(files: File[]) {
+  return Promise.all(
+    files.map(async (file, index) => {
+      const resized = await resizeImage(file);
+      const base64 = await blobToBase64(resized);
+      const mimeType = resized instanceof File ? resized.type : "image/jpeg";
+
+      return {
+        index,
+        base64,
+        mimeType,
+        filename: file.name,
+      };
+    }),
+  );
+}
+
+export async function requestAutoGroup(
+  files: File[],
+  productContext?: string,
+  mode: AutoGroupMode = "default",
+  options?: {
+    signal?: AbortSignal;
+    onGroup?: (group: AutoGroupResult) => void;
+    onDone?: (totalGroups: number) => void;
+  },
+): Promise<AutoGroupResult[]> {
+  const imagePayloads = await buildAutoGroupImagePayloads(files);
+
+  const res = await fetch(api.images.autoGroup.path, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildAutoGroupRequestPayload(imagePayloads, productContext, mode)),
+    signal: options?.signal,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "Unknown error");
+    throw new Error(`Auto-grouping failed (${res.status}): ${text}`);
+  }
+
+  if (!res.body) {
+    throw new Error("Auto-grouping failed: empty response body");
+  }
+
+  const groups: AutoGroupResult[] = [];
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+
+    for (const event of events) {
+      const dataLine = event
+        .split("\n")
+        .find((line) => line.startsWith("data: "));
+      if (!dataLine) continue;
+
+      const json = JSON.parse(dataLine.slice(6));
+      if (json.type === "group") {
+        groups.push(json.group);
+        options?.onGroup?.(json.group);
+      } else if (json.type === "done") {
+        options?.onDone?.(json.totalGroups);
+      } else if (json.type === "error") {
+        throw new Error(json.message || "Auto-grouping failed");
+      }
+    }
+  }
+
+  return groups;
+}
+
 export function useAutoGroup(): UseAutoGroupReturn {
   const [isGrouping, setIsGrouping] = useState(false);
   const [groups, setGroups] = useState<AutoGroupResult[]>([]);
@@ -71,7 +153,7 @@ export function useAutoGroup(): UseAutoGroupReturn {
     setIsGrouping(false);
   }
 
-  function startGrouping(files: FileItem[], productContext?: string) {
+  function startGrouping(files: FileItem[], productContext?: string, mode: AutoGroupMode = "default") {
     // Reset state
     setIsGrouping(true);
     setGroups([]);
@@ -85,74 +167,16 @@ export function useAutoGroup(): UseAutoGroupReturn {
 
     (async () => {
       try {
-        // Resize and convert all images to base64 in parallel
-        const imagePayloads = await Promise.all(
-          files.map(async (item, index) => {
-            const resized = await resizeImage(item.file);
-            const base64 = await blobToBase64(resized);
-            const mimeType =
-              resized instanceof File ? resized.type : "image/jpeg";
-            return {
-              index,
-              base64,
-              mimeType,
-              filename: item.file.name,
-            };
-          })
+        await requestAutoGroup(
+          files.map((item) => item.file),
+          productContext,
+          mode,
+          {
+            signal: controller.signal,
+            onGroup: (group) => setGroups((prev) => [...prev, group]),
+            onDone: (groupCount) => setTotalGroups(groupCount),
+          },
         );
-
-        const res = await fetch(api.images.autoGroup.path, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            images: imagePayloads,
-            productContext: productContext || undefined,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => "Unknown error");
-          setError(`Auto-grouping failed (${res.status}): ${text}`);
-          setIsGrouping(false);
-          return;
-        }
-
-        // Read SSE stream
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          // Parse SSE events (split on double newline)
-          const events = buffer.split("\n\n");
-          buffer = events.pop() || "";
-
-          for (const event of events) {
-            const dataLine = event
-              .split("\n")
-              .find((l) => l.startsWith("data: "));
-            if (!dataLine) continue;
-
-            try {
-              const json = JSON.parse(dataLine.slice(6));
-              if (json.type === "group") {
-                setGroups((prev) => [...prev, json.group]);
-              } else if (json.type === "done") {
-                setTotalGroups(json.totalGroups);
-              } else if (json.type === "error") {
-                setError(json.message);
-              }
-            } catch {
-              // Skip malformed JSON lines
-            }
-          }
-        }
 
         setIsGrouping(false);
       } catch (err: unknown) {
@@ -175,5 +199,17 @@ export function useAutoGroup(): UseAutoGroupReturn {
     totalGroups,
     error,
     cancel,
+  };
+}
+
+export function buildAutoGroupRequestPayload(
+  images: Array<{ index: number; base64: string; mimeType: string; filename: string }>,
+  productContext?: string,
+  mode: AutoGroupMode = "default",
+) {
+  return {
+    images,
+    productContext: productContext || undefined,
+    mode,
   };
 }

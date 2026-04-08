@@ -14,6 +14,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isImageLikeFile } from "@/lib/image-file-utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { Textarea } from "@/components/ui/textarea";
@@ -300,6 +301,13 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
 
   const totalFiles = groups.reduce((sum, g) => sum + g.items.length, 0);
 
+  const sortVariantsIntoProducts = useCallback((items: FileItem[]) => {
+    if (items.length === 0) return;
+    allItemsRef.current = items;
+    setMode("auto");
+    autoGroup.startGrouping(items, productContext || undefined, "variant-family");
+  }, [autoGroup, productContext]);
+
   // ── Auto-group: map streamed results to Group[] state ─────────────────────
   useEffect(() => {
     if (mode !== "auto") return;
@@ -437,6 +445,10 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       return { id: crypto.randomUUID(), file: f, url };
     });
 
+    // When dropping files while still in "choosing" mode, switch to manual
+    // so the groups section and Analyze button become visible immediately.
+    if (mode === "choosing") setMode("manual");
+
     setGroups(prev => {
       const allItems = [...prev.flatMap(g => g.items), ...newItems];
       if (allItems.length > 200) return prev;
@@ -448,12 +460,41 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         .catch(err => console.warn('[upload-zone] IDB save failed:', err));
       return newGroups;
     });
-  }, [globalGroupSize, saveBlob, saveGroups]);
+  }, [mode, globalGroupSize, saveBlob, saveGroups]);
+
+  const handleDropRejected = useCallback(() => {
+    toast({
+      title: "Unsupported image format",
+      description: "Drop PNG, JPG, WEBP, GIF, BMP, TIFF, HEIC, or AVIF images.",
+      variant: "destructive",
+    });
+  }, [toast]);
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
-    noClick: totalFiles > 0,
+    onDropRejected: handleDropRejected,
+    accept: {
+      "image/*": [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".gif",
+        ".bmp",
+        ".tif",
+        ".tiff",
+        ".heic",
+        ".heif",
+        ".avif",
+      ],
+    },
+    validator: (file) =>
+      isImageLikeFile({ name: file.name, type: file.type })
+        ? null
+        : { code: "file-invalid-type", message: "Unsupported image format" },
+    noClick: true,
+    noKeyboard: true,
+    noDragEventsBubbling: true,
   });
 
   // ── Auto-arrange ───────────────────────────────────────────────────────────
@@ -570,11 +611,18 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
 
   // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-4">
+    <div
+      {...getRootProps({
+        className: "w-full max-w-3xl mx-auto space-y-4",
+      })}
+    >
+      <input {...getInputProps()} data-testid="input-file-upload" />
 
       {/* Drop zone */}
       <div
-        {...getRootProps()}
+        onClick={() => {
+          if (!isUploading) open();
+        }}
         className={cn(
           "relative group cursor-pointer overflow-hidden rounded-xl border border-dashed transition-all duration-200 text-center",
           totalFiles > 0 ? "p-3" : "p-6",
@@ -583,7 +631,6 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             : "border-border hover:border-primary/50 hover:bg-muted/50 bg-muted/20"
         )}
       >
-        <input {...getInputProps()} data-testid="input-file-upload" />
         <div className="relative z-10 flex flex-col items-center gap-1.5">
           <div className={cn(
             "p-2 rounded-lg bg-muted border border-border transition-transform duration-200",
@@ -630,6 +677,16 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                 <span className="text-sm font-medium text-white">Auto-group with AI</span>
               </div>
               <p className="text-[11px] text-white/40">AI identifies products and groups images automatically</p>
+            </button>
+            <button
+              onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
+              className="flex-1 max-w-[220px] p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all text-left space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-medium text-white">Sort Variants Into Products</span>
+              </div>
+              <p className="text-[11px] text-white/40">Groups the same product family together across colors, sizes, and views</p>
             </button>
             <button
               onClick={() => setMode("manual")}
@@ -740,6 +797,16 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
               )}
 
               {/* Add more */}
+              {totalFiles > 1 && (
+                <button
+                  onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
+                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                  title="Sort same-product variants into product families"
+                >
+                  <Package className="w-3 h-3" />
+                  <span className="hidden sm:inline">Sort variants</span>
+                </button>
+              )}
               <button
                 onClick={open}
                 className="ml-auto flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"

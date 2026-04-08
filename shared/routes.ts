@@ -119,6 +119,12 @@ export const api = {
     autoGroup: {
       method: 'POST' as const,
       path: '/api/images/auto-group' as const,
+      // Request body:
+      // {
+      //   images: [{ index, base64, mimeType, filename }],
+      //   productContext?: string,
+      //   mode?: "default" | "variant-family"
+      // }
     },
   },
   etsy: {

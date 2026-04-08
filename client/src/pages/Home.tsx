@@ -26,6 +26,9 @@ import type { Image } from "@shared/schema";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { requestAutoGroup } from "@/hooks/use-auto-group";
+import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages } from "@/lib/workspace-variant-sort";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Home() {
   const { data: images, isLoading } = useImages();
@@ -76,6 +79,7 @@ export default function Home() {
   const [instagramPostCaption, setInstagramPostCaption] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const [instagramPostImageId, setInstagramPostImageId] = useState<number | null>(null);
+  const [isVariantSorting, setIsVariantSorting] = useState(false);
   const [amazonLwaClientId, setAmazonLwaClientId] = useState("");
   const [amazonLwaClientSecret, setAmazonLwaClientSecret] = useState("");
   const [amazonLwaRefreshToken, setAmazonLwaRefreshToken] = useState("");
@@ -444,6 +448,88 @@ export default function Home() {
     return images?.filter((img: Image) => img.instagramStatus === "posted").length || 0;
   }, [images]);
 
+  const selectedWorkspaceImages = useMemo(() => {
+    return collectSelectedWorkspaceImages(productEntries, selectedIds);
+  }, [productEntries, selectedIds]);
+
+  const handleSortVariants = useCallback(async () => {
+    if (selectedWorkspaceImages.length < 2) {
+      toast({
+        title: "Select more images",
+        description: "Choose at least 2 product images to sort variants into products.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedWorkspaceImages.length > 200) {
+      toast({
+        title: "Too many images selected",
+        description: "Sort up to 200 images at a time.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVariantSorting(true);
+
+    try {
+      const files = await Promise.all(
+        selectedWorkspaceImages.map(async (image) => {
+          const response = await fetch(`/api/images/${image.id}/file`, {
+            credentials: "include",
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to load ${image.originalName || `image ${image.id}`}`);
+          }
+
+          const blob = await response.blob();
+          const mimeType = blob.type || image.mimeType || "image/jpeg";
+
+          return new File(
+            [blob],
+            image.originalName || `image-${image.id}.jpg`,
+            { type: mimeType },
+          );
+        }),
+      );
+
+      const groups = await requestAutoGroup(files, undefined, "variant-family");
+      const assignments = buildWorkspaceVariantAssignments(selectedWorkspaceImages, groups);
+
+      for (const assignment of assignments) {
+        const response = await apiRequest("POST", "/api/images/assign-group-batch", {
+          imageIds: assignment.imageIds,
+          productGroupId: assignment.productGroupId,
+          primaryImageId: assignment.primaryImageId,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save regrouped product "${assignment.label}"`);
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/images"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      setSelectedIds(new Set());
+
+      toast({
+        title: "Variants sorted",
+        description: `Grouped ${selectedWorkspaceImages.length} image${selectedWorkspaceImages.length !== 1 ? "s" : ""} into ${assignments.length} product${assignments.length !== 1 ? "s" : ""}.`,
+      });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Failed to sort variants";
+      toast({
+        title: "Variant sorting failed",
+        description,
+        variant: "destructive",
+      });
+    } finally {
+      setIsVariantSorting(false);
+    }
+  }, [queryClient, selectedWorkspaceImages, toast]);
+
   return (
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
       <header className="h-14 flex items-center justify-between px-4 shrink-0 bg-transparent z-10 relative">
@@ -601,6 +687,21 @@ export default function Home() {
                         >
                           <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
                           {selectedIds.size === images.length ? "Deselect All" : "Select All"}
+                        </Button>
+
+                        <Button
+                          data-testid="button-sort-variants"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSortVariants}
+                          disabled={selectedWorkspaceImages.length < 2 || isVariantSorting}
+                        >
+                          {isVariantSorting ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <BrainCircuit className="w-3.5 h-3.5 mr-1.5" />
+                          )}
+                          Sort Variants
                         </Button>
 
                         <Button

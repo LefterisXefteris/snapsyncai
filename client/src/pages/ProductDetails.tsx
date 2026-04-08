@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@shared/routes";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -70,6 +71,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
   const [pickerUploading, setPickerUploading] = useState(false);
+  const [pickerDragActive, setPickerDragActive] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const editBackgroundMutation = useEditBackground();
   const generatePhotoshootMutation = useGeneratePhotoshoot();
@@ -219,6 +221,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       setPickerUploading(false);
     }
   };
+
+  const normalizePickerFiles = (files: FileList | File[]) => filterImageLikeFiles(files);
 
   const handleApplyBackground = () => {
     if (!bgEditKey) return;
@@ -623,7 +627,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               </CardHeader>
 
               {/* Library picker dialog — redesigned */}
-              <Dialog open={showLibraryPicker} onOpenChange={(open) => { setShowLibraryPicker(open); if (!open) { setPickerSelected(new Set()); setPickerSearch(""); setPickerTab("library"); } }}>
+              <Dialog open={showLibraryPicker} onOpenChange={(open) => { setShowLibraryPicker(open); if (!open) { setPickerSelected(new Set()); setPickerSearch(""); setPickerTab("library"); setPickerDragActive(false); } }}>
                 <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
                   {/* Header */}
                   <div className="px-6 pt-5 pb-4 border-b border-border/50 shrink-0">
@@ -757,15 +761,39 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         accept="image/*"
                         className="hidden"
                         onChange={e => {
-                          const files = Array.from(e.target.files ?? []);
-                          if (files.length) handlePickerFiles(files);
+                          const files = normalizePickerFiles(e.target.files ?? []);
+                          if (files.length) {
+                            handlePickerFiles(files);
+                          } else {
+                            toast({ title: "No valid images found", description: "Please upload PNG, JPG, WEBP, GIF, HEIC, or AVIF files.", variant: "destructive" });
+                          }
                           e.target.value = "";
                         }}
                       />
                       <div
-                        className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${pickerUploading ? "border-primary/50 bg-primary/5 cursor-default" : "border-border hover:border-primary/60 hover:bg-primary/5"}`}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/")); if (files.length && !pickerUploading) handlePickerFiles(files); }}
+                        className={`w-full max-w-md border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${pickerUploading ? "border-primary/50 bg-primary/5 cursor-default" : pickerDragActive ? "border-primary bg-primary/10" : "border-border hover:border-primary/60 hover:bg-primary/5"}`}
+                        onDragOver={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!pickerUploading) setPickerDragActive(true);
+                        }}
+                        onDragLeave={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setPickerDragActive(false);
+                        }}
+                        onDrop={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setPickerDragActive(false);
+                          if (pickerUploading) return;
+                          const files = normalizePickerFiles(e.dataTransfer.files);
+                          if (files.length) {
+                            handlePickerFiles(files);
+                          } else {
+                            toast({ title: "No valid images found", description: "Please drop image files (PNG, JPG, WEBP, GIF, HEIC, AVIF).", variant: "destructive" });
+                          }
+                        }}
                         onClick={() => { if (!pickerUploading) uploadInputRef.current?.click(); }}
                       >
                         {pickerUploading ? (
