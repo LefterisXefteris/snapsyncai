@@ -20,12 +20,14 @@ When users bulk-upload up to 200 images, an AI agent visually identifies which i
 - Single "Confirm & Analyze All" button triggers full AI analysis on all groups at once
 - Add a simple one-click action in the workspace to sort uploaded images into product families automatically
 - The button language should make the outcome obvious: same product variants get sorted under one product
+- Workspace success states must be truthful and visually obvious — no claiming a sort happened if no meaningful family merges occurred
 
 ### Product scope
 - Clothing/fashion is the priority — optimize grouping accuracy for clothing first
 - Other product categories (electronics, furniture, etc.) should work but may be less accurate initially
 - Same product in different colors = one product group (treat as variants, group together)
 - Same product in different sizes, materials, prints, washes, and camera angles = one product group when the base design is clearly the same
+- Different graphics, distinct silhouettes, and different base garments should usually remain separate even when the shoot styling is similar
 - Unmatched/low-confidence images — Claude's discretion on solo groups vs unsorted bucket
 - Working assumption: when genuinely uncertain, prefer separate groups over destructive over-merging
 
@@ -52,6 +54,8 @@ When users bulk-upload up to 200 images, an AI agent visually identifies which i
 - User's pain point: dragging 200 images one by one takes too long — this should feel like "upload and done"
 - The agent should recognize clothing items from different angles as the same product (front, back, detail shots)
 - The agent should collapse large batches of variant-heavy uploads into the true underlying product count as closely as possible
+- The next quality step should focus on apparel-family identity: cut, silhouette, construction, and graphic treatment — not just color or generic category
+- The system needs repeatable evaluation examples so grouping quality can improve intentionally instead of by guesswork
 - Live progress: groups appearing one by one as the agent works, not a spinner-then-reveal
 - "Smart suggest" model: agent does the heavy lifting, user just reviews and tweaks
 

@@ -129,16 +129,17 @@ Plans:
   2. Suggested groupings are presented to the user for review — user can split, merge, or rearrange before confirming
   3. After the user confirms groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
   4. The existing manual drag-and-drop grouping flow remains available as an alternative
-**Plans**: 5 plans
+**Plans**: 6 plans
 Plans:
 - [x] 07-01-PLAN.md — SSE auto-grouping endpoint with batched GPT-5.2 vision calls
 - [x] 07-02-PLAN.md — useAutoGroup hook + mode choice UI + live group streaming
 - [x] 07-03-PLAN.md — AI labels on group cards + Confirm & Analyze All button
 - [ ] 07-04-PLAN.md — Human verification of all 4 success criteria
-- [ ] 07-05-PLAN.md — One-click variant-family grouping button + stronger same-product merge behavior
+- [x] 07-05-PLAN.md — One-click variant-family grouping button + stronger same-product merge behavior
+- [ ] 07-06-PLAN.md — Strengthen apparel-family grouping quality + truthful workspace review feedback
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Drag-and-Drop UI | 4/5 | In Progress|  |
 | 6. Product Detail AI Content | 3/3 | Complete | 2026-04-02 |
-| 7. AI Auto-Grouping Agent | 0/4 | Not started | - |
+| 7. AI Auto-Grouping Agent | 4/6 | In Progress | - |
