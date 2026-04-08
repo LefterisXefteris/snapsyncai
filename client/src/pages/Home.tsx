@@ -79,6 +79,7 @@ export default function Home() {
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const [instagramPostImageId, setInstagramPostImageId] = useState<number | null>(null);
   const [isVariantSorting, setIsVariantSorting] = useState(false);
+  const [recentlyMergedGroupIds, setRecentlyMergedGroupIds] = useState<Set<string>>(new Set());
   const [amazonLwaClientId, setAmazonLwaClientId] = useState("");
   const [amazonLwaClientSecret, setAmazonLwaClientSecret] = useState("");
   const [amazonLwaRefreshToken, setAmazonLwaRefreshToken] = useState("");
@@ -240,6 +241,16 @@ export default function Home() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [toast, queryClient]);
+
+  useEffect(() => {
+    if (recentlyMergedGroupIds.size === 0) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setRecentlyMergedGroupIds(new Set());
+    }, 12000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [recentlyMergedGroupIds]);
 
   const handleInstagramConnect = () => {
     if (!instagramAccessToken.trim()) {
@@ -504,11 +515,13 @@ export default function Home() {
 
       await queryClient.invalidateQueries({ queryKey: ["/api/images"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/images"], type: "active" });
+      setRecentlyMergedGroupIds(new Set(assignments.filter((item) => item.imageIds.length > 1).map((item) => item.productGroupId)));
       setSelectedIds(new Set());
 
       toast({
         title: "Variants sorted",
-        description: `Merged ${summary.mergedImages} image${summary.mergedImages !== 1 ? "s" : ""} into ${summary.mergedGroups} product famil${summary.mergedGroups === 1 ? "y" : "ies"}${summary.unmergedImages > 0 ? `, leaving ${summary.unmergedImages} separate.` : "."}`,
+        description: `Merged ${summary.mergedImages} image${summary.mergedImages !== 1 ? "s" : ""} into ${summary.mergedGroups} product famil${summary.mergedGroups === 1 ? "y" : "ies"}${summary.unmergedImages > 0 ? `, leaving ${summary.unmergedImages} separate.` : "."} Look for the highlighted cards.`,
       });
     } catch (error) {
       const description = error instanceof Error ? error.message : "Failed to sort variants";
@@ -806,6 +819,7 @@ export default function Home() {
                                 views={entry.views}
                                 index={idx}
                                 selected={selectedIds.has(entry.primary.id)}
+                                highlighted={!!entry.primary.productGroupId && recentlyMergedGroupIds.has(entry.primary.productGroupId)}
                                 onSelect={handleSelect}
                                 instagramConnected={!!instagramStatus?.connected}
                                 onInstagramPost={openInstagramPostDialog}

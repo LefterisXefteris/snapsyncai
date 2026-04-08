@@ -34,12 +34,13 @@ interface ImageCardProps {
   views?: Image[];        // other images of the same product
   index: number;
   selected?: boolean;
+  highlighted?: boolean;
   onSelect?: (id: number, selected: boolean) => void;
   instagramConnected?: boolean;
   onInstagramPost?: (imageId: number) => void;
 }
 
-export const ImageCard = memo(function ImageCard({ image, views = [], index, selected, onSelect }: ImageCardProps) {
+export const ImageCard = memo(function ImageCard({ image, views = [], index, selected, highlighted = false, onSelect }: ImageCardProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const deleteMutation = useDeleteImage();
@@ -91,7 +92,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
   return (
     <div
-      className="group relative flex flex-col overflow-hidden rounded-xl bg-card border shadow-sm hover:shadow-md transition-all animate-in fade-in duration-300 cursor-pointer"
+      className={`group relative flex flex-col overflow-hidden rounded-xl bg-card border shadow-sm hover:shadow-md transition-all animate-in fade-in duration-300 cursor-pointer ${highlighted ? "ring-2 ring-emerald-500/70 border-emerald-500/50 shadow-emerald-500/10" : ""}`}
       data-testid={`card-product-${image.id}`}
       style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
       onClick={(e) => {
@@ -121,6 +122,11 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         </div>
 
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
+          {highlighted && (
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/40 text-emerald-600 bg-white/90 dark:bg-black/40 dark:text-emerald-300">
+              Merged
+            </Badge>
+          )}
           {hasViews && (
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-white/20 text-white/70 bg-black/40">
               {allImages.length} views
