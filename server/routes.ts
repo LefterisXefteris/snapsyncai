@@ -1864,6 +1864,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const id = Number(req.params.id);
       const userId = getUserId(req);
+      const shouldProxy = req.query.proxy === "1";
 
       // Always fetch image record to check ownership and storageUrl
       const image = await storage.getImage(id);
@@ -1871,28 +1872,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "Image not found" });
       }
 
-      // Fast path: redirect to Supabase Storage URL (persistent, CDN-cached)
-      if ((image as any).storageUrl) {
+      // Fast path for normal image tags: redirect to Supabase Storage URL.
+      // Some client flows need same-origin bytes (e.g. blob fetches), so allow
+      // an explicit proxy mode that streams through this route instead.
+      if ((image as any).storageUrl && !shouldProxy) {
         return res.redirect(302, (image as any).storageUrl);
       }
 
-      // Medium path: serve from in-memory buffer if available
-      const cached = imageBuffers.get(id);
-      if (cached) {
-        res.set({
-          'Content-Type': image.mimeType,
-          'Content-Length': cached.length.toString(),
-          'Cache-Control': 'public, max-age=604800, immutable',
-        });
-        return res.send(cached);
-      }
-
-      // Slow path: load base64 from DB (legacy images)
-      if (!image.imageData) {
+      const buffer = await loadImageBuffer(image);
+      if (!buffer) {
         return res.status(404).json({ message: "Image data not found" });
       }
-      const buffer = Buffer.from(image.imageData, 'base64');
-      setImageBuffer(id, buffer); // cache for next time (within this server lifetime)
 
       res.set({
         'Content-Type': image.mimeType,

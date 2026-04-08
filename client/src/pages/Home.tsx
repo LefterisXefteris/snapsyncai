@@ -476,7 +476,7 @@ export default function Home() {
     try {
       const files = await Promise.all(
         selectedWorkspaceImages.map(async (image) => {
-          const response = await fetch(`/api/images/${image.id}/file`, {
+          const response = await fetch(`/api/images/${image.id}/file?proxy=1`, {
             credentials: "include",
           });
 
