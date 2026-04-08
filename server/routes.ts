@@ -111,6 +111,7 @@ type AutoGroupInputImage = {
   base64: string;
   mimeType: string;
   filename: string;
+  descriptor?: string;
 };
 type AutoGroupOutput = {
   label: string;
@@ -137,6 +138,9 @@ async function runAutoGrouping(
     const globalOffset = batchIdx * BATCH_SIZE;
 
     const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
+    const imageSummary = batch
+      .map((img, idx) => `Image ${idx}: ${img.descriptor || img.filename}`)
+      .join("\n");
 
     const imageContent = batch.map((img) => ({
       type: "image_url" as const,
@@ -144,7 +148,10 @@ async function runAutoGrouping(
     }));
 
     const userContent = [
-      { type: "text" as const, text: `Group these ${batch.length} product images by product. Image indices are 0-${batch.length - 1} in the order shown. JSON only.` },
+      {
+        type: "text" as const,
+        text: `Group these ${batch.length} product images by product family. Image indices are 0-${batch.length - 1} in the order shown. Use the metadata below as supporting context, but trust the visuals first.\n\n${imageSummary}\n\nJSON only.`,
+      },
       ...imageContent,
     ];
 
@@ -3490,6 +3497,12 @@ Rules:
           base64: buffer.toString("base64"),
           mimeType: image.mimeType,
           filename: image.originalName,
+          descriptor: [
+            image.title ? `title: ${image.title}` : null,
+            image.category ? `category: ${image.category}` : null,
+            image.mainCategory ? `main category: ${image.mainCategory}` : null,
+            image.originalName ? `filename: ${image.originalName}` : null,
+          ].filter(Boolean).join(" | "),
         };
       });
 

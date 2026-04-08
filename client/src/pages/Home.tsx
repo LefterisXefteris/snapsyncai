@@ -26,7 +26,7 @@ import type { Image } from "@shared/schema";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages } from "@/lib/workspace-variant-sort";
+import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages, summarizeWorkspaceVariantAssignments } from "@/lib/workspace-variant-sort";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Home() {
@@ -480,8 +480,17 @@ export default function Home() {
       const data = await response.json() as { groups: Array<{ label: string; imageIndices: number[]; confidence: "high" | "medium" | "low" }> };
       const groups = data.groups;
       const assignments = buildWorkspaceVariantAssignments(selectedWorkspaceImages, groups);
+      const summary = summarizeWorkspaceVariantAssignments(assignments, selectedWorkspaceImages.length);
 
-      for (const assignment of assignments) {
+      if (summary.mergedGroups === 0) {
+        toast({
+          title: "No variants merged",
+          description: "The AI did not find any confident multi-image product families in this selection yet. Try a smaller batch of closely related products.",
+        });
+        return;
+      }
+
+      for (const assignment of assignments.filter((item) => item.imageIds.length > 1)) {
         const response = await apiRequest("POST", "/api/images/assign-group-batch", {
           imageIds: assignment.imageIds,
           productGroupId: assignment.productGroupId,
@@ -499,7 +508,7 @@ export default function Home() {
 
       toast({
         title: "Variants sorted",
-        description: `Grouped ${selectedWorkspaceImages.length} image${selectedWorkspaceImages.length !== 1 ? "s" : ""} into ${assignments.length} product${assignments.length !== 1 ? "s" : ""}.`,
+        description: `Merged ${summary.mergedImages} image${summary.mergedImages !== 1 ? "s" : ""} into ${summary.mergedGroups} product famil${summary.mergedGroups === 1 ? "y" : "ies"}${summary.unmergedImages > 0 ? `, leaving ${summary.unmergedImages} separate.` : "."}`,
       });
     } catch (error) {
       const description = error instanceof Error ? error.message : "Failed to sort variants";

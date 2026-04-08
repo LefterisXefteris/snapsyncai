@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildWorkspaceVariantAssignments,
   collectSelectedWorkspaceImages,
+  summarizeWorkspaceVariantAssignments,
 } from "../client/src/lib/workspace-variant-sort.ts";
 
 test("collectSelectedWorkspaceImages includes grouped views when a product card is selected", () => {
@@ -57,5 +58,32 @@ test("buildWorkspaceVariantAssignments maps AI groups back to image ids and pres
     primaryImageId: 13,
     imageIds: [13],
     label: "pants-front.jpg",
+  });
+});
+
+test("summarizeWorkspaceVariantAssignments reports real merges separately from singles", () => {
+  const summary = summarizeWorkspaceVariantAssignments(
+    [
+      {
+        productGroupId: "group-1",
+        primaryImageId: 10,
+        imageIds: [10, 11, 12],
+        label: "Graphic Tee",
+      },
+      {
+        productGroupId: "group-2",
+        primaryImageId: 13,
+        imageIds: [13],
+        label: "Pants",
+      },
+    ],
+    4,
+  );
+
+  assert.deepEqual(summary, {
+    totalGroups: 2,
+    mergedGroups: 1,
+    mergedImages: 3,
+    unmergedImages: 1,
   });
 });

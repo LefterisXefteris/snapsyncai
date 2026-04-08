@@ -13,6 +13,13 @@ export interface WorkspaceVariantAssignment {
   label: string;
 }
 
+export interface WorkspaceVariantAssignmentSummary {
+  totalGroups: number;
+  mergedGroups: number;
+  mergedImages: number;
+  unmergedImages: number;
+}
+
 export function collectSelectedWorkspaceImages(
   entries: WorkspaceProductEntry[],
   selectedIds: Set<number>,
@@ -80,6 +87,21 @@ export function buildWorkspaceVariantAssignments(
   }
 
   return assignments;
+}
+
+export function summarizeWorkspaceVariantAssignments(
+  assignments: WorkspaceVariantAssignment[],
+  totalImageCount: number,
+): WorkspaceVariantAssignmentSummary {
+  const mergedAssignments = assignments.filter((assignment) => assignment.imageIds.length > 1);
+  const mergedImages = mergedAssignments.reduce((count, assignment) => count + assignment.imageIds.length, 0);
+
+  return {
+    totalGroups: assignments.length,
+    mergedGroups: mergedAssignments.length,
+    mergedImages,
+    unmergedImages: Math.max(totalImageCount - mergedImages, 0),
+  };
 }
 
 function uniqueImageIds(imageIds: number[]) {
