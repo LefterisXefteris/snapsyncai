@@ -26,7 +26,6 @@ import type { Image } from "@shared/schema";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { requestAutoGroup } from "@/hooks/use-auto-group";
 import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages } from "@/lib/workspace-variant-sort";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -474,28 +473,12 @@ export default function Home() {
     setIsVariantSorting(true);
 
     try {
-      const files = await Promise.all(
-        selectedWorkspaceImages.map(async (image) => {
-          const response = await fetch(`/api/images/${image.id}/file?proxy=1`, {
-            credentials: "include",
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to load ${image.originalName || `image ${image.id}`}`);
-          }
-
-          const blob = await response.blob();
-          const mimeType = blob.type || image.mimeType || "image/jpeg";
-
-          return new File(
-            [blob],
-            image.originalName || `image-${image.id}.jpg`,
-            { type: mimeType },
-          );
-        }),
-      );
-
-      const groups = await requestAutoGroup(files, undefined, "variant-family");
+      const response = await apiRequest("POST", "/api/images/auto-group-existing", {
+        imageIds: selectedWorkspaceImages.map((image) => image.id),
+        mode: "variant-family",
+      });
+      const data = await response.json() as { groups: Array<{ label: string; imageIndices: number[]; confidence: "high" | "medium" | "low" }> };
+      const groups = data.groups;
       const assignments = buildWorkspaceVariantAssignments(selectedWorkspaceImages, groups);
 
       for (const assignment of assignments) {

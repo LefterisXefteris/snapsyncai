@@ -105,6 +105,131 @@ async function runWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T,
   return results;
 }
 
+type AutoGroupMode = "default" | "variant-family";
+type AutoGroupInputImage = {
+  index: number;
+  base64: string;
+  mimeType: string;
+  filename: string;
+};
+type AutoGroupOutput = {
+  label: string;
+  imageIndices: number[];
+  confidence: string;
+  familyKey?: string;
+};
+
+async function runAutoGrouping(
+  inputImages: AutoGroupInputImage[],
+  productContext?: string,
+  mode: AutoGroupMode = "default",
+): Promise<AutoGroupOutput[]> {
+  const BATCH_SIZE = 15;
+  const batches: Array<typeof inputImages> = [];
+  for (let i = 0; i < inputImages.length; i += BATCH_SIZE) {
+    batches.push(inputImages.slice(i, i + BATCH_SIZE));
+  }
+
+  const allGroups: AutoGroupOutput[] = [];
+
+  for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+    const batch = batches[batchIdx];
+    const globalOffset = batchIdx * BATCH_SIZE;
+
+    const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
+
+    const imageContent = batch.map((img) => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+    }));
+
+    const userContent = [
+      { type: "text" as const, text: `Group these ${batch.length} product images by product. Image indices are 0-${batch.length - 1} in the order shown. JSON only.` },
+      ...imageContent,
+    ];
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      response_format: { type: "json_object" },
+      max_completion_tokens: 2000,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) continue;
+
+    let parsed: { groups: Array<{ label: string; familyKey?: string; imageIndices: number[]; confidence: string }> };
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      continue;
+    }
+
+    for (const group of parsed.groups) {
+      allGroups.push(canonicalizeAutoGroup({
+        label: group.label,
+        familyKey: group.familyKey,
+        imageIndices: group.imageIndices.map((i) => i + globalOffset),
+        confidence: group.confidence,
+      }));
+    }
+  }
+
+  let finalGroups = mergeAutoGroupsByFamily(allGroups);
+
+  if (batches.length > 1 && finalGroups.length > 0) {
+    const mergeSystemPrompt = buildAutoGroupMergePrompt(mode);
+
+    const groupSummary = finalGroups
+      .map((g, i) => `Group ${i}: label="${g.label}", familyKey="${g.familyKey || ""}" (${g.imageIndices.length} images)`)
+      .join("\n");
+
+    const mergeResponse = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      response_format: { type: "json_object" },
+      max_completion_tokens: 1000,
+      messages: [
+        { role: "system", content: mergeSystemPrompt },
+        { role: "user", content: `Here are the groups to merge if applicable:\n${groupSummary}\n\nJSON only.` },
+      ],
+    });
+
+    const mergeContent = mergeResponse.choices[0]?.message?.content;
+    if (mergeContent) {
+      try {
+        const mergeParsed: { mergedGroups: Array<{ label: string; familyKey?: string; sourceGroupIds: number[] }> } = JSON.parse(mergeContent);
+        const merged: typeof finalGroups = [];
+        for (const mg of mergeParsed.mergedGroups) {
+          const combinedIndices: number[] = [];
+          let bestConfidence = "low";
+          for (const srcId of mg.sourceGroupIds) {
+            if (finalGroups[srcId]) {
+              combinedIndices.push(...finalGroups[srcId].imageIndices);
+              const confidence = finalGroups[srcId].confidence;
+              if (confidence === "high") bestConfidence = "high";
+              else if (confidence === "medium" && bestConfidence !== "high") bestConfidence = "medium";
+            }
+          }
+          merged.push(canonicalizeAutoGroup({
+            label: mg.label,
+            familyKey: mg.familyKey,
+            imageIndices: combinedIndices,
+            confidence: bestConfidence,
+          }));
+        }
+        finalGroups = mergeAutoGroupsByFamily(merged);
+      } catch {
+        // fall through with existing groups
+      }
+    }
+  }
+
+  return finalGroups;
+}
+
 const SUBSCRIPTION_PRICE_PENCE = 1900;
 
 const CREDIT_PACKS = [
@@ -3283,9 +3408,9 @@ Rules:
   app.post("/api/images/auto-group", requireAuth(), async (req, res) => {
     try {
       const { images: inputImages, productContext, mode = "default" } = req.body as {
-        images: Array<{ index: number; base64: string; mimeType: string; filename: string }>;
+        images: AutoGroupInputImage[];
         productContext?: string;
-        mode?: "default" | "variant-family";
+        mode?: AutoGroupMode;
       };
 
       // Validate input
@@ -3302,112 +3427,7 @@ Rules:
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders();
 
-      const BATCH_SIZE = 15;
-      const batches: Array<typeof inputImages> = [];
-      for (let i = 0; i < inputImages.length; i += BATCH_SIZE) {
-        batches.push(inputImages.slice(i, i + BATCH_SIZE));
-      }
-
-      // Collect all groups from all batches with global index mapping
-      const allGroups: Array<{ label: string; imageIndices: number[]; confidence: string; familyKey?: string }> = [];
-
-      for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-        const batch = batches[batchIdx];
-        const globalOffset = batchIdx * BATCH_SIZE;
-
-        const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
-
-        const imageContent = batch.map((img) => ({
-          type: "image_url" as const,
-          image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-        }));
-
-        const userContent = [
-          { type: "text" as const, text: `Group these ${batch.length} product images by product. Image indices are 0-${batch.length - 1} in the order shown. JSON only.` },
-          ...imageContent,
-        ];
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-5.2",
-          response_format: { type: "json_object" },
-          max_completion_tokens: 2000,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
-          ],
-        });
-
-        const content = response.choices[0]?.message?.content;
-        if (!content) continue;
-
-        let parsed: { groups: Array<{ label: string; familyKey?: string; imageIndices: number[]; confidence: string }> };
-        try {
-          parsed = JSON.parse(content);
-        } catch {
-          continue;
-        }
-
-        // Map batch-local indices to global indices
-        for (const group of parsed.groups) {
-          allGroups.push(canonicalizeAutoGroup({
-            label: group.label,
-            familyKey: group.familyKey,
-            imageIndices: group.imageIndices.map((i) => i + globalOffset),
-            confidence: group.confidence,
-          }));
-        }
-      }
-
-      let finalGroups = mergeAutoGroupsByFamily(allGroups);
-
-      if (batches.length > 1 && finalGroups.length > 0) {
-        const mergeSystemPrompt = buildAutoGroupMergePrompt(mode);
-
-        const groupSummary = finalGroups
-          .map((g, i) => `Group ${i}: label="${g.label}", familyKey="${g.familyKey || ""}" (${g.imageIndices.length} images)`)
-          .join("\n");
-
-        const mergeResponse = await openai.chat.completions.create({
-          model: "gpt-5.2",
-          response_format: { type: "json_object" },
-          max_completion_tokens: 1000,
-          messages: [
-            { role: "system", content: mergeSystemPrompt },
-            { role: "user", content: `Here are the groups to merge if applicable:\n${groupSummary}\n\nJSON only.` },
-          ],
-        });
-
-        const mergeContent = mergeResponse.choices[0]?.message?.content;
-        if (mergeContent) {
-          try {
-            const mergeParsed: { mergedGroups: Array<{ label: string; familyKey?: string; sourceGroupIds: number[] }> } = JSON.parse(mergeContent);
-            // Build merged groups
-            const merged: typeof finalGroups = [];
-            for (const mg of mergeParsed.mergedGroups) {
-              const combinedIndices: number[] = [];
-              let bestConfidence = "low";
-              for (const srcId of mg.sourceGroupIds) {
-                if (finalGroups[srcId]) {
-                  combinedIndices.push(...finalGroups[srcId].imageIndices);
-                  // Escalate confidence: high > medium > low
-                  const c = finalGroups[srcId].confidence;
-                  if (c === "high") bestConfidence = "high";
-                  else if (c === "medium" && bestConfidence !== "high") bestConfidence = "medium";
-                }
-              }
-              merged.push(canonicalizeAutoGroup({
-                label: mg.label,
-                familyKey: mg.familyKey,
-                imageIndices: combinedIndices,
-                confidence: bestConfidence,
-              }));
-            }
-            finalGroups = mergeAutoGroupsByFamily(merged);
-          } catch {
-            // If merge parsing fails, use unmerged groups
-          }
-        }
-      }
+      const finalGroups = await runAutoGrouping(inputImages, productContext, mode);
 
       // Stream each final group as an SSE event
       for (const group of finalGroups) {
@@ -3425,6 +3445,59 @@ Rules:
       } else {
         res.status(500).json({ message: "Failed to auto-group images", error: error.message });
       }
+    }
+  });
+
+  app.post("/api/images/auto-group-existing", requireAuth(), async (req, res) => {
+    try {
+      const sessionId = getUserId(req);
+      const { imageIds, productContext, mode = "variant-family" } = req.body as {
+        imageIds: number[];
+        productContext?: string;
+        mode?: AutoGroupMode;
+      };
+
+      if (!Array.isArray(imageIds) || imageIds.length < 2) {
+        return res.status(400).json({ message: "At least 2 image IDs are required" });
+      }
+      if (imageIds.length > 200) {
+        return res.status(400).json({ message: "Maximum 200 images allowed" });
+      }
+
+      const existingImages = await storage.getImagesByIds(imageIds);
+      const imagesById = new Map(existingImages.map((image) => [image.id, image]));
+      const orderedImages = imageIds
+        .map((imageId) => imagesById.get(imageId))
+        .filter((image): image is NonNullable<typeof image> => !!image);
+
+      if (orderedImages.length !== imageIds.length) {
+        return res.status(404).json({ message: "Some selected images could not be found" });
+      }
+
+      const unauthorizedImage = orderedImages.find((image) => image.sessionId !== sessionId);
+      if (unauthorizedImage) {
+        return res.status(403).json({ message: "Some selected images do not belong to this workspace" });
+      }
+
+      const inputImages = await runWithConcurrency(orderedImages, 6, async (image, index) => {
+        const buffer = await loadImageBuffer(image);
+        if (!buffer) {
+          throw new Error(`Image data not found for ${image.originalName || `image ${image.id}`}`);
+        }
+
+        return {
+          index,
+          base64: buffer.toString("base64"),
+          mimeType: image.mimeType,
+          filename: image.originalName,
+        };
+      });
+
+      const groups = await runAutoGrouping(inputImages, productContext, mode);
+      res.json({ groups });
+    } catch (error: any) {
+      console.error("auto-group-existing error:", error);
+      res.status(500).json({ message: "Failed to auto-group existing images", error: error.message });
     }
   });
 

@@ -126,6 +126,16 @@ export const api = {
       //   mode?: "default" | "variant-family"
       // }
     },
+    autoGroupExisting: {
+      method: 'POST' as const,
+      path: '/api/images/auto-group-existing' as const,
+      // Request body:
+      // {
+      //   imageIds: number[],
+      //   productContext?: string,
+      //   mode?: "default" | "variant-family"
+      // }
+    },
   },
   etsy: {
     status: {
