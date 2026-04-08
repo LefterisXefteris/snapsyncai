@@ -12,7 +12,7 @@ import { db } from "./db";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 import { uploadImageToStorage } from "./supabaseClient";
-import { buildAutoGroupMergePrompt, buildAutoGroupSystemPrompt, canonicalizeAutoGroup, mergeAutoGroupsByFamily } from "./auto-group-utils";
+import { buildAutoGroupMergePrompt, buildAutoGroupSystemPrompt, buildCandidateBucketKey, canonicalizeAutoGroup, mergeAutoGroupsByFamily } from "./auto-group-utils";
 import { resolveUploadProcessingMode } from "./uploadLanggraph";
 import { title } from "process";
 
@@ -118,6 +118,7 @@ type AutoGroupOutput = {
   imageIndices: number[];
   confidence: string;
   familyKey?: string;
+  descriptor?: string;
 };
 
 async function runAutoGrouping(
@@ -126,72 +127,109 @@ async function runAutoGrouping(
   mode: AutoGroupMode = "default",
 ): Promise<AutoGroupOutput[]> {
   const BATCH_SIZE = 15;
-  const batches: Array<typeof inputImages> = [];
-  for (let i = 0; i < inputImages.length; i += BATCH_SIZE) {
-    batches.push(inputImages.slice(i, i + BATCH_SIZE));
+  const bucketMap = new Map<string, AutoGroupInputImage[]>();
+
+  for (const image of inputImages) {
+    const bucketKey = buildCandidateBucketKey(
+      [image.filename, image.descriptor].filter(Boolean).join(" "),
+      mode,
+    );
+    const bucket = bucketMap.get(bucketKey) ?? [];
+    bucket.push(image);
+    bucketMap.set(bucketKey, bucket);
   }
 
   const allGroups: AutoGroupOutput[] = [];
+  const buckets = Array.from(bucketMap.values()).sort((left, right) => {
+    const leftIndex = Math.min(...left.map((image) => image.index));
+    const rightIndex = Math.min(...right.map((image) => image.index));
+    return leftIndex - rightIndex;
+  });
 
-  for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-    const batch = batches[batchIdx];
-    const globalOffset = batchIdx * BATCH_SIZE;
-
-    const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
-    const imageSummary = batch
-      .map((img, idx) => `Image ${idx}: ${img.descriptor || img.filename}`)
-      .join("\n");
-
-    const imageContent = batch.map((img) => ({
-      type: "image_url" as const,
-      image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-    }));
-
-    const userContent = [
-      {
-        type: "text" as const,
-        text: `Group these ${batch.length} product images by product family. Image indices are 0-${batch.length - 1} in the order shown. Use the metadata below as supporting context, but trust the visuals first.\n\n${imageSummary}\n\nJSON only.`,
-      },
-      ...imageContent,
-    ];
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2000,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-    });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) continue;
-
-    let parsed: { groups: Array<{ label: string; familyKey?: string; imageIndices: number[]; confidence: string }> };
-    try {
-      parsed = JSON.parse(content);
-    } catch {
+  for (const bucket of buckets) {
+    if (bucket.length === 1) {
+      const solo = bucket[0];
+      allGroups.push(canonicalizeAutoGroup({
+        label: solo.filename.replace(/\.[^/.]+$/, "") || `Product ${solo.index + 1}`,
+        familyKey: undefined,
+        imageIndices: [solo.index],
+        confidence: "low",
+        descriptor: solo.descriptor,
+      }));
       continue;
     }
 
-    for (const group of parsed.groups) {
-      allGroups.push(canonicalizeAutoGroup({
-        label: group.label,
-        familyKey: group.familyKey,
-        imageIndices: group.imageIndices.map((i) => i + globalOffset),
-        confidence: group.confidence,
+    const batches: Array<AutoGroupInputImage[]> = [];
+    for (let i = 0; i < bucket.length; i += BATCH_SIZE) {
+      batches.push(bucket.slice(i, i + BATCH_SIZE));
+    }
+
+    for (const batch of batches) {
+      const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
+      const imageSummary = batch
+        .map((img, idx) => `Image ${idx}: ${img.descriptor || img.filename}`)
+        .join("\n");
+
+      const imageContent = batch.map((img) => ({
+        type: "image_url" as const,
+        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
       }));
+
+      const userContent = [
+        {
+          type: "text" as const,
+          text: `Group these ${batch.length} product images by product family. Image indices are 0-${batch.length - 1} in the order shown. Use the metadata below as supporting context, but trust the visuals first.\n\n${imageSummary}\n\nJSON only.`,
+        },
+        ...imageContent,
+      ];
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2000,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) continue;
+
+      let parsed: { groups: Array<{ label: string; familyKey?: string; imageIndices: number[]; confidence: string }> };
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        continue;
+      }
+
+      for (const group of parsed.groups) {
+        const groupDescriptors = group.imageIndices
+          .map((imageIndex) => batch[imageIndex]?.descriptor || batch[imageIndex]?.filename)
+          .filter(Boolean)
+          .slice(0, 4)
+          .join(" || ");
+
+        allGroups.push(canonicalizeAutoGroup({
+          label: group.label,
+          familyKey: group.familyKey,
+          imageIndices: group.imageIndices
+            .map((imageIndex) => batch[imageIndex]?.index)
+            .filter((imageIndex): imageIndex is number => typeof imageIndex === "number"),
+          confidence: group.confidence,
+          descriptor: groupDescriptors,
+        }));
+      }
     }
   }
 
   let finalGroups = mergeAutoGroupsByFamily(allGroups);
 
-  if (batches.length > 1 && finalGroups.length > 0) {
+  if ((buckets.length > 1 || inputImages.length > BATCH_SIZE) && finalGroups.length > 1) {
     const mergeSystemPrompt = buildAutoGroupMergePrompt(mode);
 
     const groupSummary = finalGroups
-      .map((g, i) => `Group ${i}: label="${g.label}", familyKey="${g.familyKey || ""}" (${g.imageIndices.length} images)`)
+      .map((g, i) => `Group ${i}: label="${g.label}", familyKey="${g.familyKey || ""}", descriptors="${g.descriptor || ""}" (${g.imageIndices.length} images)`)
       .join("\n");
 
     const mergeResponse = await openai.chat.completions.create({
@@ -225,6 +263,10 @@ async function runAutoGrouping(
             familyKey: mg.familyKey,
             imageIndices: combinedIndices,
             confidence: bestConfidence,
+            descriptor: mg.sourceGroupIds
+              .map((srcId) => finalGroups[srcId]?.descriptor)
+              .filter(Boolean)
+              .join(" || "),
           }));
         }
         finalGroups = mergeAutoGroupsByFamily(merged);
