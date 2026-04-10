@@ -157,6 +157,6 @@ Plans:
   5. `COHERE_API_KEY` is recorded as a deploy blocker in STATE.md (mirroring the Phase 3 ENCRYPTION_KEY precedent)
 **Plans**: 3 plans
 Plans:
-- [ ] 08-01-PLAN.md — Install cohere-ai + add embedding-utils (clusterByCosine, embedImagesCohere) + unit tests
+- [x] 08-01-PLAN.md — Install cohere-ai + add embedding-utils (clusterByCosine, embedImagesCohere) + unit tests
 - [ ] 08-02-PLAN.md — Rewrite runAutoGrouping with Cohere primary path + filename-only fallback + propagate fallbackUsed signal
 - [ ] 08-03-PLAN.md — Client fallback banner + toast + STATE.md deploy blocker + human verification checkpoint

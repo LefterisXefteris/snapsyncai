@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-04-06T21:38:48.545Z"
-last_activity: 2026-04-06
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-10T20:50:38.637Z"
+last_activity: 2026-04-10
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 2
-  total_plans: 14
-  completed_plans: 12
+  total_plans: 19
+  completed_plans: 15
   percent: 20
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 Phase: 1 of 4 (Credit Idempotency)
 Plan: 2 of 2 in current phase (Phase 1 COMPLETE)
 Status: Phase complete — ready for verification
-Last activity: 2026-04-06
+Last activity: 2026-04-10
 
 Progress: [██░░░░░░░░] 20%
 
@@ -62,6 +62,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 07-ai-auto-grouping-agent P01 | 2 | 2 tasks | 2 files |
 | Phase 07-ai-auto-grouping-agent P02 | 2 | 2 tasks | 2 files |
 | Phase 07-ai-auto-grouping-agent P03 | 1 | 1 tasks | 1 files |
+| Phase 08-embeddings-variant-clustering P01 | 5 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,13 @@ Recent decisions affecting current work:
 - [Phase 07-ai-auto-grouping-agent]: OffscreenCanvas + createImageBitmap for image resizing: avoids DOM canvas, works in Web Workers
 - [Phase 07-ai-auto-grouping-agent]: allItemsRef stores flat FileItem[] snapshot at auto-group start for stable index mapping
 - [Phase 07-ai-auto-grouping-agent]: GroupWithLabel extends Group locally for optional label/confidence without modifying shared interface
+- [Phase 08-embeddings-variant-clustering]: Use CohereClientV2 (not legacy CohereClient) — only V2 exposes outputDimension and batched images in cohere-ai@8.x
+- [Phase 08-embeddings-variant-clustering]: Default Matryoshka embedding dimension = 512 (bandwidth/quality sweet spot)
+- [Phase 08-embeddings-variant-clustering]: getCohereClient checks cache before env var so tests can inject without COHERE_API_KEY
+
+### Roadmap Evolution
+
+- Phase 8 added: Replace VLM variant sorter with embeddings-based clustering
 
 ### Pending Todos
 
@@ -104,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T21:38:48.542Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-04-10T20:50:28.731Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
