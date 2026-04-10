@@ -17,13 +17,18 @@ type MinimalCohereClient = {
 let cachedClient: MinimalCohereClient | null = null;
 
 export function getCohereClient(): MinimalCohereClient {
+  // If a client is already cached (e.g. injected by tests via
+  // __setCohereClientForTests, or constructed by a prior call), return it
+  // without re-reading the env var. This lets integration tests stub the
+  // client without also having to set COHERE_API_KEY.
+  if (cachedClient) {
+    return cachedClient;
+  }
   const token = process.env.COHERE_API_KEY;
   if (!token) {
     throw new Error("COHERE_API_KEY is not set");
   }
-  if (!cachedClient) {
-    cachedClient = new CohereClientV2({ token });
-  }
+  cachedClient = new CohereClientV2({ token });
   return cachedClient;
 }
 
