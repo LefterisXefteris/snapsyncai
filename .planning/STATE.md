@@ -113,6 +113,7 @@ None yet.
 
 - PAY-01 fix requires atomic read-modify-write on `paidSessions.used` — concurrent requests from verify + webhook must not both pass the check; implementation must use a single UPDATE WHERE or SELECT FOR UPDATE
 - CRED-01–05 require a new `ENCRYPTION_KEY` env var to be provisioned in Vercel before Phase 3 deploys — deployment without it would break all platform connection writes
+- Phase 8 requires `COHERE_API_KEY` env var provisioned in Vercel before deploy — deployment without it causes every auto-group call to fall back to filename-only grouping with a warning banner. Treat this identically to the Phase 3 `ENCRYPTION_KEY` deploy prerequisite.
 
 ## Session Continuity
 

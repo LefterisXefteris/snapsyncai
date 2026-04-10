@@ -488,8 +488,22 @@ export default function Home() {
         imageIds: selectedWorkspaceImages.map((image) => image.id),
         mode: "variant-family",
       });
-      const data = await response.json() as { groups: Array<{ label: string; imageIndices: number[]; confidence: "high" | "medium" | "low" }> };
+      const data = await response.json() as {
+        groups: Array<{ label: string; imageIndices: number[]; confidence: "high" | "medium" | "low" }>;
+        fallbackUsed?: boolean;
+        fallbackReason?: string;
+      };
       const groups = data.groups;
+
+      if (data.fallbackUsed) {
+        toast({
+          title: "Grouped by filename",
+          description:
+            "AI grouping was unavailable so we used filename matching instead. Results may be less accurate — try again in a moment.",
+          variant: "destructive",
+        });
+      }
+
       const assignments = buildWorkspaceVariantAssignments(selectedWorkspaceImages, groups);
       const summary = summarizeWorkspaceVariantAssignments(assignments, selectedWorkspaceImages.length);
 
