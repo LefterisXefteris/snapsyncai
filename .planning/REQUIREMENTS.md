@@ -48,6 +48,13 @@
 - [x] **GROUP-03**: After confirming groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
 - [x] **GROUP-04**: Manual drag-and-drop grouping flow remains available as an alternative to AI auto-grouping
 
+### Embeddings Variant Clustering (Phase 8)
+
+- [ ] **CLUSTER-01**: Same-product / variant image grouping uses Cohere Embed v4 multimodal embeddings plus threshold-based cosine similarity + union-find clustering, replacing the GPT-5.2 vision batch loop inside `runAutoGrouping`
+- [ ] **CLUSTER-02**: End-to-end latency for the auto-group flow on a 50-image input is less than or equal to the existing VLM path baseline (verified during human checkpoint)
+- [ ] **CLUSTER-03**: Cost per 100 images is strictly less than the GPT-5.2 vision baseline (verified via Cohere dashboard usage readout during human checkpoint)
+- [ ] **CLUSTER-04**: On any Cohere failure after one retry with exponential backoff (including timeouts), `runAutoGrouping` falls back to filename-only grouping via the existing `mergeAutoGroupsByFamily` apparel-token merger and surfaces a "Grouped by filename — AI grouping unavailable" warning banner (pre-upload SSE flow) or destructive toast (workspace Sort Variants flow)
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -76,13 +83,17 @@
 | GROUP-02 | Phase 7 | Complete |
 | GROUP-03 | Phase 7 | Complete |
 | GROUP-04 | Phase 7 | Complete |
+| CLUSTER-01 | Phase 8 | Pending |
+| CLUSTER-02 | Phase 8 | Pending |
+| CLUSTER-03 | Phase 8 | Pending |
+| CLUSTER-04 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 8 total
-- Product UX requirements: 4 total
-- Mapped to phases: 12
+- Product UX requirements: 8 total
+- Mapped to phases: 16
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-04-06 — added GROUP-01 through GROUP-04 for Phase 7*
+*Last updated: 2026-04-10 — added CLUSTER-01 through CLUSTER-04 for Phase 8*

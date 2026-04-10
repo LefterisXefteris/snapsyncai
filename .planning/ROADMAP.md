@@ -143,3 +143,20 @@ Plans:
 | 5. Drag-and-Drop UI | 4/5 | In Progress|  |
 | 6. Product Detail AI Content | 3/3 | Complete | 2026-04-02 |
 | 7. AI Auto-Grouping Agent | 4/6 | In Progress | - |
+| 8. Embeddings Variant Clustering | 0/? | Not started | - |
+
+### Phase 8: Embeddings Variant Clustering
+**Goal**: Replace the GPT-5.2 vision call inside `runAutoGrouping` with a Cohere Embed v4 + cosine-similarity + union-find clustering pipeline so same-product / variant images are grouped faster and cheaper, with a filename-only fallback path (via the existing apparel-token merger) and a user-visible warning banner when the fallback runs
+**Depends on**: Phase 7
+**Requirements**: CLUSTER-01, CLUSTER-02, CLUSTER-03, CLUSTER-04
+**Success Criteria** (what must be TRUE):
+  1. The auto-group SSE and JSON endpoints no longer call GPT-5.2 vision inside their hot path — embeddings + clustering produce the groups
+  2. End-to-end latency on 50 images is at most the prior VLM baseline and cost per 100 images is strictly lower (verified during human checkpoint)
+  3. When Cohere fails (any non-2xx after 1 retry, including timeouts), grouping falls back to filename-only bucketing via `mergeAutoGroupsByFamily` — NOT to the VLM path
+  4. The fallback path surfaces a warning banner above the group cards (pre-upload flow) and a destructive toast (workspace Sort Variants flow) so the user knows grouping degraded
+  5. `COHERE_API_KEY` is recorded as a deploy blocker in STATE.md (mirroring the Phase 3 ENCRYPTION_KEY precedent)
+**Plans**: 3 plans
+Plans:
+- [ ] 08-01-PLAN.md — Install cohere-ai + add embedding-utils (clusterByCosine, embedImagesCohere) + unit tests
+- [ ] 08-02-PLAN.md — Rewrite runAutoGrouping with Cohere primary path + filename-only fallback + propagate fallbackUsed signal
+- [ ] 08-03-PLAN.md — Client fallback banner + toast + STATE.md deploy blocker + human verification checkpoint
