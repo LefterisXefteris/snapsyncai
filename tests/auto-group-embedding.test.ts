@@ -1,12 +1,42 @@
-import test, { beforeEach } from "node:test";
+import test, { before, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { runAutoGrouping } from "../server/routes.ts";
-import {
-  __resetCohereClientForTests,
-  __setCohereClientForTests,
-} from "../server/cohere-client.ts";
-import { __setTimeoutMsForTests } from "../server/embedding-utils.ts";
+// server/routes.ts transitively imports server/db.ts, which throws at import
+// time if DATABASE_URL is unset. Provide a dummy connection string BEFORE the
+// dynamic imports below so the module graph can load. The pg Pool never
+// actually connects in these tests — all code paths under test stop at the
+// in-memory Cohere stub.
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+process.env.COHERE_API_KEY = process.env.COHERE_API_KEY ?? "test-key";
+// The replit_integrations OpenAI client instantiates at import time and throws
+// without an API key. The embedding-based runAutoGrouping body no longer calls
+// OpenAI, but the module graph still references the client. A dummy key keeps
+// the constructor happy.
+process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? "sk-test-dummy";
+// server/supabaseClient.ts calls createClient at import time and validates the
+// URL. Plug dummy values so the module graph can load — no network call is made
+// on the runAutoGrouping path under test.
+process.env.SUPABASE_URL =
+  process.env.SUPABASE_URL ?? "https://test.supabase.co";
+process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? "test-anon";
+
+type RunAutoGrouping = typeof import("../server/routes.ts")["runAutoGrouping"];
+type CohereSeam = typeof import("../server/cohere-client.ts");
+type EmbeddingUtils = typeof import("../server/embedding-utils.ts");
+
+let runAutoGrouping: RunAutoGrouping;
+let __resetCohereClientForTests: CohereSeam["__resetCohereClientForTests"];
+let __setCohereClientForTests: CohereSeam["__setCohereClientForTests"];
+let __setTimeoutMsForTests: EmbeddingUtils["__setTimeoutMsForTests"];
+
+before(async () => {
+  ({ runAutoGrouping } = await import("../server/routes.ts"));
+  ({ __resetCohereClientForTests, __setCohereClientForTests } = await import(
+    "../server/cohere-client.ts"
+  ));
+  ({ __setTimeoutMsForTests } = await import("../server/embedding-utils.ts"));
+});
 
 // Integration tests for runAutoGrouping — covers the three paths 08-02 owns:
 // success, retry-then-success, retry-exhausted-then-fallback, plus the

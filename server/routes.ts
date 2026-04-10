@@ -12,7 +12,12 @@ import { db } from "./db";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 import { uploadImageToStorage } from "./supabaseClient";
-import { buildAutoGroupMergePrompt, buildAutoGroupSystemPrompt, buildCandidateBucketKey, canonicalizeAutoGroup, mergeAutoGroupsByFamily } from "./auto-group-utils";
+import { canonicalizeAutoGroup, mergeAutoGroupsByFamily } from "./auto-group-utils";
+import {
+  embedImagesCohere,
+  clusterByCosine,
+  getAutoGroupTimeoutMs,
+} from "./embedding-utils";
 import { resolveUploadProcessingMode } from "./uploadLanggraph";
 import { title } from "process";
 
@@ -121,162 +126,127 @@ type AutoGroupOutput = {
   descriptor?: string;
 };
 
-async function runAutoGrouping(
+export interface RunAutoGroupingResult {
+  groups: AutoGroupOutput[];
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+}
+
+export async function runAutoGrouping(
   inputImages: AutoGroupInputImage[],
   productContext?: string,
   mode: AutoGroupMode = "default",
-): Promise<AutoGroupOutput[]> {
-  const BATCH_SIZE = 15;
-  const bucketMap = new Map<string, AutoGroupInputImage[]>();
+): Promise<RunAutoGroupingResult> {
+  // productContext is retained as a parameter for call-site stability even
+  // though the embedding path does not consume it. Removing it would ripple
+  // through both endpoint handlers for no benefit — revisit only if a future
+  // phase wires product context into Cohere's multimodal embed call.
+  void productContext;
 
-  for (const image of inputImages) {
-    const bucketKey = buildCandidateBucketKey(
-      [image.filename, image.descriptor].filter(Boolean).join(" "),
-      mode,
-    );
-    const bucket = bucketMap.get(bucketKey) ?? [];
-    bucket.push(image);
-    bucketMap.set(bucketKey, bucket);
-  }
+  // Thresholds from 08-RESEARCH.md pitfalls 1 & 2. variant-family is looser
+  // because the user has explicitly said "these are variants"; default is
+  // more conservative to avoid over-merging distinct products.
+  const threshold = mode === "variant-family" ? 0.78 : 0.88;
+  const MAX_ATTEMPTS = 2; // initial + 1 retry per 08-CONTEXT.md
+  const BACKOFF_MS = 750;
+  const TIMEOUT_MS = getAutoGroupTimeoutMs();
 
-  const allGroups: AutoGroupOutput[] = [];
-  const buckets = Array.from(bucketMap.values()).sort((left, right) => {
-    const leftIndex = Math.min(...left.map((image) => image.index));
-    const rightIndex = Math.min(...right.map((image) => image.index));
-    return leftIndex - rightIndex;
-  });
+  async function attemptEmbeddingPath(): Promise<AutoGroupOutput[]> {
+    const embedInputs = inputImages.map((img) => ({
+      base64: img.base64,
+      mimeType: img.mimeType,
+    }));
 
-  for (const bucket of buckets) {
-    if (bucket.length === 1) {
-      const solo = bucket[0];
-      allGroups.push(canonicalizeAutoGroup({
-        label: solo.filename.replace(/\.[^/.]+$/, "") || `Product ${solo.index + 1}`,
-        familyKey: undefined,
-        imageIndices: [solo.index],
-        confidence: "low",
-        descriptor: solo.descriptor,
-      }));
-      continue;
-    }
-
-    const batches: Array<AutoGroupInputImage[]> = [];
-    for (let i = 0; i < bucket.length; i += BATCH_SIZE) {
-      batches.push(bucket.slice(i, i + BATCH_SIZE));
-    }
-
-    for (const batch of batches) {
-      const systemPrompt = buildAutoGroupSystemPrompt(mode, productContext);
-      const imageSummary = batch
-        .map((img, idx) => `Image ${idx}: ${img.descriptor || img.filename}`)
-        .join("\n");
-
-      const imageContent = batch.map((img) => ({
-        type: "image_url" as const,
-        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-      }));
-
-      const userContent = [
-        {
-          type: "text" as const,
-          text: `Group these ${batch.length} product images by product family. Image indices are 0-${batch.length - 1} in the order shown. Use the metadata below as supporting context, but trust the visuals first.\n\n${imageSummary}\n\nJSON only.`,
-        },
-        ...imageContent,
-      ];
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-5.2",
-        response_format: { type: "json_object" },
-        max_completion_tokens: 2000,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-      });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) continue;
-
-      let parsed: { groups: Array<{ label: string; familyKey?: string; imageIndices: number[]; confidence: string }> };
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        continue;
-      }
-
-      for (const group of parsed.groups) {
-        const groupDescriptors = group.imageIndices
-          .map((imageIndex) => batch[imageIndex]?.descriptor || batch[imageIndex]?.filename)
-          .filter(Boolean)
-          .slice(0, 4)
-          .join(" || ");
-
-        allGroups.push(canonicalizeAutoGroup({
-          label: group.label,
-          familyKey: group.familyKey,
-          imageIndices: group.imageIndices
-            .map((imageIndex) => batch[imageIndex]?.index)
-            .filter((imageIndex): imageIndex is number => typeof imageIndex === "number"),
-          confidence: group.confidence,
-          descriptor: groupDescriptors,
-        }));
-      }
-    }
-  }
-
-  let finalGroups = mergeAutoGroupsByFamily(allGroups);
-
-  if ((buckets.length > 1 || inputImages.length > BATCH_SIZE) && finalGroups.length > 1) {
-    const mergeSystemPrompt = buildAutoGroupMergePrompt(mode);
-
-    const groupSummary = finalGroups
-      .map((g, i) => `Group ${i}: label="${g.label}", familyKey="${g.familyKey || ""}", descriptors="${g.descriptor || ""}" (${g.imageIndices.length} images)`)
-      .join("\n");
-
-    const mergeResponse = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      response_format: { type: "json_object" },
-      max_completion_tokens: 1000,
-      messages: [
-        { role: "system", content: mergeSystemPrompt },
-        { role: "user", content: `Here are the groups to merge if applicable:\n${groupSummary}\n\nJSON only.` },
-      ],
+    // Promise.race does not cancel the losing promise. Track the setTimeout
+    // handle and clear it on the success path so we don't pin the event loop
+    // open for the full TIMEOUT_MS on every successful call.
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error(`Cohere embed timeout after ${TIMEOUT_MS}ms`)),
+        TIMEOUT_MS,
+      );
     });
 
-    const mergeContent = mergeResponse.choices[0]?.message?.content;
-    if (mergeContent) {
-      try {
-        const mergeParsed: { mergedGroups: Array<{ label: string; familyKey?: string; sourceGroupIds: number[] }> } = JSON.parse(mergeContent);
-        const merged: typeof finalGroups = [];
-        for (const mg of mergeParsed.mergedGroups) {
-          const combinedIndices: number[] = [];
-          let bestConfidence = "low";
-          for (const srcId of mg.sourceGroupIds) {
-            if (finalGroups[srcId]) {
-              combinedIndices.push(...finalGroups[srcId].imageIndices);
-              const confidence = finalGroups[srcId].confidence;
-              if (confidence === "high") bestConfidence = "high";
-              else if (confidence === "medium" && bestConfidence !== "high") bestConfidence = "medium";
-            }
-          }
-          merged.push(canonicalizeAutoGroup({
-            label: mg.label,
-            familyKey: mg.familyKey,
-            imageIndices: combinedIndices,
-            confidence: bestConfidence,
-            descriptor: mg.sourceGroupIds
-              .map((srcId) => finalGroups[srcId]?.descriptor)
-              .filter(Boolean)
-              .join(" || "),
-          }));
-        }
-        finalGroups = mergeAutoGroupsByFamily(merged);
-      } catch {
-        // fall through with existing groups
+    let vectors: number[][];
+    try {
+      vectors = await Promise.race([
+        embedImagesCohere(embedInputs),
+        timeoutPromise,
+      ]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+
+    const clusters = clusterByCosine(vectors, threshold);
+
+    return clusters.map((indicesInInputOrder) => {
+      const clusterImages = indicesInInputOrder.map((i) => inputImages[i]);
+      const descriptorBlob = clusterImages
+        .map((img) => [img.descriptor, img.filename].filter(Boolean).join(" "))
+        .slice(0, 4)
+        .join(" || ");
+
+      const head = clusterImages[0];
+      return canonicalizeAutoGroup({
+        label:
+          head.filename.replace(/\.[^/.]+$/, "") ||
+          `Product ${head.index + 1}`,
+        familyKey: undefined,
+        imageIndices: clusterImages.map((img) => img.index),
+        confidence: clusterImages.length > 1 ? "high" : "low",
+        descriptor: descriptorBlob,
+      });
+    });
+  }
+
+  // Primary path: Cohere with 1 retry.
+  //
+  // IMPORTANT: on the embedding success path we return clusters AS-IS. Do NOT
+  // call mergeAutoGroupsByFamily here — per 08-CONTEXT.md the apparel filename
+  // merger is the FALLBACK path, not a second pass on top of embeddings. Running
+  // it on embedding clusters would let filename heuristics re-cluster images that
+  // the semantic model already grouped, which defeats the point of replacing the
+  // VLM.
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const groups = await attemptEmbeddingPath();
+      return { groups, fallbackUsed: false };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(
+        `[auto-group] Cohere attempt ${attempt}/${MAX_ATTEMPTS} failed: ${lastError.message}`,
+      );
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS * attempt));
       }
     }
   }
 
-  return finalGroups;
+  // Fallback: filename-only bucketing via the existing apparel-token merger.
+  // NOT the VLM path — per 08-CONTEXT.md the dead VLM code is left untouched
+  // elsewhere but is never reached from this function.
+  console.error(
+    `[auto-group] Cohere failed after ${MAX_ATTEMPTS} attempts — falling back to filename grouping. Last error: ${lastError?.message}`,
+  );
+
+  const fallbackSeedGroups: AutoGroupOutput[] = inputImages.map((img) =>
+    canonicalizeAutoGroup({
+      label: img.filename.replace(/\.[^/.]+$/, "") || `Product ${img.index + 1}`,
+      familyKey: undefined,
+      imageIndices: [img.index],
+      confidence: "low",
+      descriptor: img.descriptor,
+    }),
+  );
+  const mergedFallback = mergeAutoGroupsByFamily(fallbackSeedGroups);
+
+  return {
+    groups: mergedFallback,
+    fallbackUsed: true,
+    fallbackReason: lastError?.message ?? "Cohere unavailable",
+  };
 }
 
 const SUBSCRIPTION_PRICE_PENCE = 1900;
@@ -3476,15 +3446,27 @@ Rules:
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders();
 
-      const finalGroups = await runAutoGrouping(inputImages, productContext, mode);
+      const { groups: finalGroups, fallbackUsed, fallbackReason } =
+        await runAutoGrouping(inputImages, productContext, mode);
+
+      // If the embedding path failed, tell the client BEFORE any group events
+      // so the UI can render the filename-only-fallback banner from Plan 08-03.
+      if (fallbackUsed) {
+        res.write(
+          `data: ${JSON.stringify({ type: "fallback", reason: fallbackReason ?? "unknown" })}\n\n`,
+        );
+      }
 
       // Stream each final group as an SSE event
       for (const group of finalGroups) {
         res.write(`data: ${JSON.stringify({ type: "group", group })}\n\n`);
       }
 
-      // Send done event
-      res.write(`data: ${JSON.stringify({ type: "done", totalGroups: finalGroups.length })}\n\n`);
+      // Send done event (fallbackUsed also echoed here for clients that only
+      // listen for the terminal event).
+      res.write(
+        `data: ${JSON.stringify({ type: "done", totalGroups: finalGroups.length, fallbackUsed })}\n\n`,
+      );
       res.end();
     } catch (error: any) {
       console.error("auto-group error:", error);
@@ -3548,8 +3530,9 @@ Rules:
         };
       });
 
-      const groups = await runAutoGrouping(inputImages, productContext, mode);
-      res.json({ groups });
+      const { groups, fallbackUsed, fallbackReason } =
+        await runAutoGrouping(inputImages, productContext, mode);
+      res.json({ groups, fallbackUsed, fallbackReason });
     } catch (error: any) {
       console.error("auto-group-existing error:", error);
       res.status(500).json({ message: "Failed to auto-group existing images", error: error.message });
