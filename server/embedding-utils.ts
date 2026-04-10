@@ -14,6 +14,19 @@ export const COHERE_EMBED_BATCH_SIZE = 96;
 // Plan 08-02 may revisit after live quality checks.
 export const COHERE_EMBED_DIMENSION = 512;
 
+// Module-level timeout for the runAutoGrouping embedding path. Lives here (not
+// in routes.ts) so integration tests can override it without waiting for a real
+// 60s Promise.race to unblock. Plan 08-02 wiring layer consumes this via
+// getAutoGroupTimeoutMs() so the default and the test override share one source.
+let autoGroupTimeoutMs = 60_000;
+export function getAutoGroupTimeoutMs(): number {
+  return autoGroupTimeoutMs;
+}
+// Test-only: override the module-level timeout. Restore to 60_000 after use.
+export function __setTimeoutMsForTests(ms: number): void {
+  autoGroupTimeoutMs = ms;
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
     throw new Error(
