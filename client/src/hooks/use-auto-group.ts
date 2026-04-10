@@ -10,12 +10,18 @@ export interface AutoGroupResult {
   confidence: "high" | "medium" | "low";
 }
 
+export interface FallbackInfo {
+  used: boolean;
+  reason?: string;
+}
+
 export interface UseAutoGroupReturn {
   startGrouping: (files: FileItem[], productContext?: string, mode?: AutoGroupMode) => void;
   isGrouping: boolean;
   groups: AutoGroupResult[];
   totalGroups: number | null;
   error: string | null;
+  fallbackInfo: FallbackInfo;
   cancel: () => void;
 }
 
@@ -85,6 +91,7 @@ export async function requestAutoGroup(
     signal?: AbortSignal;
     onGroup?: (group: AutoGroupResult) => void;
     onDone?: (totalGroups: number) => void;
+    onFallback?: (info: FallbackInfo) => void;
   },
 ): Promise<AutoGroupResult[]> {
   const imagePayloads = await buildAutoGroupImagePayloads(files);
@@ -129,7 +136,18 @@ export async function requestAutoGroup(
       if (json.type === "group") {
         groups.push(json.group);
         options?.onGroup?.(json.group);
+      } else if (json.type === "fallback") {
+        options?.onFallback?.({
+          used: true,
+          reason: typeof json.reason === "string" ? json.reason : undefined,
+        });
       } else if (json.type === "done") {
+        if (json.fallbackUsed === true) {
+          options?.onFallback?.({
+            used: true,
+            reason: typeof json.fallbackReason === "string" ? json.fallbackReason : undefined,
+          });
+        }
         options?.onDone?.(json.totalGroups);
       } else if (json.type === "error") {
         throw new Error(json.message || "Auto-grouping failed");
@@ -145,6 +163,7 @@ export function useAutoGroup(): UseAutoGroupReturn {
   const [groups, setGroups] = useState<AutoGroupResult[]>([]);
   const [totalGroups, setTotalGroups] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fallbackInfo, setFallbackInfo] = useState<FallbackInfo>({ used: false });
   const controllerRef = useRef<AbortController | null>(null);
 
   function cancel() {
@@ -159,6 +178,7 @@ export function useAutoGroup(): UseAutoGroupReturn {
     setGroups([]);
     setTotalGroups(null);
     setError(null);
+    setFallbackInfo({ used: false });
 
     // Abort any previous request
     controllerRef.current?.abort();
@@ -175,6 +195,8 @@ export function useAutoGroup(): UseAutoGroupReturn {
             signal: controller.signal,
             onGroup: (group) => setGroups((prev) => [...prev, group]),
             onDone: (groupCount) => setTotalGroups(groupCount),
+            onFallback: (info) =>
+              setFallbackInfo((prev) => (prev.used ? prev : { used: true, reason: info.reason })),
           },
         );
 
@@ -198,6 +220,7 @@ export function useAutoGroup(): UseAutoGroupReturn {
     groups,
     totalGroups,
     error,
+    fallbackInfo,
     cancel,
   };
 }

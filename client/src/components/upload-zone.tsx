@@ -12,7 +12,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2 } from "lucide-react";
+import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isImageLikeFile } from "@/lib/image-file-utils";
 import { useUploadImages } from "@/hooks/use-images";
@@ -281,6 +281,14 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   const { loadStaged, saveBlob, deleteBlob, saveGroups, clearAll } = useStagedImages();
   const autoGroup = useAutoGroup();
   const allItemsRef = useRef<FileItem[]>([]);
+  const [fallbackBannerDismissed, setFallbackBannerDismissed] = useState(false);
+
+  // Re-show the fallback banner each time a new auto-group run begins.
+  useEffect(() => {
+    if (autoGroup.isGrouping) {
+      setFallbackBannerDismissed(false);
+    }
+  }, [autoGroup.isGrouping]);
 
   // Revoke object URLs on unmount
   const urlsRef = useRef<string[]>([]);
@@ -728,6 +736,33 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           <p className="text-xs text-white/80">
             AI identified <span className="font-medium text-white">{groups.length} products</span> — review groupings below, then confirm
           </p>
+        </div>
+      )}
+
+      {/* Fallback warning banner — shown when AI embedding grouping degraded to filename-only */}
+      {mode === "auto" && autoGroup.fallbackInfo.used && !fallbackBannerDismissed && (
+        <div
+          role="alert"
+          data-testid="auto-group-fallback-banner"
+          className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30"
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-100">
+              Grouped by filename — AI grouping unavailable
+            </p>
+            <p className="text-[11px] text-amber-100/70 mt-0.5">
+              These groupings are less accurate than usual. Review carefully before confirming.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFallbackBannerDismissed(true)}
+            aria-label="Dismiss warning"
+            className="text-amber-100/60 hover:text-amber-100 transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
