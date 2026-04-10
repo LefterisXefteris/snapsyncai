@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-04-10T20:50:38.637Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-04-10T20:59:44.492Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 19
-  completed_plans: 15
+  completed_plans: 16
   percent: 20
 ---
 
@@ -63,6 +63,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 07-ai-auto-grouping-agent P02 | 2 | 2 tasks | 2 files |
 | Phase 07-ai-auto-grouping-agent P03 | 1 | 1 tasks | 1 files |
 | Phase 08-embeddings-variant-clustering P01 | 5 min | 3 tasks | 5 files |
+| Phase 08-embeddings-variant-clustering P02 | ~10 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Recent decisions affecting current work:
 - [Phase 08-embeddings-variant-clustering]: Use CohereClientV2 (not legacy CohereClient) — only V2 exposes outputDimension and batched images in cohere-ai@8.x
 - [Phase 08-embeddings-variant-clustering]: Default Matryoshka embedding dimension = 512 (bandwidth/quality sweet spot)
 - [Phase 08-embeddings-variant-clustering]: getCohereClient checks cache before env var so tests can inject without COHERE_API_KEY
+- [Phase 08-embeddings-variant-clustering]: runAutoGrouping embedding path: variant-family threshold 0.78, default 0.88, MAX_ATTEMPTS=2, BACKOFF_MS=750 linear, TIMEOUT_MS=60000
+- [Phase 08-embeddings-variant-clustering]: fallbackUsed signal propagated via new SSE 'fallback' event + JSON response field; embedding success path does NOT run mergeAutoGroupsByFamily (fallback-only)
+- [Phase 08-embeddings-variant-clustering]: Promise.race timeout handle is explicitly cleared in finally to prevent event-loop pinning on successful embed calls
 
 ### Roadmap Evolution
 
@@ -112,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T20:50:28.731Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-04-10T20:59:44.489Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None

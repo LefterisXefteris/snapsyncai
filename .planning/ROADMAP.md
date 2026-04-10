@@ -158,5 +158,5 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 08-01-PLAN.md — Install cohere-ai + add embedding-utils (clusterByCosine, embedImagesCohere) + unit tests
-- [ ] 08-02-PLAN.md — Rewrite runAutoGrouping with Cohere primary path + filename-only fallback + propagate fallbackUsed signal
+- [x] 08-02-PLAN.md — Rewrite runAutoGrouping with Cohere primary path + filename-only fallback + propagate fallbackUsed signal
 - [ ] 08-03-PLAN.md — Client fallback banner + toast + STATE.md deploy blocker + human verification checkpoint

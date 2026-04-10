@@ -51,8 +51,8 @@
 ### Embeddings Variant Clustering (Phase 8)
 
 - [x] **CLUSTER-01**: Same-product / variant image grouping uses Cohere Embed v4 multimodal embeddings plus threshold-based cosine similarity + union-find clustering, replacing the GPT-5.2 vision batch loop inside `runAutoGrouping`
-- [ ] **CLUSTER-02**: End-to-end latency for the auto-group flow on a 50-image input is less than or equal to the existing VLM path baseline (verified during human checkpoint)
-- [ ] **CLUSTER-03**: Cost per 100 images is strictly less than the GPT-5.2 vision baseline (verified via Cohere dashboard usage readout during human checkpoint)
+- [x] **CLUSTER-02**: End-to-end latency for the auto-group flow on a 50-image input is less than or equal to the existing VLM path baseline (verified during human checkpoint)
+- [x] **CLUSTER-03**: Cost per 100 images is strictly less than the GPT-5.2 vision baseline (verified via Cohere dashboard usage readout during human checkpoint)
 - [ ] **CLUSTER-04**: On any Cohere failure after one retry with exponential backoff (including timeouts), `runAutoGrouping` falls back to filename-only grouping via the existing `mergeAutoGroupsByFamily` apparel-token merger and surfaces a "Grouped by filename — AI grouping unavailable" warning banner (pre-upload SSE flow) or destructive toast (workspace Sort Variants flow)
 
 ## Out of Scope
@@ -84,8 +84,8 @@
 | GROUP-03 | Phase 7 | Complete |
 | GROUP-04 | Phase 7 | Complete |
 | CLUSTER-01 | Phase 8 | Complete |
-| CLUSTER-02 | Phase 8 | Pending |
-| CLUSTER-03 | Phase 8 | Pending |
+| CLUSTER-02 | Phase 8 | Complete |
+| CLUSTER-03 | Phase 8 | Complete |
 | CLUSTER-04 | Phase 8 | Pending |
 
 **Coverage:**
