@@ -144,6 +144,7 @@ Plans:
 | 6. Product Detail AI Content | 3/3 | Complete | 2026-04-02 |
 | 7. AI Auto-Grouping Agent | 4/6 | In Progress | - |
 | 8. Embeddings Variant Clustering | 0/? | Not started | - |
+| 9. Manual Grouping-First UX | 0/5 | Not started | - |
 
 ### Phase 8: Embeddings Variant Clustering
 **Goal**: Replace the GPT-5.2 vision call inside `runAutoGrouping` with a Cohere Embed v4 + cosine-similarity + union-find clustering pipeline so same-product / variant images are grouped faster and cheaper, with a filename-only fallback path (via the existing apparel-token merger) and a user-visible warning banner when the fallback runs
@@ -160,3 +161,23 @@ Plans:
 - [x] 08-01-PLAN.md — Install cohere-ai + add embedding-utils (clusterByCosine, embedImagesCohere) + unit tests
 - [x] 08-02-PLAN.md — Rewrite runAutoGrouping with Cohere primary path + filename-only fallback + propagate fallbackUsed signal
 - [ ] 08-03-PLAN.md — Client fallback banner + toast + STATE.md deploy blocker + human verification checkpoint
+
+### Phase 9: Manual Grouping-First UX
+**Goal**: Make manual drag-and-drop the primary grouping UX — fast and frictionless enough that AI auto-sort is an optional secondary button, not the default. Staged groups in IndexedDB are promoted to Supabase as product records one group at a time via the existing POST /api/images/upload groupAsOne=true path, with per-group failure isolation so a single upload error never wipes the user's staging work. The free-text AI prompt and preset group-size controls are permanently removed from the staging UI.
+**Depends on**: Phase 8
+**Requirements**: GROUP-05, GROUP-06, GROUP-07, GROUP-08, GROUP-09, GROUP-10, GROUP-11, GROUP-12
+**Success Criteria** (what must be TRUE):
+  1. On file drop, the user lands directly in manual drag-and-drop mode — no three-card mode chooser appears; AI auto-sort is only reachable as a secondary toolbar button
+  2. The "Custom AI Prompt" textarea, brand-tone selector, per-group maxImages +/- controls, and [1..5] presets toolbar are gone from upload-zone.tsx
+  3. Clicking a thumbnail selects only that one; Shift-click extends a range in visual order across groups; Cmd/Ctrl-click toggles a single thumbnail; selection persists through drag so multi-select batch moves work
+  4. Dropping a dragged thumbnail onto an invalid target (page background, over === null) animates it back to its origin instead of vanishing
+  5. Groups with more than 20 items show an amber "Large group (N) — consider splitting" badge but adding more items is never blocked
+  6. Clicking "Confirm" uploads each group with POST /api/images/upload groupAsOne=true (parallelism capped at 2); successful groups have their IDB blobs removed; failed groups remain in the grid with a red "Retry" button and the user can click to retry without losing work
+  7. A "+ New group" drop target is always visible at the end of the grid and accepts dropped thumbnails to create a new empty group
+**Plans**: 5 plans
+Plans:
+- [ ] 09-01-PLAN.md — Define GROUP-05..12 in REQUIREMENTS.md and fill Phase 9 Goal + Success Criteria in ROADMAP.md
+- [ ] 09-02-PLAN.md — Delete prompt UI, presets, mode chooser, maxImages controls, chunkArray, TONES from upload-zone.tsx
+- [ ] 09-03-PLAN.md — Add useGroupSelection hook (Shift/Cmd-click) + fix snap-back dropAnimation timing
+- [ ] 09-04-PLAN.md — Per-file landing (one group per file), soft large-group warning (threshold 20), verify always-visible "+ New group"
+- [ ] 09-05-PLAN.md — Per-group failure-isolated handleConfirm rewrite with inline retry + human verification checkpoint
