@@ -12,13 +12,11 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, MessageSquare, Mic, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
+import { UploadCloud, Loader2, X, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isImageLikeFile } from "@/lib/image-file-utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 import { useAutoGroup } from "@/hooks/use-auto-group";
@@ -26,23 +24,6 @@ import { useAutoGroup } from "@/hooks/use-auto-group";
 interface GroupWithLabel extends Group {
   label?: string;
   confidence?: "high" | "medium" | "low";
-}
-
-const TONES = [
-  { value: "professional", label: "Professional" },
-  { value: "casual", label: "Casual" },
-  { value: "luxury", label: "Luxury" },
-  { value: "playful", label: "Playful" },
-  { value: "technical", label: "Technical" },
-];
-
-const PRESETS = [1, 2, 3, 4, 5];
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  if (size <= 0) return arr.map(i => [i]);
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
-  return chunks;
 }
 
 // ── Sortable thumbnail (handles within-group sort AND between-group drag) ─────
@@ -118,18 +99,16 @@ function SortableThumbnail({
 
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
-  groupId, groupIdx, items, maxImages, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
-  onAdjustMax, selectedIds, onSelect, label, confidence,
+  groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
+  selectedIds, onSelect, label, confidence,
 }: {
   groupId: string;
   groupIdx: number;
   items: FileItem[];
-  maxImages: number;
   onRemoveItem: (itemId: string) => void;
   onSplit: () => void;
   onDeleteGroup: () => void;
   totalGroups: number;
-  onAdjustMax: (delta: number) => void;
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
   label?: string;
@@ -177,26 +156,6 @@ function DroppableGroup({
           {items.length} {items.length === 1 ? "image" : "images"}
         </span>
         <div className="ml-auto flex items-center gap-1">
-          {/* Per-group max control */}
-          <div className="flex items-center gap-0.5" onPointerDown={e => e.stopPropagation()}>
-            <button
-              onClick={() => onAdjustMax(-1)}
-              className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 transition-colors text-xs font-bold"
-              title="Decrease max images for this product"
-            >
-              −
-            </button>
-            <span className="text-[10px] text-white/60 font-medium w-4 text-center select-none">
-              {maxImages}
-            </span>
-            <button
-              onClick={() => onAdjustMax(+1)}
-              className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 transition-colors text-xs font-bold"
-              title="Increase max images for this product"
-            >
-              +
-            </button>
-          </div>
           {items.length > 1 && (
             <button
               onPointerDown={e => e.stopPropagation()}
@@ -265,17 +224,13 @@ function DroppableNewGroup() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: File[]) => void }) {
-  type GroupingMode = "choosing" | "auto" | "manual";
-  const [mode, setMode] = useState<GroupingMode>("choosing");
   const [groups, setGroups] = useState<GroupWithLabel[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
-  const [globalGroupSize, setGlobalGroupSize] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [productContext, setProductContext] = useState("");
-  const [brandTone, setBrandTone] = useState("professional");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadingQueue, setUploadingQueue] = useState<File[]>([]);
+  const [isAutoSorting, setIsAutoSorting] = useState(false);
   const uploadMutation = useUploadImages();
   const { toast } = useToast();
   const { loadStaged, saveBlob, deleteBlob, saveGroups, clearAll } = useStagedImages();
@@ -312,13 +267,13 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   const sortVariantsIntoProducts = useCallback((items: FileItem[]) => {
     if (items.length === 0) return;
     allItemsRef.current = items;
-    setMode("auto");
-    autoGroup.startGrouping(items, productContext || undefined, "variant-family");
-  }, [autoGroup, productContext]);
+    setIsAutoSorting(true);
+    autoGroup.startGrouping(items, undefined, "variant-family");
+  }, [autoGroup]);
 
   // ── Auto-group: map streamed results to Group[] state ─────────────────────
   useEffect(() => {
-    if (mode !== "auto") return;
+    if (!isAutoSorting) return;
     if (autoGroup.groups.length === 0) return;
 
     const allItems = allItemsRef.current;
@@ -329,37 +284,35 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       items: ag.imageIndices
         .map(idx => allItems[idx])
         .filter(Boolean),
-      maxImages: globalGroupSize,
+      maxImages: Number.MAX_SAFE_INTEGER,
       label: ag.label,
       confidence: ag.confidence,
     })).filter(g => g.items.length > 0);
 
     setGroups(newGroups);
     saveGroups(newGroups);
-  }, [autoGroup.groups.length, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoGroup.groups.length, isAutoSorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-group error → fallback to manual ─────────────────────────────────
+  // ── Auto-group finished (success or idle) ─────────────────────────────────
+  useEffect(() => {
+    if (isAutoSorting && !autoGroup.isGrouping && autoGroup.totalGroups !== null) {
+      setIsAutoSorting(false);
+    }
+  }, [isAutoSorting, autoGroup.isGrouping, autoGroup.totalGroups]);
+
+  // ── Auto-group error → toast + clear sorting flag ─────────────────────────
   useEffect(() => {
     if (autoGroup.error) {
       toast({ title: "Auto-grouping failed", description: autoGroup.error, variant: "destructive" });
-      setMode("manual");
+      setIsAutoSorting(false);
     }
   }, [autoGroup.error]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Reset mode when all images are removed ────────────────────────────────
-  useEffect(() => {
-    if (totalFiles === 0 && mode !== "choosing") setMode("choosing");
-  }, [totalFiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── DnD sensors ─────────────────────────────────────────────────────────────
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
   );
-
-  // ── Find group by item id ──────────────────────────────────────────────────
-  const findGroupByItemId = (itemId: string) =>
-    groups.find(g => g.items.some(i => i.id === itemId));
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveItem(groups.flatMap(g => g.items).find(i => i.id === active.id) ?? null);
@@ -419,7 +372,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           toMove.push(...moved);
         }
         if (toMove.length > 0) {
-          next.push({ id: crypto.randomUUID(), items: toMove, maxImages: globalGroupSize });
+          next.push({ id: crypto.randomUUID(), items: toMove, maxImages: Number.MAX_SAFE_INTEGER });
         }
       } else {
         // Resolve target group: direct group-ID match OR group that owns the hovered thumbnail
@@ -453,22 +406,27 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       return { id: crypto.randomUUID(), file: f, url };
     });
 
-    // When dropping files while still in "choosing" mode, switch to manual
-    // so the groups section and Analyze button become visible immediately.
-    if (mode === "choosing") setMode("manual");
-
     setGroups(prev => {
-      const allItems = [...prev.flatMap(g => g.items), ...newItems];
-      if (allItems.length > 200) return prev;
-      const chunks = chunkArray(allItems, globalGroupSize);
-      const newGroups = chunks.map(items => ({ id: crypto.randomUUID(), items, maxImages: globalGroupSize }));
+      const existingCount = prev.reduce((n, g) => n + g.items.length, 0);
+      if (existingCount + newItems.length > 200) {
+        toast({ title: "Too many images", description: "Max 200 per upload.", variant: "destructive" });
+        return prev;
+      }
+      // Each dropped file becomes its own one-item group, appended to the end.
+      // No rechunking of existing groups — manual-first UX (GROUP-05/06/08).
+      const newGroups: GroupWithLabel[] = newItems.map(item => ({
+        id: crypto.randomUUID(),
+        items: [item],
+        maxImages: Number.MAX_SAFE_INTEGER, // vestigial; kept for IDB back-compat
+      }));
+      const next = [...prev, ...newGroups];
       // Persist new blobs and updated groups (fire-and-forget)
       Promise.all(newItems.map(item => saveBlob(item.id, item.file)))
-        .then(() => saveGroups(newGroups))
+        .then(() => saveGroups(next))
         .catch(err => console.warn('[upload-zone] IDB save failed:', err));
-      return newGroups;
+      return next;
     });
-  }, [mode, globalGroupSize, saveBlob, saveGroups]);
+  }, [toast, saveBlob, saveGroups]);
 
   const handleDropRejected = useCallback(() => {
     toast({
@@ -505,19 +463,6 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     noDragEventsBubbling: true,
   });
 
-  // ── Auto-arrange ───────────────────────────────────────────────────────────
-  const setGlobalGroupSizeAndRechunk = (newSize: number) => {
-    const clamped = Math.max(1, Math.min(20, newSize));
-    setGlobalGroupSize(clamped);
-    setGroups(prev => {
-      const allItems = prev.flatMap(g => g.items);
-      const chunks = chunkArray(allItems, clamped);
-      const newGroups = chunks.map(items => ({ id: crypto.randomUUID(), items, maxImages: clamped }));
-      saveGroups(newGroups); // fire-and-forget
-      return newGroups;
-    });
-  };
-
   // ── Split a group into individual products ─────────────────────────────────
   const splitGroup = (groupId: string) => {
     setGroups(prev => {
@@ -525,7 +470,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       if (idx === -1) return prev;
       const next = [...prev];
       const [group] = next.splice(idx, 1);
-      const singles = group.items.map(item => ({ id: crypto.randomUUID(), items: [item], maxImages: globalGroupSize }));
+      const singles = group.items.map(item => ({ id: crypto.randomUUID(), items: [item], maxImages: Number.MAX_SAFE_INTEGER }));
       next.splice(idx, 0, ...singles);
       saveGroups(next);
       return next;
@@ -539,19 +484,6 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       if (group) group.items.forEach(i => deleteBlob(i.id));
       const next = prev.filter(g => g.id !== groupId);
       saveGroups(next);
-      return next;
-    });
-  };
-
-  // ── Adjust per-group max ───────────────────────────────────────────────────
-  const adjustGroupMax = (groupId: string, delta: number) => {
-    setGroups(prev => {
-      const next = prev.map(g =>
-        g.id === groupId
-          ? { ...g, maxImages: Math.max(1, g.maxImages + delta) }
-          : g
-      );
-      saveGroups(next); // persist the updated maxImages
       return next;
     });
   };
@@ -590,8 +522,6 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         try {
           const data = await uploadMutation.mutateAsync({
             files: group,
-            productContext,
-            brandTone,
             groupAsOne: group.length > 1,
             hideToast: true,
           });
@@ -607,7 +537,6 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
 
     setUploadingQueue([]);
     setIsUploading(false);
-    setProductContext("");
 
     toast({
       title: hasPaid && !hasUnpaid ? "Products Ready" : "Images Uploaded",
@@ -659,69 +588,18 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       </div>
 
-      {/* Mode choice UI */}
-      {totalFiles > 0 && mode === "choosing" && !isUploading && (
-        <div className="p-6 rounded-xl border border-white/[0.08] bg-white/[0.02] space-y-4">
-          <div className="text-center space-y-2">
-            <h3 className="text-sm font-medium text-white">
-              {totalFiles} images ready — how would you like to group them?
-            </h3>
-            <p className="text-xs text-white/40">
-              Each group becomes one product listing
-            </p>
-          </div>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => {
-                const allItems = groups.flatMap(g => g.items);
-                allItemsRef.current = allItems;
-                setMode("auto");
-                autoGroup.startGrouping(allItems, productContext || undefined);
-              }}
-              className="flex-1 max-w-[220px] p-4 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all text-left space-y-2"
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-white">Auto-group with AI</span>
-              </div>
-              <p className="text-[11px] text-white/40">AI identifies products and groups images automatically</p>
-            </button>
-            <button
-              onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
-              className="flex-1 max-w-[220px] p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all text-left space-y-2"
-            >
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-medium text-white">Sort Variants Into Products</span>
-              </div>
-              <p className="text-[11px] text-white/40">Groups the same product family together across colors, sizes, and views</p>
-            </button>
-            <button
-              onClick={() => setMode("manual")}
-              className="flex-1 max-w-[220px] p-4 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/5 hover:border-white/20 transition-all text-left space-y-2"
-            >
-              <div className="flex items-center gap-2">
-                <Images className="w-4 h-4 text-white/60" />
-                <span className="text-sm font-medium text-white">Group manually</span>
-              </div>
-              <p className="text-[11px] text-white/40">Drag and drop images into product groups yourself</p>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Auto-grouping progress */}
-      {mode === "auto" && autoGroup.isGrouping && (
+      {isAutoSorting && autoGroup.isGrouping && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/20">
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
           <div className="flex-1">
             <p className="text-sm font-medium text-white">
-              AI is grouping your images... {autoGroup.groups.length} product{autoGroup.groups.length !== 1 ? 's' : ''} found
+              AI is sorting your variants... {autoGroup.groups.length} product{autoGroup.groups.length !== 1 ? 's' : ''} found
             </p>
             <p className="text-[11px] text-white/40">Groups appear as they are identified</p>
           </div>
           <button
-            onClick={() => { autoGroup.cancel(); setMode("choosing"); }}
+            onClick={() => { autoGroup.cancel(); setIsAutoSorting(false); }}
             className="text-xs text-white/40 hover:text-white/80 transition-colors"
           >
             Cancel
@@ -730,7 +608,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       )}
 
       {/* Auto-grouping completion summary */}
-      {mode === "auto" && !autoGroup.isGrouping && autoGroup.totalGroups !== null && (
+      {!isAutoSorting && autoGroup.totalGroups !== null && !autoGroup.isGrouping && groups.length > 0 && (
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-500/5 border border-green-500/20">
           <CheckCircle2 className="w-4 h-4 text-green-400" />
           <p className="text-xs text-white/80">
@@ -740,7 +618,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       )}
 
       {/* Fallback warning banner — shown when AI embedding grouping degraded to filename-only */}
-      {mode === "auto" && autoGroup.fallbackInfo.used && !fallbackBannerDismissed && (
+      {autoGroup.fallbackInfo.used && !fallbackBannerDismissed && (
         <div
           role="alert"
           data-testid="auto-group-fallback-banner"
@@ -766,8 +644,8 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       )}
 
-      {/* Groups section */}
-      {totalFiles > 0 && !isUploading && (mode === "manual" || (mode === "auto" && (autoGroup.groups.length > 0 || !autoGroup.isGrouping))) && (
+      {/* Groups section — manual-first: renders unconditionally when any files exist */}
+      {totalFiles > 0 && !isUploading && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
 
           {/* ── Toolbar ─────────────────────────────────────────────────── */}
@@ -785,63 +663,19 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                 </div>
               </div>
 
-              <div className="h-4 w-px bg-white/10" />
-
-              {/* Preset buttons */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-white/40 uppercase tracking-wider font-medium hidden sm:block">Per product:</span>
-                <div className="flex gap-0.5">
-                  {PRESETS.map(n => (
-                    <button
-                      key={n}
-                      onClick={() => setGlobalGroupSizeAndRechunk(n)}
-                      className={cn(
-                        "w-7 h-7 rounded-md text-xs font-medium transition-all duration-150",
-                        globalGroupSize === n
-                          ? "bg-primary text-white shadow-sm shadow-primary/30"
-                          : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
-                      )}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Switch to manual (when in auto mode) */}
-              {mode === "auto" && (
-                <button
-                  onClick={() => {
-                    autoGroup.cancel();
-                    setMode("manual");
-                    setGroups(prev => {
-                      const allItems = prev.flatMap(g => g.items);
-                      const manualGroups = chunkArray(allItems, globalGroupSize).map(items => ({
-                        id: crypto.randomUUID(),
-                        items,
-                        maxImages: globalGroupSize,
-                      }));
-                      saveGroups(manualGroups);
-                      return manualGroups;
-                    });
-                  }}
-                  className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white/80 transition-colors"
-                >
-                  Switch to manual
-                </button>
-              )}
-
-              {/* Add more */}
+              {/* Sort Variants — secondary AI button (GROUP-11) */}
               {totalFiles > 1 && (
                 <button
                   onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
-                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                  disabled={isAutoSorting}
+                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-50"
                   title="Sort same-product variants into product families"
                 >
-                  <Package className="w-3 h-3" />
+                  <Sparkles className="w-3 h-3" />
                   <span className="hidden sm:inline">Sort variants</span>
                 </button>
               )}
+
               <button
                 onClick={open}
                 className="ml-auto flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
@@ -854,7 +688,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             {/* Hint */}
             <div className="px-3.5 py-1.5 bg-white/[0.015] border-b border-white/[0.04]">
               <p className="text-[10px] text-white/30">
-                Drag to regroup — click thumbnails to multi-select — presets auto-arrange all products
+                Drag to regroup — click thumbnails to multi-select
               </p>
             </div>
 
@@ -866,14 +700,12 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   groupId={group.id}
                   groupIdx={idx}
                   items={group.items}
-                  maxImages={group.maxImages}
                   label={group.label}
                   confidence={group.confidence}
                   onRemoveItem={removeItem}
                   onSplit={() => splitGroup(group.id)}
                   onDeleteGroup={() => deleteGroup(group.id)}
                   totalGroups={groups.length}
-                  onAdjustMax={(delta) => adjustGroupMax(group.id, delta)}
                   selectedIds={selectedIds}
                   onSelect={toggleSelect}
                 />
@@ -940,40 +772,8 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         </div>
       )}
 
-      {/* AI Prompt + Tone */}
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-white">
-          <MessageSquare className="w-4 h-4 text-primary" />
-          Custom AI Prompt
-        </div>
-        <Textarea
-          data-testid="input-product-context"
-          value={productContext}
-          onChange={e => setProductContext(e.target.value)}
-          placeholder="Custom instructions for SEO, AEO tags, descriptions, etc. E.g., 'Target audience: men 25-45. Focus on durability and classic style.'"
-          className="bg-black/30 border-white/10 text-white text-sm resize-none min-h-[70px]"
-          rows={3}
-        />
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Mic className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Voice:</span>
-          </div>
-          <Select value={brandTone} onValueChange={setBrandTone}>
-            <SelectTrigger data-testid="select-brand-tone" className="w-[140px] h-8 bg-black/30 border-white/10 text-white text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TONES.map(t => (
-                <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
       {/* Analyze / Confirm button */}
-      {!isUploading && (mode === "manual" || (mode === "auto" && !autoGroup.isGrouping && groups.length > 0)) && (
+      {!isUploading && groups.length > 0 && (
         <div className="flex justify-center">
           <ShinyButton
             onClick={handleUpload}
@@ -982,11 +782,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             data-testid="button-upload-preview"
           >
             <UploadCloud className="w-4 h-4 mr-2" />
-            {mode === "auto"
-              ? `Confirm & Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`
-              : groups.length > 0
-                ? `Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`
-                : "Upload & Analyze"}
+            {`Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`}
           </ShinyButton>
         </div>
       )}
