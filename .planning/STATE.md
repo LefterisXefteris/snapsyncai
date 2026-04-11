@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-04-11T08:29:49.177Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-04-11T08:35:21.594Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 24
-  completed_plans: 17
+  completed_plans: 18
   percent: 20
 ---
 
@@ -65,6 +65,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 08-embeddings-variant-clustering P01 | 5 min | 3 tasks | 5 files |
 | Phase 08-embeddings-variant-clustering P02 | ~10 min | 2 tasks | 3 files |
 | Phase 09 P01 | 2 min | 2 tasks | 2 files |
+| Phase 09 P02 | ~3 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,7 @@ Recent decisions affecting current work:
 - [Phase 09]: Phase 9 LARGE_GROUP_THRESHOLD locked at 20 images — soft warning only, no hard cap
 - [Phase 09]: Phase 9 upload path reuses POST /api/images/upload?groupAsOne=true with CONCURRENCY=2 per-group failure isolation
 - [Phase 09]: Phase 9 AI auto-sort stays as secondary toolbar button, not hidden
+- [Phase 09]: Phase 9 upload-zone.tsx stripped of prompt/brand-tone/presets/mode-chooser; new drops append as one-item groups (no rechunking); Sort variants stays as secondary toolbar button
 
 ### Roadmap Evolution
 
@@ -122,6 +124,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T08:29:49.174Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-04-11T08:35:21.591Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
