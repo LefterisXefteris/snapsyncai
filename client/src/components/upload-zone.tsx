@@ -117,7 +117,7 @@ function SortableThumbnail({
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
   groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
-  selectedIds, onSelect, label, confidence,
+  selectedIds, onSelect, label, confidence, isFailed, onRetry,
 }: {
   groupId: string;
   groupIdx: number;
@@ -130,6 +130,8 @@ function DroppableGroup({
   onSelect: (id: string, groupId: string, e: React.MouseEvent) => void;
   label?: string;
   confidence?: "high" | "medium" | "low";
+  isFailed?: boolean;
+  onRetry?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
 
@@ -138,7 +140,9 @@ function DroppableGroup({
       ref={setNodeRef}
       className={cn(
         "relative rounded-xl border transition-all duration-200 overflow-hidden",
-        isOver
+        isFailed
+          ? "border-destructive bg-destructive/[0.06]"
+          : isOver
           ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)] scale-[1.02]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
       )}
@@ -182,6 +186,17 @@ function DroppableGroup({
           </span>
         )}
         <div className="ml-auto flex items-center gap-1">
+          {isFailed && onRetry && (
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={onRetry}
+              data-testid={`retry-group-${groupId}`}
+              className="flex items-center gap-1 text-[10px] text-red-100 bg-red-500/80 hover:bg-red-500 transition-colors px-2 py-0.5 rounded font-medium"
+              title="Retry uploading this product"
+            >
+              <span>Retry</span>
+            </button>
+          )}
           {items.length > 1 && (
             <button
               onPointerDown={e => e.stopPropagation()}
@@ -265,6 +280,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     setSelected,
   } = useGroupSelection(orderedItemIds);
   const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
+  const [failedGroupIds, setFailedGroupIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadingQueue, setUploadingQueue] = useState<File[]>([]);
@@ -586,51 +602,116 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
     });
   };
 
-  // ── Upload ───────────────────────────────────────────────────────────────────
-  const handleUpload = async () => {
+  // ── Confirm / Upload with per-group failure isolation (GROUP-10) ───────────
+  // Each group uploads independently. Successful groups have their IDB blobs
+  // cleared. Failed groups remain in the grid with an inline Retry button.
+  // A single failure never wipes other successful groups.
+  const handleConfirm = async () => {
     if (groups.length === 0) return;
 
-    const snapshot = groups.map(g => g.items.map(i => i.file));
-    const allFiles = snapshot.flat();
+    // Snapshot at start so concurrent state updates don't mutate our plan.
+    const snapshot: GroupWithLabel[] = groups.map(g => ({ ...g, items: [...g.items] }));
+    const allFiles = snapshot.flatMap(g => g.items.map(i => i.file));
 
     setIsUploading(true);
     setUploadProgress({ current: 0, total: snapshot.length });
-    setGroups([]);
-    clearAll(); // fire-and-forget — images are being uploaded, no need to keep staged copies
     setUploadingQueue(allFiles);
 
-    let hasPaid = false;
-    let hasUnpaid = false;
-
+    const failed: GroupWithLabel[] = [];
     const CONCURRENCY = 2;
+
     for (let i = 0; i < snapshot.length; i += CONCURRENCY) {
       const batch = snapshot.slice(i, i + CONCURRENCY);
       await Promise.all(batch.map(async (group) => {
         try {
-          const data = await uploadMutation.mutateAsync({
-            files: group,
-            groupAsOne: group.length > 1,
+          await uploadMutation.mutateAsync({
+            files: group.items.map(it => it.file),
+            groupAsOne: group.items.length > 1,
             hideToast: true,
           });
-          if (data.every((img: any) => img.paymentStatus === "paid")) hasPaid = true;
-          else hasUnpaid = true;
-        } catch (e) {
-          console.error(e);
+          // Per-group success → clear IDB blobs for this group only.
+          for (const it of group.items) {
+            await deleteBlob(it.id);
+          }
+        } catch (err) {
+          console.error("[upload-zone] group upload failed:", err);
+          failed.push(group);
         } finally {
           setUploadProgress(prev => ({ ...prev, current: prev.current + 1 }));
         }
       }));
     }
 
+    // After all batches settle: ONLY failed groups remain in React state + IDB.
+    setGroups(failed);
+    await saveGroups(failed);
+    // CRITICAL: populate failedGroupIds from the settled failed array so
+    // Retry buttons actually render. Without this line GROUP-10 silently
+    // breaks — the user sees failed groups but no affordance to recover.
+    setFailedGroupIds(new Set(failed.map(g => g.id)));
+
     setUploadingQueue([]);
     setIsUploading(false);
 
-    toast({
-      title: hasPaid && !hasUnpaid ? "Products Ready" : "Images Uploaded",
-      description: hasPaid && !hasUnpaid
-        ? `${snapshot.length} product${snapshot.length !== 1 ? "s" : ""} analyzed and ready.`
-        : `${allFiles.length} images uploaded. Subscribe to unlock full descriptions.`,
-    });
+    if (failed.length === 0) {
+      clearAll(); // fire-and-forget — nothing left to stage
+      setFailedGroupIds(new Set());
+      toast({
+        title: "Products Ready",
+        description: `${snapshot.length} product${snapshot.length !== 1 ? "s" : ""} created`,
+      });
+    } else {
+      toast({
+        title: "Some uploads failed",
+        description: `${failed.length} of ${snapshot.length} groups failed. Click Retry on each.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ── Retry a single failed group ────────────────────────────────────────────
+  const retryGroup = async (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    try {
+      await uploadMutation.mutateAsync({
+        files: group.items.map(it => it.file),
+        groupAsOne: group.items.length > 1,
+        hideToast: true,
+      });
+      // Success: clear blobs for every item in this group.
+      for (const it of group.items) {
+        await deleteBlob(it.id);
+      }
+      // Remove this id from failedGroupIds and from groups.
+      setFailedGroupIds(prev => {
+        const next = new Set(prev);
+        next.delete(groupId);
+        return next;
+      });
+      setGroups(prev => {
+        const next = prev.filter(g => g.id !== groupId);
+        if (next.length === 0) {
+          clearAll(); // fire-and-forget
+        } else {
+          saveGroups(next); // fire-and-forget
+        }
+        return next;
+      });
+      toast({
+        title: "Upload successful",
+        description: "Product created.",
+      });
+    } catch (err) {
+      console.error("[upload-zone] retry failed:", err);
+      // Leave failedGroupIds unchanged — the Retry button stays visible.
+      toast({
+        title: "Retry failed",
+        description: "The upload failed again. You can try once more.",
+        variant: "destructive",
+      });
+    }
   };
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -800,6 +881,8 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   totalGroups={groups.length}
                   selectedIds={selectedIds}
                   onSelect={onThumbnailSelect}
+                  isFailed={failedGroupIds.has(group.id)}
+                  onRetry={failedGroupIds.has(group.id) ? () => retryGroup(group.id) : undefined}
                 />
               ))}
               {groups.length > 0 && <DroppableNewGroup />}
@@ -868,13 +951,13 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       {!isUploading && groups.length > 0 && (
         <div className="flex justify-center">
           <ShinyButton
-            onClick={handleUpload}
+            onClick={handleConfirm}
             disabled={groups.length === 0}
             className="w-full sm:w-auto min-w-[200px]"
             data-testid="button-upload-preview"
           >
             <UploadCloud className="w-4 h-4 mr-2" />
-            {`Analyze ${groups.length} Product${groups.length !== 1 ? "s" : ""}`}
+            {`Confirm & Create ${groups.length} Product${groups.length === 1 ? "" : "s"}`}
           </ShinyButton>
         </div>
       )}
