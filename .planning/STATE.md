@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-04-11T08:40:07.572Z"
+stopped_at: Completed 09-04-PLAN.md
+last_updated: "2026-04-11T08:42:57.161Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 20
   percent: 20
 ---
 
@@ -67,6 +67,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 09 P01 | 2 min | 2 tasks | 2 files |
 | Phase 09 P02 | ~3 min | 2 tasks | 1 files |
 | Phase 09 P03 | ~8 min | 2 tasks | 2 files |
+| Phase 09 P04 | ~2 min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 09]: Phase 9 useGroupSelection stays pure — Esc/Cmd+A listeners wired by component effect, not the hook
 - [Phase 09]: Phase 9 handleDragEnd branched: Phase 5 intra-group arrayMove path preserved byte-for-byte, gated on selected.size <= 1; batch/cross-group path handles multi-select
 - [Phase 09]: Phase 9 snap-back fix: explicit 250ms dropAnimation + queueMicrotask-deferred setActiveItem(null) on invalid drop; Cmd+A defers to browser default when focusedGroupId is null
+- [Phase 09]: Phase 9 LARGE_GROUP_THRESHOLD = 20 constant is single source of truth; advisory badge pattern uses amber-100/amber-900 pill with data-testid per group and never blocks interaction
+- [Phase 09]: Phase 9 DroppableNewGroup render gated on groups.length > 0 (not totalFiles > 0) so empty-state does not render a dangling drop target
 
 ### Roadmap Evolution
 
@@ -128,6 +131,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T08:40:05.640Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-04-11T08:42:57.158Z
+Stopped at: Completed 09-04-PLAN.md
 Resume file: None
