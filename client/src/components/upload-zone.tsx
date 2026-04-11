@@ -1,9 +1,10 @@
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   DndContext, DragOverlay, useDroppable,
   MouseSensor, TouchSensor, useSensor, useSensors,
-  type DragEndEvent, type DragStartEvent,
+  defaultDropAnimationSideEffects,
+  type DragEndEvent, type DragStartEvent, type DropAnimation,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -20,6 +21,17 @@ import { ShinyButton } from "@/components/ui/shiny-button";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 import { useAutoGroup } from "@/hooks/use-auto-group";
+import { useGroupSelection } from "@/hooks/use-group-selection";
+
+// Snap-back drop animation — keeps DragOverlay child mounted long enough for
+// dnd-kit's built-in return-to-origin transition to play on invalid drops.
+const dropAnimation: DropAnimation = {
+  duration: 250,
+  easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.4" } },
+  }),
+};
 
 interface GroupWithLabel extends Group {
   label?: string;
@@ -28,13 +40,14 @@ interface GroupWithLabel extends Group {
 
 // ── Sortable thumbnail (handles within-group sort AND between-group drag) ─────
 function SortableThumbnail({
-  item, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds,
+  item, groupId, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds,
 }: {
   item: FileItem;
+  groupId: string;
   onRemove: () => void;
   isHero?: boolean;
   isSelected?: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, groupId: string, e: React.MouseEvent) => void;
   selectedIds: Set<string>;
 }) {
   const {
@@ -66,7 +79,7 @@ function SortableThumbnail({
       {...listeners}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(item.id);
+        onSelect(item.id, groupId, e);
       }}
     >
       <img
@@ -110,7 +123,7 @@ function DroppableGroup({
   onDeleteGroup: () => void;
   totalGroups: number;
   selectedIds: Set<string>;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, groupId: string, e: React.MouseEvent) => void;
   label?: string;
   confidence?: "high" | "medium" | "low";
 }) {
@@ -185,6 +198,7 @@ function DroppableGroup({
             <SortableThumbnail
               key={item.id}
               item={item}
+              groupId={groupId}
               onRemove={() => onRemoveItem(item.id)}
               isHero={idx === 0}
               isSelected={selectedIds.has(item.id)}
@@ -226,7 +240,17 @@ function DroppableNewGroup() {
 export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: File[]) => void }) {
   const [groups, setGroups] = useState<GroupWithLabel[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const orderedItemIds = useMemo(
+    () => groups.flatMap(g => g.items.map(i => i.id)),
+    [groups],
+  );
+  const {
+    selected: selectedIds,
+    handleClick: handleThumbnailClick,
+    clear: clearSelection,
+    setSelected,
+  } = useGroupSelection(orderedItemIds);
+  const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadingQueue, setUploadingQueue] = useState<File[]>([]);
@@ -315,31 +339,78 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   );
 
   const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveItem(groups.flatMap(g => g.items).find(i => i.id === active.id) ?? null);
+    const activeId = active.id as string;
+    const dragged = groups.flatMap(g => g.items).find(i => i.id === activeId) ?? null;
+    setActiveItem(dragged);
+
+    // Preserve multi-selection if the dragged item is part of it; otherwise
+    // reset selection to just this item so a grab on an unselected thumb
+    // doesn't accidentally carry stale range-selection state.
+    if (!(selectedIds.has(activeId) && selectedIds.size > 1)) {
+      clearSelection();
+      setSelected(new Set([activeId]));
+    }
   };
 
-  // ── Selection toggle ───────────────────────────────────────────────────────
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  // ── Thumbnail click adapter: update focused group + delegate to hook ───────
+  const onThumbnailSelect = useCallback(
+    (id: string, groupId: string, e: React.MouseEvent) => {
+      setFocusedGroupId(groupId);
+      handleThumbnailClick(id, e);
+    },
+    [handleThumbnailClick],
+  );
+
+  // ── Esc clears selection; Cmd/Ctrl+A selects everything in focused group ──
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        clearSelection();
+        setFocusedGroupId(null);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "a" || e.key === "A")) {
+        if (focusedGroupId === null) return; // no focused group → let browser default run
+        const focusedGroup = groups.find(g => g.id === focusedGroupId);
+        if (!focusedGroup) return;
+        e.preventDefault();
+        setSelected(new Set(focusedGroup.items.map(i => i.id)));
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [groups, focusedGroupId, clearSelection, setSelected]);
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    setActiveItem(null);
-    if (!over) { setSelectedIds(new Set()); return; }
+    // Invalid drop: defer clearing activeItem to the next microtask so the
+    // DragOverlay child stays mounted long enough for dnd-kit's snap-back
+    // dropAnimation to play. Do NOT touch selection — the user may want to
+    // retry the same drag.
+    if (!over) {
+      queueMicrotask(() => setActiveItem(null));
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Detect within-group reorder: both active and over are item IDs in the same group
+    // Resolve source + target groups (target may be a group UUID or an item UUID).
     const activeGroup = groups.find(g => g.items.some(i => i.id === activeId));
-    const overGroup = groups.find(g => g.items.some(i => i.id === overId));
+    const overGroup =
+      groups.find(g => g.id === overId) ??
+      groups.find(g => g.items.some(i => i.id === overId));
 
-    if (activeGroup && overGroup && activeGroup.id === overGroup.id) {
-      // Within-group reorder — use arrayMove
+    // ── Branch 1: Intra-group single-item reorder ────────────────────────────
+    // PRESERVED from Phase 5 — drag-reorder-to-front re-elects the hero image.
+    // Falls through ONLY when source group === target group AND selection is
+    // at most one item (i.e., not a batch move).
+    if (
+      activeGroup &&
+      overGroup &&
+      activeGroup.id === overGroup.id &&
+      selectedIds.size <= 1
+    ) {
+      setActiveItem(null);
       setGroups(prev => {
         const next = prev.map(g => {
           if (g.id !== activeGroup.id) return g;
@@ -352,11 +423,12 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
         saveGroups(next); // fire-and-forget
         return next;
       });
-      setSelectedIds(new Set());
+      // Selection state is intentionally unchanged here — Phase 5 behavior.
       return;
     }
 
-    // Between-group / new-group logic with multi-select batch move
+    // ── Branch 2: Cross-group OR batch move ──────────────────────────────────
+    setActiveItem(null);
     const draggedIds: string[] = selectedIds.has(activeId) && selectedIds.size > 1
       ? Array.from(selectedIds)
       : [activeId];
@@ -375,14 +447,15 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           next.push({ id: crypto.randomUUID(), items: toMove, maxImages: Number.MAX_SAFE_INTEGER });
         }
       } else {
-        // Resolve target group: direct group-ID match OR group that owns the hovered thumbnail
+        // Two-step overId resolution: direct group-ID match OR group that
+        // owns the hovered thumbnail (RESEARCH Pitfall 2).
         const toGroup =
           next.find(g => g.id === overId) ??
           next.find(g => g.items.some(i => i.id === overId));
         if (!toGroup) return prev;
         const toMove: FileItem[] = [];
         for (const g of next) {
-          if (g.id === overId) continue;
+          if (g.id === toGroup.id) continue;
           const moved = g.items.filter(i => draggedIds.includes(i.id));
           g.items = g.items.filter(i => !draggedIds.includes(i.id));
           toMove.push(...moved);
@@ -395,7 +468,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
       return filtered;
     });
 
-    setSelectedIds(new Set()); // clear selection after drag
+    clearSelection(); // clear after successful cross-group / batch move
   };
 
   // ── File drop ────────────────────────────────────────────────────────────────
@@ -646,7 +719,12 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
 
       {/* Groups section — manual-first: renders unconditionally when any files exist */}
       {totalFiles > 0 && !isUploading && (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveItem(null)}
+        >
 
           {/* ── Toolbar ─────────────────────────────────────────────────── */}
           <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
@@ -707,7 +785,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   onDeleteGroup={() => deleteGroup(group.id)}
                   totalGroups={groups.length}
                   selectedIds={selectedIds}
-                  onSelect={toggleSelect}
+                  onSelect={onThumbnailSelect}
                 />
               ))}
               <DroppableNewGroup />
@@ -715,7 +793,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
           </div>
 
           {/* Drag overlay — floating thumbnail with count badge for multi-select */}
-          <DragOverlay>
+          <DragOverlay dropAnimation={dropAnimation}>
             {activeItem ? (
               selectedIds.size > 1 && selectedIds.has(activeItem.id) ? (
                 // Multi-select ghost: stack badge
