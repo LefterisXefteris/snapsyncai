@@ -23,6 +23,10 @@ import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 import { useAutoGroup } from "@/hooks/use-auto-group";
 import { useGroupSelection } from "@/hooks/use-group-selection";
 
+// Soft advisory threshold (GROUP-08) — groups larger than this render an
+// amber "consider splitting" badge but are NEVER blocked from accepting drops.
+const LARGE_GROUP_THRESHOLD = 20;
+
 // Snap-back drop animation — keeps DragOverlay child mounted long enough for
 // dnd-kit's built-in return-to-origin transition to play on invalid drops.
 const dropAnimation: DropAnimation = {
@@ -168,6 +172,15 @@ function DroppableGroup({
         <span className="text-[10px] text-white/40 ml-0.5">
           {items.length} {items.length === 1 ? "image" : "images"}
         </span>
+        {items.length > LARGE_GROUP_THRESHOLD && (
+          <span
+            className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900"
+            title="Large group — consider splitting into multiple products"
+            data-testid={`large-group-warning-${groupId}`}
+          >
+            Large group ({items.length}) — consider splitting
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-1">
           {items.length > 1 && (
             <button
@@ -223,6 +236,7 @@ function DroppableNewGroup() {
   return (
     <div
       ref={setNodeRef}
+      data-testid="droppable-new-group"
       className={cn(
         "flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed transition-all duration-200",
         isOver
@@ -788,7 +802,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   onSelect={onThumbnailSelect}
                 />
               ))}
-              <DroppableNewGroup />
+              {groups.length > 0 && <DroppableNewGroup />}
             </div>
           </div>
 
