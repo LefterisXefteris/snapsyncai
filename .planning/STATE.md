@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-04-11T08:35:21.594Z"
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-04-11T08:40:07.572Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 24
-  completed_plans: 18
+  completed_plans: 19
   percent: 20
 ---
 
@@ -66,6 +66,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 08-embeddings-variant-clustering P02 | ~10 min | 2 tasks | 3 files |
 | Phase 09 P01 | 2 min | 2 tasks | 2 files |
 | Phase 09 P02 | ~3 min | 2 tasks | 1 files |
+| Phase 09 P03 | ~8 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Recent decisions affecting current work:
 - [Phase 09]: Phase 9 upload path reuses POST /api/images/upload?groupAsOne=true with CONCURRENCY=2 per-group failure isolation
 - [Phase 09]: Phase 9 AI auto-sort stays as secondary toolbar button, not hidden
 - [Phase 09]: Phase 9 upload-zone.tsx stripped of prompt/brand-tone/presets/mode-chooser; new drops append as one-item groups (no rechunking); Sort variants stays as secondary toolbar button
+- [Phase 09]: Phase 9 useGroupSelection stays pure — Esc/Cmd+A listeners wired by component effect, not the hook
+- [Phase 09]: Phase 9 handleDragEnd branched: Phase 5 intra-group arrayMove path preserved byte-for-byte, gated on selected.size <= 1; batch/cross-group path handles multi-select
+- [Phase 09]: Phase 9 snap-back fix: explicit 250ms dropAnimation + queueMicrotask-deferred setActiveItem(null) on invalid drop; Cmd+A defers to browser default when focusedGroupId is null
 
 ### Roadmap Evolution
 
@@ -124,6 +128,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T08:35:21.591Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-04-11T08:40:05.640Z
+Stopped at: Completed 09-03-PLAN.md
 Resume file: None
