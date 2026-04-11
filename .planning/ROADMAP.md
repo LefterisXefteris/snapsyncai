@@ -176,7 +176,7 @@ Plans:
   7. A "+ New group" drop target is always visible at the end of the grid and accepts dropped thumbnails to create a new empty group
 **Plans**: 5 plans
 Plans:
-- [ ] 09-01-PLAN.md — Define GROUP-05..12 in REQUIREMENTS.md and fill Phase 9 Goal + Success Criteria in ROADMAP.md
+- [x] 09-01-PLAN.md — Define GROUP-05..12 in REQUIREMENTS.md and fill Phase 9 Goal + Success Criteria in ROADMAP.md
 - [ ] 09-02-PLAN.md — Delete prompt UI, presets, mode chooser, maxImages controls, chunkArray, TONES from upload-zone.tsx
 - [ ] 09-03-PLAN.md — Add useGroupSelection hook (Shift/Cmd-click) + fix snap-back dropAnimation timing
 - [ ] 09-04-PLAN.md — Per-file landing (one group per file), soft large-group warning (threshold 20), verify always-visible "+ New group"

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-04-10T20:59:44.492Z"
-last_activity: 2026-04-10
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-04-11T08:29:49.177Z"
+last_activity: 2026-04-11
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 2
-  total_plans: 19
-  completed_plans: 16
+  total_plans: 24
+  completed_plans: 17
   percent: 20
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 Phase: 1 of 4 (Credit Idempotency)
 Plan: 2 of 2 in current phase (Phase 1 COMPLETE)
 Status: Phase complete — ready for verification
-Last activity: 2026-04-10
+Last activity: 2026-04-11
 
 Progress: [██░░░░░░░░] 20%
 
@@ -64,6 +64,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 07-ai-auto-grouping-agent P03 | 1 | 1 tasks | 1 files |
 | Phase 08-embeddings-variant-clustering P01 | 5 min | 3 tasks | 5 files |
 | Phase 08-embeddings-variant-clustering P02 | ~10 min | 2 tasks | 3 files |
+| Phase 09 P01 | 2 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -100,10 +101,14 @@ Recent decisions affecting current work:
 - [Phase 08-embeddings-variant-clustering]: runAutoGrouping embedding path: variant-family threshold 0.78, default 0.88, MAX_ATTEMPTS=2, BACKOFF_MS=750 linear, TIMEOUT_MS=60000
 - [Phase 08-embeddings-variant-clustering]: fallbackUsed signal propagated via new SSE 'fallback' event + JSON response field; embedding success path does NOT run mergeAutoGroupsByFamily (fallback-only)
 - [Phase 08-embeddings-variant-clustering]: Promise.race timeout handle is explicitly cleared in finally to prevent event-loop pinning on successful embed calls
+- [Phase 09]: Phase 9 LARGE_GROUP_THRESHOLD locked at 20 images — soft warning only, no hard cap
+- [Phase 09]: Phase 9 upload path reuses POST /api/images/upload?groupAsOne=true with CONCURRENCY=2 per-group failure isolation
+- [Phase 09]: Phase 9 AI auto-sort stays as secondary toolbar button, not hidden
 
 ### Roadmap Evolution
 
 - Phase 8 added: Replace VLM variant sorter with embeddings-based clustering
+- Phase 9 added: Manual Grouping-First UX — drag-drop becomes primary, AI sort optional; remove staging prompt; push grouped images to Supabase as products
 
 ### Pending Todos
 
@@ -117,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T20:59:44.489Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-04-11T08:29:49.174Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None

@@ -57,14 +57,14 @@
 
 ### Manual Grouping-First UX (Phase 9)
 
-- [ ] **GROUP-05**: Drag-and-drop staging is the primary grouping UX; the mode chooser ("Auto-group / Sort Variants / Group manually") is removed, manual mode starts immediately on file drop.
-- [ ] **GROUP-06**: The "Custom AI Prompt" textarea, brand-tone selector, and productContext / brandTone state are permanently deleted from upload-zone.tsx; the upload call stops sending them.
-- [ ] **GROUP-07**: Shift-click selects a range within/across groups in visual order, Cmd/Ctrl-click toggles a single thumbnail, plain click selects only that thumbnail; multi-select persists across a drag.
-- [ ] **GROUP-08**: The per-group maxImages counter, the +/− controls, and the PRESETS = [1..5] toolbar are removed; groups larger than LARGE_GROUP_THRESHOLD (20) show a soft warning badge but no hard cap.
-- [ ] **GROUP-09**: An invalid drop (over === null) animates the dragged thumbnail back to its origin using dnd-kit's built-in dropAnimation instead of vanishing instantly.
-- [ ] **GROUP-10**: Confirming the staged layout pushes each group to Supabase by calling POST /api/images/upload with groupAsOne=true once per group (CONCURRENCY=2); on per-group success the IDB blobs are cleared for that group, on per-group failure the failed group remains in staging with a retry affordance.
-- [ ] **GROUP-11**: The AI auto-group / "Sort variants" flow remains accessible as a secondary toolbar button (not hidden) but is no longer the landing UX; useAutoGroup and the Phase 8 fallback banner continue to work unchanged.
-- [ ] **GROUP-12**: A "+ New group" drop target is always visible at the end of the group grid so users can create an empty group by dropping onto it.
+- [x] **GROUP-05**: Drag-and-drop staging is the primary grouping UX; the mode chooser ("Auto-group / Sort Variants / Group manually") is removed, manual mode starts immediately on file drop.
+- [x] **GROUP-06**: The "Custom AI Prompt" textarea, brand-tone selector, and productContext / brandTone state are permanently deleted from upload-zone.tsx; the upload call stops sending them.
+- [x] **GROUP-07**: Shift-click selects a range within/across groups in visual order, Cmd/Ctrl-click toggles a single thumbnail, plain click selects only that thumbnail; multi-select persists across a drag.
+- [x] **GROUP-08**: The per-group maxImages counter, the +/− controls, and the PRESETS = [1..5] toolbar are removed; groups larger than LARGE_GROUP_THRESHOLD (20) show a soft warning badge but no hard cap.
+- [x] **GROUP-09**: An invalid drop (over === null) animates the dragged thumbnail back to its origin using dnd-kit's built-in dropAnimation instead of vanishing instantly.
+- [x] **GROUP-10**: Confirming the staged layout pushes each group to Supabase by calling POST /api/images/upload with groupAsOne=true once per group (CONCURRENCY=2); on per-group success the IDB blobs are cleared for that group, on per-group failure the failed group remains in staging with a retry affordance.
+- [x] **GROUP-11**: The AI auto-group / "Sort variants" flow remains accessible as a secondary toolbar button (not hidden) but is no longer the landing UX; useAutoGroup and the Phase 8 fallback banner continue to work unchanged.
+- [x] **GROUP-12**: A "+ New group" drop target is always visible at the end of the group grid so users can create an empty group by dropping onto it.
 
 ## Out of Scope
 
@@ -98,14 +98,14 @@
 | CLUSTER-02 | Phase 8 | Complete |
 | CLUSTER-03 | Phase 8 | Complete |
 | CLUSTER-04 | Phase 8 | Pending |
-| GROUP-05 | Phase 9 | Pending |
-| GROUP-06 | Phase 9 | Pending |
-| GROUP-07 | Phase 9 | Pending |
-| GROUP-08 | Phase 9 | Pending |
-| GROUP-09 | Phase 9 | Pending |
-| GROUP-10 | Phase 9 | Pending |
-| GROUP-11 | Phase 9 | Pending |
-| GROUP-12 | Phase 9 | Pending |
+| GROUP-05 | Phase 9 | Complete |
+| GROUP-06 | Phase 9 | Complete |
+| GROUP-07 | Phase 9 | Complete |
+| GROUP-08 | Phase 9 | Complete |
+| GROUP-09 | Phase 9 | Complete |
+| GROUP-10 | Phase 9 | Complete |
+| GROUP-11 | Phase 9 | Complete |
+| GROUP-12 | Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 8 total
