@@ -27,6 +27,62 @@ import { useGroupSelection } from "@/hooks/use-group-selection";
 // amber "consider splitting" badge but are NEVER blocked from accepting drops.
 const LARGE_GROUP_THRESHOLD = 20;
 
+// Thumbnail scale tiers. panelSize is the sidebar panel's current width as a
+// percentage of the viewport (react-resizable-panels units). As the user
+// drags the sidebar wider, thumbnails step up through these tiers so images
+// are easy to inspect before upload.
+function getThumbSize(panelSize: number | undefined, isHero: boolean): string {
+  const size = panelSize ?? 25;
+  if (size < 35) return isHero ? "w-16 h-16" : "w-10 h-10"; // default compact
+  if (size < 50) return isHero ? "w-24 h-24" : "w-20 h-20";
+  if (size < 65) return isHero ? "w-36 h-36" : "w-28 h-28";
+  return isHero ? "w-48 h-48" : "w-40 h-40"; // zoomed inspection mode
+}
+
+// Complementary spacing tiers so the card layout breathes as thumbs scale up.
+// Keeps default compact mode untouched; relaxes gap/padding/min-h at each
+// zoom tier and drops the list's 480px scroll cap once thumbs go large
+// (parent ScrollArea handles overflow at that point).
+function getGroupSpacing(panelSize: number | undefined) {
+  const size = panelSize ?? 25;
+  if (size < 35) return {
+    innerGap: "gap-2",
+    innerPad: "p-3",
+    innerMinH: "min-h-[120px]",
+    headerPad: "px-3 py-2",
+    cardSpacing: "space-y-2",
+    listPad: "p-2.5",
+    listMaxH: "max-h-[480px]",
+  };
+  if (size < 50) return {
+    innerGap: "gap-3",
+    innerPad: "p-4",
+    innerMinH: "min-h-[160px]",
+    headerPad: "px-4 py-2.5",
+    cardSpacing: "space-y-3",
+    listPad: "p-3",
+    listMaxH: "",
+  };
+  if (size < 65) return {
+    innerGap: "gap-4",
+    innerPad: "p-5",
+    innerMinH: "min-h-[200px]",
+    headerPad: "px-5 py-3",
+    cardSpacing: "space-y-4",
+    listPad: "p-4",
+    listMaxH: "",
+  };
+  return {
+    innerGap: "gap-6",
+    innerPad: "p-6",
+    innerMinH: "min-h-[220px]",
+    headerPad: "px-6 py-3.5",
+    cardSpacing: "space-y-5",
+    listPad: "p-5",
+    listMaxH: "",
+  };
+}
+
 // Snap-back drop animation — keeps DragOverlay child mounted long enough for
 // dnd-kit's built-in return-to-origin transition to play on invalid drops.
 const dropAnimation: DropAnimation = {
@@ -44,7 +100,7 @@ interface GroupWithLabel extends Group {
 
 // ── Sortable thumbnail (handles within-group sort AND between-group drag) ─────
 function SortableThumbnail({
-  item, groupId, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds,
+  item, groupId, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds, panelSize,
 }: {
   item: FileItem;
   groupId: string;
@@ -53,6 +109,7 @@ function SortableThumbnail({
   isSelected?: boolean;
   onSelect: (id: string, groupId: string, e: React.MouseEvent) => void;
   selectedIds: Set<string>;
+  panelSize?: number;
 }) {
   const {
     attributes,
@@ -72,7 +129,7 @@ function SortableThumbnail({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const size = isHero ? "w-16 h-16" : "w-10 h-10";
+  const size = getThumbSize(panelSize, !!isHero);
 
   return (
     <div
@@ -117,7 +174,7 @@ function SortableThumbnail({
 // ── Droppable product group card ─────────────────────────────────────────────
 function DroppableGroup({
   groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
-  selectedIds, onSelect, label, confidence, isFailed, onRetry,
+  selectedIds, onSelect, label, confidence, isFailed, onRetry, panelSize,
 }: {
   groupId: string;
   groupIdx: number;
@@ -132,8 +189,10 @@ function DroppableGroup({
   confidence?: "high" | "medium" | "low";
   isFailed?: boolean;
   onRetry?: () => void;
+  panelSize?: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
+  const spacing = getGroupSpacing(panelSize);
 
   return (
     <div
@@ -156,7 +215,7 @@ function DroppableGroup({
       )}
 
       {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
+      <div className={cn("flex items-center gap-2 border-b border-white/[0.06]", spacing.headerPad)}>
         <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
           <span className="text-[10px] font-bold text-primary">{groupIdx + 1}</span>
         </div>
@@ -221,7 +280,7 @@ function DroppableGroup({
 
       {/* Images area — SortableContext enables within-group reordering */}
       <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
-        <div className="flex flex-wrap gap-2 p-3 min-h-[120px]">
+        <div className={cn("flex flex-wrap", spacing.innerGap, spacing.innerPad, spacing.innerMinH)}>
           {items.map((item, idx) => (
             <SortableThumbnail
               key={item.id}
@@ -232,10 +291,14 @@ function DroppableGroup({
               isSelected={selectedIds.has(item.id)}
               onSelect={onSelect}
               selectedIds={selectedIds}
+              panelSize={panelSize}
             />
           ))}
           {isOver && (
-            <div className="w-10 h-10 rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center shrink-0 animate-pulse">
+            <div className={cn(
+              getThumbSize(panelSize, false),
+              "rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center shrink-0 animate-pulse",
+            )}>
               <Plus className="w-3 h-3 text-primary/60" />
             </div>
           )}
@@ -266,7 +329,18 @@ function DroppableNewGroup() {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: File[]) => void }) {
+export function UploadZone({
+  onUploadingChange,
+  onStagedCountChange,
+  panelSize,
+}: {
+  onUploadingChange?: (files: File[]) => void;
+  onStagedCountChange?: (count: number) => void;
+  /** Current sidebar panel width as a percentage (from react-resizable-panels).
+   *  Drives responsive thumbnail scaling so images grow as the user drags
+   *  the sidebar wider. */
+  panelSize?: number;
+}) {
   const [groups, setGroups] = useState<GroupWithLabel[]>([]);
   const [activeItem, setActiveItem] = useState<FileItem | null>(null);
   const orderedItemIds = useMemo(
@@ -317,6 +391,11 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
   useEffect(() => { onUploadingChange?.(uploadingQueue); }, [uploadingQueue, onUploadingChange]);
 
   const totalFiles = groups.reduce((sum, g) => sum + g.items.length, 0);
+  const listSpacing = getGroupSpacing(panelSize);
+
+  // Notify parent whenever staged item count changes so the workspace can
+  // expand the sidebar to give the grouping grid more room.
+  useEffect(() => { onStagedCountChange?.(totalFiles); }, [totalFiles, onStagedCountChange]);
 
   const sortVariantsIntoProducts = useCallback((items: FileItem[]) => {
     if (items.length === 0) return;
@@ -866,7 +945,12 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
             </div>
 
             {/* ── Product groups list ─────────────────────────────────── */}
-            <div className="max-h-[480px] overflow-y-auto p-2.5 space-y-2">
+            <div className={cn(
+              "overflow-y-auto",
+              listSpacing.listPad,
+              listSpacing.cardSpacing,
+              listSpacing.listMaxH,
+            )}>
               {groups.map((group, idx) => (
                 <DroppableGroup
                   key={group.id}
@@ -883,6 +967,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
                   onSelect={onThumbnailSelect}
                   isFailed={failedGroupIds.has(group.id)}
                   onRetry={failedGroupIds.has(group.id) ? () => retryGroup(group.id) : undefined}
+                  panelSize={panelSize}
                 />
               ))}
               {groups.length > 0 && <DroppableNewGroup />}
@@ -895,7 +980,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
               selectedIds.size > 1 && selectedIds.has(activeItem.id) ? (
                 // Multi-select ghost: stack badge
                 <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
-                  <div className="relative w-16 h-16">
+                  <div className={cn("relative", getThumbSize(panelSize, true))}>
                     <div className="absolute inset-0 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20 translate-x-1 translate-y-1 opacity-50">
                       <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
                     </div>
@@ -913,7 +998,7 @@ export function UploadZone({ onUploadingChange }: { onUploadingChange?: (files: 
               ) : (
                 // Single item ghost (existing)
                 <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20">
+                  <div className={cn(getThumbSize(panelSize, true), "rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20")}>
                     <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
                   </div>
                   <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">

@@ -1,4 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import type { ImperativePanelHandle } from "react-resizable-panels";
+import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store } from "lucide-react";
@@ -77,6 +79,29 @@ export default function Home() {
   const [instagramAccessToken, setInstagramAccessToken] = useState("");
   const [instagramPostCaption, setInstagramPostCaption] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+  const [stagedImageCount, setStagedImageCount] = useState(0);
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  // Panel sizing constants — collapsed = comfortable sidebar, expanded =
+  // wide grouping workspace so thumbnails can be inspected at a larger size.
+  const SIDEBAR_COLLAPSED_SIZE = 25;
+  const SIDEBAR_EXPANDED_SIZE = 80;
+  const SIDEBAR_COLLAPSED_MAX = 40;
+  const SIDEBAR_EXPANDED_MAX = 95;
+  const hasStagedImages = stagedImageCount > 0;
+  // Live size (in percent of viewport) of the sidebar panel. Drives
+  // responsive thumbnail scaling inside UploadZone so images grow as the
+  // user drags the sidebar wider — not just on the initial auto-expand.
+  const [sidebarPanelSize, setSidebarPanelSize] = useState(SIDEBAR_COLLAPSED_SIZE);
+
+  // When staging has content, imperatively expand the left panel so the
+  // grouping grid gets breathing room. Snap back to the default width when
+  // staging empties. Only fires on the boolean transition so manual drag
+  // resizes in between are not clobbered.
+  useEffect(() => {
+    const panel = sidebarPanelRef.current;
+    if (!panel) return;
+    panel.resize(hasStagedImages ? SIDEBAR_EXPANDED_SIZE : SIDEBAR_COLLAPSED_SIZE);
+  }, [hasStagedImages]);
   const [instagramPostImageId, setInstagramPostImageId] = useState<number | null>(null);
   const [isVariantSorting, setIsVariantSorting] = useState(false);
   const [recentlyMergedGroupIds, setRecentlyMergedGroupIds] = useState<Set<string>>(new Set());
@@ -566,18 +591,29 @@ export default function Home() {
 
       <div className="flex-1 min-h-0 relative">
         <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="flex flex-col border-r h-full bg-muted/20">
+          <ResizablePanel
+            ref={sidebarPanelRef}
+            defaultSize={SIDEBAR_COLLAPSED_SIZE}
+            minSize={20}
+            maxSize={hasStagedImages ? SIDEBAR_EXPANDED_MAX : SIDEBAR_COLLAPSED_MAX}
+            onResize={setSidebarPanelSize}
+            className="flex flex-col border-r h-full bg-muted/20"
+          >
             <ScrollArea className="flex-1 h-full">
               <div className="p-4 space-y-6">
 
                 <section className="space-y-4">
                   <h2 className="text-sm font-semibold tracking-tight">Upload Product Image</h2>
-                  <UploadZone onUploadingChange={setUploadingFiles} />
+                  <UploadZone
+                    onUploadingChange={setUploadingFiles}
+                    onStagedCountChange={setStagedImageCount}
+                    panelSize={sidebarPanelSize}
+                  />
                 </section>
 
-                <Separator />
+                <Separator className={cn(hasStagedImages && "max-w-xs")} />
 
-                <section className="space-y-2">
+                <section className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
                   <h2 className="text-xs font-semibold tracking-tight text-muted-foreground uppercase">Integrations</h2>
                   <div className="grid grid-cols-1 gap-1.5">
                     {shopifyStatus?.connected ? (
@@ -628,7 +664,7 @@ export default function Home() {
 
             {/* Footer pinned at bottom */}
             <div className="p-3 border-t border-border shrink-0">
-              <div className="space-y-2">
+              <div className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
                 <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/40 border">
                   <div className="flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
