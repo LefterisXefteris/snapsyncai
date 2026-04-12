@@ -178,7 +178,39 @@ export async function runAutoGrouping(
       if (timeoutHandle) clearTimeout(timeoutHandle);
     }
 
+    // TEMP DIAGNOSTIC (debug session: embedding-clustering-over-merge)
+    // Logs the full pairwise cosine matrix + per-vector norm so we can see the
+    // actual distribution Cohere returns on real user data. Remove once the
+    // over-merge bug in Phase 8 is resolved and the root cause is confirmed.
+    if (process.env.DEBUG_AUTOGROUP === "1") {
+      const norms = vectors.map((v) => Math.sqrt(v.reduce((s, x) => s + x * x, 0)));
+      console.log(
+        `[auto-group DIAG] mode=${mode} threshold=${threshold} n=${vectors.length} dim=${vectors[0]?.length}`,
+      );
+      console.log(
+        `[auto-group DIAG] filenames: ${inputImages.map((img, i) => `[${i}]${img.filename}(norm=${norms[i].toFixed(3)})`).join(" ")}`,
+      );
+      const header = "         " + vectors.map((_, j) => `[${String(j).padStart(2, " ")}]    `).join("");
+      console.log(`[auto-group DIAG] ${header}`);
+      for (let i = 0; i < vectors.length; i++) {
+        const row: string[] = [];
+        for (let j = 0; j < vectors.length; j++) {
+          let dot = 0;
+          for (let k = 0; k < vectors[i].length; k++) dot += vectors[i][k] * vectors[j][k];
+          const sim = dot / (norms[i] * norms[j]);
+          row.push(sim.toFixed(4));
+        }
+        console.log(`[auto-group DIAG] [${String(i).padStart(2, " ")}]  ${row.join("  ")}`);
+      }
+    }
+
     const clusters = clusterByCosine(vectors, threshold);
+
+    if (process.env.DEBUG_AUTOGROUP === "1") {
+      console.log(
+        `[auto-group DIAG] clusterByCosine(threshold=${threshold}) produced ${clusters.length} cluster(s): ${clusters.map((c) => `[${c.join(",")}]`).join(" ")}`,
+      );
+    }
 
     return clusters.map((indicesInInputOrder) => {
       const clusterImages = indicesInInputOrder.map((i) => inputImages[i]);
