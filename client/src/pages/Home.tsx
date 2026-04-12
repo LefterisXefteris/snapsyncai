@@ -93,14 +93,22 @@ export default function Home() {
   // user drags the sidebar wider — not just on the initial auto-expand.
   const [sidebarPanelSize, setSidebarPanelSize] = useState(SIDEBAR_COLLAPSED_SIZE);
 
-  // When staging has content, imperatively expand the left panel so the
-  // grouping grid gets breathing room. Snap back to the default width when
-  // staging empties. Only fires on the boolean transition so manual drag
-  // resizes in between are not clobbered.
+  // Track whether user actively dropped files this session (not IDB restore).
+  // Prevents sidebar from auto-expanding to 80% on every page refresh when
+  // leftover staged images exist in IndexedDB.
+  const userDroppedThisSession = useRef(false);
+  const handleFreshDrop = useCallback(() => {
+    userDroppedThisSession.current = true;
+    // Expand immediately — don't wait for the effect cycle
+    sidebarPanelRef.current?.resize(SIDEBAR_EXPANDED_SIZE);
+  }, []);
+
+  // Collapse panel when staging empties (all uploaded or cleared).
   useEffect(() => {
-    const panel = sidebarPanelRef.current;
-    if (!panel) return;
-    panel.resize(hasStagedImages ? SIDEBAR_EXPANDED_SIZE : SIDEBAR_COLLAPSED_SIZE);
+    if (!hasStagedImages) {
+      sidebarPanelRef.current?.resize(SIDEBAR_COLLAPSED_SIZE);
+      userDroppedThisSession.current = false;
+    }
   }, [hasStagedImages]);
   const [instagramPostImageId, setInstagramPostImageId] = useState<number | null>(null);
   const [isVariantSorting, setIsVariantSorting] = useState(false);
@@ -607,6 +615,7 @@ export default function Home() {
                   <UploadZone
                     onUploadingChange={setUploadingFiles}
                     onStagedCountChange={setStagedImageCount}
+                    onFreshDrop={handleFreshDrop}
                     panelSize={sidebarPanelSize}
                   />
                 </section>

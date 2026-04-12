@@ -332,10 +332,13 @@ function DroppableNewGroup() {
 export function UploadZone({
   onUploadingChange,
   onStagedCountChange,
+  onFreshDrop,
   panelSize,
 }: {
   onUploadingChange?: (files: File[]) => void;
   onStagedCountChange?: (count: number) => void;
+  /** Fires when the user actively drops/selects new files (NOT on IDB restore). */
+  onFreshDrop?: () => void;
   /** Current sidebar panel width as a percentage (from react-resizable-panels).
    *  Drives responsive thumbnail scaling so images grow as the user drags
    *  the sidebar wider. */
@@ -608,7 +611,10 @@ export function UploadZone({
         .catch(err => console.warn('[upload-zone] IDB save failed:', err));
       return next;
     });
-  }, [toast, saveBlob, saveGroups]);
+
+    // Signal parent that user actively dropped files (not IDB restore)
+    onFreshDrop?.();
+  }, [toast, saveBlob, saveGroups, onFreshDrop]);
 
   const handleDropRejected = useCallback(() => {
     toast({
