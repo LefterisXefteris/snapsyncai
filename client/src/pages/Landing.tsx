@@ -810,6 +810,10 @@ export default function Landing() {
                 <span className="block">Etsy</span>
                 <span className="block">Amazon</span>
               </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Contact</p>
+                <a href="mailto:lefteris@tribeagent.co.uk" className="block hover:text-foreground transition-colors">lefteris@tribeagent.co.uk</a>
+              </div>
             </div>
           </div>
           <Separator className="my-8" />
