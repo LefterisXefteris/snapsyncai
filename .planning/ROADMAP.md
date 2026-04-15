@@ -181,3 +181,16 @@ Plans:
 - [x] 09-03-PLAN.md — Add useGroupSelection hook (Shift/Cmd-click) + fix snap-back dropAnimation timing
 - [x] 09-04-PLAN.md — Per-file landing (one group per file), soft large-group warning (threshold 20), verify always-visible "+ New group"
 - [ ] 09-05-PLAN.md — Per-group failure-isolated handleConfirm rewrite with inline retry + human verification checkpoint
+
+### Phase 10: Pricing Model Update
+**Goal**: Replace the £19/month subscription with a £9/month (monthly) and £79/year (annual) plan; halve all credit pack prices; auto-migrate existing £19/month subscribers to the new £9/month plan; update all pricing UI across the app
+**Depends on**: Phase 9
+**Requirements**: PAY-10
+**Success Criteria** (what must be TRUE):
+  1. New subscribers can choose £9/month or £79/year — both routes through Stripe Checkout work end-to-end
+  2. Existing £19/month subscribers are automatically migrated to £9/month at their next renewal (Stripe subscription price updated server-side)
+  3. Credit pack prices are halved: Starter 10 credits £4.50, Growth 50 credits £17.50, Pro 150 credits £39.50
+  4. All pricing UI (sidebar, home page credits dialog, landing page) reflects the new prices and annual option
+  5. The £19/month Stripe price is archived so no new subscriptions can use it
+  6. Subscription feature set is unchanged — £9/month and £79/year both grant the same unlimited access as the old £19/month plan
+**Plans**: TBD
