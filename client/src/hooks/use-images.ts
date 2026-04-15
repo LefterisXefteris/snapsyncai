@@ -368,13 +368,28 @@ export function usePushToShopify() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({
-        title: "Shopify Sync Complete",
-        description: `${data.success} products pushed, ${data.failed} failed.`,
-      });
+      if (data.failed > 0 && data.success === 0) {
+        toast({
+          title: "Push Failed",
+          description: `All ${data.failed} product(s) failed to push. Check your Shopify token has write_products scope.`,
+          variant: "destructive",
+        });
+      } else if (data.failed > 0) {
+        toast({
+          title: "Partial Success",
+          description: `${data.success} pushed, ${data.failed} failed.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Shopify Sync Complete",
+          description: `${data.success} product(s) pushed successfully.`,
+        });
+      }
     },
-    onError: (error) => {
-      toast({ title: "Shopify Push Failed", description: error.message, variant: "destructive" });
+    onError: (error: any) => {
+      const msg = error?.message || "Push failed";
+      toast({ title: "Shopify Push Failed", description: msg, variant: "destructive" });
     },
   });
 }

@@ -903,7 +903,12 @@ async function pushProductToShopify(
     if (!response.ok) {
       const errorBody = await response.text();
       console.error("Shopify API error:", response.status, errorBody);
-      return { error: `Shopify API error: ${response.status}` };
+      let detail = "";
+      try {
+        const parsed = JSON.parse(errorBody);
+        detail = parsed.errors ? ` — ${JSON.stringify(parsed.errors)}` : (parsed.error ? ` — ${parsed.error}` : "");
+      } catch { /* not JSON */ }
+      return { error: `Shopify API error ${response.status}${detail}` };
     }
 
     const result = await response.json();
@@ -1746,7 +1751,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const devFree = await isDevFreeUser(req);
       const sub = await storage.getSubscription(sessionId);
       const hasActiveSubscription = devFree || (sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling'));
-      const uploadMode = await resolveUploadProcessingMode({
+      const uploadMode = resolveUploadProcessingMode({
         fileCount: files.length,
         groupAsOne,
         hasActiveSubscription: Boolean(hasActiveSubscription),
@@ -1938,9 +1943,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
 
       res.status(200).json(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
-      res.status(500).json({ message: "Internal server error during upload processing" });
+      res.status(500).json({ message: error?.message || "Internal server error during upload processing" });
     }
   });
 
@@ -2302,9 +2307,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       res.json({ success: successCount, failed: failCount, results });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Shopify push error:", error);
-      res.status(500).json({ message: "Failed to push products to Shopify" });
+      res.status(500).json({ message: error?.message || "Failed to push products to Shopify" });
     }
   });
 

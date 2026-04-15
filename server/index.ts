@@ -1,4 +1,6 @@
+import "./instrument.js";
 import "dotenv/config";
+import * as Sentry from "@sentry/node";
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import { registerRoutes } from "./routes";
@@ -166,6 +168,14 @@ export const setupApp = async () => {
       // Fire it in the background so the first request is served immediately.
       initStripe().catch((err: any) => console.error('initStripe background error:', err));
       await registerRoutes(httpServer, app);
+
+      // Sentry debug route — remove after verifying integration works
+      app.get("/debug-sentry", function mainHandler(_req, _res) {
+        throw new Error("My first Sentry error!");
+      });
+
+      // Sentry error handler must be before any other error middleware
+      Sentry.setupExpressErrorHandler(app);
 
       app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
