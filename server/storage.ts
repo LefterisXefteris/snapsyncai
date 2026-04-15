@@ -72,6 +72,7 @@ export interface IStorage {
   markPaidSessionUsed(checkoutSessionId: string, usedCount: number): Promise<void>;
   getSubscription(userId: string): Promise<Subscription | undefined>;
   getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined>;
+  getAllActiveSubscriptions(): Promise<Subscription[]>;
   upsertSubscription(sub: InsertSubscription): Promise<Subscription>;
   updateSubscriptionStatus(stripeSubscriptionId: string, status: string, currentPeriodEnd?: Date): Promise<void>;
   getUserCredits(userId: string): Promise<UserCredits | undefined>;
@@ -267,6 +268,13 @@ export class DatabaseStorage implements IStorage {
   async getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined> {
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
     return sub;
+  }
+
+  async getAllActiveSubscriptions(): Promise<Subscription[]> {
+    return await db
+      .select()
+      .from(subscriptions)
+      .where(inArray(subscriptions.status, ['active', 'trialing']));
   }
 
   async upsertSubscription(sub: InsertSubscription): Promise<Subscription> {

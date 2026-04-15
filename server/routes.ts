@@ -281,12 +281,13 @@ export async function runAutoGrouping(
   };
 }
 
-const SUBSCRIPTION_PRICE_PENCE = 1900;
+const SUBSCRIPTION_MONTHLY_PRICE_PENCE = 900;
+const SUBSCRIPTION_ANNUAL_PRICE_PENCE = 7900;
 
 const CREDIT_PACKS = [
-  { id: 'starter', name: 'Starter', credits: 10, pricePence: 900 },
-  { id: 'growth', name: 'Growth', credits: 50, pricePence: 3500 },
-  { id: 'pro', name: 'Pro', credits: 150, pricePence: 7900 },
+  { id: 'starter', name: 'Starter', credits: 10, pricePence: 450 },
+  { id: 'growth', name: 'Growth', credits: 50, pricePence: 1750 },
+  { id: 'pro', name: 'Pro', credits: 150, pricePence: 3950 },
 ] as const;
 
 const cachedCreditPriceIds = new Map<string, string>();
@@ -337,10 +338,11 @@ async function getOrCreateCreditPackPriceId(packId: string): Promise<string> {
   return price.id;
 }
 
-let cachedPriceId: string | null = null;
+let cachedMonthlyPriceId: string | null = null;
+let cachedAnnualPriceId: string | null = null;
 
-async function getOrCreateSubscriptionPriceId(): Promise<string> {
-  if (cachedPriceId) return cachedPriceId;
+async function getOrCreateMonthlySubscriptionPriceId(): Promise<string> {
+  if (cachedMonthlyPriceId) return cachedMonthlyPriceId;
 
   const stripe = await getUncachableStripeClient();
 
@@ -351,11 +353,11 @@ async function getOrCreateSubscriptionPriceId(): Promise<string> {
   if (existingProduct) {
     const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
     const match = prices.data.find(
-      p => p.unit_amount === SUBSCRIPTION_PRICE_PENCE && p.type === 'recurring' && (p.recurring as any)?.interval === 'month'
+      p => p.unit_amount === SUBSCRIPTION_MONTHLY_PRICE_PENCE && p.type === 'recurring' && (p.recurring as any)?.interval === 'month'
     );
     if (match) {
-      cachedPriceId = match.id;
-      return cachedPriceId;
+      cachedMonthlyPriceId = match.id;
+      return cachedMonthlyPriceId;
     }
   }
 
@@ -374,12 +376,55 @@ async function getOrCreateSubscriptionPriceId(): Promise<string> {
 
   const price = await stripe.prices.create({
     product: productId,
-    unit_amount: SUBSCRIPTION_PRICE_PENCE,
+    unit_amount: SUBSCRIPTION_MONTHLY_PRICE_PENCE,
     currency: 'gbp',
     recurring: { interval: 'month' },
   });
-  cachedPriceId = price.id;
-  return cachedPriceId;
+  cachedMonthlyPriceId = price.id;
+  return cachedMonthlyPriceId;
+}
+
+async function getOrCreateAnnualSubscriptionPriceId(): Promise<string> {
+  if (cachedAnnualPriceId) return cachedAnnualPriceId;
+
+  const stripe = await getUncachableStripeClient();
+  const products = await stripe.products.list({ active: true, limit: 100 });
+  const existingProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
+
+  if (existingProduct) {
+    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 20 });
+    const match = prices.data.find(
+      p => p.unit_amount === SUBSCRIPTION_ANNUAL_PRICE_PENCE
+        && p.type === 'recurring'
+        && (p.recurring as any)?.interval === 'year'
+    );
+    if (match) {
+      cachedAnnualPriceId = match.id;
+      return match.id;
+    }
+  }
+
+  // No matching price found — create it on the existing product.
+  let productId: string;
+  if (existingProduct) {
+    productId = existingProduct.id;
+  } else {
+    const product = await stripe.products.create({
+      name: 'SnapSync AI Pro',
+      description: 'Unlimited AI-powered product listing generation — titles, descriptions, pricing, SEO, AEO and more',
+      metadata: { type: 'monthly_subscription' },
+    });
+    productId = product.id;
+  }
+
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: SUBSCRIPTION_ANNUAL_PRICE_PENCE,
+    currency: 'gbp',
+    recurring: { interval: 'year' },
+  });
+  cachedAnnualPriceId = price.id;
+  return cachedAnnualPriceId;
 }
 
 const updateSchema = z.object({
@@ -1190,7 +1235,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const publishableKey = await getStripePublishableKey();
       res.json({
         publishableKey,
-        subscriptionPricePence: SUBSCRIPTION_PRICE_PENCE,
+        subscriptionPricePence: SUBSCRIPTION_MONTHLY_PRICE_PENCE,        // backward-compat alias
+        subscriptionMonthlyPricePence: SUBSCRIPTION_MONTHLY_PRICE_PENCE,
+        subscriptionAnnualPricePence: SUBSCRIPTION_ANNUAL_PRICE_PENCE,
         creditPacks: CREDIT_PACKS,
       });
     } catch (error) {
@@ -1472,7 +1519,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const stripe = await getUncachableStripeClient();
-      const priceId = await getOrCreateSubscriptionPriceId();
+      const { billingInterval } = req.body; // 'monthly' | 'annual', default 'monthly'
+      const priceId = billingInterval === 'annual'
+        ? await getOrCreateAnnualSubscriptionPriceId()
+        : await getOrCreateMonthlySubscriptionPriceId();
       const appUrl = getAppUrl(req);
 
       const session = await stripe.checkout.sessions.create({
@@ -1589,6 +1639,80 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error: any) {
       console.error("Subscription cancel error:", error);
       res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  app.post("/api/subscription/migrate-to-new-price", requireAuth(), async (req, res) => {
+    try {
+      // Simple admin protection — caller must supply the MIGRATION_SECRET
+      const { migrationSecret } = req.body;
+      if (!process.env.MIGRATION_SECRET || migrationSecret !== process.env.MIGRATION_SECRET) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const newMonthlyPriceId = await getOrCreateMonthlySubscriptionPriceId();
+      const OLD_PRICE_PENCE = 1900;
+
+      // Fetch all active/trialing subscriptions from our DB
+      const allSubs = await storage.getAllActiveSubscriptions();
+      let migrated = 0;
+      let skipped = 0;
+
+      for (const sub of allSubs) {
+        if (!sub.stripeSubscriptionId) { skipped++; continue; }
+        try {
+          const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
+          const subItem = stripeSub.items.data[0];
+          if (!subItem) { skipped++; continue; }
+          if (subItem.price.unit_amount === OLD_PRICE_PENCE) {
+            await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+              items: [{ id: subItem.id, price: newMonthlyPriceId }],
+              proration_behavior: 'none',
+            });
+            migrated++;
+          } else {
+            skipped++; // already on new price or different plan
+          }
+        } catch (err) {
+          console.error(`Migration failed for sub ${sub.stripeSubscriptionId}:`, err);
+          skipped++;
+        }
+      }
+
+      res.json({ migrated, skipped, total: allSubs.length });
+    } catch (error: any) {
+      console.error("Migration error:", error);
+      res.status(500).json({ message: "Migration failed", detail: error?.message });
+    }
+  });
+
+  app.post("/api/subscription/archive-old-price", requireAuth(), async (req, res) => {
+    try {
+      const { migrationSecret } = req.body;
+      if (!process.env.MIGRATION_SECRET || migrationSecret !== process.env.MIGRATION_SECRET) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const OLD_PRICE_PENCE = 1900;
+
+      const products = await stripe.products.list({ active: true, limit: 100 });
+      const subProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
+      if (!subProduct) return res.status(404).json({ message: "Subscription product not found" });
+
+      const allPrices = await stripe.prices.list({ product: subProduct.id, limit: 100 });
+      const oldPrice = allPrices.data.find(
+        p => p.unit_amount === OLD_PRICE_PENCE && (p.recurring as any)?.interval === 'month'
+      );
+
+      if (!oldPrice) return res.json({ archived: false, message: "Old price not found — already archived or never existed" });
+
+      await stripe.prices.update(oldPrice.id, { active: false });
+      res.json({ archived: true, priceId: oldPrice.id });
+    } catch (error: any) {
+      console.error("Archive error:", error);
+      res.status(500).json({ message: "Archive failed", detail: error?.message });
     }
   });
 
