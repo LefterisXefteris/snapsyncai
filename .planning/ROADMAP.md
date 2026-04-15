@@ -104,7 +104,7 @@ Plans:
 **Goal**: Users can prompt and generate AI-written title, description, SEO tags, and AEO tags directly within the product detail view; AI background removal and AI photoshop features are disabled
 **Depends on**: Nothing (independent of security phases)
 **Beads**: lisai-app-0kt
-**Requirements**: PROD-01 (AI content generation), PROD-02 (disable AI background), PROD-03 (disable AI photoshop)
+**Requirements**: PROD-01 (AI content generation), PROD-02 (disable AI background), PROD-03 (disable AI photoshoot)
 **Success Criteria** (what must be TRUE):
   1. Within the product detail view, the user can enter a prompt and generate a product title
   2. Within the product detail view, the user can enter a prompt and generate a product description
@@ -193,4 +193,8 @@ Plans:
   4. All pricing UI (sidebar, home page credits dialog, landing page) reflects the new prices and annual option
   5. The £19/month Stripe price is archived so no new subscriptions can use it
   6. Subscription feature set is unchanged — £9/month and £79/year both grant the same unlimited access as the old £19/month plan
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 10-01-PLAN.md — Update server pricing constants, add annual price helpers, update checkout + config endpoints, add migration and archive admin endpoints; update useCreateSubscriptionCheckout + usePaymentConfig hooks
+- [ ] 10-02-PLAN.md — Add billing interval toggle to sidebar subscribe dialog; update Home.tsx fallback credit pack prices
+- [ ] 10-03-PLAN.md — Update Landing.tsx credit pack prices, add subscription section, update FAQ and JSON-LD; human verification checkpoint
