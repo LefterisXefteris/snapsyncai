@@ -1363,7 +1363,7 @@ export default function Home() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Choose a pack</p>
               <div className="grid grid-cols-3 gap-2">
-                {(paymentConfig?.creditPacks ?? [{ id: 'starter', name: 'Starter', credits: 10, pricePence: 900 }, { id: 'growth', name: 'Growth', credits: 50, pricePence: 3500 }, { id: 'pro', name: 'Pro', credits: 150, pricePence: 7900 }]).map((pack: any) => (
+                {(paymentConfig?.creditPacks ?? [{ id: 'starter', name: 'Starter', credits: 10, pricePence: 450 }, { id: 'growth', name: 'Growth', credits: 50, pricePence: 1750 }, { id: 'pro', name: 'Pro', credits: 150, pricePence: 3950 }]).map((pack: any) => (
                   <button
                     key={pack.id}
                     onClick={() => {
