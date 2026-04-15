@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 09-04-PLAN.md
-last_updated: "2026-04-11T08:42:57.161Z"
-last_activity: 2026-04-11
+status: in_progress
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-04-15T00:12:00.000Z"
+last_activity: 2026-04-15
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 2
-  total_plans: 24
-  completed_plans: 20
-  percent: 20
+  total_plans: 25
+  completed_plans: 21
+  percent: 84
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Users' data stays theirs, payments are credited exactly once, and no unauthenticated path reaches paid AI features.
-**Current focus:** Phase 1 — Credit Idempotency
+**Current focus:** Phase 10 — Pricing Model Update
 
 ## Current Position
 
-Phase: 1 of 4 (Credit Idempotency)
-Plan: 2 of 2 in current phase (Phase 1 COMPLETE)
-Status: Phase complete — ready for verification
-Last activity: 2026-04-11
+Phase: 10 of 10 (Pricing Model Update)
+Plan: 1 of N in current phase (In progress)
+Status: In progress
+Last activity: 2026-04-15
 
-Progress: [██░░░░░░░░] 20%
+Progress: [████████░░] 84%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██░░░░░░░░] 20%
 - Trend: stable
 
 *Updated after each plan completion*
+| Phase 10-pricing-model-update P01 | 12 min | 2 tasks | 3 files |
 | Phase 05-drag-drop-ui P01 | 2 | 1 tasks | 3 files |
 | Phase 05-drag-drop-ui P02 | 12 | 2 tasks | 1 files |
 | Phase 05-drag-drop-ui P03 | 351 | 3 tasks | 1 files |
@@ -113,6 +114,10 @@ Recent decisions affecting current work:
 - [Phase 09]: Phase 9 snap-back fix: explicit 250ms dropAnimation + queueMicrotask-deferred setActiveItem(null) on invalid drop; Cmd+A defers to browser default when focusedGroupId is null
 - [Phase 09]: Phase 9 LARGE_GROUP_THRESHOLD = 20 constant is single source of truth; advisory badge pattern uses amber-100/amber-900 pill with data-testid per group and never blocks interaction
 - [Phase 09]: Phase 9 DroppableNewGroup render gated on groups.length > 0 (not totalFiles > 0) so empty-state does not render a dangling drop target
+- [Phase 10-pricing-model-update]: billingInterval defaults to 'monthly' in useCreateSubscriptionCheckout mutationFn — zero breaking change for existing callers
+- [Phase 10-pricing-model-update]: Annual Stripe price uses same product (metadata.type = 'monthly_subscription') with interval: year — no new product needed
+- [Phase 10-pricing-model-update]: migrate-to-new-price checks unit_amount === 1900 before updating — idempotent, safe to run multiple times
+- [Phase 10-pricing-model-update]: subscriptionPricePence kept as backward-compat alias in /api/payments/config alongside new subscriptionMonthlyPricePence and subscriptionAnnualPricePence fields
 
 ### Roadmap Evolution
 
@@ -128,9 +133,10 @@ None yet.
 - PAY-01 fix requires atomic read-modify-write on `paidSessions.used` — concurrent requests from verify + webhook must not both pass the check; implementation must use a single UPDATE WHERE or SELECT FOR UPDATE
 - CRED-01–05 require a new `ENCRYPTION_KEY` env var to be provisioned in Vercel before Phase 3 deploys — deployment without it would break all platform connection writes
 - Phase 8 requires `COHERE_API_KEY` env var provisioned in Vercel before deploy — deployment without it causes every auto-group call to fall back to filename-only grouping with a warning banner. Treat this identically to the Phase 3 `ENCRYPTION_KEY` deploy prerequisite.
+- Phase 10 requires `MIGRATION_SECRET` env var provisioned in Vercel before running migrate-to-new-price or archive-old-price endpoints — without it both return 403.
 
 ## Session Continuity
 
-Last session: 2026-04-11T08:42:57.158Z
-Stopped at: Completed 09-04-PLAN.md
+Last session: 2026-04-15T00:12:00.000Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None
