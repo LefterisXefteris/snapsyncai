@@ -28,12 +28,14 @@ export function AppSidebar() {
   const recoverSubscription = useRecoverSubscriptionByEmail();
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
 
   const isSubscribed = subscriptionStatus?.subscribed === true;
-  const subscriptionPrice = (paymentConfig?.subscriptionPricePence || 3000) / 100;
+  const monthlyPrice = (paymentConfig?.subscriptionMonthlyPricePence ?? paymentConfig?.subscriptionPricePence ?? 900) / 100;
+  const annualPrice = (paymentConfig?.subscriptionAnnualPricePence ?? 7900) / 100;
 
   const handleSubscribe = () => {
-    createSubscriptionCheckout.mutate(undefined, {
+    createSubscriptionCheckout.mutate(billingInterval, {
       onSuccess: (data) => {
         if (data.checkoutUrl) {
           if (data.sessionId) {
@@ -131,7 +133,7 @@ export function AppSidebar() {
                         onClick={() => setShowSubscribeDialog(true)}
                       >
                         <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                        Subscribe - {"\u00A3"}{subscriptionPrice}/mo
+                        Subscribe - {"\u00A3"}{monthlyPrice}/mo
                       </Button>
                       {!subLoading && (
                         <Button
@@ -178,17 +180,38 @@ export function AppSidebar() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex items-center gap-3 p-3 rounded-md bg-muted">
-              <Crown className="w-4 h-4 shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium" data-testid="text-subscription-price">
-                  {"\u00A3"}{subscriptionPrice} per month
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Unlimited product analysis, SEO, AEO & more
-                </p>
-              </div>
+            {/* Billing interval toggle */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                data-testid="billing-toggle-monthly"
+                onClick={() => setBillingInterval('monthly')}
+                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${
+                  billingInterval === 'monthly'
+                    ? 'border-primary bg-primary/5 text-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary/50'
+                }`}
+              >
+                <span className="font-semibold">{"\u00A3"}{monthlyPrice}/mo</span>
+                <span className="text-xs mt-0.5">Monthly</span>
+              </button>
+              <button
+                data-testid="billing-toggle-annual"
+                onClick={() => setBillingInterval('annual')}
+                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${
+                  billingInterval === 'annual'
+                    ? 'border-primary bg-primary/5 text-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary/50'
+                }`}
+              >
+                <span className="font-semibold">{"\u00A3"}{annualPrice}/yr</span>
+                <span className="text-xs mt-0.5">Annual · save 2 months</span>
+              </button>
             </div>
+            <p className="text-sm font-medium" data-testid="text-subscription-price">
+              {billingInterval === 'annual'
+                ? `\u00A3${annualPrice} per year`
+                : `\u00A3${monthlyPrice} per month`}
+            </p>
             <Separator />
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Unlimited AI product analysis</li>
@@ -219,7 +242,9 @@ export function AppSidebar() {
               ) : (
                 <>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Subscribe - {"\u00A3"}{subscriptionPrice}/mo
+                  {billingInterval === 'annual'
+                    ? `Subscribe - \u00A3${annualPrice}/yr`
+                    : `Subscribe - \u00A3${monthlyPrice}/mo`}
                 </>
               )}
             </Button>
