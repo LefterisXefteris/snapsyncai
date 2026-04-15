@@ -28,7 +28,13 @@ export function usePaymentConfig() {
     queryFn: async () => {
       const res = await fetch('/api/payments/config', { credentials: "include" });
       if (!res.ok) throw new Error("Payment system not available");
-      return res.json() as Promise<{ publishableKey: string; subscriptionPricePence: number; creditPacks: { id: string; name: string; credits: number; pricePence: number }[] }>;
+      return res.json() as Promise<{
+        publishableKey: string;
+        subscriptionPricePence: number;               // backward-compat alias (= monthly)
+        subscriptionMonthlyPricePence: number;
+        subscriptionAnnualPricePence: number;
+        creditPacks: { id: string; name: string; credits: number; pricePence: number }[];
+      }>;
     },
   });
 }
@@ -52,8 +58,8 @@ export function useCreateSubscriptionCheckout() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/create-checkout", {});
+    mutationFn: async (billingInterval: 'monthly' | 'annual' = 'monthly') => {
+      const res = await apiRequest("POST", "/api/subscription/create-checkout", { billingInterval });
       return res.json() as Promise<{ checkoutUrl: string; sessionId: string }>;
     },
     onError: (error) => {
