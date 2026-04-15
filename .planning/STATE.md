@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-04-15T00:12:00.000Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-04-15T00:20:00.000Z"
 last_activity: 2026-04-15
 progress:
   total_phases: 10
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 ## Current Position
 
 Phase: 10 of 10 (Pricing Model Update)
-Plan: 1 of N in current phase (In progress)
+Plan: 2 of N in current phase (In progress)
 Status: In progress
 Last activity: 2026-04-15
 
@@ -118,6 +118,9 @@ Recent decisions affecting current work:
 - [Phase 10-pricing-model-update]: Annual Stripe price uses same product (metadata.type = 'monthly_subscription') with interval: year — no new product needed
 - [Phase 10-pricing-model-update]: migrate-to-new-price checks unit_amount === 1900 before updating — idempotent, safe to run multiple times
 - [Phase 10-pricing-model-update]: subscriptionPricePence kept as backward-compat alias in /api/payments/config alongside new subscriptionMonthlyPricePence and subscriptionAnnualPricePence fields
+- [Phase 10-pricing-model-update P02]: billingInterval state defaults to 'monthly' in sidebar — most common user choice, pre-selects monthly on dialog open
+- [Phase 10-pricing-model-update P02]: monthlyPrice uses three-level ?? chain (subscriptionMonthlyPricePence ?? subscriptionPricePence ?? 900) for graceful backward compat
+- [Phase 10-pricing-model-update P02]: Home.tsx fallback credit pack prices updated to halved values (450, 1750, 3950 pence)
 
 ### Roadmap Evolution
 
@@ -137,6 +140,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T00:12:00.000Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-04-15T00:20:00.000Z
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None
