@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Sparkles, Upload, Store, Zap, Shield, BrainCircuit, Image, Tags, FileText,
-  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart, Coins, Play
+  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart, Coins, Play, Crown
 } from "lucide-react";
 import { SiShopify, SiEtsy } from "react-icons/si";
 import { useClerk } from "@clerk/clerk-react";
@@ -75,9 +75,9 @@ const CREDIT_PACKS = [
     id: "starter",
     name: "Starter",
     credits: 10,
-    price: "£9",
+    price: "£4.50",
     description: "Perfect for trying it out",
-    perCredit: "90p per product",
+    perCredit: "45p per product",
     highlight: false,
     features: ["10 product analyses", "Full AI descriptions", "SEO + AEO content", "Shopify, Etsy & Amazon push", "Credits never expire"],
   },
@@ -85,9 +85,9 @@ const CREDIT_PACKS = [
     id: "growth",
     name: "Growth",
     credits: 50,
-    price: "£35",
+    price: "£17.50",
     description: "Best for regular sellers",
-    perCredit: "70p per product",
+    perCredit: "35p per product",
     highlight: true,
     badge: "Most Popular",
     features: ["50 product analyses", "Full AI descriptions", "SEO + AEO content", "Shopify, Etsy & Amazon push", "Credits never expire"],
@@ -96,9 +96,9 @@ const CREDIT_PACKS = [
     id: "pro",
     name: "Pro",
     credits: 150,
-    price: "£79",
+    price: "£39.50",
     description: "For high-volume stores",
-    perCredit: "53p per product",
+    perCredit: "26p per product",
     highlight: false,
     features: ["150 product analyses", "Full AI descriptions", "SEO + AEO content", "Shopify, Etsy & Amazon push", "Credits never expire"],
   },
@@ -111,7 +111,7 @@ const FAQ_DATA = [
   },
   {
     question: "How do credits work?",
-    answer: "Each credit unlocks full AI analysis for one product. A product can have multiple images (e.g. front, back, detail shots) — they all count as 1 credit. Buy a credit pack once and use them whenever you need — credits never expire. No subscriptions, no recurring charges."
+    answer: "Each credit unlocks full AI analysis for one product. A product can have multiple images (e.g. front, back, detail shots) — they all count as 1 credit. Buy a credit pack once and use them whenever you need — credits never expire. Alternatively, subscribe for unlimited access with no per-product charges."
   },
   {
     question: "How do I create product listings from photos?",
@@ -127,7 +127,7 @@ const FAQ_DATA = [
   },
   {
     question: "How much does SnapSync AI cost?",
-    answer: "Uploading images and getting AI previews is completely free — no credit card required. To unlock full AI-generated descriptions, pricing, SEO, AEO content, and variants, buy a credit pack: Starter (10 credits / £9), Growth (50 credits / £35), or Pro (150 credits / £79). Credits never expire — pay once, use whenever."
+    answer: "Uploading images and getting AI previews is completely free — no credit card required. To unlock full AI-generated descriptions, pricing, SEO, AEO content, and variants, choose a plan: subscribe for £9/month or £79/year for unlimited access, or buy a one-time credit pack — Starter (10 credits / £4.50), Growth (50 credits / £17.50), or Pro (150 credits / £39.50). Credits never expire."
   },
   {
     question: "Can I edit AI-generated product listings before publishing?",
@@ -238,9 +238,11 @@ export default function Landing() {
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
     "offers": [
-      { "@type": "Offer", "price": "9.00", "priceCurrency": "GBP", "name": "Starter — 10 credits" },
-      { "@type": "Offer", "price": "35.00", "priceCurrency": "GBP", "name": "Growth — 50 credits" },
-      { "@type": "Offer", "price": "79.00", "priceCurrency": "GBP", "name": "Pro — 150 credits" },
+      { "@type": "Offer", "price": "9.00", "priceCurrency": "GBP", "name": "Monthly subscription — unlimited", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "9.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "MON" } },
+      { "@type": "Offer", "price": "79.00", "priceCurrency": "GBP", "name": "Annual subscription — unlimited", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "79.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "ANN" } },
+      { "@type": "Offer", "price": "4.50", "priceCurrency": "GBP", "name": "Starter — 10 credits" },
+      { "@type": "Offer", "price": "17.50", "priceCurrency": "GBP", "name": "Growth — 50 credits" },
+      { "@type": "Offer", "price": "39.50", "priceCurrency": "GBP", "name": "Pro — 150 credits" },
     ],
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -626,15 +628,87 @@ export default function Landing() {
                 <Coins className="w-3 h-3" /> Pricing
               </Badge>
               <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-                Pay Once. Credits Never Expire.
+                Simple, Transparent Pricing
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                No subscriptions. No monthly charges. Buy credits when you need them — each credit unlocks full AI analysis for one product.
+                Subscribe for unlimited access, or buy credit packs and pay only for what you use. No hidden fees, no surprises.
               </p>
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary font-medium bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                1 credit = 1 product (all views/angles included)
+                Credits never expire · Cancel subscription anytime
               </div>
+            </div>
+
+            {/* Subscription plans */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 max-w-2xl mx-auto">
+              {/* Monthly */}
+              <Card className="flex flex-col reveal delay-1 bg-background/50 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Crown className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-xl">Pro Monthly</CardTitle>
+                  </div>
+                  <CardDescription>Unlimited access, billed monthly</CardDescription>
+                  <div className="pt-3">
+                    <span className="text-4xl font-display font-bold">£9</span>
+                    <span className="text-muted-foreground text-sm ml-2">/month</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col">
+                  <Separator className="mb-5 border-white/10" />
+                  <ul className="space-y-3 flex-1 mb-6">
+                    {["Unlimited AI analysis", "Full descriptions & pricing", "SEO & AEO content", "Push to all stores", "Cancel anytime"].map((item, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button variant="outline" className="w-full mt-auto rounded-xl border-border/60 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300" onClick={() => openSignIn()}>
+                    Get Started — £9/mo
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Annual */}
+              <Card className="flex flex-col relative overflow-hidden reveal delay-2 border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-background/60 backdrop-blur-xl hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] transition-all duration-300 shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-lime-500 via-emerald-500 to-primary" />
+                <CardHeader className="pb-4 relative z-10">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-primary" />
+                      <CardTitle className="text-xl">Pro Annual</CardTitle>
+                    </div>
+                    <Badge className="text-[10px]">Best value</Badge>
+                  </div>
+                  <CardDescription>Unlimited access, save 2 months</CardDescription>
+                  <div className="pt-3">
+                    <span className="text-4xl font-display font-bold">£79</span>
+                    <span className="text-muted-foreground text-sm ml-2">/year</span>
+                  </div>
+                  <p className="text-xs text-primary mt-1 font-medium">= £6.58/mo · 2 months free</p>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col relative z-10">
+                  <Separator className="mb-5" />
+                  <ul className="space-y-3 flex-1 mb-6">
+                    {["Unlimited AI analysis", "Full descriptions & pricing", "SEO & AEO content", "Push to all stores", "Best per-month rate"].map((item, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full mt-auto rounded-xl shadow-md shadow-primary/20" onClick={() => openSignIn()}>
+                    Get Started — £79/yr
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="text-center mb-8 reveal">
+              <p className="text-sm text-muted-foreground">Or buy credits and pay only for what you use</p>
             </div>
 
             {/* Free tier + Credit packs */}
@@ -720,7 +794,7 @@ export default function Landing() {
             </div>
 
             <p className="text-center text-xs text-muted-foreground mt-8 reveal">
-              Credits never expire · Secure payments via Stripe · No subscriptions, no surprises
+              Credits never expire · Cancel subscription anytime · Secure payments via Stripe
             </p>
           </div>
         </section>
