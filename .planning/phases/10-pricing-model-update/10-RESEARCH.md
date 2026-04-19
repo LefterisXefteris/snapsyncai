@@ -1,187 +1,144 @@
-# Phase 10: Pricing Model Update - Research
+# Phase 10: Pricing Model Update (COMPLETE PIVOT) - Research
 
-**Researched:** 2026-04-15
-**Domain:** Stripe billing / subscription pricing migration
-**Confidence:** HIGH
+**Researched:** 2026-04-19
+**Domain:** Stripe billing, pricing migration, weekly subscription caps, credit system removal
+**Confidence:** HIGH (Stripe API verified via official docs; codebase directly read)
 
 ---
 
 ## Summary
 
-This phase replaces a single £19/month subscription with two plans (£9/month, £79/year), halves all three credit pack prices, auto-migrates existing £19/month subscribers to the new £9 plan, and updates pricing UI across the app.
+The existing app has a monthly/annual subscription model (£9/mo, £79/yr) plus a per-product credit system (3 packs: Starter 10 credits £4.50, Growth 50 credits £17.50, Pro 150 credits £3.95). The new model replaces everything with a single weekly subscription (£4/week, 30 products/week cap) plus an annual option (2 months free). The credit system is removed entirely.
 
-The codebase is self-contained: all Stripe price IDs are resolved at runtime by searching the Stripe API for products by metadata type, then matching on `unit_amount` + `interval`. There are **no hardcoded Stripe price IDs** in environment variables. This means the migration requires updating the in-code constants and adding a new annual price lookup/create path rather than swapping env vars.
+Stripe natively supports `interval: 'week'` for recurring prices — no workarounds needed. Migrating existing subscribers requires iterating `subscriptions.update()` with the new price ID and `proration_behavior: 'none'` so they pay the old price until their next billing date. The codebase already has a working migration route pattern (`/api/subscription/migrate-to-new-price`) that can be adapted directly.
 
-The key server-side operation for subscriber migration is `stripe.subscriptions.update(subId, { items: [{ id: subItem.id, price: newPriceId }], proration_behavior: 'none' })`. Setting `proration_behavior: 'none'` defers the price change to the next renewal — users are not charged immediately, which matches the spec ("migrated at their next renewal").
+The credit system spans: `userCredits` table (schema.ts), `storage.ts` methods (`getUserCredits`, `addCredits`, `deductCredits`, `claimAndGrantCredits`), server routes (`/api/credits/*`), hooks (`useCreditsBalance`, `usePurchaseCredits`, `useVerifyCredits`), and UI in `Home.tsx` (sidebar credit counter, "Buy more" button, Pricing/Credits dialog at line 1339) and `Landing.tsx` (credit packs section, full pricing section). The `paymentStatus` column on the `images` table and the `unlock-images` endpoint are the access gate that needs rethinking under the weekly cap model.
 
-**Primary recommendation:** Update `SUBSCRIPTION_PRICE_PENCE`, `CREDIT_PACKS`, and `getOrCreateSubscriptionPriceId` in `server/routes.ts`; add a new `getOrCreateAnnualSubscriptionPriceId`; update `create-checkout` to accept a `billingInterval` body param; add a `/api/subscription/migrate-to-new-price` endpoint; update UI in `app-sidebar.tsx`, `Landing.tsx`, and `Home.tsx`.
+**Primary recommendation:** Add a weekly product count check (query `images` table for `createdAt >= monday_utc AND paymentStatus = 'paid'` per user), replace credit deduction with this cap check, remove all credit UI and routes, and run a migration endpoint to move existing subscribers to the new weekly price.
 
 ---
 
 ## Standard Stack
 
-No new libraries are needed. All Stripe operations use the existing `stripe` SDK (already installed) via `getUncachableStripeClient()`.
+### Core (already in project — no new dependencies needed)
+| Library | Version | Purpose | Status |
+|---------|---------|---------|--------|
+| stripe | latest (API `2025-08-27.basil`) | Stripe API client | In use — `stripeClient.ts` |
+| drizzle-orm | current | Database ORM + query builder | In use — `schema.ts`, `db.ts` |
+| drizzle-zod | current | Schema validation | In use |
 
-### Existing Infrastructure
-| Component | File | Role |
-|-----------|------|------|
-| Stripe client | `server/stripeClient.ts` | Returns `new Stripe(secretKey, { apiVersion: '2025-08-27.basil' })` |
-| Payment routes | `server/routes.ts` lines 284–383 | Price constants, `getOrCreate*` helpers, all `/api/subscription/*` and `/api/credits/*` routes |
-| Webhook handler | `server/webhookHandlers.ts` | Handles `checkout.session.completed` (subscription + payment modes), `customer.subscription.updated/deleted` |
-| Subscription schema | `shared/schema.ts` lines 151–167 | `subscriptions` table: `userId`, `stripeCustomerId`, `stripeSubscriptionId`, `status`, `currentPeriodEnd` |
-| Payment config hook | `client/src/hooks/use-images.ts` line 25 | `usePaymentConfig()` fetches `/api/payments/config` → `{ publishableKey, subscriptionPricePence, creditPacks }` |
-| Checkout hook | `client/src/hooks/use-images.ts` line 51 | `useCreateSubscriptionCheckout()` — currently sends empty body to `POST /api/subscription/create-checkout` |
+All required capabilities (weekly billing, subscription updates, refunds, price archival) exist in the Stripe SDK already imported. No new packages needed.
 
 ---
 
 ## Architecture Patterns
 
-### How Stripe Price IDs Are Resolved (Current)
+### Stripe Weekly Price — Confirmed Native Support
 
-The app does **not** use env-var price IDs. Instead, at checkout time it calls `getOrCreateSubscriptionPriceId()` or `getOrCreateCreditPackPriceId(packId)`. Each function:
-
-1. Lists active Stripe products, finds one matching `metadata.type === 'monthly_subscription'` (or `'credit_pack'` + `packId`)
-2. Lists prices for that product, finds one matching `unit_amount === PENCE_CONSTANT` and correct interval
-3. Returns the price ID if found; otherwise creates the product+price and returns the new ID
-
-This pattern must be replicated for the new annual price.
-
-### Pattern 1: Add Annual Price Lookup/Create
+Stripe natively supports `interval: 'week'`. Valid `recurring.interval` values: `day`, `week`, `month`, `year`. The `interval_count` parameter allows multiples (e.g., every 2 weeks).
 
 ```typescript
-// server/routes.ts
-const SUBSCRIPTION_MONTHLY_PRICE_PENCE = 900;   // was 1900
-const SUBSCRIPTION_ANNUAL_PRICE_PENCE  = 7900;
-
-let cachedMonthlyPriceId: string | null = null;
-let cachedAnnualPriceId:  string | null = null;
-
-async function getOrCreateMonthlySubscriptionPriceId(): Promise<string> {
-  if (cachedMonthlyPriceId) return cachedMonthlyPriceId;
-  const stripe = await getUncachableStripeClient();
-  const products = await stripe.products.list({ active: true, limit: 100 });
-  const existingProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
-  if (existingProduct) {
-    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
-    const match = prices.data.find(
-      p => p.unit_amount === SUBSCRIPTION_MONTHLY_PRICE_PENCE
-        && p.type === 'recurring'
-        && (p.recurring as any)?.interval === 'month'
-    );
-    if (match) { cachedMonthlyPriceId = match.id; return match.id; }
-  }
-  // ... create product if needed, then:
-  const price = await stripe.prices.create({
-    product: productId,
-    unit_amount: SUBSCRIPTION_MONTHLY_PRICE_PENCE,
-    currency: 'gbp',
-    recurring: { interval: 'month' },
-  });
-  cachedMonthlyPriceId = price.id;
-  return price.id;
-}
-
-async function getOrCreateAnnualSubscriptionPriceId(): Promise<string> {
-  if (cachedAnnualPriceId) return cachedAnnualPriceId;
-  const stripe = await getUncachableStripeClient();
-  const products = await stripe.products.list({ active: true, limit: 100 });
-  const existingProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
-  // same product, different price interval
-  if (existingProduct) {
-    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
-    const match = prices.data.find(
-      p => p.unit_amount === SUBSCRIPTION_ANNUAL_PRICE_PENCE
-        && p.type === 'recurring'
-        && (p.recurring as any)?.interval === 'year'
-    );
-    if (match) { cachedAnnualPriceId = match.id; return match.id; }
-  }
-  const price = await stripe.prices.create({
-    product: productId,   // same product as monthly
-    unit_amount: SUBSCRIPTION_ANNUAL_PRICE_PENCE,
-    currency: 'gbp',
-    recurring: { interval: 'year' },
-  });
-  cachedAnnualPriceId = price.id;
-  return price.id;
-}
-```
-
-### Pattern 2: Update Checkout to Accept billingInterval
-
-```typescript
-// server/routes.ts — POST /api/subscription/create-checkout
-app.post("/api/subscription/create-checkout", requireAuth(), async (req, res) => {
-  const { billingInterval } = req.body; // 'monthly' | 'annual', default 'monthly'
-  const priceId = billingInterval === 'annual'
-    ? await getOrCreateAnnualSubscriptionPriceId()
-    : await getOrCreateMonthlySubscriptionPriceId();
-  // ... rest unchanged
+// Source: https://docs.stripe.com/api/prices/create
+const price = await stripe.prices.create({
+  product: productId,
+  unit_amount: 400,        // £4.00 in pence
+  currency: 'gbp',
+  recurring: { interval: 'week' },
 });
 ```
 
+### Annual Price (2 months free)
+
+Two modelling options:
+
+**Option A — Discounted unit_amount on `interval: 'year'` (RECOMMENDED)**
 ```typescript
-// client/src/hooks/use-images.ts
-export function useCreateSubscriptionCheckout() {
-  return useMutation({
-    mutationFn: async (billingInterval: 'monthly' | 'annual' = 'monthly') => {
-      const res = await apiRequest("POST", "/api/subscription/create-checkout", { billingInterval });
-      return res.json() as Promise<{ checkoutUrl: string; sessionId: string }>;
-    },
-  });
+// £4/week * 50 weeks = £200 → round to £173 (saves £27 vs paying weekly for 52 weeks)
+const price = await stripe.prices.create({
+  product: productId,
+  unit_amount: 17300,   // £173.00 in pence
+  currency: 'gbp',
+  recurring: { interval: 'year' },
+});
+```
+
+**Option B — Coupon on weekly price** — not recommended. Coupon management adds complexity to checkout flow. Option A is how the existing annual plan is already modelled in the codebase.
+
+### Existing Subscriber Migration Pattern
+
+The codebase already has a working migration endpoint at `/api/subscription/migrate-to-new-price` (routes.ts line 1645). Pattern:
+1. Protected by `MIGRATION_SECRET` env var
+2. Fetches all active subscriptions from DB (`storage.getAllActiveSubscriptions()`)
+3. Calls `stripe.subscriptions.update()` with `items: [{ id: subItem.id, price: newPriceId }]` and `proration_behavior: 'none'`
+
+`proration_behavior: 'none'` means subscribers continue paying their current price until their next billing date, then the new weekly price kicks in. No surprise charges at migration time.
+
+```typescript
+// Source: routes.ts line 1669 — reuse this exact pattern
+await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+  items: [{ id: subItem.id, price: newWeeklyPriceId }],
+  proration_behavior: 'none',
+});
+```
+
+### Price Archival Pattern
+
+The codebase has `/api/subscription/archive-old-price` (routes.ts line 1690):
+```typescript
+await stripe.prices.update(oldPrice.id, { active: false });
+```
+Archiving (`active: false`) prevents new subscriptions from using the price. **Existing subscriptions on that price continue billing normally** — they are not affected. Must archive after migrating all subscribers. Both old monthly (900 pence) and old annual (7900 pence) prices need archiving, plus all 3 credit pack prices.
+
+### Weekly Product Cap — Implementation
+
+**No new DB column needed.** The `images` table already has `createdAt` (timestamp), `sessionId` (userId), `paymentStatus`, and `productGroupId`.
+
+**Critical detail:** Count unique products, not image rows. A product with 3 images = 3 rows but = 1 product. Use `DISTINCT COALESCE(productGroupId, CAST(id AS text))`.
+
+**Week boundary:** ISO week = UTC Monday 00:00:00. Consistent, timezone-predictable.
+
+```typescript
+// Add to storage.ts or inline in routes.ts
+async function getWeeklyProductCount(userId: string): Promise<number> {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setUTCHours(0, 0, 0, 0);
+  const day = weekStart.getUTCDay(); // 0=Sun, 1=Mon
+  const diff = day === 0 ? -6 : 1 - day; // Roll to Monday
+  weekStart.setUTCDate(weekStart.getUTCDate() + diff);
+
+  const [result] = await db
+    .select({
+      count: sql<number>`count(distinct coalesce(${images.productGroupId}, cast(${images.id} as text)))`
+    })
+    .from(images)
+    .where(
+      and(
+        eq(images.sessionId, userId),
+        eq(images.paymentStatus, 'paid'),
+        sql`${images.createdAt} >= ${weekStart}`
+      )
+    );
+  return Number(result?.count ?? 0);
 }
 ```
 
-### Pattern 3: Migrate Existing Subscribers (Server-Side)
-
-The migration endpoint must:
-1. List all subscriptions in the local DB with status `active` or `trialing`
-2. Retrieve the Stripe subscription for each; check `items.data[0].price.unit_amount`
-3. If it equals the old price (1900 pence), update via `stripe.subscriptions.update`
+### Subscription Schema — Current State
 
 ```typescript
-// Source: https://docs.stripe.com/api/subscriptions/update
-// server/routes.ts — POST /api/subscription/migrate-to-new-price (admin/one-time endpoint)
-const stripe = await getUncachableStripeClient();
-const newMonthlyPriceId = await getOrCreateMonthlySubscriptionPriceId();
-
-// Retrieve current sub to get the subscription item ID
-const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-const subItemId = stripeSub.items.data[0].id;
-const currentPriceAmount = stripeSub.items.data[0].price.unit_amount;
-
-if (currentPriceAmount === 1900) { // old £19 price
-  await stripe.subscriptions.update(stripeSubscriptionId, {
-    items: [{ id: subItemId, price: newMonthlyPriceId }],
-    proration_behavior: 'none',   // change takes effect at next renewal, no immediate charge
-  });
-}
+// shared/schema.ts line 151
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+  status: text("status").notNull().default("active"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 ```
 
-### Pattern 4: Archive the Old £19 Price
-
-```typescript
-// Source: https://docs.stripe.com/api/prices/update
-// Run once after migration. Find the old price ID first:
-const products = await stripe.products.list({ active: true, limit: 100 });
-const subProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
-const oldPrices = await stripe.prices.list({ product: subProduct!.id, limit: 100 });
-const oldPrice = oldPrices.data.find(p => p.unit_amount === 1900 && p.recurring?.interval === 'month');
-if (oldPrice) {
-  await stripe.prices.update(oldPrice.id, { active: false });
-}
-```
-
-### Recommended Project Structure (No Changes)
-
-No new files needed beyond `server/routes.ts` edits. The migration endpoint can live in the same file as the other subscription routes.
-
-### Anti-Patterns to Avoid
-
-- **Deleting Stripe prices:** Stripe prices cannot be deleted, only archived (set `active: false`). Attempting to delete will error.
-- **Changing `unit_amount` on existing price:** Stripe prices are immutable after creation. You must create a new price object.
-- **`proration_behavior: 'always_invoice'` for migration:** This would immediately charge (or credit) subscribers for the price difference. Use `'none'` so the change takes effect at renewal.
-- **Running migration via a webhook trigger:** Migration is a one-off admin operation, not an event-driven flow. Use an authenticated endpoint called once.
+No `billingInterval` column exists. To show "Renews weekly" vs "Renews annually" in UI, either add a column or derive from Stripe at status-check time. Adding a `billingInterval` column is cleaner.
 
 ---
 
@@ -189,164 +146,299 @@ No new files needed beyond `server/routes.ts` edits. The migration endpoint can 
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Subscription item ID lookup | Custom DB tracking of sub item IDs | `stripe.subscriptions.retrieve(subId).items.data[0].id` | Stripe's items array is the source of truth |
-| Price idempotency | Hash/cache logic | Existing `getOrCreate*` pattern already handles this | Already in codebase |
-| Proration calculation | Custom billing math | Stripe `proration_behavior: 'none'` | Stripe handles all billing cycle math |
+| Weekly billing | Custom recurring logic | `stripe.prices.create({ recurring: { interval: 'week' } })` | Stripe handles all billing natively |
+| Subscriber migration | Custom price swap logic | Adapt existing `/api/subscription/migrate-to-new-price` route | Already battle-tested in this codebase |
+| Price archival | Delete old prices | `stripe.prices.update(id, { active: false })` | Prices are immutable records; deletion not supported |
+| Refund credit balances | Manual bank transfers | `stripe.refunds.create({ payment_intent: pi_xxx, amount: N })` | Stripe Refunds API handles automatically |
+| Weekly product count | Counter column + reset job | Query `images` table with `createdAt >= weekStart` | Data already exists; no extra state to maintain |
 
 ---
 
 ## Common Pitfalls
 
-### Pitfall 1: Old Price ID Still Cached
-**What goes wrong:** `cachedPriceId` (module-level variable in `server/routes.ts` line 340) caches the old £19 price ID for the lifetime of the server process. After migration, if a server instance still has the old ID cached, new checkouts would fail (Stripe rejects archived prices for new sessions).
-**Why it happens:** The `getOrCreateSubscriptionPriceId` function checks `cachedPriceId !== null` first and returns immediately without re-querying Stripe.
-**How to avoid:** Rename the cached variable (`cachedMonthlyPriceId`) and reset it to `null` when the constants change. Since the constant changes from 1900 to 900, the `unit_amount === PENCE_CONSTANT` match will naturally fail and force creation of a new price. But any warm server process with the old ID in cache must restart. In practice this is fine — a deploy restarts the server.
-**Warning signs:** Checkout session creation failing with "price has been archived" Stripe error after deploy.
+### Pitfall 1: Migrating Without proration_behavior: 'none'
+**What goes wrong:** Default is `create_prorations`, which charges/credits the difference immediately. A subscriber on £9/month moved to £4/week mid-period gets an unexpected charge.
+**How to avoid:** Always use `proration_behavior: 'none'` in bulk migration. Old price until next billing date, then new price.
+**Warning signs:** Unexpected invoices generated at migration time.
 
-### Pitfall 2: Missing billingInterval Handling in verify/webhook
-**What goes wrong:** The `/api/subscription/verify` and webhook handler (`webhookHandlers.ts`) store `currentPeriodEnd` but do not store or check the billing interval. For annual subscriptions, `currentPeriodEnd` will be ~12 months out, which is fine. But the sidebar shows "Renews [date]" which works correctly for both intervals — no code change needed for the status display itself.
-**Why it happens:** The `subscriptions` schema has no `billingInterval` column.
-**How to avoid:** No schema change required. The `currentPeriodEnd` field communicates the right information to the UI regardless of interval. However, if a future feature needs to show "billed annually" vs "billed monthly", a `billingInterval` column would need to be added to the `subscriptions` table. For this phase, no schema migration is needed.
+### Pitfall 2: Counting Weekly Products Incorrectly
+**What goes wrong:** Counting `images` rows instead of unique products. A 3-image grouped product = 3 rows = 1 product. User hits cap at 10 products if you count rows.
+**How to avoid:** Use `DISTINCT COALESCE(productGroupId, CAST(id AS text))`.
+**Warning signs:** Users report cap triggering too early.
 
-### Pitfall 3: Landing.tsx CREDIT_PACKS is Hardcoded Locally
-**What goes wrong:** `Landing.tsx` has its own `CREDIT_PACKS` array (lines 73–105) with hardcoded prices (`£9`, `£35`, `£79`). This is separate from the server's `CREDIT_PACKS` constant and separate from the `paymentConfig` API endpoint. Changes to the server constant do NOT automatically update the landing page.
-**Why it happens:** Landing page is a static marketing page that doesn't fetch live pricing. It hardcodes display values.
-**How to avoid:** Update `Landing.tsx` CREDIT_PACKS array manually as part of this phase. Also update the `perCredit` strings, FAQ answer text, and the JSON-LD `offers` array in `softwareJsonLd`.
+### Pitfall 3: Archiving Prices Before Migrating Subscribers
+**What goes wrong:** Archiving a price doesn't affect existing subscriptions, but if you archive before migrating, the migration code looking for the old price by `unit_amount` will still find it (archive lookup uses `active: false`). However, the existing archive endpoint specifically lists only `active: true` prices when searching.
+**How to avoid:** Run migration first, then archive. Keep the sequence documented.
 
-### Pitfall 4: Home.tsx Credits Dialog Fallback Values Are Hardcoded
-**What goes wrong:** The credits dialog in `Home.tsx` (line 1366) has inline fallback values `[{ id: 'starter', pricePence: 900 }, { id: 'growth', pricePence: 3500 }, { id: 'pro', pricePence: 7900 }]`. These are the OLD prices and will display incorrectly if `paymentConfig` fails to load.
-**Why it happens:** Defensive fallback in case the API is down. The fallback never updated.
-**How to avoid:** Update the fallback values in `Home.tsx` to the new pences (450, 1750, 3950).
+### Pitfall 4: paymentStatus Under New Model
+**What goes wrong:** Under credits model, images start `paymentStatus: 'unpaid'` and get set to `'paid'` when credits are spent. Under new model, subscriber uploads should be `'paid'` immediately if within cap.
+**How to avoid:** At upload time (`/api/images/upload`), check subscription active AND weekly count < 30. If so, set `paymentStatus: 'paid'`. If cap exceeded, either block the upload (hard block) or set `'unpaid'` (soft). The existing `hasActiveSubscription` path already sets `'paid'` — extend this with the cap check.
 
-### Pitfall 5: `usePaymentConfig` Return Type Missing Annual Price
-**What goes wrong:** `usePaymentConfig()` in `use-images.ts` (line 31) types the return as `{ publishableKey, subscriptionPricePence, creditPacks }` — single price. If the sidebar needs to know both prices, the API response needs updating too.
-**Why it happens:** Currently only one subscription price exists.
-**How to avoid:** Update `/api/payments/config` to return `{ subscriptionMonthlyPricePence, subscriptionAnnualPricePence, creditPacks, ... }` and update the TypeScript type in `usePaymentConfig`.
+### Pitfall 5: Weekly Reset Timezone Ambiguity
+**What goes wrong:** "Week starts Monday" means different times for different users.
+**How to avoid:** Define reset as UTC Monday 00:00:00. Document this for users ("resets every Monday at midnight UTC").
 
-### Pitfall 6: Sidebar Subscribe Button Shows Single Price
-**What goes wrong:** `app-sidebar.tsx` line 33 computes `subscriptionPrice` from `paymentConfig.subscriptionPricePence`. The subscribe button label is "Subscribe - £{subscriptionPrice}/mo". With two plans, this must show a plan-selection UI (monthly vs annual toggle) before redirecting to checkout.
-**Why it happens:** Current design assumes one price.
-**How to avoid:** Add a `billingInterval` state (`'monthly' | 'annual'`) to `AppSidebar`. The subscribe dialog needs two radio/toggle options. Pass the selected interval to `createSubscriptionCheckout.mutate(billingInterval)`.
+### Pitfall 6: Credit Balance Refunds Are Not Automatic
+**What goes wrong:** Users who purchased credits but have remaining balance are owed money. Silently removing the credit system without refunding is a legal/trust issue.
+**How to avoid:** Before removing credit routes, identify users with `userCredits.balance > 0`. Refund via Stripe. See credit refund flow section below.
+
+### Pitfall 7: Webhook Handler Still Processing Credit Purchases
+**What goes wrong:** `webhookHandlers.ts` line 32-48 handles `checkout.session.completed` with `mode === 'payment'` to grant credits. After credits are removed, this code path becomes dead but harmless — unless Stripe sends a webhook for an old credit purchase.
+**How to avoid:** Remove the credit webhook handler branch, but only after all in-flight credit purchases have resolved.
 
 ---
 
-## All Files That Need to Change
+## Credit Refund Flow (Critical Path)
 
-| File | What Changes |
-|------|-------------|
-| `server/routes.ts` | (1) Rename `SUBSCRIPTION_PRICE_PENCE` → `SUBSCRIPTION_MONTHLY_PRICE_PENCE = 900`, add `SUBSCRIPTION_ANNUAL_PRICE_PENCE = 7900`. (2) Update `CREDIT_PACKS` pricePence: starter 450, growth 1750, pro 3950. (3) Rename `cachedPriceId` → `cachedMonthlyPriceId`, add `cachedAnnualPriceId`. (4) Rename `getOrCreateSubscriptionPriceId` → `getOrCreateMonthlySubscriptionPriceId`, add `getOrCreateAnnualSubscriptionPriceId`. (5) Update `create-checkout` to accept `billingInterval` body param and call the appropriate helper. (6) Update `GET /api/payments/config` to return `subscriptionMonthlyPricePence` and `subscriptionAnnualPricePence`. (7) Add `POST /api/subscription/migrate-to-new-price` endpoint (admin, requires auth). (8) Add `POST /api/subscription/archive-old-price` endpoint (admin, run once). |
-| `server/webhookHandlers.ts` | No changes needed. The webhook already handles `checkout.session.completed` for subscription mode and stores `currentPeriodEnd` from the retrieved subscription — this works correctly for both monthly and annual. |
-| `shared/schema.ts` | No changes needed. The `subscriptions` table does not need a `billingInterval` column for this phase. |
-| `client/src/hooks/use-images.ts` | (1) Update `useCreateSubscriptionCheckout` mutationFn to accept `billingInterval: 'monthly' | 'annual'` and pass it in the request body. (2) Update `usePaymentConfig` return type to include `subscriptionMonthlyPricePence` and `subscriptionAnnualPricePence`. |
-| `client/src/components/app-sidebar.tsx` | (1) Add `billingInterval` state. (2) Update subscribe dialog to show monthly vs annual toggle. (3) Update button label. (4) Pass `billingInterval` to `createSubscriptionCheckout.mutate()`. |
-| `client/src/pages/Landing.tsx` | (1) Update `CREDIT_PACKS` array: Starter £4.50, Growth £17.50, Pro £39.50, update `perCredit` strings. (2) Update `softwareJsonLd` offers prices. (3) Update FAQ answer text for "How much does SnapSync AI cost?". (4) Add subscription pricing section (monthly £9 / annual £79) to the pricing section or add a subscription card — currently the landing page only shows credit packs and no subscription option. |
-| `client/src/pages/Home.tsx` | (1) Update fallback values in credits dialog (line 1366) to new pences. |
+**Data available:** `userCredits.balance` (remaining credits), `userCredits.lifetimeCredits`, `paidSessions` table (has `checkoutSessionId`, `amountPaid` in pence).
+
+**To issue a Stripe refund, need `payment_intent` ID.** `paidSessions` stores Stripe checkout session IDs (`cs_xxx`), not payment intents. Bridge:
+```typescript
+const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+const paymentIntentId = session.payment_intent; // pi_xxx
+```
+
+**Refund flow:**
+```typescript
+// Source: https://docs.stripe.com/api/refunds/create
+await stripe.refunds.create({
+  payment_intent: paymentIntentId,
+  amount: refundAmountPence, // partial refund — pence value of remaining credits
+});
+```
+
+**Complication:** Users may have bought multiple packs (multiple `paidSessions` rows). Need to calculate partial refunds across multiple payment intents. Recommendation: **build an admin endpoint that returns a list of users with balances and estimated refund amounts; process refunds via Stripe Dashboard manually or approve them one by one**. Do not automate fully in Phase 10 — this is an operator task.
+
+**Credit pack prices (for refund calculation):**
+- Starter: 10 credits = £4.50 → 45p/credit
+- Growth: 50 credits = £17.50 → 35p/credit
+- Pro: 150 credits = £39.50 → ~26p/credit
+
+Since we don't know which pack each remaining credit came from, use the lowest rate (26p/credit) for conservative refund, or the highest (45p/credit) for user-favorable refund. User-favorable is the right call legally.
 
 ---
 
 ## Code Examples
 
-### Retrieve Subscription Item ID (Required for Migration)
-
+### New Weekly Price Creation
 ```typescript
-// Source: https://docs.stripe.com/api/subscriptions/update
-const stripe = await getUncachableStripeClient();
-const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-const subItemId = stripeSub.items.data[0].id;          // 'si_xxxx'
-const currentAmount = stripeSub.items.data[0].price.unit_amount; // 1900 for old £19 price
+// Source: Stripe API docs — https://docs.stripe.com/api/prices/create
+const SUBSCRIPTION_WEEKLY_PRICE_PENCE = 400; // £4.00
+let cachedWeeklyPriceId: string | null = null;
 
-await stripe.subscriptions.update(stripeSubscriptionId, {
-  items: [{ id: subItemId, price: newPriceId }],
-  proration_behavior: 'none',  // defers to next renewal
-});
+async function getOrCreateWeeklySubscriptionPriceId(): Promise<string> {
+  if (cachedWeeklyPriceId) return cachedWeeklyPriceId;
+  const stripe = await getUncachableStripeClient();
+  const products = await stripe.products.list({ active: true, limit: 100 });
+  const existingProduct = products.data.find(p => p.metadata?.type === 'weekly_subscription');
+
+  if (existingProduct) {
+    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
+    const match = prices.data.find(
+      p => p.unit_amount === SUBSCRIPTION_WEEKLY_PRICE_PENCE
+        && p.type === 'recurring'
+        && (p.recurring as any)?.interval === 'week'
+    );
+    if (match) { cachedWeeklyPriceId = match.id; return match.id; }
+  }
+
+  let productId: string;
+  if (existingProduct) {
+    productId = existingProduct.id;
+  } else {
+    const product = await stripe.products.create({
+      name: 'SnapSync AI',
+      description: 'Up to 30 AI-powered product listings per week',
+      metadata: { type: 'weekly_subscription' },
+    });
+    productId = product.id;
+  }
+
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: SUBSCRIPTION_WEEKLY_PRICE_PENCE,
+    currency: 'gbp',
+    recurring: { interval: 'week' },
+  });
+  cachedWeeklyPriceId = price.id;
+  return cachedWeeklyPriceId;
+}
 ```
 
-### Archive a Price
-
+### Weekly Cap Check in unlock-images Endpoint
 ```typescript
-// Source: https://docs.stripe.com/api/prices/update
-await stripe.prices.update(oldPriceId, { active: false });
+// Replaces the credit deduction block (routes.ts lines 1741-1780)
+const WEEKLY_PRODUCT_LIMIT = 30;
+
+const weeklyCount = await getWeeklyProductCount(userId);
+const remaining = WEEKLY_PRODUCT_LIMIT - weeklyCount;
+
+if (remaining <= 0) {
+  return res.status(403).json({
+    message: "Weekly limit reached",
+    detail: `You've used all ${WEEKLY_PRODUCT_LIMIT} products for this week. Your limit resets on Monday.`,
+    weeklyLimit: WEEKLY_PRODUCT_LIMIT,
+    used: weeklyCount,
+    resetsAt: nextMondayUTC(),
+  });
+}
+
+// If partial unlock needed (more unpaid images than remaining cap):
+const imagesToUnlock = unpaidImages.slice(0, remaining);
+// Process imagesToUnlock, not all unpaidImages
 ```
 
-### Create Annual Stripe Price
-
+### Subscription Migration to Weekly (adapt existing endpoint)
 ```typescript
-// Source: https://docs.stripe.com/api/prices/create
-const price = await stripe.prices.create({
-  product: productId,          // same product as monthly
-  unit_amount: 7900,           // £79.00 in pence
-  currency: 'gbp',
-  recurring: { interval: 'year' },
-});
+// POST /api/subscription/migrate-to-weekly
+// Protected by MIGRATION_SECRET
+
+const newWeeklyPriceId = await getOrCreateWeeklySubscriptionPriceId();
+const allSubs = await storage.getAllActiveSubscriptions();
+let migrated = 0, skipped = 0;
+
+for (const sub of allSubs) {
+  const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
+  const subItem = stripeSub.items.data[0];
+  if (!subItem) { skipped++; continue; }
+
+  // Skip if already on weekly price
+  if ((subItem.price.recurring as any)?.interval === 'week') { skipped++; continue; }
+
+  await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+    items: [{ id: subItem.id, price: newWeeklyPriceId }],
+    proration_behavior: 'none',
+  });
+  migrated++;
+}
+
+res.json({ migrated, skipped, total: allSubs.length });
 ```
 
-### Annual Checkout Session
+---
 
-```typescript
-// Source: https://docs.stripe.com/api/checkout/sessions/create
-const session = await stripe.checkout.sessions.create({
-  payment_method_types: ['card'],
-  line_items: [{ price: annualPriceId, quantity: 1 }],
-  mode: 'subscription',
-  success_url: `${appUrl}/?subscription=success&checkout_session_id={CHECKOUT_SESSION_ID}`,
-  cancel_url: `${appUrl}/?subscription=cancelled`,
-  metadata: { userId },
-});
-// Returning subscriber verify flow is identical — no change to /api/subscription/verify
-```
+## Complete Credits UI Removal Inventory
+
+All locations to delete (clean delete, not hidden):
+
+**server/routes.ts**
+- Line 284: `SUBSCRIPTION_MONTHLY_PRICE_PENCE` constant — replace with `SUBSCRIPTION_WEEKLY_PRICE_PENCE`
+- Lines 287-291: `CREDIT_PACKS` constant — delete
+- Lines 293-338: `cachedCreditPriceIds` + `getOrCreateCreditPackPriceId()` — delete
+- Lines 344-385: `getOrCreateMonthlySubscriptionPriceId()` — delete (replaced by weekly)
+- Line 1238-1241: `/api/payments/config` response — remove `subscriptionPricePence`, `subscriptionMonthlyPricePence`, `creditPacks`; add `subscriptionWeeklyPricePence`, `weeklyProductLimit`
+- Lines 1249-1318: All `/api/credits/balance`, `/api/credits/purchase`, `/api/credits/verify` routes — delete
+
+**server/storage.ts**
+- Lines 78-81 (interface): `getUserCredits`, `addCredits`, `deductCredits`, `claimAndGrantCredits` — remove from interface
+- Lines 312-398 (implementation): All four credit methods — delete
+
+**server/webhookHandlers.ts**
+- Lines 32-48: `checkout.session.completed` with `mode === 'payment'` handler — delete this branch
+
+**client/src/hooks/use-images.ts**
+- Line 36: `creditPacks` from `usePaymentConfig` return type — remove
+- Lines 840-884: `useCreditsBalance`, `usePurchaseCredits`, `useVerifyCredits` — delete all three
+
+**client/src/pages/Home.tsx**
+- Line 8: Remove `useCreditsBalance`, `usePurchaseCredits`, `useVerifyCredits` from import
+- Lines 62-64: Remove `creditsData`, `purchaseCredits`, `verifyCredits` declarations
+- Line 66: Remove `showPricingDialog` state
+- Lines 136-141: Remove `creditsParam` URL handling block
+- Lines 677-688: Remove credit balance display in left panel footer
+- Lines 709-723: Remove "unanalyzed items" / credits banner
+- Lines 1339-1393: Delete entire "Pricing / Credits Dialog"
+
+**client/src/pages/Landing.tsx**
+- Lines 77-103: `creditPacks` array
+- Lines 113-131: FAQ answers referencing credits (questions 2, 3, 4, 5 touch credits)
+- Lines 711-796: "Or buy credits" section + all credit pack buttons
+- Lines 241-245: Schema.org credit pack offers in JSON-LD
+- Lines 342, 852: "Credits never expire" copy strings
+- All inline "credits" references in feature descriptions (lines ~154-167)
+
+**client/src/components/app-sidebar.tsx**
+- Line 31: `billingInterval` state is `'monthly' | 'annual'` — change to `'weekly' | 'annual'`
+- Lines 34-35: Price calculations from `paymentConfig` — update to weekly pricing
+- Lines 136, 194, 207: Monthly price display strings — update to weekly
 
 ---
 
 ## State of the Art
 
-| Old Approach | Current Approach | Impact |
-|--------------|------------------|--------|
-| Single monthly price constant | Two price constants (monthly + annual) | Doubles the `getOrCreate` helpers; minor complexity increase |
-| Single cached price ID | Two cached price IDs | Add one module-level variable |
-| No billing interval in checkout | `billingInterval` body param | One-line addition to hook + route |
-| No migration logic | Admin endpoint + Stripe `subscriptions.update` | New endpoint ~25 lines |
+| Old Approach | New Approach | Impact |
+|--------------|--------------|--------|
+| Monthly subscription (£9/mo, `interval: month`) | Weekly subscription (£4/wk, `interval: week`) | Stripe `interval: 'week'` — fully supported natively |
+| Annual subscription (£79/yr = £7900 pence) | Annual subscription (~£173/yr = 2 months free) | Same `interval: 'year'` model, new price amount |
+| Credit packs (pay-per-product, one-time checkout) | Removed entirely | All credit routes, UI, DB methods deleted |
+| Unlimited products for subscribers | 30 products/week cap | Weekly count query on existing `images` table |
+| paymentStatus gate (paid/unpaid via credit deduction) | paymentStatus gate (paid/unpaid via weekly cap) | Replaces `deductCredits` with cap check in unlock flow |
+
+**Deprecated/outdated after this phase:**
+- `CREDIT_PACKS` constant: Remove
+- `getOrCreateCreditPackPriceId`: Remove
+- `getOrCreateMonthlySubscriptionPriceId`: Remove (replace with weekly)
+- `userCredits` table: Deprecate (keep data, stop writing)
+- `claimAndGrantCredits` storage method: Remove
 
 ---
 
 ## Open Questions
 
-1. **Landing page subscription section**
-   - What we know: The landing page currently shows NO subscription plan — only credit packs. The pricing section header says "No subscriptions." This is a major copy/design change.
-   - What's unclear: Should a new subscription pricing section replace the "No subscriptions" hero copy, or sit alongside the credit packs section?
-   - Recommendation: Add a subscription card above or separate from credit packs. Update copy to reflect the new "both options available" model.
+1. **Annual price exact figure**
+   - What we know: 2 months free at £4/week = 50 weeks = £200 value; round to clean number
+   - Recommendation: £173 (saves £27 vs full 52 weeks at £4; clean number)
 
-2. **Migration endpoint authentication**
-   - What we know: The decisions doc says "admin endpoint" vs "automatic on deploy." No admin auth middleware currently exists.
-   - What's unclear: How to protect the migration endpoint so only the developer can call it.
-   - Recommendation: Protect with a hardcoded secret token in the request body checked against a `MIGRATION_SECRET` env var. Simple and sufficient for a one-time operation.
+2. **Weekly reset — calendar week vs subscription anniversary**
+   - What we know: Calendar Monday UTC is simpler; subscription anniversary is fairer
+   - Recommendation: Calendar Monday UTC for Phase 10 (simpler, well-understood)
 
-3. **`usePaymentConfig` field naming**
-   - What we know: Current field is `subscriptionPricePence`. The sidebar references `paymentConfig?.subscriptionPricePence`.
-   - What's unclear: Whether to keep backward compat (`subscriptionPricePence` = monthly) or rename to `subscriptionMonthlyPricePence`.
-   - Recommendation: Add `subscriptionMonthlyPricePence` and `subscriptionAnnualPricePence` as new fields. Keep `subscriptionPricePence` as an alias pointing to monthly for backward compat — though the sidebar will be rewritten anyway, so this is low stakes.
+3. **Hard block vs soft warning at cap**
+   - What we know: TBD during planning
+   - Recommendation: Hard block at upload time — cleaner, prevents users from uploading and discovering they can't unlock
+
+4. **Existing subscriber migration timing**
+   - What we know: Migration endpoint is a manual trigger via HTTP POST with secret
+   - Recommendation: Run manually by operator after deploy; not auto-triggered on startup
+
+5. **Credit balance refunds — automated vs manual**
+   - What we know: Requires `payment_intent` lookup from `paidSessions`; multi-pack users complicate partial refunds
+   - Recommendation: Build admin endpoint that lists users with balance > 0 and estimated refund amounts; operator processes via Stripe Dashboard
+
+6. **`billingInterval` column in subscriptions table**
+   - What we know: No column exists; UI shows "Renews" date but not interval label
+   - Recommendation: Add `billingInterval text` column; set it during subscription verify webhook
+
+7. **`paidSessions` table — remove or keep**
+   - What we know: Used for idempotency in credit granting; holds historical payment records
+   - Recommendation: Keep table in DB (historical records), remove storage methods
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Stripe API docs — `https://docs.stripe.com/api/subscriptions/update` — subscriptions.update with items + proration_behavior
-- Stripe API docs — `https://docs.stripe.com/api/prices/update` — prices.update with active: false for archiving
-- Stripe API docs — `https://docs.stripe.com/billing/subscriptions/change-price` — change price flow for existing subs
-- Direct code inspection of `server/routes.ts`, `server/webhookHandlers.ts`, `server/stripeClient.ts`, `shared/schema.ts`, `client/src/hooks/use-images.ts`, `client/src/components/app-sidebar.tsx`, `client/src/pages/Landing.tsx`, `client/src/pages/Home.tsx`
+- Stripe API docs (WebFetch `https://docs.stripe.com/api/prices/create`): confirmed `interval: 'week'` is a valid recurring interval
+- Stripe API docs (WebFetch `https://docs.stripe.com/api/refunds/create`): refund via `payment_intent` param, partial refund via `amount`
+- Stripe API docs (WebFetch `https://docs.stripe.com/api/subscriptions/update`): `items` + `proration_behavior` parameters
+- Stripe docs (WebFetch `https://docs.stripe.com/billing/subscriptions/change-price`): subscriber migration pattern
+- Codebase direct reads: `server/routes.ts`, `shared/schema.ts`, `server/storage.ts`, `server/webhookHandlers.ts`, `client/src/pages/Home.tsx`, `client/src/pages/Landing.tsx`, `client/src/components/app-sidebar.tsx`, `client/src/hooks/use-images.ts`
 
 ### Secondary (MEDIUM confidence)
-- Stripe manage prices docs — `https://docs.stripe.com/products-prices/manage-prices` — archiving behavior
+- Stripe WebSearch: confirmed archiving prices does not cancel existing subscriptions
+- Stripe WebSearch: confirmed `interval: 'week'` in subscription schedule duration parameter
 
 ---
 
 ## Metadata
 
 **Confidence breakdown:**
-- Standard stack: HIGH — all existing, no new deps
-- Architecture: HIGH — code inspected directly, patterns verified against Stripe docs
-- Pitfalls: HIGH — all identified from direct code reading
-- Stripe API calls: HIGH — verified against official docs
+- Stripe weekly interval support: HIGH — verified via official API docs
+- Subscription migration pattern: HIGH — working code already exists in codebase at routes.ts:1645
+- Price archival behavior: HIGH — Stripe docs confirm existing subs unaffected
+- Weekly cap implementation: HIGH — `images` table has all required columns
+- Credit refund flow: MEDIUM — payment_intent lookup confirmed, multi-pack edge cases complex
+- Credits UI inventory: HIGH — all locations confirmed via direct file reads with line numbers
 
-**Research date:** 2026-04-15
-**Valid until:** 2026-05-15 (Stripe API is stable; 30-day window appropriate)
+**Research date:** 2026-04-19
+**Valid until:** 2026-05-19
