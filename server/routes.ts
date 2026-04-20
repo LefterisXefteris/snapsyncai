@@ -9,6 +9,8 @@ import { z } from "zod";
 import crypto from "crypto";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { db } from "./db";
+import { images } from "@shared/schema";
+import { sql, and, eq } from "drizzle-orm";
 import { clerkMiddleware, requireAuth as clerkRequireAuth, getAuth, clerkClient } from "@clerk/express";
 import memoizee from "memoizee";
 import { uploadImageToStorage } from "./supabaseClient";
@@ -281,115 +283,57 @@ export async function runAutoGrouping(
   };
 }
 
-const SUBSCRIPTION_MONTHLY_PRICE_PENCE = 900;
-const SUBSCRIPTION_ANNUAL_PRICE_PENCE = 7900;
+const SUBSCRIPTION_WEEKLY_PRICE_PENCE = 400;    // £4.00/week
+const SUBSCRIPTION_ANNUAL_PRICE_PENCE = 17300;  // £173.00/year (2 months free vs 52×£4=£208)
+const WEEKLY_PRODUCT_LIMIT = 30;
 
-const CREDIT_PACKS = [
-  { id: 'starter', name: 'Starter', credits: 10, pricePence: 450 },
-  { id: 'growth', name: 'Growth', credits: 50, pricePence: 1750 },
-  { id: 'pro', name: 'Pro', credits: 150, pricePence: 3950 },
-] as const;
-
-const cachedCreditPriceIds = new Map<string, string>();
-
-async function getOrCreateCreditPackPriceId(packId: string): Promise<string> {
-  if (cachedCreditPriceIds.has(packId)) return cachedCreditPriceIds.get(packId)!;
-
-  const pack = CREDIT_PACKS.find(p => p.id === packId);
-  if (!pack) throw new Error(`Unknown credit pack: ${packId}`);
-
-  const stripe = await getUncachableStripeClient();
-
-  // Look up existing product+price directly from Stripe API (not stripe-replit-sync DB,
-  // which is Replit-specific and may not exist on Vercel).
-  const products = await stripe.products.list({ active: true, limit: 100 });
-  const existingProduct = products.data.find(
-    p => p.metadata?.type === 'credit_pack' && p.metadata?.packId === packId
-  );
-
-  if (existingProduct) {
-    const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
-    const match = prices.data.find(p => p.unit_amount === pack.pricePence && p.type === 'one_time');
-    if (match) {
-      cachedCreditPriceIds.set(packId, match.id);
-      return match.id;
-    }
-  }
-
-  // No matching product+price found — create them.
-  let productId: string;
-  if (existingProduct) {
-    productId = existingProduct.id;
-  } else {
-    const product = await stripe.products.create({
-      name: `SnapSync AI Credits — ${pack.name} (${pack.credits} credits)`,
-      description: `${pack.credits} AI product analysis credits. Each credit unlocks full AI listing generation for one product.`,
-      metadata: { type: 'credit_pack', packId, credits: String(pack.credits) },
-    });
-    productId = product.id;
-  }
-
-  const price = await stripe.prices.create({
-    product: productId,
-    unit_amount: pack.pricePence,
-    currency: 'gbp',
-  });
-  cachedCreditPriceIds.set(packId, price.id);
-  return price.id;
-}
-
-let cachedMonthlyPriceId: string | null = null;
+let cachedWeeklyPriceId: string | null = null;
 let cachedAnnualPriceId: string | null = null;
 
-async function getOrCreateMonthlySubscriptionPriceId(): Promise<string> {
-  if (cachedMonthlyPriceId) return cachedMonthlyPriceId;
-
+async function getOrCreateWeeklySubscriptionPriceId(): Promise<string> {
+  if (cachedWeeklyPriceId) return cachedWeeklyPriceId;
   const stripe = await getUncachableStripeClient();
-
-  // Look up existing product+price directly from Stripe API (not stripe-replit-sync DB).
   const products = await stripe.products.list({ active: true, limit: 100 });
-  const existingProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
+  const existingProduct = products.data.find(p => p.metadata?.type === 'weekly_subscription');
 
   if (existingProduct) {
     const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 10 });
     const match = prices.data.find(
-      p => p.unit_amount === SUBSCRIPTION_MONTHLY_PRICE_PENCE && p.type === 'recurring' && (p.recurring as any)?.interval === 'month'
+      p => p.unit_amount === SUBSCRIPTION_WEEKLY_PRICE_PENCE
+        && p.type === 'recurring'
+        && (p.recurring as any)?.interval === 'week'
     );
-    if (match) {
-      cachedMonthlyPriceId = match.id;
-      return cachedMonthlyPriceId;
-    }
+    if (match) { cachedWeeklyPriceId = match.id; return match.id; }
   }
 
-  // No matching product+price found — create them.
   let productId: string;
   if (existingProduct) {
     productId = existingProduct.id;
   } else {
     const product = await stripe.products.create({
-      name: 'SnapSync AI Pro',
-      description: 'Unlimited AI-powered product listing generation — titles, descriptions, pricing, SEO, AEO and more',
-      metadata: { type: 'monthly_subscription' },
+      name: 'SnapSync AI',
+      description: 'Up to 30 AI-powered product listings per week',
+      metadata: { type: 'weekly_subscription' },
     });
     productId = product.id;
   }
 
   const price = await stripe.prices.create({
     product: productId,
-    unit_amount: SUBSCRIPTION_MONTHLY_PRICE_PENCE,
+    unit_amount: SUBSCRIPTION_WEEKLY_PRICE_PENCE,
     currency: 'gbp',
-    recurring: { interval: 'month' },
+    recurring: { interval: 'week' },
   });
-  cachedMonthlyPriceId = price.id;
-  return cachedMonthlyPriceId;
+  cachedWeeklyPriceId = price.id;
+  return cachedWeeklyPriceId;
 }
 
 async function getOrCreateAnnualSubscriptionPriceId(): Promise<string> {
   if (cachedAnnualPriceId) return cachedAnnualPriceId;
-
   const stripe = await getUncachableStripeClient();
   const products = await stripe.products.list({ active: true, limit: 100 });
-  const existingProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
+  // Annual price lives on the same product as the weekly price
+  const existingProduct = products.data.find(p => p.metadata?.type === 'weekly_subscription');
 
   if (existingProduct) {
     const prices = await stripe.prices.list({ product: existingProduct.id, active: true, limit: 20 });
@@ -398,21 +342,17 @@ async function getOrCreateAnnualSubscriptionPriceId(): Promise<string> {
         && p.type === 'recurring'
         && (p.recurring as any)?.interval === 'year'
     );
-    if (match) {
-      cachedAnnualPriceId = match.id;
-      return match.id;
-    }
+    if (match) { cachedAnnualPriceId = match.id; return match.id; }
   }
 
-  // No matching price found — create it on the existing product.
   let productId: string;
   if (existingProduct) {
     productId = existingProduct.id;
   } else {
     const product = await stripe.products.create({
-      name: 'SnapSync AI Pro',
-      description: 'Unlimited AI-powered product listing generation — titles, descriptions, pricing, SEO, AEO and more',
-      metadata: { type: 'monthly_subscription' },
+      name: 'SnapSync AI',
+      description: 'Up to 30 AI-powered product listings per week',
+      metadata: { type: 'weekly_subscription' },
     });
     productId = product.id;
   }
@@ -425,6 +365,41 @@ async function getOrCreateAnnualSubscriptionPriceId(): Promise<string> {
   });
   cachedAnnualPriceId = price.id;
   return cachedAnnualPriceId;
+}
+
+// Returns the UTC Monday that starts the current ISO week
+function getWeekStartUTC(): Date {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setUTCHours(0, 0, 0, 0);
+  const day = weekStart.getUTCDay(); // 0=Sun, 1=Mon
+  const diff = day === 0 ? -6 : 1 - day;
+  weekStart.setUTCDate(weekStart.getUTCDate() + diff);
+  return weekStart;
+}
+
+// Returns next Monday at UTC midnight (for "resets at" display)
+function nextMondayUTC(): Date {
+  const start = getWeekStartUTC();
+  start.setUTCDate(start.getUTCDate() + 7);
+  return start;
+}
+
+async function getWeeklyProductCount(userId: string): Promise<number> {
+  const weekStart = getWeekStartUTC();
+  const [result] = await db
+    .select({
+      count: sql<number>`count(distinct coalesce(${images.productGroupId}, cast(${images.id} as text)))`
+    })
+    .from(images)
+    .where(
+      and(
+        eq(images.sessionId, userId),
+        eq(images.paymentStatus, 'paid'),
+        sql`${images.createdAt} >= ${weekStart}`
+      )
+    );
+  return Number(result?.count ?? 0);
 }
 
 const updateSchema = z.object({
@@ -1235,87 +1210,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const publishableKey = await getStripePublishableKey();
       res.json({
         publishableKey,
-        subscriptionPricePence: SUBSCRIPTION_MONTHLY_PRICE_PENCE,        // backward-compat alias
-        subscriptionMonthlyPricePence: SUBSCRIPTION_MONTHLY_PRICE_PENCE,
+        subscriptionWeeklyPricePence: SUBSCRIPTION_WEEKLY_PRICE_PENCE,
         subscriptionAnnualPricePence: SUBSCRIPTION_ANNUAL_PRICE_PENCE,
-        creditPacks: CREDIT_PACKS,
+        weeklyProductLimit: WEEKLY_PRODUCT_LIMIT,
       });
     } catch (error) {
       console.error("Stripe config error:", error);
       res.status(500).json({ message: "Payment system not available" });
-    }
-  });
-
-  // ── Credits ──────────────────────────────────────────────────────────────
-
-  app.get("/api/credits/balance", requireAuth(), async (req, res) => {
-    try {
-      const userId = getUserId(req);
-      if (DEV_BYPASS_AUTH) return res.json({ balance: 999, lifetimeCredits: 999 });
-      if (await isDevFreeUser(req)) return res.json({ balance: 999, lifetimeCredits: 999 });
-      const row = await storage.getUserCredits(userId);
-      res.json({ balance: row?.balance ?? 0, lifetimeCredits: row?.lifetimeCredits ?? 0 });
-    } catch (error: any) {
-      res.status(500).json({ message: "Failed to fetch credit balance" });
-    }
-  });
-
-  app.post("/api/credits/purchase", requireAuth(), async (req, res) => {
-    try {
-      const userId = getUserId(req);
-      const { packId } = req.body;
-      const pack = CREDIT_PACKS.find(p => p.id === packId);
-      if (!pack) return res.status(400).json({ message: "Invalid credit pack" });
-
-      const stripe = await getUncachableStripeClient();
-      const priceId = await getOrCreateCreditPackPriceId(packId);
-      const appUrl = getAppUrl(req);
-
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [{ price: priceId, quantity: 1 }],
-        mode: 'payment',
-        success_url: `${appUrl}/?credits=success&checkout_session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${appUrl}/?credits=cancelled`,
-        metadata: { userId, credits: String(pack.credits), packId },
-      });
-
-      res.json({ checkoutUrl: session.url, sessionId: session.id });
-    } catch (error: any) {
-      console.error("Credits purchase error:", error);
-      res.status(500).json({ message: "Failed to create checkout", detail: error?.message });
-    }
-  });
-
-  app.post("/api/credits/verify", requireAuth(), async (req, res) => {
-    try {
-      const userId = getUserId(req);
-      const { checkoutSessionId } = req.body;
-      if (!checkoutSessionId) return res.status(400).json({ message: "Missing checkout session ID" });
-
-      const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
-
-      if (session.payment_status !== 'paid') {
-        return res.status(402).json({ message: "Payment not completed" });
-      }
-
-      const credits = Number(session.metadata?.credits);
-      const sessionUserId = session.metadata?.userId;
-
-      if (!credits || sessionUserId !== userId) {
-        return res.status(400).json({ message: "Invalid session" });
-      }
-
-      // amountPaid: Stripe stores amount_total in cents; fall back to 0 if unavailable
-      const amountPaid = session.amount_total ?? 0;
-      const granted = await storage.claimAndGrantCredits(checkoutSessionId, userId, credits, amountPaid);
-      const row = await storage.getUserCredits(userId);
-      // Per D-01: return 200 whether or not this was a duplicate call — fully idempotent
-      res.json({ verified: true, credits, balance: row?.balance ?? credits });
-    } catch (error: any) {
-      console.error("Credits verify error:", error);
-      res.status(500).json({ message: "Failed to verify purchase" });
     }
   });
 
@@ -1519,10 +1420,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const stripe = await getUncachableStripeClient();
-      const { billingInterval } = req.body; // 'monthly' | 'annual', default 'monthly'
+      const { billingInterval } = req.body; // 'weekly' | 'annual', default 'weekly'
       const priceId = billingInterval === 'annual'
         ? await getOrCreateAnnualSubscriptionPriceId()
-        : await getOrCreateMonthlySubscriptionPriceId();
+        : await getOrCreateWeeklySubscriptionPriceId();
       const appUrl = getAppUrl(req);
 
       const session = await stripe.checkout.sessions.create({
@@ -1642,22 +1543,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/subscription/migrate-to-new-price", requireAuth(), async (req, res) => {
+  app.post("/api/subscription/migrate-to-weekly", requireAuth(), async (req, res) => {
     try {
-      // Simple admin protection — caller must supply the MIGRATION_SECRET
       const { migrationSecret } = req.body;
       if (!process.env.MIGRATION_SECRET || migrationSecret !== process.env.MIGRATION_SECRET) {
         return res.status(403).json({ message: "Forbidden" });
       }
 
       const stripe = await getUncachableStripeClient();
-      const newMonthlyPriceId = await getOrCreateMonthlySubscriptionPriceId();
-      const OLD_PRICE_PENCE = 1900;
-
-      // Fetch all active/trialing subscriptions from our DB
+      const newWeeklyPriceId = await getOrCreateWeeklySubscriptionPriceId();
       const allSubs = await storage.getAllActiveSubscriptions();
-      let migrated = 0;
-      let skipped = 0;
+      let migrated = 0, skipped = 0, errors = 0;
 
       for (const sub of allSubs) {
         if (!sub.stripeSubscriptionId) { skipped++; continue; }
@@ -1665,29 +1561,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
           const subItem = stripeSub.items.data[0];
           if (!subItem) { skipped++; continue; }
-          if (subItem.price.unit_amount === OLD_PRICE_PENCE) {
-            await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-              items: [{ id: subItem.id, price: newMonthlyPriceId }],
-              proration_behavior: 'none',
-            });
-            migrated++;
-          } else {
-            skipped++; // already on new price or different plan
-          }
+          // Skip if already on weekly interval
+          if ((subItem.price.recurring as any)?.interval === 'week') { skipped++; continue; }
+          await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+            items: [{ id: subItem.id, price: newWeeklyPriceId }],
+            proration_behavior: 'none',
+          });
+          migrated++;
         } catch (err) {
           console.error(`Migration failed for sub ${sub.stripeSubscriptionId}:`, err);
-          skipped++;
+          errors++;
         }
       }
 
-      res.json({ migrated, skipped, total: allSubs.length });
+      res.json({ migrated, skipped, errors, total: allSubs.length });
     } catch (error: any) {
       console.error("Migration error:", error);
       res.status(500).json({ message: "Migration failed", detail: error?.message });
     }
   });
 
-  app.post("/api/subscription/archive-old-price", requireAuth(), async (req, res) => {
+  app.post("/api/subscription/archive-old-prices", requireAuth(), async (req, res) => {
     try {
       const { migrationSecret } = req.body;
       if (!process.env.MIGRATION_SECRET || migrationSecret !== process.env.MIGRATION_SECRET) {
@@ -1695,21 +1589,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const stripe = await getUncachableStripeClient();
-      const OLD_PRICE_PENCE = 1900;
+      const archivedIds: string[] = [];
+      let skippedCount = 0;
 
-      const products = await stripe.products.list({ active: true, limit: 100 });
-      const subProduct = products.data.find(p => p.metadata?.type === 'monthly_subscription');
-      if (!subProduct) return res.status(404).json({ message: "Subscription product not found" });
-
-      const allPrices = await stripe.prices.list({ product: subProduct.id, limit: 100 });
-      const oldPrice = allPrices.data.find(
-        p => p.unit_amount === OLD_PRICE_PENCE && (p.recurring as any)?.interval === 'month'
+      // 1. Archive old subscription prices that are not weekly
+      const allProducts = await stripe.products.list({ limit: 100 });
+      const subProducts = allProducts.data.filter(
+        p => p.metadata?.type === 'monthly_subscription' || p.metadata?.type === 'weekly_subscription'
       );
+      for (const subProduct of subProducts) {
+        const subPrices = await stripe.prices.list({ product: subProduct.id, limit: 100 });
+        for (const price of subPrices.data) {
+          if (!price.active) { skippedCount++; continue; }
+          // Keep weekly prices active; archive monthly, annual (old), and any other intervals
+          if ((price.recurring as any)?.interval === 'week') { skippedCount++; continue; }
+          await stripe.prices.update(price.id, { active: false });
+          archivedIds.push(price.id);
+        }
+      }
 
-      if (!oldPrice) return res.json({ archived: false, message: "Old price not found — already archived or never existed" });
+      // 2. Archive all credit pack prices
+      const creditProducts = allProducts.data.filter(p => p.metadata?.type === 'credit_pack');
+      for (const creditProduct of creditProducts) {
+        const creditPrices = await stripe.prices.list({ product: creditProduct.id, active: true, limit: 100 });
+        for (const price of creditPrices.data) {
+          await stripe.prices.update(price.id, { active: false });
+          archivedIds.push(price.id);
+        }
+      }
 
-      await stripe.prices.update(oldPrice.id, { active: false });
-      res.json({ archived: true, priceId: oldPrice.id });
+      res.json({ archived: archivedIds, archivedCount: archivedIds.length, skipped: skippedCount });
     } catch (error: any) {
       console.error("Archive error:", error);
       res.status(500).json({ message: "Archive failed", detail: error?.message });
@@ -1739,46 +1648,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const isSubscribed = devFree || (sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'canceling'));
 
       if (!isSubscribed) {
-        // Count unique products (groups count as 1 credit each).
-        // Cap to the user's available balance so a partial unlock succeeds
-        // rather than failing with 403 when credits < total unpaid products.
-        const creditRow = await storage.getUserCredits(userId);
-        const availableCredits = creditRow?.balance ?? 0;
-
-        if (availableCredits === 0) {
-          return res.status(403).json({
-            message: "Insufficient credits",
-            detail: "You have no credits remaining. Please purchase more credits to continue.",
-            creditsRequired: 1,
-          });
-        }
-
-        // Build an ordered list of unique product groups, capped to availableCredits
-        const seenGroups = new Set<string>();
-        const affordableImages: typeof unpaidImages = [];
-        for (const img of unpaidImages) {
-          const key = img.productGroupId || `single_${img.id}`;
-          if (!seenGroups.has(key)) {
-            if (seenGroups.size >= availableCredits) break; // credit cap reached
-            seenGroups.add(key);
-          }
-          affordableImages.push(img);
-        }
-
-        const creditCost = seenGroups.size;
-        const deducted = await storage.deductCredits(userId, creditCost);
-        if (!deducted) {
-          return res.status(403).json({
-            message: "Insufficient credits",
-            detail: `This will use ${creditCost} credit${creditCost !== 1 ? 's' : ''}. Please purchase more credits to continue.`,
-            creditsRequired: creditCost,
-          });
-        }
-        console.log(`Credits: deducted ${creditCost} from user ${userId} for unlock (${affordableImages.length} images, ${unpaidImages.length - affordableImages.length} deferred)`);
-
-        // Replace the full list with only the affordable subset
-        unpaidImages.splice(0, unpaidImages.length, ...affordableImages);
+        return res.status(403).json({
+          message: "Subscription required",
+          detail: "Subscribe to SnapSync AI to unlock AI product analysis.",
+        });
       }
+
+      // Enforce weekly product cap for subscribers
+      const weeklyCount = await getWeeklyProductCount(userId);
+      const remaining = WEEKLY_PRODUCT_LIMIT - weeklyCount;
+
+      if (remaining <= 0) {
+        return res.status(403).json({
+          message: "Weekly limit reached",
+          detail: `You've used all ${WEEKLY_PRODUCT_LIMIT} products this week. Your limit resets every Monday at midnight UTC.`,
+          weeklyLimit: WEEKLY_PRODUCT_LIMIT,
+          used: weeklyCount,
+          resetsAt: nextMondayUTC().toISOString(),
+        });
+      }
+
+      // Partial cap: if more unpaid products than remaining weekly allowance, only unlock up to remaining
+      const seenGroups = new Set<string>();
+      const cappedImages: typeof unpaidImages = [];
+      for (const img of unpaidImages) {
+        const key = img.productGroupId || `single_${img.id}`;
+        if (!seenGroups.has(key)) {
+          if (seenGroups.size >= remaining) break;
+          seenGroups.add(key);
+        }
+        cappedImages.push(img);
+      }
+      unpaidImages.splice(0, unpaidImages.length, ...cappedImages);
 
       const results = await runWithConcurrency(unpaidImages, CONCURRENCY_LIMIT, async (image) => {
         try {

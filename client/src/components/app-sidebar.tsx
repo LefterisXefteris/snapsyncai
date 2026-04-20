@@ -28,11 +28,11 @@ export function AppSidebar() {
   const recoverSubscription = useRecoverSubscriptionByEmail();
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [billingInterval, setBillingInterval] = useState<'weekly' | 'annual'>('weekly');
 
   const isSubscribed = subscriptionStatus?.subscribed === true;
-  const monthlyPrice = (paymentConfig?.subscriptionMonthlyPricePence ?? paymentConfig?.subscriptionPricePence ?? 900) / 100;
-  const annualPrice = (paymentConfig?.subscriptionAnnualPricePence ?? 7900) / 100;
+  const weeklyPrice = (paymentConfig?.subscriptionWeeklyPricePence ?? 400) / 100;
+  const annualPrice = (paymentConfig?.subscriptionAnnualPricePence ?? 17300) / 100;
 
   const handleSubscribe = () => {
     createSubscriptionCheckout.mutate(billingInterval, {
@@ -133,7 +133,7 @@ export function AppSidebar() {
                         onClick={() => setShowSubscribeDialog(true)}
                       >
                         <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                        Subscribe - {"\u00A3"}{monthlyPrice}/mo
+                        Subscribe - {"\u00A3"}{weeklyPrice}/wk
                       </Button>
                       {!subLoading && (
                         <Button
@@ -183,16 +183,16 @@ export function AppSidebar() {
             {/* Billing interval toggle */}
             <div className="grid grid-cols-2 gap-2">
               <button
-                data-testid="billing-toggle-monthly"
-                onClick={() => setBillingInterval('monthly')}
+                data-testid="billing-toggle-weekly"
+                onClick={() => setBillingInterval('weekly')}
                 className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${
-                  billingInterval === 'monthly'
+                  billingInterval === 'weekly'
                     ? 'border-primary bg-primary/5 text-foreground'
                     : 'border-border text-muted-foreground hover:border-primary/50'
                 }`}
               >
-                <span className="font-semibold">{"\u00A3"}{monthlyPrice}/mo</span>
-                <span className="text-xs mt-0.5">Monthly</span>
+                <span className="font-semibold">{"\u00A3"}{weeklyPrice}/wk</span>
+                <span className="text-xs mt-0.5">Weekly</span>
               </button>
               <button
                 data-testid="billing-toggle-annual"
@@ -210,7 +210,7 @@ export function AppSidebar() {
             <p className="text-sm font-medium" data-testid="text-subscription-price">
               {billingInterval === 'annual'
                 ? `\u00A3${annualPrice} per year`
-                : `\u00A3${monthlyPrice} per month`}
+                : `\u00A3${weeklyPrice} per week`}
             </p>
             <Separator />
             <ul className="space-y-2 text-sm text-muted-foreground">
@@ -244,7 +244,7 @@ export function AppSidebar() {
                   <CreditCard className="w-4 h-4 mr-2" />
                   {billingInterval === 'annual'
                     ? `Subscribe - \u00A3${annualPrice}/yr`
-                    : `Subscribe - \u00A3${monthlyPrice}/mo`}
+                    : `Subscribe - \u00A3${weeklyPrice}/wk`}
                 </>
               )}
             </Button>
