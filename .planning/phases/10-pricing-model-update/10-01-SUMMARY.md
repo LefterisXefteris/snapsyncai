@@ -1,114 +1,124 @@
 ---
-phase: 10-pricing-model-update
+phase: 10
 plan: 01
-subsystem: payments
-tags: [stripe, typescript, react-query, subscriptions, pricing, billing]
+subsystem: pricing-engine
+tags: [stripe, pricing, weekly-subscription, credit-removal, server]
+one_liner: "Replace monthly/credit pricing engine with weekly (£4) + annual (£173) Stripe helpers, 30/week product cap enforcement, and zero credit-system server code"
 
-# Dependency graph
-requires:
-  - phase: 01-credit-idempotency
-    provides: subscription storage layer and Stripe client infrastructure
-provides:
-  - SUBSCRIPTION_MONTHLY_PRICE_PENCE = 900 and SUBSCRIPTION_ANNUAL_PRICE_PENCE = 7900 server constants
-  - getOrCreateMonthlySubscriptionPriceId and getOrCreateAnnualSubscriptionPriceId helpers
-  - create-checkout endpoint routing by billingInterval param
-  - /api/payments/config returns both monthly and annual price fields
-  - POST /api/subscription/migrate-to-new-price admin endpoint (MIGRATION_SECRET protected)
-  - POST /api/subscription/archive-old-price admin endpoint (MIGRATION_SECRET protected)
-  - getAllActiveSubscriptions() in IStorage and DatabaseStorage
-  - useCreateSubscriptionCheckout accepts billingInterval: 'monthly' | 'annual'
-  - usePaymentConfig typed with subscriptionMonthlyPricePence + subscriptionAnnualPricePence
-affects: [10-02, 10-03, any UI plans wiring up subscription checkout or pricing display]
+dependency_graph:
+  requires: []
+  provides:
+    - "getOrCreateWeeklySubscriptionPriceId — Stripe price helper for £4/week"
+    - "getOrCreateAnnualSubscriptionPriceId — updated to use weekly_subscription product type"
+    - "GET /api/payments/config — returns subscriptionWeeklyPricePence, subscriptionAnnualPricePence, weeklyProductLimit"
+    - "POST /api/subscription/create-checkout — defaults to weekly price"
+    - "POST /api/subscription/unlock-images — 30/week cap enforcement with partial cap"
+    - "POST /api/subscription/migrate-to-weekly — MIGRATION_SECRET-protected admin endpoint"
+    - "POST /api/subscription/archive-old-prices — archives non-weekly sub prices + all credit pack prices"
+    - "IStorage interface — zero credit method signatures"
+    - "DatabaseStorage — zero credit method implementations"
+    - "WebhookHandlers — only subscription checkout handler, no payment/credit handler"
+  affects:
+    - "10-02 (credits UI removal) — server endpoints are now correct and clean"
+    - "10-03 (subscription UI + Landing.tsx) — weekly pricing shape ready for UI"
 
-# Tech tracking
-tech-stack:
+tech_stack:
   added: []
   patterns:
-    - Dual Stripe price helper pattern: separate cached functions per billing interval, lazy-create on same product
-    - MIGRATION_SECRET guard: env var checked before any admin mutation, 403 on mismatch
-    - Backward-compat alias: subscriptionPricePence kept alongside new named fields in config response
+    - "getWeeklyProductCount — drizzle query with count(distinct coalesce(productGroupId, cast(id as text))) for week-boundary product counting"
+    - "getWeekStartUTC / nextMondayUTC — pure UTC date helpers, no timezone library"
+    - "Partial weekly cap — cappedImages splice pattern limits unlock to remaining allowance"
 
-key-files:
+key_files:
   created: []
   modified:
     - server/routes.ts
     - server/storage.ts
-    - client/src/hooks/use-images.ts
+    - server/webhookHandlers.ts
+    - client/src/components/app-sidebar.tsx
+    - client/src/pages/Home.tsx
 
-key-decisions:
-  - "billingInterval defaults to 'monthly' in mutationFn — zero breaking change for existing callers"
-  - "Annual price uses same Stripe product (metadata.type = 'monthly_subscription') with interval: year — no new product needed"
-  - "migrate-to-new-price is idempotent: skips any sub not on OLD_PRICE_PENCE = 1900, safe to run multiple times"
-  - "subscriptionPricePence kept as backward-compat alias in config response to avoid breaking callers not yet updated"
+decisions:
+  - id: "10-01-D1"
+    description: "weekly_subscription product type used for both weekly and annual Stripe prices — annual price lives on the same product as weekly"
+    alternatives: ["separate annual product"]
+    rationale: "Cleaner Stripe dashboard, simpler archive-old-prices logic (one product to scan)"
+  - id: "10-01-D2"
+    description: "getWeeklyProductCount uses count(distinct coalesce(productGroupId, cast(id as text))) — counts product groups as single unit, singles as individual"
+    alternatives: ["count all paid images"]
+    rationale: "Correct semantics: one grouped product = 1 slot regardless of image count"
+  - id: "10-01-D3"
+    description: "paidSessions table import kept in storage.ts — still referenced by createPaidSession, getPaidSession, markPaidSessionUsed"
+    alternatives: ["remove paidSessions"]
+    rationale: "These methods serve the subscription verify flow, not credits; only userCredits removed"
 
-patterns-established:
-  - "Dual price cache vars (cachedMonthlyPriceId / cachedAnnualPriceId) pattern for per-interval price ID caching"
-  - "MIGRATION_SECRET env var guard on admin mutation endpoints"
-
-# Metrics
-duration: 12min
-completed: 2026-04-15
+metrics:
+  duration: "~20 min"
+  completed: "2026-04-19"
+  tasks_completed: 2
+  files_changed: 5
 ---
 
-# Phase 10 Plan 01: Pricing Model Update — Server Foundation Summary
+# Phase 10 Plan 01: Pricing Engine Server Replacement Summary
 
-**£9/month + £79/year dual billing with halved credit pack prices, MIGRATION_SECRET-protected subscriber migration and price archive endpoints, and billingInterval-aware checkout hook**
+Replace the entire server-side pricing engine: delete all credit system code, add weekly (£4) and annual (£173) Stripe price helpers, replace credit-deduction unlock logic with a 30/week product cap, and add migrate-to-weekly and archive-old-prices admin endpoints.
 
-## Performance
+## What Was Built
 
-- **Duration:** 12 min
-- **Started:** 2026-04-15T00:00:00Z
-- **Completed:** 2026-04-15T00:12:00Z
-- **Tasks:** 2
-- **Files modified:** 3
+### Task 1 — routes.ts pricing engine replacement
 
-## Accomplishments
+**Deleted:**
+- `SUBSCRIPTION_MONTHLY_PRICE_PENCE`, `SUBSCRIPTION_ANNUAL_PRICE_PENCE` (old 7900p value), `CREDIT_PACKS` constant
+- `cachedCreditPriceIds` Map, `getOrCreateCreditPackPriceId()` function
+- `cachedMonthlyPriceId`, `getOrCreateMonthlySubscriptionPriceId()` function
+- `/api/credits/balance`, `/api/credits/purchase`, `/api/credits/verify` routes
+- Credit-deduction block in `/api/subscription/unlock-images`
 
-- Replaced single £19/month subscription constant with separate monthly (£9) and annual (£79) constants and lazy-create Stripe price helpers
-- Halved all credit pack prices: Starter 450p, Growth 1750p, Pro 3950p
-- Added admin migration + archive endpoints protected by MIGRATION_SECRET env var, with getAllActiveSubscriptions() storage method to drive the migration loop
-- Updated client checkout hook and payment config types for dual billing interval support
+**Added:**
+- `SUBSCRIPTION_WEEKLY_PRICE_PENCE = 400`, `SUBSCRIPTION_ANNUAL_PRICE_PENCE = 17300`, `WEEKLY_PRODUCT_LIMIT = 30`
+- `getOrCreateWeeklySubscriptionPriceId()` — finds or creates weekly_subscription product + week-interval price
+- Updated `getOrCreateAnnualSubscriptionPriceId()` — searches weekly_subscription product (not monthly_subscription)
+- `getWeekStartUTC()`, `nextMondayUTC()` — pure UTC ISO-week helpers
+- `getWeeklyProductCount(userId)` — counts distinct paid products since Monday midnight UTC
+- `GET /api/payments/config` → `{ publishableKey, subscriptionWeeklyPricePence, subscriptionAnnualPricePence, weeklyProductLimit }`
+- Subscription checkout defaults to `getOrCreateWeeklySubscriptionPriceId()` when billingInterval !== 'annual'
+- `POST /api/subscription/migrate-to-weekly` — migrates all active subscribers not already on weekly; counts migrated/skipped/errors
+- `POST /api/subscription/archive-old-prices` — archives non-weekly sub prices + all credit pack prices; both protected by `MIGRATION_SECRET`
+- 30/week cap block in unlock-images: 403 with weeklyLimit/used/resetsAt when limit reached; partial cap splice when remaining < requested
 
-## Task Commits
+### Task 2 — storage.ts and webhookHandlers.ts credit code removal
 
-Each task was committed atomically:
+**storage.ts:**
+- Removed `getUserCredits`, `addCredits`, `deductCredits`, `claimAndGrantCredits` from `IStorage` interface
+- Deleted all four method implementations from `DatabaseStorage`
+- Removed `userCredits` and `UserCredits` from schema import (paidSessions kept — still used by createPaidSession/getPaidSession/markPaidSessionUsed)
 
-1. **Task 1: Update server/routes.ts — price constants, dual helpers, checkout, config, migration, archive endpoints** - `0006a4e` (feat)
-2. **Task 2: Update client/src/hooks/use-images.ts — billingInterval checkout hook + updated usePaymentConfig type** - `e521e5f` (feat)
-
-**Plan metadata:** (docs commit follows this summary)
-
-## Files Created/Modified
-
-- `server/routes.ts` - Updated price constants, split getOrCreateSubscriptionPriceId into monthly/annual, updated payments/config response, added billingInterval routing in create-checkout, added migrate-to-new-price and archive-old-price endpoints
-- `server/storage.ts` - Added getAllActiveSubscriptions() to IStorage interface and DatabaseStorage implementation
-- `client/src/hooks/use-images.ts` - useCreateSubscriptionCheckout accepts billingInterval param, usePaymentConfig return type includes both price fields
-
-## Decisions Made
-
-- billingInterval defaults to 'monthly' in mutationFn so all existing callers continue to work unchanged
-- Annual Stripe price is created on the same product (metadata.type = 'monthly_subscription') with interval: year — avoids a second product and keeps price lookups scoped to one product
-- migrate-to-new-price checks subItem.price.unit_amount === 1900 before updating, making it idempotent — safe to run twice
-- subscriptionPricePence retained as backward-compat alias in /api/payments/config response so any callers not yet updated to the new field names continue to work
+**webhookHandlers.ts:**
+- Deleted the `checkout.session.completed` + `data.mode === 'payment'` block (credit grant handler)
+- Subscription webhook block (`data.mode === 'subscription'`) untouched
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
 
-## Issues Encountered
+**1. [Rule 3 - Blocking] app-sidebar.tsx and Home.tsx caused TypeScript build failures**
 
-Pre-existing TypeScript errors in server/routes.ts (Stripe Subscription type missing `current_period_end`, lines 1360–1492) and unrelated files (replit_integrations, db.ts, client components) were present before this plan executed. None were introduced by our changes and none are in the files we modified.
+- **Found during:** Task 1 verification (`npx tsc --noEmit`)
+- **Issue:** `app-sidebar.tsx` referenced `subscriptionMonthlyPricePence`, `subscriptionPricePence`, and `billingInterval: 'monthly'` which no longer exist on the new paymentConfig type. `Home.tsx` referenced `paymentConfig?.creditPacks` which was removed.
+- **Fix:** Updated `app-sidebar.tsx` to use `weeklyPrice`, `billingInterval: 'weekly' | 'annual'`, and weekly UI copy. Updated `Home.tsx` credit packs map to use empty typed array (dead code — credits dialog is superseded by subscription model).
+- **Files modified:** `client/src/components/app-sidebar.tsx`, `client/src/pages/Home.tsx`
+- **Note:** These client files were scheduled for Plan 02/03, but the TypeScript type mismatch caused build failure on the server plan's verification step — fixing was required to unblock.
 
-## User Setup Required
+## Verification Results
 
-**MIGRATION_SECRET env var must be provisioned before running the migration or archive endpoints.** Without it, both endpoints return 403 Forbidden. Set in Vercel dashboard as `MIGRATION_SECRET=<random-secret>`.
+All checks pass:
+- `grep -rn "CREDIT_PACKS|creditPacks|getUserCredits|deductCredits|addCredits|claimAndGrantCredits" server/` → 0 matches
+- `grep -n "SUBSCRIPTION_WEEKLY_PRICE_PENCE|WEEKLY_PRODUCT_LIMIT|getWeeklyProductCount" server/routes.ts` → multiple matches
+- `grep -n "migrate-to-weekly|archive-old-prices" server/routes.ts` → both endpoints present
+- `grep -n "api/credits" server/routes.ts` → 0 matches
+- `grep -n "getAllActiveSubscriptions" server/storage.ts` → interface (line 75) + implementation (line 269)
+- Pre-existing TypeScript errors (Stripe SDK `current_period_end` type, `server/replit_integrations`, `server/db.ts` Pool type) remain unchanged — confirmed pre-existing via git stash test
 
 ## Next Phase Readiness
 
-- Server-side dual pricing is complete — UI plans (10-02 sidebar, 10-03 Landing.tsx) can wire directly to `useCreateSubscriptionCheckout(billingInterval)` and `usePaymentConfig().data.subscriptionMonthlyPricePence / subscriptionAnnualPricePence`
-- Migration endpoint ready to run post-deploy: `POST /api/subscription/migrate-to-new-price` with `{ migrationSecret: "..." }` body
-- No blockers for downstream UI plans
-
----
-*Phase: 10-pricing-model-update*
-*Completed: 2026-04-15*
+Plan 02 (credits UI removal) and Plan 03 (subscription UI + Landing.tsx) can now proceed. The server exposes the correct weekly pricing shape and has zero credit endpoints.
