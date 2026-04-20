@@ -29,25 +29,6 @@ export class WebhookHandlers {
 
     if (!data) return;
 
-    if (type === 'checkout.session.completed' && data.mode === 'payment') {
-      const userId = data.metadata?.userId;
-      const credits = Number(data.metadata?.credits);
-      // data.id is the Stripe checkout session ID (cs_live_... / cs_test_...)
-      const sessionId = data.id as string;
-      const amountPaid = (data.amount_total as number | null) ?? 0;
-      if (userId && credits > 0 && sessionId) {
-        try {
-          const granted = await storage.claimAndGrantCredits(sessionId, userId, credits, amountPaid);
-          if (granted) {
-            console.log(`Webhook: Added ${credits} credits to user ${userId}`);
-          }
-          // If !granted: session already processed (verify ran first) — no log, return 200 to Stripe
-        } catch (e) {
-          console.error("Webhook: Error adding credits:", e);
-        }
-      }
-    }
-
     if (type === 'checkout.session.completed' && data.mode === 'subscription') {
       const userId = data.metadata?.userId;
       const subscriptionId = typeof data.subscription === 'string' ? data.subscription : data.subscription?.id;

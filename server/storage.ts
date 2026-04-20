@@ -1,4 +1,4 @@
-import { images, shopifyConnections, etsyConnections, amazonConnections, instagramConnections, paidSessions, subscriptions, userCredits, type InsertImage, type Image, type InsertShopifyConnection, type ShopifyConnection, type InsertEtsyConnection, type EtsyConnection, type InsertAmazonConnection, type AmazonConnection, type InsertInstagramConnection, type InstagramConnection, type InsertPaidSession, type PaidSession, type InsertSubscription, type Subscription, type UserCredits } from "@shared/schema";
+import { images, shopifyConnections, etsyConnections, amazonConnections, instagramConnections, paidSessions, subscriptions, type InsertImage, type Image, type InsertShopifyConnection, type ShopifyConnection, type InsertEtsyConnection, type EtsyConnection, type InsertAmazonConnection, type AmazonConnection, type InsertInstagramConnection, type InstagramConnection, type InsertPaidSession, type PaidSession, type InsertSubscription, type Subscription } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
@@ -75,10 +75,6 @@ export interface IStorage {
   getAllActiveSubscriptions(): Promise<Subscription[]>;
   upsertSubscription(sub: InsertSubscription): Promise<Subscription>;
   updateSubscriptionStatus(stripeSubscriptionId: string, status: string, currentPeriodEnd?: Date): Promise<void>;
-  getUserCredits(userId: string): Promise<UserCredits | undefined>;
-  addCredits(userId: string, amount: number): Promise<void>;
-  deductCredits(userId: string, amount: number): Promise<boolean>;
-  claimAndGrantCredits(checkoutSessionId: string, userId: string, credits: number, amountPaid: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -309,94 +305,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
   }
 
-  async getUserCredits(userId: string): Promise<UserCredits | undefined> {
-    const [row] = await db.select().from(userCredits).where(eq(userCredits.userId, userId));
-    return row;
-  }
-
-  async addCredits(userId: string, amount: number): Promise<void> {
-    await db.insert(userCredits)
-      .values({ userId, balance: amount, lifetimeCredits: amount })
-      .onConflictDoUpdate({
-        target: userCredits.userId,
-        set: {
-          balance: sql`${userCredits.balance} + ${amount}`,
-          lifetimeCredits: sql`${userCredits.lifetimeCredits} + ${amount}`,
-          updatedAt: new Date(),
-        },
-      });
-  }
-
-  async deductCredits(userId: string, amount: number): Promise<boolean> {
-    const result = await db.update(userCredits)
-      .set({ balance: sql`${userCredits.balance} - ${amount}`, updatedAt: new Date() })
-      .where(and(eq(userCredits.userId, userId), sql`${userCredits.balance} >= ${amount}`))
-      .returning({ balance: userCredits.balance });
-    return result.length > 0;
-  }
-
-  async claimAndGrantCredits(
-    checkoutSessionId: string,
-    userId: string,
-    credits: number,
-    amountPaid: number
-  ): Promise<boolean> {
-    return await db.transaction(async (tx) => {
-      // Step 1: Ensure the paidSessions row exists.
-      // The credit purchase flow does not create a paidSessions row, so we must upsert one.
-      // ON CONFLICT DO NOTHING is safe because the unique constraint on checkout_session_id
-      // guarantees at most one row per session. imageCount=0 and tone='professional' are
-      // placeholder values — paidSessions was designed for a prior product listing flow.
-      await tx
-        .insert(paidSessions)
-        .values({
-          checkoutSessionId,
-          sessionId: userId,
-          imageCount: 0,
-          tone: 'professional',
-          amountPaid,
-          used: 0,
-        })
-        .onConflictDoNothing();
-
-      // Step 2: Atomic claim — only one concurrent caller gets a row back.
-      // PostgreSQL acquires a row-level write-intent lock on the UPDATE target row,
-      // so the WHERE used=0 predicate is evaluated under lock. Only one caller
-      // wins; all others get an empty RETURNING result and must skip credit granting.
-      const claimed = await tx
-        .update(paidSessions)
-        .set({ used: 1 })
-        .where(
-          and(
-            eq(paidSessions.checkoutSessionId, checkoutSessionId),
-            eq(paidSessions.used, 0)
-          )
-        )
-        .returning({ id: paidSessions.id });
-
-      if (claimed.length === 0) {
-        // Already processed — idempotent duplicate, do not grant
-        return false;
-      }
-
-      // Step 3: Grant credits inside the same transaction.
-      // If this insert/update throws, the entire transaction rolls back,
-      // including the paidSessions.used=1 update above — no permanent credit loss.
-      await tx
-        .insert(userCredits)
-        .values({ userId, balance: credits, lifetimeCredits: credits })
-        .onConflictDoUpdate({
-          target: userCredits.userId,
-          set: {
-            balance: sql`${userCredits.balance} + ${credits}`,
-            lifetimeCredits: sql`${userCredits.lifetimeCredits} + ${credits}`,
-            updatedAt: new Date(),
-          },
-        });
-
-      return true;
-    });
-  }
 }
+
 
 export const storage = new DatabaseStorage();
