@@ -372,7 +372,52 @@ export default function Home() {
   const handleUnlockAll = () => {
     if (!unpaidImages || unpaidImages.length === 0) return;
     const ids = unpaidImages.map((img: Image) => img.id);
-    unlockImages.mutate({ imageIds: ids });
+    unlockImages.mutate({ imageIds: ids }, {
+      onError: (error: any) => {
+        // Parse JSON body from error message ("403: {...}")
+        let parsed: any = null;
+        try {
+          const colonIdx = error?.message?.indexOf(":");
+          const jsonStr = colonIdx >= 0 ? error.message.slice(colonIdx + 1).trim() : null;
+          const match = jsonStr?.startsWith("{") ? [null, jsonStr] : null;
+          if (match) parsed = JSON.parse(match[1]);
+        } catch {
+          // ignore parse errors
+        }
+
+        const isWeeklyCap =
+          parsed?.weeklyLimit !== undefined ||
+          parsed?.message === "Weekly limit reached" ||
+          error?.message?.includes("Weekly limit reached");
+
+        if (isWeeklyCap) {
+          const resetsAt = parsed?.resetsAt
+            ? new Date(parsed.resetsAt).toLocaleDateString("en-GB", { weekday: "long", month: "short", day: "numeric" })
+            : "next Monday";
+          toast({
+            title: "Weekly limit reached",
+            description: `You've used ${parsed?.used ?? parsed?.weeklyLimit ?? 30} of ${parsed?.weeklyLimit ?? 30} products this week. Your limit resets ${resetsAt}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (parsed?.message === "Subscription required" || error?.message?.includes("Subscription required")) {
+          toast({
+            title: "Subscription required",
+            description: "Subscribe to SnapSync AI to unlock AI product analysis.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "Unlock failed",
+          description: parsed?.message ?? error?.message ?? "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleDownloadAllJson = () => {
