@@ -26,7 +26,7 @@ import { title } from "process";
 const MIN_IMAGE_COUNT = 1;
 const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
 const DEV_USER_ID = "dev_local_user";
-const DEV_FREE_EMAIL = "lefterisyilmaz96@gmail.com";
+const DEV_FREE_EMAIL = "lefterisgilmaz@gmail.com";
 
 /** Returns true if this user gets free unlimited AI on localhost (non-production only). */
 async function isDevFreeUser(req: Request): Promise<boolean> {
