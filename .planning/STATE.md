@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-04-27T10:16:42.199Z"
+stopped_at: Completed 10-03-PLAN.md
+last_updated: "2026-04-27T11:00:00.000Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 10
@@ -70,6 +70,7 @@ Progress: [████████░░] 84%
 | Phase 09 P03 | ~8 min | 2 tasks | 2 files |
 | Phase 09 P04 | ~2 min | 1 tasks | 1 files |
 | Phase 10-pricing-model-update P02 | 30 | 2 tasks | 4 files |
+| Phase 10-pricing-model-update P03 | 15 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase 10-pricing-model-update P01]: paidSessions import kept in storage.ts — still used by createPaidSession/getPaidSession/markPaidSessionUsed for subscription verify flow
 - [Phase 10-pricing-model-update]: billingInterval defaults to 'weekly' in useCreateSubscriptionCheckout — breaking from 'monthly' intentional, credits fully removed
 - [Phase 10-pricing-model-update]: weeklyPrice uses simple (subscriptionWeeklyPricePence ?? 400) / 100 — three-level backward compat chain removed post-purge
+- [Phase 10-pricing-model-update P03]: weekly cap 403 body parsed from error.message string via colonIdx slice + JSON.parse — no separate response.json() call needed; consistent with existing apiRequest error shape
+- [Phase 10-pricing-model-update P03]: no proactive weekly usage display added to Home.tsx — cap feedback is unlock-time only; usage counter deferred to future plan
+- [Phase 10-pricing-model-update P03]: Landing.tsx JSON-LD uses unitCode WEE and ANN for weekly and annual subscription offers on SoftwareApplication schema
 
 ### Roadmap Evolution
 
@@ -146,6 +150,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27T10:16:42.197Z
-Stopped at: Completed 10-02-PLAN.md
+Last session: 2026-04-27T11:00:00.000Z
+Stopped at: Completed 10-03-PLAN.md
 Resume file: None
