@@ -77,8 +77,12 @@ const FAQ_DATA = [
     answer: "SnapSync AI is an AI-powered product listing generator built for e-commerce sellers. You upload product photos, and our AI analyses each image to generate complete listings — including titles, descriptions, pricing, categories, SEO metadata, and AEO content. You can then review, edit, and push listings to Shopify, Etsy, or Amazon with one click."
   },
   {
+    question: "How does the 30-product weekly limit work?",
+    answer: "Each week (Monday to Sunday UTC) you can unlock full AI analysis for up to 30 products. A product can have multiple images — they all count as one product towards your limit. The count resets every Monday at midnight UTC."
+  },
+  {
     question: "How do I create product listings from photos?",
-    answer: "Simply drag and drop up to 200 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to unlock full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, AEO FAQ content, and variant options for every product."
+    answer: "Simply drag and drop up to 200 product images into SnapSync AI. The AI instantly generates a free preview with titles, categories, and tags. Subscribe to SnapSync AI and your limit of 30 products per week gives you access to full AI analysis including detailed descriptions, pricing suggestions, SEO metadata, AEO FAQ content, and variant options for every product."
   },
   {
     question: "Which e-commerce platforms does SnapSync AI support?",
