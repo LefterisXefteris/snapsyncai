@@ -2,101 +2,101 @@
 phase: 10-pricing-model-update
 plan: 02
 subsystem: ui
-tags: [react, typescript, stripe, subscriptions, pricing, billing, sidebar]
+tags: [react, stripe, payments, typescript, subscription]
 
 # Dependency graph
 requires:
-  - phase: 10-01
-    provides: useCreateSubscriptionCheckout billingInterval param, usePaymentConfig subscriptionMonthlyPricePence + subscriptionAnnualPricePence types, and backward-compat subscriptionPricePence alias
+  - phase: 10-pricing-model-update plan 01
+    provides: server-side weekly/annual pricing model, /api/payments/config returning subscriptionWeeklyPricePence + weeklyProductLimit
 provides:
-  - app-sidebar.tsx billingInterval state and monthly/annual toggle cards in subscribe dialog
-  - createSubscriptionCheckout.mutate(billingInterval) call wired to user selection
-  - Home.tsx fallback credit pack prices updated to halved values (450, 1750, 3950 pence)
-affects: [10-03, any UI plans showing subscription pricing or credit pack prices]
+  - Client fully purged of credits system — no hooks, no UI, no copy
+  - use-images.ts usePaymentConfig typed to weekly pricing shape
+  - useCreateSubscriptionCheckout accepts 'weekly' | 'annual'
+  - app-sidebar.tsx weekly/annual toggle with billing-toggle-weekly data-testid
+  - Home.tsx with no credits imports, state, URL handlers, or dialogs
+  - Landing.tsx with no CREDIT_PACKS array, no credits FAQ, no credits copy
+affects: [10-03-plan, 10-04-plan]
 
 # Tech tracking
 tech-stack:
   added: []
   patterns:
-    - Billing interval toggle: two-button grid with border-primary/bg-primary/5 active state, data-testid billing-toggle-monthly/annual
-    - Fallback price array collocated with paymentConfig nullish coalescing to ensure correct offline display
+    - "Delete-only migration: remove credit hooks, state, and UI entirely rather than conditionally hiding"
+    - "Weekly pricing default: billingInterval state defaults to 'weekly' in sidebar"
 
 key-files:
   created: []
   modified:
-    - client/src/components/app-sidebar.tsx
+    - client/src/hooks/use-images.ts
     - client/src/pages/Home.tsx
+    - client/src/components/app-sidebar.tsx
+    - client/src/pages/Landing.tsx
 
 key-decisions:
-  - "billingInterval state defaults to 'monthly' so first open shows the monthly option selected"
-  - "monthlyPrice falls back to subscriptionPricePence then 900 — three-level graceful degradation via ??"
-  - "annualPrice falls back to 7900 — matches SUBSCRIPTION_ANNUAL_PRICE_PENCE server constant"
+  - "billingInterval defaults to 'weekly' in useCreateSubscriptionCheckout mutationFn — breaking change from 'monthly' was intentional as credits are fully removed"
+  - "Three-level fallback removed: weeklyPrice uses simple (subscriptionWeeklyPricePence ?? 400) / 100 since backward compat alias no longer needed"
 
 patterns-established:
-  - "Toggle card pattern: grid-cols-2 with per-card border-primary active class, data-testid on each option"
+  - "Subscription-only UI: all credits UI deleted, no conditional rendering — simpler and safer"
+
+requirements-completed: []
 
 # Metrics
-duration: 8min
-completed: 2026-04-15
+duration: 30min
+completed: 2026-04-27
 ---
 
-# Phase 10 Plan 02: Pricing Model Update — Sidebar UI Summary
+# Phase 10 Plan 02: Client Credits Purge Summary
 
-**Monthly/annual billing interval toggle in subscribe dialog wired to Stripe checkout, with corrected Home.tsx fallback credit pack prices (450/1750/3950 pence)**
+**Deleted all credits code from the React client — hooks, Home.tsx state/UI/dialogs, Landing.tsx copy/FAQ — and updated sidebar + use-images.ts to weekly/annual subscription pricing**
 
 ## Performance
 
-- **Duration:** 8 min
-- **Started:** 2026-04-15T00:12:00Z
-- **Completed:** 2026-04-15T00:20:00Z
+- **Duration:** ~30 min (includes verification of prior partial work)
+- **Started:** 2026-04-27T00:00:00Z
+- **Completed:** 2026-04-27T00:30:00Z
 - **Tasks:** 2
-- **Files modified:** 2
+- **Files modified:** 4
 
 ## Accomplishments
-
-- Added `billingInterval` state to AppSidebar and replaced the static price card in the subscribe dialog with a two-button monthly/annual toggle
-- Wired the selected billing interval directly into `createSubscriptionCheckout.mutate(billingInterval)` so the chosen plan is passed to Stripe Checkout
-- Removed stale `subscriptionPrice` variable; derive `monthlyPrice` and `annualPrice` from `paymentConfig` with three-level graceful fallbacks
-- Patched Home.tsx fallback credit pack prices to the new halved values (Starter 450p, Growth 1750p, Pro 3950p)
+- Deleted `useCreditsBalance`, `usePurchaseCredits`, `useVerifyCredits` from `use-images.ts`; `usePaymentConfig` now returns `subscriptionWeeklyPricePence + weeklyProductLimit` shape
+- Purged all credits imports, state, URL param handlers, credit balance display, unanalyzed items banner, and Pricing/Credits dialog from `Home.tsx`
+- Updated `app-sidebar.tsx` to `'weekly' | 'annual'` billing toggle with `billing-toggle-weekly` data-testid and `£4/wk` display
+- Removed `CREDIT_PACKS` array, "How do credits work?" FAQ entry, and all credits copy from `Landing.tsx`
 
 ## Task Commits
 
 Each task was committed atomically:
 
-1. **Task 1: Update app-sidebar.tsx — billingInterval state + monthly/annual toggle in subscribe dialog** - `a71f1fd` (feat)
-2. **Task 2: Update Home.tsx fallback credit pack prices** - `b3d81ab` (fix)
-
-**Plan metadata:** (docs commit follows this summary)
+1. **Task 1: Delete credit hooks, update payment config type and checkout hook** - `a40b1c9` (feat)
+2. **Task 2: Purge credits from Home.tsx, update sidebar to weekly pricing, purge credits from Landing.tsx** - `0a9b8bc` (feat)
 
 ## Files Created/Modified
-
-- `client/src/components/app-sidebar.tsx` - Added billingInterval state, replaced static price card with two-button toggle grid (data-testid billing-toggle-monthly/annual), updated mutate call and button labels to reflect selected interval
-- `client/src/pages/Home.tsx` - Updated fallback credit pack pricePence values from old prices (900, 3500, 7900) to halved prices (450, 1750, 3950)
+- `client/src/hooks/use-images.ts` - Removed 3 credit hooks (~53 lines), updated usePaymentConfig return type to weekly shape, updated useCreateSubscriptionCheckout to `'weekly' | 'annual'`
+- `client/src/pages/Home.tsx` - Removed credit imports, state variables, URL param handler, credit balance sidebar footer, unanalyzed items banner (~60 lines deleted)
+- `client/src/components/app-sidebar.tsx` - Changed billingInterval type to `'weekly' | 'annual'`, price derivation to weeklyPrice, all display labels and data-testids updated to weekly
+- `client/src/pages/Landing.tsx` - Removed CREDIT_PACKS array (37 lines), removed credits FAQ entry, updated FAQ answers removing "buy credits" references
 
 ## Decisions Made
-
-- billingInterval state defaults to 'monthly' so the dialog always opens with monthly pre-selected — most common user choice
-- monthlyPrice uses three-level ?? chain: subscriptionMonthlyPricePence ?? subscriptionPricePence ?? 900 — ensures correct display even if API returns the old field name
-- annualPrice falls back to 7900 — matches the SUBSCRIPTION_ANNUAL_PRICE_PENCE server constant from Plan 01
+- `billingInterval` defaults to `'weekly'` (breaking from prior `'monthly'` default) — intentional since credits are fully removed and weekly is the primary offering
+- Simple `?? 400` fallback for weeklyPrice instead of three-level chain — backward compat alias no longer needed post-purge
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+None - plan executed exactly as written. Task 1 was already committed before this execution session began (`a40b1c9`). Task 2 changes were staged as uncommitted working-tree diffs, committed in this session.
 
 ## Issues Encountered
-
-Pre-existing TypeScript errors in unrelated files (server/routes.ts Stripe Subscription type, replit_integrations, db.ts, client/src/components/review-queue-modal.tsx, shiny-button.tsx) were present before this plan executed. None introduced by our changes; none are in the two files we modified.
+- Plan noted that some 10-02 work was already committed. Confirmed via git log that `a40b1c9` covered Task 1 entirely. Task 2 changes (Home.tsx + Landing.tsx) were in the working tree as uncommitted diffs — committed in this session as `0a9b8bc`.
+- Pre-existing TypeScript errors in `server/replit_integrations/` and Stripe type mismatches are unrelated to this plan and were present before execution.
 
 ## User Setup Required
-
-None - no external service configuration required for this UI plan.
+None - no external service configuration required.
 
 ## Next Phase Readiness
-
-- Sidebar subscribe dialog now correctly passes `billingInterval` to Stripe Checkout — end-to-end monthly/annual selection is functional once STRIPE_SECRET_KEY and MIGRATION_SECRET are provisioned
-- Home.tsx fallback prices are correct for the new pricing model
-- Plan 10-03 (Landing.tsx) can reference `usePaymentConfig().data.subscriptionMonthlyPricePence` and `subscriptionAnnualPricePence` directly for marketing page pricing display
+- Client is fully subscription-only — no credits code anywhere in `client/src/`
+- Plan 10-03 can proceed: it handles server-side Stripe webhook and subscription verification for the new weekly product limit enforcement
+- No blockers
 
 ---
 *Phase: 10-pricing-model-update*
-*Completed: 2026-04-15*
+*Completed: 2026-04-27*

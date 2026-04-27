@@ -112,7 +112,7 @@ Plans:
   4. Within the product detail view, the user can generate AEO (Answer Engine Optimization) tags for the product
   5. Generated content is editable before saving — user can tweak before committing
   6. AI background removal feature is disabled (visible but greyed out with "coming soon" tooltip)
-  7. AI photoshop feature is disabled (visible but greyed out with "coming soon" tooltip)
+  7. AI photoshoot feature is disabled (visible but greyed out with "coming soon" tooltip)
 **Plans**: 3 plans
 Plans:
 - [x] 06-01-PLAN.md — Add generate-content + regenerate-field SSE endpoints to server/routes.ts
@@ -183,18 +183,19 @@ Plans:
 - [ ] 09-05-PLAN.md — Per-group failure-isolated handleConfirm rewrite with inline retry + human verification checkpoint
 
 ### Phase 10: Pricing Model Update
-**Goal**: Replace the £19/month subscription with a £9/month (monthly) and £79/year (annual) plan; halve all credit pack prices; auto-migrate existing £19/month subscribers to the new £9/month plan; update all pricing UI across the app
+**Goal**: Replace the entire pricing model with a £4/week flat subscription (30 products/week cap) and a £173/year annual option (2 months free); remove the credit system entirely (UI, API routes, storage methods, Stripe products); migrate existing subscribers to the new weekly price; refund existing credit balances
 **Depends on**: Phase 9
 **Requirements**: PAY-10
 **Success Criteria** (what must be TRUE):
-  1. New subscribers can choose £9/month or £79/year — both routes through Stripe Checkout work end-to-end
-  2. Existing £19/month subscribers are automatically migrated to £9/month at their next renewal (Stripe subscription price updated server-side)
-  3. Credit pack prices are halved: Starter 10 credits £4.50, Growth 50 credits £17.50, Pro 150 credits £39.50
-  4. All pricing UI (sidebar, home page credits dialog, landing page) reflects the new prices and annual option
-  5. The £19/month Stripe price is archived so no new subscriptions can use it
-  6. Subscription feature set is unchanged — £9/month and £79/year both grant the same unlimited access as the old £19/month plan
-**Plans**: 3 plans
+  1. New subscribers can choose £4/week or £173/year — both routes through Stripe Checkout work end-to-end
+  2. Subscribers are capped at 30 products per week (resets every Monday UTC); attempting to unlock beyond the cap returns a clear 403 with reset date
+  3. The credit system is completely removed — no credits UI in the app, no /api/credits/* routes, no credit methods in storage.ts
+  4. All pricing UI (sidebar, landing page) reflects the new weekly/annual plans with no credit pack content
+  5. Existing subscribers are migrated to the new weekly price via the /api/subscription/migrate-to-weekly admin endpoint
+  6. Old subscription prices and all credit pack prices are archived in Stripe (active: false) so no new purchases can use them
+**Plans**: 4 plans
 Plans:
-- [ ] 10-01-PLAN.md — Update server pricing constants, add annual price helpers, update checkout + config endpoints, add migration and archive admin endpoints; update useCreateSubscriptionCheckout + usePaymentConfig hooks
-- [ ] 10-02-PLAN.md — Add billing interval toggle to sidebar subscribe dialog; update Home.tsx fallback credit pack prices
-- [ ] 10-03-PLAN.md — Update Landing.tsx credit pack prices, add subscription section, update FAQ and JSON-LD; human verification checkpoint
+- [x] 10-01-PLAN.md — Server credits purge: new weekly/annual price helpers, 30/week cap on unlock-images, migrate-to-weekly + archive-old-prices admin endpoints, remove credit methods from storage.ts and webhookHandlers.ts
+- [x] 10-02-PLAN.md — Client credits purge: delete useCreditsBalance/usePurchaseCredits/useVerifyCredits hooks, remove all credits UI from Home.tsx and Landing.tsx, update sidebar to weekly/annual toggle (£4/wk, £173/yr)
+- [ ] 10-03-PLAN.md — Cap feedback + Landing.tsx rewrite: weekly cap error toast in Home.tsx unlock flow, subscription-only pricing section on Landing.tsx, updated FAQ and JSON-LD
+- [ ] 10-04-PLAN.md — Human verification + production migration runbook: confirm clean app, run migrate-to-weekly and archive-old-prices in production

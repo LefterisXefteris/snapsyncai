@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-04-19T00:00:00.000Z"
+status: executing
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-04-27T10:16:42.199Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 10
   completed_phases: 2
-  total_plans: 25
-  completed_plans: 21
+  total_plans: 28
+  completed_plans: 22
   percent: 84
 ---
 
@@ -69,6 +69,7 @@ Progress: [████████░░] 84%
 | Phase 09 P02 | ~3 min | 2 tasks | 1 files |
 | Phase 09 P03 | ~8 min | 2 tasks | 2 files |
 | Phase 09 P04 | ~2 min | 1 tasks | 1 files |
+| Phase 10-pricing-model-update P02 | 30 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,8 @@ Recent decisions affecting current work:
 - [Phase 10-pricing-model-update P01]: weekly_subscription product type used for both weekly and annual Stripe prices — annual lives on same product as weekly
 - [Phase 10-pricing-model-update P01]: getWeeklyProductCount counts distinct coalesce(productGroupId, cast(id as text)) — product groups count as 1 slot
 - [Phase 10-pricing-model-update P01]: paidSessions import kept in storage.ts — still used by createPaidSession/getPaidSession/markPaidSessionUsed for subscription verify flow
+- [Phase 10-pricing-model-update]: billingInterval defaults to 'weekly' in useCreateSubscriptionCheckout — breaking from 'monthly' intentional, credits fully removed
+- [Phase 10-pricing-model-update]: weeklyPrice uses simple (subscriptionWeeklyPricePence ?? 400) / 100 — three-level backward compat chain removed post-purge
 
 ### Roadmap Evolution
 
@@ -143,6 +146,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-19T00:00:00.000Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-04-27T10:16:42.197Z
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None
