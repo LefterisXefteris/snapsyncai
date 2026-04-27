@@ -3,7 +3,7 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store } from "lucide-react";
+import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store, CalendarDays, XCircle, CreditCard } from "lucide-react";
 import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
 import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart, usePaymentConfig, useCreateSubscriptionCheckout, useCancelSubscription } from "@/hooks/use-images";
 import { UploadZone } from "@/components/upload-zone";
@@ -59,6 +59,7 @@ export default function Home() {
   const unlockImages = useUnlockImages();
   const { toast } = useToast();
   const createSubscriptionCheckout = useCreateSubscriptionCheckout();
+  const cancelSubscription = useCancelSubscription();
   const { data: paymentConfig } = usePaymentConfig();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showReviewQueue, setShowReviewQueue] = useState(false);
@@ -114,6 +115,9 @@ export default function Home() {
   const [amazonLwaRefreshToken, setAmazonLwaRefreshToken] = useState("");
   const [amazonSellerId, setAmazonSellerId] = useState("");
   const [amazonMarketplaceId, setAmazonMarketplaceId] = useState("ATVPDKIKX0DER");
+  const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'weekly' | 'annual'>('weekly');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -368,6 +372,27 @@ export default function Home() {
   };
 
   const isSubscribed = subscriptionStatus?.subscribed === true;
+  const weeklyPrice = (paymentConfig?.subscriptionWeeklyPricePence ?? 400) / 100;
+  const annualPrice = (paymentConfig?.subscriptionAnnualPricePence ?? 17300) / 100;
+
+  const handleSubscribe = () => {
+    createSubscriptionCheckout.mutate(billingInterval, {
+      onSuccess: (data) => {
+        if (data.checkoutUrl) {
+          if (data.sessionId) {
+            localStorage.setItem('snapsyncai_checkout_session_id', data.sessionId);
+          }
+          window.location.href = data.checkoutUrl;
+        }
+      },
+    });
+  };
+
+  const handleCancelSubscription = () => {
+    cancelSubscription.mutate(undefined, {
+      onSuccess: () => setShowCancelDialog(false),
+    });
+  };
 
   const handleUnlockAll = () => {
     if (!unpaidImages || unpaidImages.length === 0) return;
@@ -701,6 +726,69 @@ export default function Home() {
                     )}
                   </div>
                 </section>
+
+                <Separator className={cn(hasStagedImages && "max-w-xs")} />
+
+                <section className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
+                  <h2 className="text-xs font-semibold tracking-tight text-muted-foreground uppercase">Subscription</h2>
+                  {isSubscribed ? (
+                    <Card className="border-emerald-500/20 bg-emerald-500/5">
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-xs font-medium">Pro Active</span>
+                        </div>
+                        {subscriptionStatus?.currentPeriodEnd && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <CalendarDays className="w-3 h-3" />
+                            <span>Renews {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setShowCancelDialog(true)}
+                        >
+                          <XCircle className="w-3 h-3 mr-1.5" />
+                          Cancel
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card>
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Crown className="w-3.5 h-3.5" />
+                          <span className="text-xs font-medium">SnapSync AI Pro</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={() => setBillingInterval('weekly')}
+                            className={`flex flex-col items-center p-2 rounded border text-xs transition-colors ${billingInterval === 'weekly' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                          >
+                            <span className="font-semibold">£{weeklyPrice}/wk</span>
+                          </button>
+                          <button
+                            onClick={() => setBillingInterval('annual')}
+                            className={`flex flex-col items-center p-2 rounded border text-xs transition-colors ${billingInterval === 'annual' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                          >
+                            <span className="font-semibold">£{annualPrice}/yr</span>
+                          </button>
+                        </div>
+                        <Button
+                          className="w-full h-7 text-xs"
+                          size="sm"
+                          onClick={() => setShowSubscribeDialog(true)}
+                          disabled={createSubscriptionCheckout.isPending}
+                        >
+                          <CreditCard className="w-3 h-3 mr-1.5" />
+                          {billingInterval === 'annual' ? `£${annualPrice}/yr` : `£${weeklyPrice}/wk`}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </section>
               </div>
             </ScrollArea>
 
@@ -909,6 +997,80 @@ export default function Home() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      <Dialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="w-5 h-5" />
+              SnapSync AI Pro
+            </DialogTitle>
+            <DialogDescription>
+              Unlock AI-powered analysis for up to 30 products per week.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setBillingInterval('weekly')}
+                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${billingInterval === 'weekly' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+              >
+                <span className="font-semibold">£{weeklyPrice}/wk</span>
+                <span className="text-xs mt-0.5">Weekly</span>
+              </button>
+              <button
+                onClick={() => setBillingInterval('annual')}
+                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${billingInterval === 'annual' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+              >
+                <span className="font-semibold">£{annualPrice}/yr</span>
+                <span className="text-xs mt-0.5">Annual · save 2 months</span>
+              </button>
+            </div>
+            <Separator />
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> 30 products per week</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Full AI descriptions, pricing &amp; variants</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> SEO &amp; AEO content</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Push to Shopify, Etsy &amp; Amazon</li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSubscribeDialog(false)}>Cancel</Button>
+            <Button onClick={() => { setShowSubscribeDialog(false); handleSubscribe(); }} disabled={createSubscriptionCheckout.isPending}>
+              {createSubscriptionCheckout.isPending
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Redirecting...</>
+                : <><CreditCard className="w-4 h-4 mr-2" />{billingInterval === 'annual' ? `Subscribe £${annualPrice}/yr` : `Subscribe £${weeklyPrice}/wk`}</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="w-5 h-5" />
+              Cancel Subscription
+            </DialogTitle>
+            <DialogDescription>
+              You'll keep access until the end of your current billing period.
+            </DialogDescription>
+          </DialogHeader>
+          {subscriptionStatus?.currentPeriodEnd && (
+            <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm">
+              <CalendarDays className="w-4 h-4 shrink-0" />
+              <span>Access until {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()}</span>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>Keep Subscription</Button>
+            <Button variant="destructive" onClick={handleCancelSubscription} disabled={cancelSubscription.isPending}>
+              {cancelSubscription.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cancelling...</> : "Yes, Cancel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {images && (
         <ReviewQueueModal
