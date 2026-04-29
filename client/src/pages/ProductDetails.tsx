@@ -304,11 +304,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           aeoFaqs: aeoFaqs.map((f) => ({ question: f.q, answer: f.a })),
         },
       },
-      {
-        onSuccess: () => {
-          setLocation("/");
-        },
-      }
     );
   };
 
@@ -337,14 +332,14 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 size="sm" 
                 className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === 'synced' ? 'bg-secondary/50 text-muted-foreground' : 'bg-[#95bf46]/10 text-[#5e8e3e] border-[#95bf46]/30 hover:bg-[#95bf46]/20'}`}
                 onClick={() => pushToShopifyMutation.mutate([image.id])}
-                disabled={pushToShopifyMutation.isPending || image.shopifyStatus === "synced"}
+                disabled={pushToShopifyMutation.isPending}
               >
                 {pushToShopifyMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 ) : (
                   <Store className="w-3.5 h-3.5 mr-1.5" />
                 )}
-                {image.shopifyStatus === "synced" ? "Synced to Shopify" : "Push to Shopify"}
+                {image.shopifyStatus === "synced" ? "Sync updates to Shopify" : "Push to Shopify"}
               </Button>
             )}
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLocation("/")}>
