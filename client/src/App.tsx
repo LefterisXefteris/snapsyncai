@@ -128,7 +128,7 @@ function AppWithClerkFallback() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="snapsyncai-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AppWithClerk />

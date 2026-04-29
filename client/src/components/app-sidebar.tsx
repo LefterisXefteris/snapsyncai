@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown, CreditCard, Zap, Loader2, XCircle, Settings, CalendarDays } from "lucide-react";
+import { Crown, Check, Loader2, XCircle, Settings, CalendarDays } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -111,36 +111,30 @@ export function AppSidebar() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card data-testid="card-subscription-inactive">
-                    <CardContent className="p-3 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Crown className="w-4 h-4" />
-                        <span className="text-sm font-medium">SnapSync AI Pro</span>
+                  <Card data-testid="card-subscription-inactive" className="border-border/40 bg-muted/20">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Crown className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground font-medium">SnapSync AI Pro</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">From £{weeklyPrice}/wk</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Subscribe for unlimited AI-powered product analysis.
-                      </p>
-                      <ul className="space-y-1.5 text-xs text-muted-foreground">
-                        <li className="flex items-center gap-1.5"><Zap className="w-3 h-3 shrink-0" /> Unlimited AI analysis</li>
-                        <li className="flex items-center gap-1.5"><Zap className="w-3 h-3 shrink-0" /> Full descriptions & pricing</li>
-                        <li className="flex items-center gap-1.5"><Zap className="w-3 h-3 shrink-0" /> SEO & AEO content</li>
-                        <li className="flex items-center gap-1.5"><Zap className="w-3 h-3 shrink-0" /> Push to all stores</li>
-                      </ul>
                       <Button
                         data-testid="button-sidebar-subscribe"
                         className="w-full"
+                        variant="outline"
                         size="sm"
                         onClick={() => setShowSubscribeDialog(true)}
                       >
-                        <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                        Subscribe - {"\u00A3"}{weeklyPrice}/wk
+                        Unlock Pro
                       </Button>
                       {!subLoading && (
                         <Button
                           data-testid="button-restore-subscription"
                           variant="ghost"
                           size="sm"
-                          className="w-full text-muted-foreground text-xs"
+                          className="w-full text-muted-foreground text-xs h-7"
                           onClick={() => recoverSubscription.mutate()}
                           disabled={recoverSubscription.isPending}
                         >
@@ -169,82 +163,90 @@ export function AppSidebar() {
       </Sidebar>
 
       <Dialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Crown className="w-5 h-5" />
-              SnapSync AI Pro Subscription
-            </DialogTitle>
-            <DialogDescription>
-              Subscribe to unlock unlimited AI-powered product analysis — full descriptions, pricing, SEO, AEO content, and variant suggestions for all your products.
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader className="items-center text-center pb-2">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
+              <Crown className="w-6 h-6 text-primary" />
+            </div>
+            <DialogTitle className="text-xl">Unlock SnapSync AI Pro</DialogTitle>
+            <DialogDescription className="text-sm text-center">
+              Full AI analysis, SEO metadata, AEO content, and one-click store publishing for every product.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+
+          <div className="space-y-4 py-2">
             {/* Billing interval toggle */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 data-testid="billing-toggle-weekly"
                 onClick={() => setBillingInterval('weekly')}
-                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${
+                className={`flex flex-col items-start p-3.5 rounded-xl border-2 transition-all ${
                   billingInterval === 'weekly'
-                    ? 'border-primary bg-primary/5 text-foreground'
-                    : 'border-border text-muted-foreground hover:border-primary/50'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border text-muted-foreground hover:border-primary/40'
                 }`}
               >
-                <span className="font-semibold">{"\u00A3"}{weeklyPrice}/wk</span>
-                <span className="text-xs mt-0.5">Weekly</span>
+                <span className="text-base font-bold">£{weeklyPrice}<span className="text-xs font-normal text-muted-foreground ml-0.5">/wk</span></span>
+                <span className="text-xs text-muted-foreground mt-0.5">Billed weekly</span>
               </button>
               <button
                 data-testid="billing-toggle-annual"
                 onClick={() => setBillingInterval('annual')}
-                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${
+                className={`relative flex flex-col items-start p-3.5 rounded-xl border-2 transition-all ${
                   billingInterval === 'annual'
-                    ? 'border-primary bg-primary/5 text-foreground'
-                    : 'border-border text-muted-foreground hover:border-primary/50'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border text-muted-foreground hover:border-primary/40'
                 }`}
               >
-                <span className="font-semibold">{"\u00A3"}{annualPrice}/yr</span>
-                <span className="text-xs mt-0.5">Annual · save 2 months</span>
+                <span className="absolute top-2 right-2 text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded-full">Save 17%</span>
+                <span className="text-base font-bold">£{(annualPrice / 52).toFixed(2)}<span className="text-xs font-normal text-muted-foreground ml-0.5">/wk</span></span>
+                <span className="text-xs text-muted-foreground mt-0.5">£{annualPrice} billed annually</span>
               </button>
             </div>
-            <p className="text-sm font-medium" data-testid="text-subscription-price">
-              {billingInterval === 'annual'
-                ? `\u00A3${annualPrice} per year`
-                : `\u00A3${weeklyPrice} per week`}
+
+            {/* Feature grid */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 py-1">
+              {[
+                "Full AI descriptions & pricing",
+                "SEO titles & meta descriptions",
+                "AEO FAQs & snippets",
+                "Variant suggestions",
+                "Push to Shopify, Etsy & Amazon",
+                "Cancel anytime",
+              ].map((feat) => (
+                <div key={feat} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Check className="w-3.5 h-3.5 shrink-0 text-primary" />
+                  {feat}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-muted-foreground text-center">
+              No setup fees · Secure checkout via Stripe · Cancel anytime
             </p>
-            <Separator />
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Unlimited AI product analysis</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Full descriptions, pricing & variants</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> SEO titles, descriptions & alt text</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> AEO FAQs & conversational snippets</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Push to Shopify, Etsy & Amazon</li>
-            </ul>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button
               data-testid="button-cancel-subscribe-dialog"
               variant="outline"
               onClick={() => setShowSubscribeDialog(false)}
             >
-              Cancel
+              Not now
             </Button>
             <Button
               data-testid="button-confirm-subscribe"
+              className="flex-1"
               onClick={() => { setShowSubscribeDialog(false); handleSubscribe(); }}
               disabled={createSubscriptionCheckout.isPending}
             >
               {createSubscriptionCheckout.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Redirecting to checkout...
-                </>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Redirecting...</>
               ) : (
-                <>
-                  <CreditCard className="w-4 h-4 mr-2" />
+                <><Crown className="w-4 h-4 mr-2" />
                   {billingInterval === 'annual'
-                    ? `Subscribe - \u00A3${annualPrice}/yr`
-                    : `Subscribe - \u00A3${weeklyPrice}/wk`}
+                    ? `Start Pro — £${annualPrice}/yr`
+                    : `Start Pro — £${weeklyPrice}/wk`}
                 </>
               )}
             </Button>
