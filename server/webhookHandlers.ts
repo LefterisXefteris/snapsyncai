@@ -39,8 +39,8 @@ export class WebhookHandlers {
           const stripe = await getUncachableStripeClient();
           const sub = await stripe.subscriptions.retrieve(subscriptionId);
           let periodEnd: Date | null = null;
-          if (sub.current_period_end) {
-            periodEnd = new Date(sub.current_period_end * 1000);
+          if ((sub as any).current_period_end) {
+            periodEnd = new Date((sub as any).current_period_end * 1000);
           }
           await storage.upsertSubscription({
             userId,

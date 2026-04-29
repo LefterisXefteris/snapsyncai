@@ -83,6 +83,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [photoshootStyle, setPhotoshootStyle] = useState(VALID_STYLES[0]);
   const [imageKey, setImageKey] = useState(Date.now());
+  const [selectedVariantRows, setSelectedVariantRows] = useState<Set<number>>(new Set());
+  const [variantRowData, setVariantRowData] = useState<{ price: string; available: number; sku: string }[]>([]);
+  const [bulkPrice, setBulkPrice] = useState("");
+  const [bulkAvailable, setBulkAvailable] = useState("");
+  const [bulkSku, setBulkSku] = useState("");
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -122,11 +127,25 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       setInventoryQuantity(image.inventoryQuantity || 0);
       setTags(Array.isArray(image.tags) ? image.tags : []);
       setAeoFaqs(Array.isArray(image.aeoFaqs) ? (image.aeoFaqs as { question: string; answer: string }[]).map((f) => ({ q: f.question, a: f.answer })) : []);
+      const imgVariants = Array.isArray(image.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
+      const combos = imgVariants.reduce<string[][]>((acc, v) => {
+        if (acc.length === 0) return v.values.map((val: string) => [val]);
+        return acc.flatMap((combo: string[]) => v.values.map((val: string) => [...combo, val]));
+      }, []);
+      setVariantRowData(combos.map((combo) => ({
+        price: image.price || "0.00",
+        available: image.inventoryQuantity || 0,
+        sku: (image.sku ? `${image.sku}-` : "") + combo.map((v: string) => v.toUpperCase().replace(/\s/g, "")).join("-"),
+      })));
     }
   }, [image]);
 
   const variants = Array.isArray(image?.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
   const mediaGallery = Array.isArray(image?.mediaGallery) ? (image.mediaGallery as string[]) : [];
+  const variantCombos = variants.reduce<string[][]>((acc, v) => {
+    if (acc.length === 0) return v.values.map((val: string) => [val]);
+    return acc.flatMap((combo: string[]) => v.values.map((val: string) => [...combo, val]));
+  }, []);
 
   if (isLoading) {
     return (
@@ -246,6 +265,21 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     });
   };
 
+  const applyBulkEdit = () => {
+    setVariantRowData(prev => prev.map((row, i) => {
+      if (!selectedVariantRows.has(i)) return row;
+      return {
+        price: bulkPrice !== "" ? bulkPrice : row.price,
+        available: bulkAvailable !== "" ? Number(bulkAvailable) : row.available,
+        sku: bulkSku !== "" ? bulkSku : row.sku,
+      };
+    }));
+    setBulkPrice("");
+    setBulkAvailable("");
+    setBulkSku("");
+    setSelectedVariantRows(new Set());
+  };
+
   const handleSave = () => {
     updateMutation.mutate(
       {
@@ -279,7 +313,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-12">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
@@ -328,9 +362,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-4">
+      <div className="flex-1 min-h-0 max-w-6xl w-full mx-auto px-4 py-3 flex flex-col">
         {isUnpaid && (
-          <div className="mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center gap-2">
+          <div className="mb-3 shrink-0 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center gap-2">
             <Lock className="w-4 h-4 shrink-0" />
             <div>
               <p className="font-medium text-xs">This product is in preview mode.</p>
@@ -341,9 +375,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-0">
           {/* Main Content Column */}
-          <div className="md:col-span-2 space-y-4">
+          <div className="md:col-span-2 space-y-3 overflow-y-auto">
             {!isUnpaid && (
               <AiContentPanel
                 imageId={image.id}
@@ -398,7 +432,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     disabled={isUnpaid || rewriteDescriptionMutation.isPending}
-                    rows={5}
+                    rows={3}
                     placeholder="Product description..."
                     className="resize-y text-sm"
                   />
@@ -567,10 +601,61 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         </div>
                       ))}
                     </div>
+
+                    {/* Bulk edit bar */}
+                    {selectedVariantRows.size > 0 && (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border-b border-border/50 flex-wrap">
+                        <span className="text-xs font-medium text-primary shrink-0">{selectedVariantRows.size} selected</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Input
+                            value={bulkPrice}
+                            onChange={(e) => setBulkPrice(e.target.value)}
+                            placeholder="Price"
+                            className="h-7 w-20 text-xs"
+                            type="number"
+                          />
+                          <Input
+                            value={bulkAvailable}
+                            onChange={(e) => setBulkAvailable(e.target.value)}
+                            placeholder="Qty"
+                            className="h-7 w-16 text-xs"
+                            type="number"
+                          />
+                          <Input
+                            value={bulkSku}
+                            onChange={(e) => setBulkSku(e.target.value)}
+                            placeholder="SKU"
+                            className="h-7 w-28 text-xs"
+                          />
+                          <Button size="sm" className="h-7 text-xs px-3" onClick={applyBulkEdit}>
+                            Apply
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 text-muted-foreground"
+                            onClick={() => setSelectedVariantRows(new Set())}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Combinations table */}
                     <Table className="text-xs">
                       <TableHeader>
                         <TableRow className="h-8">
+                          <TableHead className="h-8 py-1 w-8">
+                            <Checkbox
+                              checked={variantCombos.length > 0 && selectedVariantRows.size === variantCombos.length}
+                              onCheckedChange={(checked) => {
+                                if (checked) setSelectedVariantRows(new Set(variantCombos.map((_, i) => i)));
+                                else setSelectedVariantRows(new Set());
+                              }}
+                              className="w-3.5 h-3.5"
+                            />
+                          </TableHead>
                           <TableHead className="h-8 py-1">Variant</TableHead>
                           <TableHead className="h-8 py-1">Price</TableHead>
                           <TableHead className="h-8 py-1">Available</TableHead>
@@ -578,23 +663,52 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {variants.reduce<string[][]>((acc, v) => {
-                          if (acc.length === 0) return v.values.map((val: string) => [val]);
-                          return acc.flatMap((combo: string[]) => v.values.map((val: string) => [...combo, val]));
-                        }, []).map((combo, i) => {
+                        {variantCombos.map((combo, i) => {
                           const label = combo.join(" / ");
-                          const skuSuffix = combo.map((v: string) => v.toUpperCase().replace(/\s/g, '')).join('-');
+                          const skuSuffix = combo.map((v: string) => v.toUpperCase().replace(/\s/g, "")).join("-");
+                          const row = variantRowData[i];
+                          const isSelected = selectedVariantRows.has(i);
                           return (
-                            <TableRow key={i} className="h-10">
+                            <TableRow key={i} className={`h-10 ${isSelected ? "bg-primary/5" : ""}`}>
+                              <TableCell className="py-1 w-8">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedVariantRows(prev => {
+                                      const next = new Set(prev);
+                                      if (checked) next.add(i); else next.delete(i);
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5"
+                                />
+                              </TableCell>
                               <TableCell className="font-medium whitespace-nowrap py-1">{label}</TableCell>
                               <TableCell className="py-1">
-                                <Input defaultValue={price} disabled={isUnpaid} className="h-7 w-20 text-xs" />
+                                <Input
+                                  value={row?.price ?? price}
+                                  onChange={(e) => setVariantRowData(prev => prev.map((r, j) => j === i ? { ...r, price: e.target.value } : r))}
+                                  disabled={isUnpaid}
+                                  className="h-7 w-20 text-xs"
+                                  type="number"
+                                />
                               </TableCell>
                               <TableCell className="py-1">
-                                <Input type="number" defaultValue={inventoryQuantity} disabled={isUnpaid} className="h-7 w-16 text-xs" />
+                                <Input
+                                  type="number"
+                                  value={row?.available ?? inventoryQuantity}
+                                  onChange={(e) => setVariantRowData(prev => prev.map((r, j) => j === i ? { ...r, available: Number(e.target.value) } : r))}
+                                  disabled={isUnpaid}
+                                  className="h-7 w-16 text-xs"
+                                />
                               </TableCell>
                               <TableCell className="py-1">
-                                <Input defaultValue={sku ? `${sku}-${skuSuffix}` : skuSuffix} disabled={isUnpaid} className="h-7 min-w-[100px] text-xs" />
+                                <Input
+                                  value={row?.sku ?? (sku ? `${sku}-${skuSuffix}` : skuSuffix)}
+                                  onChange={(e) => setVariantRowData(prev => prev.map((r, j) => j === i ? { ...r, sku: e.target.value } : r))}
+                                  disabled={isUnpaid}
+                                  className="h-7 min-w-[100px] text-xs"
+                                />
                               </TableCell>
                             </TableRow>
                           );
@@ -831,7 +945,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
               <CardContent className="p-4 space-y-4">
                 {/* All product images grid — always visible */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {productImages.map((img) => (
                     <div
                       key={img.id}
@@ -876,7 +990,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 {/* Selected image large preview with AI tools */}
                 {displayImageId && (
                   <>
-                    <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border">
+                    <div className="relative w-full h-44 bg-muted rounded-lg overflow-hidden border border-border">
                       <img
                         src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
                         alt={image.altText || image.title || "Product Image"}
@@ -1051,7 +1165,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           </div>
 
           {/* Sidebar Column */}
-          <div className="space-y-4">
+          <div className="space-y-3 overflow-y-auto">
             <Card className="shadow-sm">
               <CardHeader className="px-4 py-3 border-b border-border/50">
                 <CardTitle className="text-sm font-medium">Status</CardTitle>

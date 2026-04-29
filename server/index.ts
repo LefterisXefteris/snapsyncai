@@ -1,5 +1,7 @@
 import "./instrument.js";
 import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local", override: true });
 import * as Sentry from "@sentry/node";
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";

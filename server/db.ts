@@ -10,13 +10,27 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 0,
-  ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
-});
+// node-postgres misparses Supabase Transaction Pooler connection strings when the
+// username contains a dot (e.g. "postgres.ubgdfnnidnhvakcchxbw") — it treats the
+// dotted username as a hostname, causing ENOTFOUND. Parsing the URL explicitly and
+// passing discrete fields prevents pg from doing its own (broken) parsing.
+function buildPoolConfig(databaseUrl: string): pg.PoolConfig {
+  const url = new URL(databaseUrl);
+  const isSupabase = databaseUrl.includes('supabase');
+  return {
+    host: url.hostname,
+    port: parseInt(url.port, 10) || 5432,
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: url.pathname.replace(/^\//, ''),
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 0,
+    ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
+  };
+}
+
+export const pool = new Pool(buildPoolConfig(process.env.DATABASE_URL));
 export const db = drizzle(pool, { schema });

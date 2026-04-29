@@ -21,7 +21,7 @@ import {
   getAutoGroupTimeoutMs,
 } from "./embedding-utils";
 import { resolveUploadProcessingMode } from "./uploadLanggraph";
-import { title } from "process";
+
 
 const MIN_IMAGE_COUNT = 1;
 const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
@@ -1258,8 +1258,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                   await storage.migrateSession(oldSubRecord.userId, userId);
                 }
 
-                const periodEnd = activeSub.current_period_end
-                  ? new Date(activeSub.current_period_end * 1000) : null;
+                const periodEnd = (activeSub as any).current_period_end
+                  ? new Date((activeSub as any).current_period_end * 1000) : null;
                 sub = await storage.upsertSubscription({
                   userId,
                   stripeCustomerId: customer.id,
@@ -1389,8 +1389,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             await storage.migrateSession(oldSubRecord.userId, userId);
           }
 
-          const periodEnd = activeSub.current_period_end
-            ? new Date(activeSub.current_period_end * 1000)
+          const periodEnd = (activeSub as any).current_period_end
+            ? new Date((activeSub as any).current_period_end * 1000)
             : null;
           await storage.upsertSubscription({
             userId,
@@ -1539,7 +1539,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ cancelled: true, message: "Subscription will end at the current billing period" });
     } catch (error: any) {
       console.error("Subscription cancel error:", error);
-      res.status(500).json({ message: "Failed to cancel subscription" });
+      res.status(500).json({ message: "Failed to cancel subscription", detail: error?.message || String(error) });
     }
   });
 

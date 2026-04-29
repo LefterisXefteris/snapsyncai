@@ -40,9 +40,15 @@ export async function getStripeSync() {
     const { StripeSync } = await import('stripe-replit-sync');
     const secretKey = await getStripeSecretKey();
 
+    const dbUrl = new URL(process.env.DATABASE_URL!);
     stripeSync = new StripeSync({
       poolConfig: {
-        connectionString: process.env.DATABASE_URL!,
+        host: dbUrl.hostname,
+        port: parseInt(dbUrl.port, 10) || 5432,
+        user: decodeURIComponent(dbUrl.username),
+        password: decodeURIComponent(dbUrl.password),
+        database: dbUrl.pathname.replace(/^\//, ''),
+        ssl: { rejectUnauthorized: false },
         max: 2,
       },
       stripeSecretKey: secretKey,
