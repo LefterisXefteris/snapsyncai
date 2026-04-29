@@ -925,13 +925,14 @@ export default function Home() {
                 <div className="p-4">
                   {isLoading ? (
                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                      {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <Card key={i} className="border-border">
+                      {Array.from({ length: 20 }).map((_, i) => (
+                        <Card key={i} className="border-border overflow-hidden">
                           <CardContent className="p-0">
-                            <Skeleton className="h-32 w-full rounded-t-md rounded-b-none" />
-                            <div className="p-2 space-y-2">
+                            <Skeleton className="h-44 w-full rounded-none" />
+                            <div className="p-3 space-y-2">
                               <Skeleton className="h-3 w-3/4" />
-                              <Skeleton className="h-2 w-1/2" />
+                              <Skeleton className="h-2.5 w-1/2" />
+                              <Skeleton className="h-2 w-1/3" />
                             </div>
                           </CardContent>
                         </Card>

@@ -2,6 +2,7 @@ import { useState, memo } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, Trash2, Lock, ChevronRight, Check } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Image } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
   const [draftPrice, setDraftPrice] = useState(image.price ? String(image.price) : "");
   const [currency, _setCurrency] = useState(getCurrency);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const handleCurrencyChange = (code: string) => {
     setCurrency(code);
@@ -102,15 +104,17 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
     >
       {/* ── Main image ── */}
       <div className="relative bg-muted flex items-center justify-center border-b" style={{ height: hasViews ? "120px" : "176px" }}>
+        {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
         <img
           src={`/api/images/${image.id}/file?sz=${image.size}&t=${new Date(image.createdAt || Date.now()).getTime()}`}
           alt={image.altText || image.title || image.originalName}
-          className="absolute inset-0 w-full h-full object-contain bg-muted"
+          className={`absolute inset-0 w-full h-full object-contain bg-muted transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
+          onLoad={() => setImgLoaded(true)}
+          onError={(e) => { e.currentTarget.style.display = "none"; setImgLoaded(true); }}
           data-testid={`img-product-${image.id}`}
         />
-        <ImageIcon className="w-8 h-8 text-white/20" />
+        {imgLoaded && <ImageIcon className="w-8 h-8 text-white/20" />}
 
         <div className="absolute top-2.5 left-2.5">
           <Checkbox
