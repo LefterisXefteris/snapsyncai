@@ -1420,11 +1420,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const stripe = await getUncachableStripeClient();
+
+      // Look up Stripe by email before creating a new checkout. Prevents the
+      // double-charge case where a user signs in with a different Clerk auth
+      // method (Google vs email) and ends up with a second Stripe customer +
+      // subscription on the same card.
+      let existingCustomerId: string | undefined;
+      let primaryEmail: string | undefined;
+      try {
+        const clerkUser = await clerkClient.users.getUser(userId);
+        primaryEmail = clerkUser.emailAddresses?.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
+          ?? clerkUser.emailAddresses?.[0]?.emailAddress;
+
+        if (primaryEmail) {
+          const customers = await stripe.customers.list({ email: primaryEmail, limit: 5 });
+          for (const customer of customers.data) {
+            const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 3 });
+            const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+            if (activeSub) {
+              const periodEnd = (activeSub as any).current_period_end
+                ? new Date((activeSub as any).current_period_end * 1000) : null;
+              const oldSubRecord = await storage.getSubscriptionByStripeId(activeSub.id);
+              if (oldSubRecord && oldSubRecord.userId !== userId) {
+                console.log(`create-checkout: migrating data from old userId ${oldSubRecord.userId} to ${userId}`);
+                await storage.migrateSession(oldSubRecord.userId, userId);
+              }
+              await storage.upsertSubscription({
+                userId,
+                stripeCustomerId: customer.id,
+                stripeSubscriptionId: activeSub.id,
+                status: activeSub.status,
+                currentPeriodEnd: periodEnd,
+              });
+              console.log(`create-checkout: recovered existing sub ${activeSub.id} for user ${userId} via email ${primaryEmail}`);
+              return res.status(409).json({
+                message: "You already have an active subscription on this email — your account has been refreshed.",
+                recovered: true,
+              });
+            }
+            if (!existingCustomerId) existingCustomerId = customer.id;
+          }
+        }
+      } catch (lookupErr: any) {
+        // Non-fatal: log and proceed with a fresh checkout. Better to let the
+        // user pay than to block them on a Stripe lookup hiccup.
+        console.warn("create-checkout: email-based Stripe lookup failed (non-fatal):", lookupErr?.message);
+      }
+
       const { billingInterval } = req.body; // 'weekly' | 'annual', default 'weekly'
       const priceId = billingInterval === 'annual'
         ? await getOrCreateAnnualSubscriptionPriceId()
         : await getOrCreateWeeklySubscriptionPriceId();
       const appUrl = getAppUrl(req);
+
+      // Bucket per minute so rapid double-clicks/network retries return the
+      // same checkout session instead of creating a duplicate.
+      const idempotencyKey = `checkout-${userId}-${billingInterval ?? 'weekly'}-${Math.floor(Date.now() / 60000)}`;
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -1438,6 +1489,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         metadata: {
           userId,
         },
+        ...(existingCustomerId
+          ? { customer: existingCustomerId }
+          : primaryEmail ? { customer_email: primaryEmail } : {}),
+      }, {
+        idempotencyKey,
       });
 
       res.json({ checkoutUrl: session.url, sessionId: session.id });
