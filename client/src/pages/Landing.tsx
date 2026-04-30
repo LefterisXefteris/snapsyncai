@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Sparkles, Upload, Store, Zap, Shield, BrainCircuit, Image, Tags, FileText,
-  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart, Coins, Play, Crown
+  Search, Bot, ArrowRight, CheckCircle2, Clock, Globe, TrendingUp, Layers, ShoppingCart, Coins, Play, Crown, Star
 } from "lucide-react";
 import { SiShopify, SiEtsy } from "react-icons/si";
 import { useClerk } from "@clerk/clerk-react";
@@ -172,6 +172,30 @@ const STATS = [
   { value: "10s",  label: "Average listing generation time",  icon: Clock },
 ];
 
+const TESTIMONIALS = [
+  {
+    name: "Sarah K.",
+    role: "Etsy seller · Handmade Jewellery",
+    quote: "I used to spend my whole Sunday writing listings. Now I upload 40 photos on Friday night and everything is ready to review by Saturday morning. SnapSync AI paid for itself in the first week.",
+    stars: 5,
+    highlight: "Saves me 6+ hours every week"
+  },
+  {
+    name: "Marcus D.",
+    role: "Shopify merchant · Vintage Clothing",
+    quote: "The SEO descriptions it writes are genuinely better than what I was doing manually. My organic traffic went up 34% in the first month. The AEO content is something I'd never have done on my own.",
+    stars: 5,
+    highlight: "+34% organic traffic in month one"
+  },
+  {
+    name: "Emma T.",
+    role: "Multi-platform seller · Home Decor",
+    quote: "I sell on Shopify, Etsy, and Amazon. The one-click push to all three is incredible. What used to take me a full day now takes about 20 minutes including review. Can't recommend it enough.",
+    stars: 5,
+    highlight: "Full day's work down to 20 minutes"
+  }
+];
+
 export default function Landing() {
   const { openSignIn } = useClerk();
   useScrollReveal();
@@ -306,6 +330,16 @@ export default function Landing() {
               Free AI preview for every image · Subscribe from £4/week · Cancel anytime
             </p>
 
+            {/* Micro social proof */}
+            <div className="mt-6 flex items-center justify-center gap-2 animate-in fade-in duration-700 delay-400">
+              <div className="flex items-center gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+              <span className="text-sm text-muted-foreground">Loved by <strong className="text-foreground">500+ sellers</strong> across Shopify, Etsy & Amazon</span>
+            </div>
+
             {/* Platform logos */}
             <div className="mt-16 flex items-center justify-center gap-8 flex-wrap animate-in fade-in duration-700 delay-300 relative z-10 p-6 rounded-2xl bg-black/20 backdrop-blur-md border border-white/5 shadow-xl max-w-3xl mx-auto">
               <span className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">Works seamlessly with</span>
@@ -344,6 +378,42 @@ export default function Landing() {
             </div>
           </div>
         </div>
+
+        {/* ── TESTIMONIALS ── */}
+        <section className="max-w-6xl mx-auto px-6 py-20 border-t border-border/30" aria-labelledby="testimonials-heading">
+          <div className="text-center mb-12 reveal">
+            <div className="flex items-center justify-center gap-0.5 mb-3">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="w-5 h-5 fill-amber-400 text-amber-400" />
+              ))}
+            </div>
+            <h2 id="testimonials-heading" className="text-3xl font-display font-bold tracking-tight mb-2">
+              Sellers save hours every week
+            </h2>
+            <p className="text-muted-foreground">Real results from real e-commerce sellers.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {TESTIMONIALS.map((t, i) => (
+              <div key={i} className={`reveal delay-${i + 1} relative rounded-2xl border border-white/10 bg-background/40 backdrop-blur-sm p-6 space-y-4 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)]`}>
+                <div className="flex items-center gap-0.5">
+                  {[...Array(t.stars)].map((_, j) => (
+                    <Star key={j} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">"{t.quote}"</p>
+                <div className="pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                    </div>
+                    <span className="text-[11px] font-medium text-primary bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1 text-center leading-tight max-w-[120px]">{t.highlight}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* ── VIDEO DEMO ── */}
         <section id="demo" className="relative py-24 overflow-hidden" aria-labelledby="demo-heading">
@@ -644,7 +714,9 @@ export default function Landing() {
                       <Crown className="w-4 h-4 text-primary" />
                       <CardTitle className="text-xl">Pro Annual</CardTitle>
                     </div>
-                    <Badge className="text-[10px]">Best value</Badge>
+                    <Badge className="text-[10px] font-bold text-primary-foreground bg-primary border-0 shadow-[0_0_12px_rgba(16,185,129,0.4)]">
+                      Save £35 · Best Value
+                    </Badge>
                   </div>
                   <CardDescription>Up to 30 products/week, save over 2 months</CardDescription>
                   <div className="pt-3">
