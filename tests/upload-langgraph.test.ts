@@ -44,7 +44,7 @@ test("routes non-grouped preview uploads through the singlePreview branch", asyn
 });
 
 test("rejects empty uploads before routing", async () => {
-  await assert.rejects(
+  assert.throws(
     () =>
       resolveUploadProcessingMode({
         fileCount: 0,
