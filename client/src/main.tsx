@@ -8,4 +8,8 @@ Sentry.init({
   sendDefaultPii: true,
 });
 
+// Read runtime config injected by the host before booting the app
+const runtimeConfig = (window as unknown as { __SNAPSYNC_CONFIG__?: { version: string } }).__SNAPSYNC_CONFIG__;
+console.info(`Booting SnapSync ${runtimeConfig.version}`);
+
 createRoot(document.getElementById("root")!).render(<App />);
