@@ -9,6 +9,10 @@ export function resolveUploadProcessingMode(input: {
   groupAsOne: boolean;
   hasActiveSubscription: boolean;
 }): UploadProcessingMode {
+  if (input.fileCount <= 0) {
+    throw new Error("No files uploaded");
+  }
+
   const shouldGroup = input.groupAsOne && input.fileCount > 1;
   if (shouldGroup && input.hasActiveSubscription) return "groupedPaid";
   if (shouldGroup && !input.hasActiveSubscription) return "groupedPreview";
