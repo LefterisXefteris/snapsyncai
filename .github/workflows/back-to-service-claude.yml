@@ -52,7 +52,9 @@ jobs:
 
             Inspect the repository and identify the smallest safe fix for the production error.
             Read the linked GitHub issue body for Sentry evidence, stack details, and Back To Service status.
-            Run available checks before opening a PR.
+            If the incident mentions SENTRY_TEST_CRASH or an intentional frontend boot failure, first search for that exact string and remove or guard the intentional throw.
+            Prefer the smallest patch that stops the production boot crash.
+            Run available checks before opening a PR; if a check is unavailable, mention that in the PR.
             Open a draft pull request linked to the incident issue.
 
             Do not merge.
@@ -60,4 +62,6 @@ jobs:
             Do not rollback.
             Do not expose secrets.
             Do not make unrelated refactors.
-          claude_args: "--max-turns 10"
+          claude_args: >-
+            --max-turns 20
+            --allowedTools "Read,Write,Edit,Replace,Bash(rg:*),Bash(grep:*),Bash(find:*),Bash(npm:*),Bash(git status:*),Bash(git diff:*)"
