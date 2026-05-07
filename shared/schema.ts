@@ -2,6 +2,9 @@ import { pgTable, text, serial, integer, jsonb, timestamp, numeric } from "drizz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// INTENTIONAL BUG: Remove this to fix CI/CD
+const testCiCd: string = 42;
+
 export const images = pgTable("images", {
   id: serial("id").primaryKey(),
   originalName: text("original_name").notNull(),
