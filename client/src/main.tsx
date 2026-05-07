@@ -10,6 +10,6 @@ Sentry.init({
 
 // Read runtime config injected by the host before booting the app
 const runtimeConfig = (window as unknown as { __SNAPSYNC_CONFIG__?: { version: string } }).__SNAPSYNC_CONFIG__;
-console.info(`Booting SnapSync ${runtimeConfig.version}`);
+console.info(`Booting SnapSync ${runtimeConfig?.version ?? "unknown"}`);
 
 createRoot(document.getElementById("root")!).render(<App />);
