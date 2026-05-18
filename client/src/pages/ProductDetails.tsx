@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search } from "lucide-react";
+import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search, GripVertical } from "lucide-react";
 import { AiContentPanel } from "@/components/ai-content-panel";
 
 const AI_BG_REMOVAL_ENABLED = import.meta.env.VITE_FEATURE_AI_BG_REMOVAL === "true";
@@ -32,6 +32,25 @@ const BG_STYLES = [
   { key: "minimal",   label: "Minimal",   color: "#e5e5e5" },
   { key: "dark",      label: "Dark",      color: "#1c1c1c" },
 ] as const;
+
+function orderProductImages(images: Image[], mediaGallery: string[]) {
+  if (mediaGallery.length === 0) return images;
+
+  const rank = new Map(
+    mediaGallery
+      .map((id, index) => [Number(id), index] as const)
+      .filter(([id]) => Number.isFinite(id))
+  );
+
+  return [...images].sort((a, b) => {
+    const aRank = rank.get(a.id);
+    const bRank = rank.get(b.id);
+    if (aRank !== undefined || bRank !== undefined) {
+      return (aRank ?? Number.MAX_SAFE_INTEGER) - (bRank ?? Number.MAX_SAFE_INTEGER) || a.id - b.id;
+    }
+    return a.id - b.id;
+  });
+}
 
 export default function ProductDetails({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
@@ -88,6 +107,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkAvailable, setBulkAvailable] = useState("");
   const [bulkSku, setBulkSku] = useState("");
+  const [draggedImageId, setDraggedImageId] = useState<number | null>(null);
+  const [dragOverImageId, setDragOverImageId] = useState<number | null>(null);
+  const [thumbnailDragActive, setThumbnailDragActive] = useState(false);
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -95,7 +117,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const { data: groupImages } = useProductGroup(image?.id);
 
   // productImages: prefer server group result, fall back to client-side filtering, then just primary
-  const productImages: Image[] = (() => {
+  const rawProductImages: Image[] = (() => {
     if (groupImages && groupImages.length > 0) return groupImages as Image[];
     if (images && image?.productGroupId) {
       const siblings = (images as Image[]).filter(img => img.productGroupId === image.productGroupId).sort((a, b) => a.id - b.id);
@@ -142,6 +164,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const variants = Array.isArray(image?.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
   const mediaGallery = Array.isArray(image?.mediaGallery) ? (image.mediaGallery as string[]) : [];
+  const productImages = orderProductImages(rawProductImages, mediaGallery);
   const variantCombos = variants.reduce<string[][]>((acc, v) => {
     if (acc.length === 0) return v.values.map((val: string) => [val]);
     return acc.flatMap((combo: string[]) => v.values.map((val: string) => [...combo, val]));
@@ -166,6 +189,47 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const isUnpaid = image.paymentStatus !== "paid";
   const backgrounds = Array.isArray(image?.generatedBackgrounds) ? (image.generatedBackgrounds as string[]) : [];
+
+  const persistMediaOrder = async (orderedIds: number[], primaryId?: number) => {
+    if (!image || orderedIds.length === 0) return;
+    const mediaGallery = orderedIds.map(String);
+    try {
+      await Promise.all(productImages.map((productImage) =>
+        apiRequest("PUT", buildUrl(api.images.update.path, { id: productImage.id }), { mediaGallery })
+      ));
+      if (primaryId) {
+        setSelectedImageId(primaryId);
+        setBgEditUrl(null);
+        setBgEditKey(null);
+      }
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
+      toast({
+        title: primaryId ? "Thumbnail updated" : "Media reordered",
+        description: primaryId ? "This image will be used first for the product." : "Product image order saved.",
+      });
+    } catch (err: any) {
+      toast({ title: "Failed to update media", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const moveImageToIndex = (imageId: number, targetIndex: number) => {
+    const currentIds = productImages.map((img) => img.id);
+    const fromIndex = currentIds.indexOf(imageId);
+    if (fromIndex === -1) return;
+
+    const nextIds = [...currentIds];
+    const [movedId] = nextIds.splice(fromIndex, 1);
+    nextIds.splice(Math.max(0, Math.min(targetIndex, nextIds.length)), 0, movedId);
+    if (nextIds.every((id, index) => id === currentIds[index])) return;
+    persistMediaOrder(nextIds, targetIndex === 0 ? imageId : undefined);
+  };
+
+  const getDraggedImageId = (event: DragEvent) => {
+    const rawId = event.dataTransfer.getData("application/x-product-image-id") || event.dataTransfer.getData("text/plain");
+    const id = Number(rawId);
+    return Number.isFinite(id) ? id : null;
+  };
 
   const handleEditBackground = (style: string) => {
     setShowBgPicker(false);
@@ -941,14 +1005,46 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               <CardContent className="p-4 space-y-4">
                 {/* All product images grid — always visible */}
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {productImages.map((img) => (
+                  {productImages.map((img, index) => (
                     <div
                       key={img.id}
-                      className={`relative group/thumb rounded-lg overflow-hidden border-2 aspect-square cursor-pointer transition-all ${
+                      draggable={!isUnpaid}
+                      className={`relative group/thumb rounded-lg overflow-hidden border-2 aspect-square cursor-grab active:cursor-grabbing transition-all ${
                         displayImageId === img.id
                           ? "border-primary ring-2 ring-primary/30"
+                          : dragOverImageId === img.id
+                            ? "border-primary/70 ring-2 ring-primary/20 scale-[0.98]"
                           : "border-border hover:border-foreground/30"
                       }`}
+                      onDragStart={(e) => {
+                        if (isUnpaid) return;
+                        setDraggedImageId(img.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("application/x-product-image-id", String(img.id));
+                        e.dataTransfer.setData("text/plain", String(img.id));
+                      }}
+                      onDragOver={(e) => {
+                        if (isUnpaid || draggedImageId === img.id) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDragOverImageId(img.id);
+                      }}
+                      onDragLeave={() => {
+                        setDragOverImageId((current) => current === img.id ? null : current);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const droppedId = getDraggedImageId(e);
+                        setDraggedImageId(null);
+                        setDragOverImageId(null);
+                        if (!droppedId || droppedId === img.id || isUnpaid) return;
+                        moveImageToIndex(droppedId, index);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedImageId(null);
+                        setDragOverImageId(null);
+                        setThumbnailDragActive(false);
+                      }}
                       onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
                     >
                       <img
@@ -957,6 +1053,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
+                      <div className="absolute top-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 text-white shadow-sm opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                        <GripVertical className="w-3 h-3" />
+                        <span className="text-[9px] font-medium tabular-nums">{index + 1}</span>
+                      </div>
                       {/* Remove from product button on hover — unlinks image back to library */}
                       <button
                         onClick={(e) => {
@@ -985,12 +1085,37 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 {/* Selected image large preview with AI tools */}
                 {displayImageId && (
                   <>
-                    <div className="relative w-full h-44 bg-muted rounded-lg overflow-hidden border border-border">
+                    <div
+                      className={`relative w-full h-44 bg-muted rounded-lg overflow-hidden border transition-all ${thumbnailDragActive ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "border-border"}`}
+                      onDragOver={(e) => {
+                        if (isUnpaid) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setThumbnailDragActive(true);
+                      }}
+                      onDragLeave={() => setThumbnailDragActive(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setThumbnailDragActive(false);
+                        setDraggedImageId(null);
+                        setDragOverImageId(null);
+                        const droppedId = getDraggedImageId(e);
+                        if (!droppedId || isUnpaid) return;
+                        moveImageToIndex(droppedId, 0);
+                      }}
+                    >
                       <img
                         src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
                         alt={image.altText || image.title || "Product Image"}
                         className="w-full h-full object-contain"
                       />
+                      {thumbnailDragActive && (
+                        <div className="absolute inset-0 z-20 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+                          <div className="rounded-md border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary shadow-sm">
+                            Drop to make thumbnail
+                          </div>
+                        </div>
+                      )}
 
                       {editBackgroundMutation.isPending && (
                         <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 gap-2">

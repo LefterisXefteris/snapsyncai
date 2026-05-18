@@ -4,7 +4,7 @@ import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
 // Columns returned for list/dashboard queries.
 // Excludes imageData (base64 blob), aiData (large JSONB), aeoFaqs, generatedBackgrounds,
-// mediaGallery, instagramCaption — these are only needed on the detail page, not the list.
+// instagramCaption — these are only needed on the detail page, not the list.
 const listColumns = {
   id: images.id,
   originalName: images.originalName,
@@ -28,6 +28,7 @@ const listColumns = {
   barcode: images.barcode,
   trackQuantity: images.trackQuantity,
   inventoryQuantity: images.inventoryQuantity,
+  mediaGallery: images.mediaGallery,
   collections: images.collections,
   shopifyProductId: images.shopifyProductId,
   shopifyStatus: images.shopifyStatus,
@@ -42,6 +43,17 @@ const listColumns = {
   sessionId: images.sessionId,
   createdAt: images.createdAt,
 } as const;
+
+function getMediaGalleryOrder(group: Record<string, any>[], preferredImageId?: number): number[] {
+  const preferred = group.find((img) => img.id === preferredImageId);
+  const source = [preferred, ...group].find((img) => Array.isArray(img?.mediaGallery) && img.mediaGallery.length > 0);
+  if (!source) return [];
+
+  const groupIds = new Set(group.map((img) => img.id));
+  return source.mediaGallery
+    .map((id: unknown) => Number(id))
+    .filter((id: number) => Number.isFinite(id) && groupIds.has(id));
+}
 
 export interface IStorage {
   createImage(image: InsertImage): Promise<Image>;
@@ -115,9 +127,19 @@ export class DatabaseStorage implements IStorage {
       return db.select(listColumns).from(images)
         .where(and(eq(images.id, imageId), eq(images.sessionId, sessionId)));
     }
-    return db.select(listColumns).from(images)
+    const group = await db.select(listColumns).from(images)
       .where(and(eq(images.productGroupId, img.productGroupId), eq(images.sessionId, sessionId)))
       .orderBy(images.id);
+    const orderedIds = getMediaGalleryOrder(group, imageId);
+    if (orderedIds.length === 0) return group;
+
+    const rank = new Map(orderedIds.map((id, index) => [id, index]));
+    return [...group].sort((a, b) => {
+      const aRank = rank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const bRank = rank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      if (aRank !== bRank) return aRank - bRank;
+      return a.id - b.id;
+    });
   }
 
   async updateImage(id: number, updates: Partial<InsertImage>): Promise<Image | undefined> {

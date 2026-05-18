@@ -2316,13 +2316,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           groupMap.set(img.productGroupId, arr);
         }
       }
-      // Sort each group: primary (has description) first, then by id
-      groupMap.forEach((arr) => {
+      const sortGroupByMediaGallery = (arr: ListedImage[]) => {
+        const source = arr.find((item: any) => Array.isArray(item.mediaGallery) && item.mediaGallery.length > 0);
+        const orderedIds = Array.isArray((source as any)?.mediaGallery)
+          ? (source as any).mediaGallery.map((id: unknown) => Number(id)).filter((id: number) => Number.isFinite(id))
+          : [];
+        const rank = new Map<number, number>(orderedIds.map((id: number, index: number) => [id, index]));
+
         arr.sort((a: ListedImage, b: ListedImage) => {
+          const aRank = rank.get(a.id);
+          const bRank = rank.get(b.id);
+          if (aRank !== undefined || bRank !== undefined) {
+            return (aRank ?? Number.MAX_SAFE_INTEGER) - (bRank ?? Number.MAX_SAFE_INTEGER) || a.id - b.id;
+          }
           if (a.description && !b.description) return -1;
           if (!a.description && b.description) return 1;
           return a.id - b.id;
         });
+      };
+
+      // Sort each group by saved media order, with the previous primary-first fallback.
+      groupMap.forEach((arr) => {
+        sortGroupByMediaGallery(arr);
       });
 
       const processedGroups = new Set<string>();
