@@ -52,6 +52,14 @@ function orderProductImages(images: Image[], mediaGallery: string[]) {
   });
 }
 
+function productImageSrc(image: Pick<Image, "id" | "size" | "createdAt">, proxy = false, cacheKey?: number) {
+  const params = new URLSearchParams();
+  if (image.size) params.set("sz", String(image.size));
+  params.set("t", String(cacheKey ?? new Date(image.createdAt || Date.now()).getTime()));
+  if (proxy) params.set("proxy", "1");
+  return `/api/images/${image.id}/file?${params.toString()}`;
+}
+
 export default function ProductDetails({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -110,6 +118,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [draggedImageId, setDraggedImageId] = useState<number | null>(null);
   const [dragOverImageId, setDragOverImageId] = useState<number | null>(null);
   const [thumbnailDragActive, setThumbnailDragActive] = useState(false);
+  const [proxyImageIds, setProxyImageIds] = useState<Set<number>>(new Set());
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -165,6 +174,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const variants = Array.isArray(image?.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
   const mediaGallery = Array.isArray(image?.mediaGallery) ? (image.mediaGallery as string[]) : [];
   const productImages = orderProductImages(rawProductImages, mediaGallery);
+  const displayImage = productImages.find((img) => img.id === displayImageId) ?? image;
   const variantCombos = variants.reduce<string[][]>((acc, v) => {
     if (acc.length === 0) return v.values.map((val: string) => [val]);
     return acc.flatMap((combo: string[]) => v.values.map((val: string) => [...combo, val]));
@@ -229,6 +239,15 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     const rawId = event.dataTransfer.getData("application/x-product-image-id") || event.dataTransfer.getData("text/plain");
     const id = Number(rawId);
     return Number.isFinite(id) ? id : null;
+  };
+
+  const handleImageLoadError = (imageId: number) => {
+    setProxyImageIds((current) => {
+      if (current.has(imageId)) return current;
+      const next = new Set(current);
+      next.add(imageId);
+      return next;
+    });
   };
 
   const handleEditBackground = (style: string) => {
@@ -876,10 +895,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                                     className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all select-none ${isSel ? "border-primary ring-2 ring-primary/40 scale-[0.97]" : "border-border hover:border-primary/50 hover:scale-[0.98]"}`}
                                   >
                                     <img
-                                      src={`/api/images/${img.id}/file`}
+                                      src={productImageSrc(img, proxyImageIds.has(img.id))}
                                       alt={img.originalName || "Image"}
                                       className="w-full h-full object-cover"
                                       loading="lazy"
+                                      onError={() => handleImageLoadError(img.id)}
                                     />
                                     {/* Checkmark overlay */}
                                     {isSel && (
@@ -1048,10 +1068,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
                     >
                       <img
-                        src={`/api/images/${img.id}/file`}
+                        src={productImageSrc(img, proxyImageIds.has(img.id))}
                         alt={img.originalName || "Product view"}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        onError={() => handleImageLoadError(img.id)}
                       />
                       <div className="absolute top-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 text-white shadow-sm opacity-0 group-hover/thumb:opacity-100 transition-opacity">
                         <GripVertical className="w-3 h-3" />
@@ -1105,9 +1126,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       }}
                     >
                       <img
-                        src={bgEditUrl ?? `/api/images/${displayImageId}/file?t=${imageKey}`}
+                        src={bgEditUrl ?? productImageSrc(displayImage, proxyImageIds.has(displayImage.id), imageKey)}
                         alt={image.altText || image.title || "Product Image"}
                         className="w-full h-full object-contain"
+                        onError={() => handleImageLoadError(displayImage.id)}
                       />
                       {thumbnailDragActive && (
                         <div className="absolute inset-0 z-20 bg-background/70 backdrop-blur-sm flex items-center justify-center">
