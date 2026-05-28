@@ -66,7 +66,6 @@ export default function Home() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [showEtsyConnectDialog, setShowEtsyConnectDialog] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
-  const [accessToken, setAccessToken] = useState("");
   const [etsyApiKey, setEtsyApiKey] = useState("");
   const [etsyAccessToken, setEtsyAccessToken] = useState("");
   const [etsyShopId, setEtsyShopId] = useState("");
@@ -132,6 +131,25 @@ export default function Home() {
       localStorage.removeItem('snapsyncai_checkout_session_id');
       toast({ title: "Subscription Cancelled", description: "Your subscription checkout was cancelled. You can try again.", variant: "destructive" });
       window.history.replaceState({}, '', '/');
+    } else if (params.get('shopify') === 'connected') {
+      queryClient.invalidateQueries({ queryKey: ['/api/shopify/status'] });
+      toast({ title: "Shopify Connected", description: "Your Shopify store is ready to receive products." });
+      window.history.replaceState({}, '', '/');
+    } else if (params.get('shopify') === 'error') {
+      const reason = params.get('reason');
+      const messages: Record<string, string> = {
+        invalid_shop: "Shopify sent an invalid shop domain. Please try connecting again.",
+        invalid_hmac: "Shopify callback verification failed. Check the app callback URL and API secret.",
+        missing_write_products: "SnapSync AI needs Shopify's write_products permission to create draft products.",
+        token_exchange_failed: "Shopify authorization succeeded, but SnapSync AI could not exchange the code for an access token.",
+        not_configured: "Shopify OAuth is not configured for this deployment.",
+      };
+      toast({
+        title: "Shopify Connection Failed",
+        description: messages[reason || ""] || "Shopify could not be connected. Please try again.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, '', '/');
     }
   }, []);
 
@@ -173,20 +191,11 @@ export default function Home() {
   };
 
   const handleConnect = () => {
-    if (!shopDomain.trim() || !accessToken.trim()) {
-      toast({ title: "Missing fields", description: "Please enter both your store URL and access token.", variant: "destructive" });
+    if (!shopDomain.trim()) {
+      toast({ title: "Missing store", description: "Please enter your Shopify store URL.", variant: "destructive" });
       return;
     }
-    shopifyConnect.mutate(
-      { shopDomain: shopDomain.trim(), accessToken: accessToken.trim() },
-      {
-        onSuccess: () => {
-          setShowConnectDialog(false);
-          setShopDomain("");
-          setAccessToken("");
-        },
-      }
-    );
+    shopifyConnect.mutate({ shopDomain: shopDomain.trim() });
   };
 
   const handleDisconnect = () => {
@@ -1090,7 +1099,7 @@ export default function Home() {
               Connect to Shopify
             </DialogTitle>
             <DialogDescription>
-              Enter your Shopify store URL and custom app access token to connect.
+              Enter your Shopify store URL. You'll approve SnapSync AI in Shopify next.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1107,23 +1116,6 @@ export default function Home() {
                 Your Shopify store domain (e.g. my-store or my-store.myshopify.com)
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="access-token" data-testid="label-access-token">
-                <Key className="w-3.5 h-3.5 inline mr-1" />
-                Access Token
-              </Label>
-              <Input
-                id="access-token"
-                data-testid="input-access-token"
-                type="password"
-                placeholder="shpat_..."
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                From your Shopify custom app: Settings &rarr; Apps &rarr; Develop apps &rarr; Your app &rarr; API credentials
-              </p>
-            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1136,15 +1128,15 @@ export default function Home() {
             <Button
               data-testid="button-submit-connect"
               onClick={handleConnect}
-              disabled={shopifyConnect.isPending || !shopDomain.trim() || !accessToken.trim()}
+              disabled={shopifyConnect.isPending || !shopDomain.trim()}
             >
               {shopifyConnect.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Connecting...
+                  Opening Shopify...
                 </>
               ) : (
-                "Connect"
+                "Authorize in Shopify"
               )}
             </Button>
           </DialogFooter>

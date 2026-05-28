@@ -15,6 +15,8 @@ import { pool } from './db';
 
 const app = express();
 const httpServer = createServer(app);
+const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+const RUN_STARTUP_JOBS = process.env.RUN_STARTUP_JOBS === 'true' || !IS_VERCEL;
 
 // Compress all JSON/text responses — cuts payload size 60-80%
 app.use(compression());
@@ -165,10 +167,14 @@ async function runAppMigrations() {
 export const setupApp = async () => {
   if (!setupPromise) {
     setupPromise = (async () => {
-      await runAppMigrations();
-      // initStripe does schema migrations + Stripe HTTP calls — don't block routes on it.
-      // Fire it in the background so the first request is served immediately.
-      initStripe().catch((err: any) => console.error('initStripe background error:', err));
+      if (RUN_STARTUP_JOBS) {
+        await runAppMigrations();
+        // initStripe does schema migrations + Stripe HTTP calls — don't block routes on it.
+        // Fire it in the background so the first request is served immediately.
+        initStripe().catch((err: any) => console.error('initStripe background error:', err));
+      } else {
+        console.log('Skipping startup migrations/sync on Vercel; set RUN_STARTUP_JOBS=true to enable.');
+      }
       await registerRoutes(httpServer, app);
 
       // Sentry debug route — remove after verifying integration works

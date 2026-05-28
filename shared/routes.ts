@@ -237,6 +237,10 @@ export const api = {
       method: 'POST' as const,
       path: '/api/shopify/connect' as const,
     },
+    oauthStart: {
+      method: 'GET' as const,
+      path: '/api/shopify/oauth/start' as const,
+    },
     disconnect: {
       method: 'POST' as const,
       path: '/api/shopify/disconnect' as const,

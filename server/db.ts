@@ -17,15 +17,23 @@ if (!process.env.DATABASE_URL) {
 function buildPoolConfig(databaseUrl: string): pg.PoolConfig {
   const url = new URL(databaseUrl);
   const isSupabase = databaseUrl.includes('supabase');
+  const isServerless = process.env.VERCEL === "1" || process.env.VERCEL === "true";
+  const maxConnections = Number.parseInt(
+    process.env.DATABASE_POOL_MAX || (isServerless ? "1" : "10"),
+    10,
+  );
+
   return {
     host: url.hostname,
     port: parseInt(url.port, 10) || 5432,
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: url.pathname.replace(/^\//, ''),
-    max: 10,
-    idleTimeoutMillis: 30000,
+    max: Number.isFinite(maxConnections) && maxConnections > 0 ? maxConnections : 1,
+    idleTimeoutMillis: isServerless ? 5000 : 30000,
     connectionTimeoutMillis: 10000,
+    allowExitOnIdle: isServerless,
+    maxLifetimeSeconds: isServerless ? 60 : 0,
     keepAlive: true,
     keepAliveInitialDelayMillis: 0,
     ssl: isSupabase ? { rejectUnauthorized: false } : undefined,

@@ -21,6 +21,15 @@ import {
   getAutoGroupTimeoutMs,
 } from "./embedding-utils";
 import { resolveUploadProcessingMode } from "./uploadLanggraph";
+import {
+  buildShopifyOAuthAuthorizeUrl,
+  getShopifyOAuthConfig,
+  createShopifyOAuthState,
+  isValidShopifyDomain,
+  normalizeShopifyDomain,
+  verifyShopifyHmac,
+  verifyShopifyOAuthState,
+} from "./shopifyOAuth";
 
 
 const MIN_IMAGE_COUNT = 1;
@@ -843,6 +852,11 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function isDatabaseConnectionLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("EMAXCONN") || message.includes("max client connections reached");
+}
+
 async function pushProductToShopify(
   image: any,
   accessToken: string,
@@ -1180,14 +1194,6 @@ function getAppUrl(req: express.Request): string {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const host = req.headers['x-forwarded-host'] || req.headers.host || req.hostname;
   return `${protocol}://${host}`;
-}
-
-function verifyShopifyHmac(query: Record<string, string>, secret: string): boolean {
-  const { hmac, ...rest } = query;
-  if (!hmac) return false;
-  const sortedParams = Object.keys(rest).sort().map(k => `${k}=${rest[k]}`).join('&');
-  const computed = crypto.createHmac('sha256', secret).update(sortedParams).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hmac));
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
@@ -2215,6 +2221,114 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.get("/api/shopify/oauth/start", requireAuth(), async (req, res) => {
+    try {
+      const { apiKey, apiSecret, scopes, appBaseUrl } = getShopifyOAuthConfig();
+      if (!apiKey || !apiSecret) {
+        return res.status(500).json({ message: "Shopify OAuth is not configured. Set SHOPIFY_API_KEY and SHOPIFY_API_SECRET." });
+      }
+
+      const rawShop = Array.isArray(req.query.shop) ? req.query.shop[0] : req.query.shop;
+      const shop = typeof rawShop === "string" ? normalizeShopifyDomain(rawShop) : "";
+      if (!shop || !isValidShopifyDomain(shop)) {
+        return res.status(400).json({ message: "Invalid Shopify shop domain. Use your-store.myshopify.com." });
+      }
+
+      const redirectUri = `${appBaseUrl}/api/shopify/oauth/callback`;
+      const state = createShopifyOAuthState(getUserId(req), apiSecret);
+      const authUrl = buildShopifyOAuthAuthorizeUrl({
+        shop,
+        apiKey,
+        scopes,
+        redirectUri,
+        state,
+      });
+
+      res.redirect(authUrl);
+    } catch (error) {
+      console.error("Shopify OAuth start error:", error);
+      res.status(500).json({ message: "Failed to start Shopify authorization" });
+    }
+  });
+
+  app.get("/api/shopify/oauth/callback", async (req, res) => {
+    const fail = (reason: string) => {
+      const redirect = new URL("/", getShopifyOAuthConfig().appBaseUrl);
+      redirect.searchParams.set("shopify", "error");
+      redirect.searchParams.set("reason", reason);
+      return res.redirect(redirect.toString());
+    };
+
+    try {
+      const { apiKey, apiSecret, scopes, appBaseUrl } = getShopifyOAuthConfig();
+      if (!apiKey || !apiSecret) {
+        return fail("not_configured");
+      }
+
+      const code = typeof req.query.code === "string" ? req.query.code : "";
+      const rawShop = Array.isArray(req.query.shop) ? req.query.shop[0] : req.query.shop;
+      const shop = typeof rawShop === "string" ? normalizeShopifyDomain(rawShop) : "";
+      const state = typeof req.query.state === "string" ? req.query.state : "";
+
+      if (!code) return fail("missing_code");
+      if (!shop || !isValidShopifyDomain(shop)) return fail("invalid_shop");
+      if (!verifyShopifyHmac(req.query as Record<string, unknown>, apiSecret)) return fail("invalid_hmac");
+
+      const stateResult = verifyShopifyOAuthState(state, apiSecret);
+      if (!stateResult.ok) return fail(`invalid_state_${stateResult.reason}`);
+
+      const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          client_id: apiKey,
+          client_secret: apiSecret,
+          code,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const body = await tokenResponse.text();
+        console.error("Shopify OAuth token exchange failed:", tokenResponse.status, body);
+        return fail("token_exchange_failed");
+      }
+
+      const tokenData = await tokenResponse.json() as { access_token?: string; scope?: string };
+      const accessToken = tokenData.access_token;
+      if (!accessToken) return fail("token_exchange_failed");
+
+      const grantedScopes = new Set((tokenData.scope || "").split(",").map(scope => scope.trim()).filter(Boolean));
+      const requiredScopes = scopes.split(",").map(scope => scope.trim()).filter(Boolean);
+      const missingScopes = requiredScopes.filter(scope => !grantedScopes.has(scope));
+      if (missingScopes.length > 0) {
+        return fail("missing_write_products");
+      }
+
+      const shopResponse = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
+        headers: { "X-Shopify-Access-Token": accessToken },
+      });
+      const shopData = shopResponse.ok ? await shopResponse.json() : {};
+      const shopName = shopData.shop?.name || shop.replace(".myshopify.com", "");
+
+      await storage.upsertShopifyConnection({
+        sessionId: stateResult.userId,
+        shopDomain: shop,
+        accessToken,
+        shopName,
+      });
+
+      const redirect = new URL("/", appBaseUrl);
+      redirect.searchParams.set("shopify", "connected");
+      res.redirect(redirect.toString());
+    } catch (error) {
+      console.error("Shopify OAuth callback error:", error);
+      return fail("unexpected_error");
+    }
+  });
+
   app.post("/api/shopify/connect", requireAuth(), async (req, res) => {
     try {
       const { shopDomain, accessToken } = req.body;
@@ -2316,13 +2430,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           groupMap.set(img.productGroupId, arr);
         }
       }
-      // Sort each group: primary (has description) first, then by id
-      groupMap.forEach((arr) => {
+      const sortGroupByMediaGallery = (arr: ListedImage[]) => {
+        const source = arr.find((item: any) => Array.isArray(item.mediaGallery) && item.mediaGallery.length > 0);
+        const orderedIds = Array.isArray((source as any)?.mediaGallery)
+          ? (source as any).mediaGallery.map((id: unknown) => Number(id)).filter((id: number) => Number.isFinite(id))
+          : [];
+        const rank = new Map<number, number>(orderedIds.map((id: number, index: number) => [id, index]));
+
         arr.sort((a: ListedImage, b: ListedImage) => {
+          const aRank = rank.get(a.id);
+          const bRank = rank.get(b.id);
+          if (aRank !== undefined || bRank !== undefined) {
+            return (aRank ?? Number.MAX_SAFE_INTEGER) - (bRank ?? Number.MAX_SAFE_INTEGER) || a.id - b.id;
+          }
           if (a.description && !b.description) return -1;
           if (!a.description && b.description) return 1;
           return a.id - b.id;
         });
+      };
+
+      // Sort each group by saved media order, with the previous primary-first fallback.
+      groupMap.forEach((arr) => {
+        sortGroupByMediaGallery(arr);
       });
 
       const processedGroups = new Set<string>();
@@ -2390,6 +2519,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ success: successCount, failed: failCount, results });
     } catch (error: any) {
       console.error("Shopify push error:", error);
+      if (isDatabaseConnectionLimitError(error)) {
+        return res.status(503).json({
+          message: "The database is still clearing old connections. Please wait 1-2 minutes and try pushing to Shopify again.",
+          code: "DATABASE_CONNECTION_LIMIT",
+        });
+      }
       res.status(500).json({ message: error?.message || "Failed to push products to Shopify" });
     }
   });
