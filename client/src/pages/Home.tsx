@@ -66,7 +66,6 @@ export default function Home() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [showEtsyConnectDialog, setShowEtsyConnectDialog] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
-  const [accessToken, setAccessToken] = useState("");
   const [etsyApiKey, setEtsyApiKey] = useState("");
   const [etsyAccessToken, setEtsyAccessToken] = useState("");
   const [etsyShopId, setEtsyShopId] = useState("");
@@ -192,20 +191,11 @@ export default function Home() {
   };
 
   const handleConnect = () => {
-    if (!shopDomain.trim() || !accessToken.trim()) {
-      toast({ title: "Missing fields", description: "Please enter your Shopify store URL and Admin API access token.", variant: "destructive" });
+    if (!shopDomain.trim()) {
+      toast({ title: "Missing store", description: "Please enter your Shopify store URL.", variant: "destructive" });
       return;
     }
-    shopifyConnect.mutate(
-      { shopDomain: shopDomain.trim(), accessToken: accessToken.trim() },
-      {
-        onSuccess: () => {
-          setShowConnectDialog(false);
-          setShopDomain("");
-          setAccessToken("");
-        },
-      },
-    );
+    shopifyConnect.mutate({ shopDomain: shopDomain.trim() });
   };
 
   const handleDisconnect = () => {
@@ -1109,7 +1099,7 @@ export default function Home() {
               Connect to Shopify
             </DialogTitle>
             <DialogDescription>
-              Enter your Shopify store URL and Admin API access token to save your connection.
+              Enter your Shopify store URL. You'll approve SnapSync AI in Shopify next.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1126,23 +1116,6 @@ export default function Home() {
                 Your Shopify store domain (e.g. my-store or my-store.myshopify.com)
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="access-token" data-testid="label-access-token">
-                <Key className="w-3.5 h-3.5 inline mr-1" />
-                Admin API Access Token
-              </Label>
-              <Input
-                id="access-token"
-                data-testid="input-access-token"
-                type="password"
-                placeholder="shpat_..."
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Create this in Shopify Admin under Apps → Develop apps → API credentials. It needs write_products.
-              </p>
-            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1155,15 +1128,15 @@ export default function Home() {
             <Button
               data-testid="button-submit-connect"
               onClick={handleConnect}
-              disabled={shopifyConnect.isPending || !shopDomain.trim() || !accessToken.trim()}
+              disabled={shopifyConnect.isPending || !shopDomain.trim()}
             >
               {shopifyConnect.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Connecting...
+                  Opening Shopify...
                 </>
               ) : (
-                "Connect"
+                "Authorize in Shopify"
               )}
             </Button>
           </DialogFooter>

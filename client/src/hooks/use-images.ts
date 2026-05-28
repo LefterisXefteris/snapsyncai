@@ -493,20 +493,15 @@ export function useShopifyStatus() {
 }
 
 export function useShopifyConnect() {
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ shopDomain, accessToken }: { shopDomain: string; accessToken: string }) => {
-      const res = await apiRequest("POST", api.shopify.connect.path, { shopDomain, accessToken });
-      return res.json() as Promise<{ connected: boolean; shopName: string; shopDomain: string }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [api.shopify.status.path] });
-      toast({ title: "Shopify Connected", description: `Connected to ${data.shopName}` });
+    mutationFn: async ({ shopDomain }: { shopDomain: string }) => {
+      const params = new URLSearchParams({ shop: shopDomain });
+      window.location.assign(`${api.shopify.oauthStart.path}?${params.toString()}`);
     },
     onError: (error) => {
-      toast({ title: "Connection Failed", description: error.message || "Failed to save Shopify credentials.", variant: "destructive" });
+      toast({ title: "Connection Failed", description: error.message || "Failed to start Shopify authorization.", variant: "destructive" });
     },
   });
 }
