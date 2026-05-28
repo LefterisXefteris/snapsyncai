@@ -89,8 +89,8 @@ An AI-powered batch image upload tool that analyzes product images and generates
 - CLERK_SECRET_KEY (from Clerk Dashboard)
 - AI_INTEGRATIONS_OPENAI_API_KEY (auto-provisioned)
 - AI_INTEGRATIONS_OPENAI_BASE_URL (auto-provisioned)
-- SHOPIFY_CLIENT_ID (from Shopify Partner Dashboard)
-- SHOPIFY_CLIENT_SECRET (from Shopify Partner Dashboard)
+- SHOPIFY_API_KEY (from Shopify Partner Dashboard; SHOPIFY_CLIENT_ID also supported)
+- SHOPIFY_API_SECRET (from Shopify Partner Dashboard; SHOPIFY_CLIENT_SECRET also supported)
 - Stripe keys managed via Replit Stripe connector (auto-provisioned)
 
 ## User Preferences

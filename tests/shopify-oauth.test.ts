@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 
 import {
   createShopifyOAuthState,
+  getShopifyOAuthConfig,
   isValidShopifyDomain,
   normalizeShopifyDomain,
   verifyShopifyHmac,
@@ -75,4 +76,33 @@ test("verifyShopifyOAuthState rejects invalid and expired state", () => {
     ok: false,
     reason: "expired",
   });
+});
+
+test("getShopifyOAuthConfig accepts legacy Shopify client env names", () => {
+  const original = {
+    SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY,
+    SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET,
+    SHOPIFY_CLIENT_ID: process.env.SHOPIFY_CLIENT_ID,
+    SHOPIFY_CLIENT_SECRET: process.env.SHOPIFY_CLIENT_SECRET,
+  };
+
+  try {
+    delete process.env.SHOPIFY_API_KEY;
+    delete process.env.SHOPIFY_API_SECRET;
+    process.env.SHOPIFY_CLIENT_ID = "legacy-client-id";
+    process.env.SHOPIFY_CLIENT_SECRET = "legacy-client-secret";
+
+    const config = getShopifyOAuthConfig();
+
+    assert.equal(config.apiKey, "legacy-client-id");
+    assert.equal(config.apiSecret, "legacy-client-secret");
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 });

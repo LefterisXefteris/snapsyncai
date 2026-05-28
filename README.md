@@ -11,6 +11,8 @@ SHOPIFY_SCOPES="write_products"
 APP_BASE_URL="https://snapsyncai.co.uk"
 ```
 
+`SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET` are also accepted for older deployments, but prefer the `SHOPIFY_API_*` names for new setup.
+
 In the Shopify app dashboard, set the app URL to `https://snapsyncai.co.uk` and add this allowed redirection URL:
 
 ```text

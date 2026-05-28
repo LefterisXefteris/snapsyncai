@@ -130,8 +130,8 @@ export function buildShopifyOAuthAuthorizeUrl({
 
 export function getShopifyOAuthConfig() {
   return {
-    apiKey: process.env.SHOPIFY_API_KEY || "",
-    apiSecret: process.env.SHOPIFY_API_SECRET || "",
+    apiKey: process.env.SHOPIFY_API_KEY || process.env.SHOPIFY_CLIENT_ID || "",
+    apiSecret: process.env.SHOPIFY_API_SECRET || process.env.SHOPIFY_CLIENT_SECRET || "",
     scopes: process.env.SHOPIFY_SCOPES || DEFAULT_SHOPIFY_SCOPES,
     appBaseUrl: (process.env.APP_BASE_URL || DEFAULT_APP_BASE_URL).replace(/\/$/, ""),
   };
