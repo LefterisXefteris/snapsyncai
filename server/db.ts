@@ -32,6 +32,8 @@ function buildPoolConfig(databaseUrl: string): pg.PoolConfig {
     max: Number.isFinite(maxConnections) && maxConnections > 0 ? maxConnections : 1,
     idleTimeoutMillis: isServerless ? 5000 : 30000,
     connectionTimeoutMillis: 10000,
+    allowExitOnIdle: isServerless,
+    maxLifetimeSeconds: isServerless ? 60 : 0,
     keepAlive: true,
     keepAliveInitialDelayMillis: 0,
     ssl: isSupabase ? { rejectUnauthorized: false } : undefined,

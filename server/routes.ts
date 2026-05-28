@@ -852,6 +852,11 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function isDatabaseConnectionLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("EMAXCONN") || message.includes("max client connections reached");
+}
+
 async function pushProductToShopify(
   image: any,
   accessToken: string,
@@ -2514,6 +2519,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ success: successCount, failed: failCount, results });
     } catch (error: any) {
       console.error("Shopify push error:", error);
+      if (isDatabaseConnectionLimitError(error)) {
+        return res.status(503).json({
+          message: "The database is still clearing old connections. Please wait 1-2 minutes and try pushing to Shopify again.",
+          code: "DATABASE_CONNECTION_LIMIT",
+        });
+      }
       res.status(500).json({ message: error?.message || "Failed to push products to Shopify" });
     }
   });
