@@ -462,7 +462,7 @@ export default function Landing() {
 
         {/* ── STATS BAR ── */}
         <div className="relative glass-panel overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-yellow-400/10 opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-amber-400/10 opacity-60" />
           <div className="max-w-5xl mx-auto px-6 py-12 relative z-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
               {STATS.map((stat, i) => (
@@ -532,7 +532,7 @@ export default function Landing() {
 
             {/* Video player */}
             <div className="reveal relative max-w-5xl mx-auto">
-              <div className="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-yellow-400/20 blur-3xl rounded-[3rem] opacity-50" />
+              <div className="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-amber-400/20 blur-3xl rounded-[3rem] opacity-50" />
               <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_80px_rgba(16,185,129,0.15)] bg-black/60">
                 <video
                   className="w-full aspect-video object-cover"
@@ -565,8 +565,8 @@ export default function Landing() {
                 <p className="text-center text-xs text-muted-foreground mt-3">Browse &amp; select from your full image library</p>
               </div>
               <div className="relative group">
-                <div className="absolute -inset-2 bg-gradient-to-tr from-yellow-400/15 to-transparent blur-2xl rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl hover:shadow-[0_0_40px_rgba(250,204,21,0.15)] transition-all duration-500 hover:-translate-y-1 bg-black/20">
+                <div className="absolute -inset-2 bg-gradient-to-tr from-amber-400/15 to-transparent blur-2xl rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl hover:shadow-[0_0_40px_rgba(217,168,38,0.12)] transition-all duration-500 hover:-translate-y-1 bg-black/20">
                   <div className="absolute top-3 left-3 z-10">
                     <Badge variant="outline" className="text-[10px] backdrop-blur-md border-primary/40 bg-background/80 shadow-lg">Review Queue</Badge>
                   </div>
@@ -625,7 +625,7 @@ export default function Landing() {
         <section className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50" aria-labelledby="ai-editing-heading">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1 relative reveal">
-              <div className="absolute -inset-4 bg-gradient-to-tr from-amber-500/30 to-yellow-400/30 blur-3xl rounded-[3rem] opacity-70 animate-pulse-glow" />
+              <div className="absolute -inset-4 bg-gradient-to-tr from-amber-500/30 to-amber-400/30 blur-3xl rounded-[3rem] opacity-70 animate-pulse-glow" />
               <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black/70 animate-float">
                 <img
                   src="/screenshot-workspace2.png"
@@ -635,7 +635,7 @@ export default function Landing() {
                 />
                 <div className="absolute bottom-6 left-6 right-6 p-5 rounded-2xl bg-background/90 border border-white/10 animate-float-delayed shadow-2xl">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-primary flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(250,204,21,0.4)]">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-primary flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(217,168,38,0.3)]">
                       <Sparkles className="w-6 h-6 text-white" />
                     </div>
                     <div>
@@ -675,7 +675,7 @@ export default function Landing() {
 
         {/* ── SEO & AEO ── */}
         <section className="relative bg-card/60 py-24 overflow-hidden" aria-labelledby="seo-aeo-heading">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-primary/5 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 via-transparent to-primary/5 pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
@@ -754,7 +754,7 @@ export default function Landing() {
         {/* ── PRICING ── */}
         <section id="pricing" className="relative bg-card/60 py-24 overflow-hidden" aria-labelledby="pricing-heading">
           <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-background to-amber-900/10 pointer-events-none" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-yellow-400/10 blur-[100px] rounded-full pointer-events-none" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-amber-400/10 blur-[100px] rounded-full pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
@@ -806,7 +806,7 @@ export default function Landing() {
               {/* Annual */}
               <Card className="flex flex-col relative overflow-hidden reveal delay-2 border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-background/80 hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] transition-all duration-300 shadow-xl">
                 <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
-                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-yellow-400 via-amber-500 to-primary" />
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-400 via-amber-500 to-primary" />
                 <CardHeader className="pb-4 relative z-10">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2">
@@ -874,9 +874,9 @@ export default function Landing() {
         {/* ── BOTTOM CTA ── */}
         <section className="max-w-6xl mx-auto px-6 pb-24" aria-labelledby="cta-heading">
           <div className="relative rounded-3xl border border-white/10 bg-black/40 backdrop-blur-md p-12 md:p-20 text-center overflow-hidden reveal shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-yellow-900/20" />
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-amber-900/20" />
             <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-primary/20 blur-[120px] rounded-full pointer-events-none" />
-            <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-yellow-400/20 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-amber-400/20 blur-[120px] rounded-full pointer-events-none" />
             <div className="relative z-10">
               <Badge variant="outline" className="mb-8 no-default-active-elevate gap-1.5 px-4 py-1.5 rounded-full border-primary/30 bg-primary/10 text-primary">
                 <Sparkles className="w-4 h-4" />

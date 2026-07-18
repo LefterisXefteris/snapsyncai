@@ -409,7 +409,7 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                           </div>
                         ) : currentImage.category ? (
                           <div className="flex items-center gap-1.5 mt-2 text-xs">
-                            <FolderTree className="w-3 h-3 text-yellow-400 shrink-0" />
+                            <FolderTree className="w-3 h-3 text-amber-400 shrink-0" />
                             <span className="text-muted-foreground truncate" title={currentImage.category}>{currentImage.category}</span>
                           </div>
                         ) : null}
@@ -542,7 +542,7 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                           <p className="text-sm text-blue-400 truncate">
                             {(isEditing ? editState?.seoTitle : currentImage.seoTitle) || currentImage.title || "Product Title"}
                           </p>
-                          <p className="text-xs text-yellow-400 truncate">yourstore.myshopify.com/products/...</p>
+                          <p className="text-xs text-amber-400 truncate">yourstore.myshopify.com/products/...</p>
                           <p className="text-xs text-muted-foreground line-clamp-2">
                             {(isEditing ? editState?.seoDescription : currentImage.seoDescription) || "No meta description set."}
                           </p>
@@ -581,7 +581,7 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                             <div className="space-y-2">
                               {(currentImage.aeoFaqs as { question: string; answer: string }[]).map((faq, i) => (
                                 <div key={i} className="p-3 rounded-xl bg-muted/20 space-y-1 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.05)]">
-                                  <p className="text-sm font-medium text-yellow-400" data-testid={`text-review-faq-q-${i}`}>{faq.question}</p>
+                                  <p className="text-sm font-medium text-amber-400" data-testid={`text-review-faq-q-${i}`}>{faq.question}</p>
                                   <p className="text-sm text-muted-foreground" data-testid={`text-review-faq-a-${i}`}>{faq.answer}</p>
                                 </div>
                               ))}
@@ -589,9 +589,9 @@ export function ReviewQueueModal({ open, onOpenChange, images, shopifyConnected 
                           </div>
                         )}
 
-                        <div className="p-3 rounded-xl bg-yellow-500/5 space-y-1.5 shadow-[inset_0_0_0_1px_hsl(48_100%_55%/0.2)]">
+                        <div className="p-3 rounded-xl bg-amber-500/5 space-y-1.5 shadow-[inset_0_0_0_1px_hsl(45_70%_50%/0.2)]">
                           <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-[0.15em]">AI Assistant Preview</p>
-                          <p className="text-xs italic text-yellow-200/80">
+                          <p className="text-xs italic text-amber-200/80">
                             "{(isEditing ? editState?.aeoSnippet : currentImage.aeoSnippet) || "Tell me about this product..."}"
                           </p>
                         </div>

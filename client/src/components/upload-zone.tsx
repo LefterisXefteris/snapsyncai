@@ -226,7 +226,7 @@ function DroppableGroup({
           <span className={cn(
             "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
             confidence === "high" ? "bg-green-500/20 text-green-400" :
-            confidence === "medium" ? "bg-yellow-500/20 text-yellow-400" :
+            confidence === "medium" ? "bg-amber-500/20 text-amber-400" :
             "bg-red-500/20 text-red-400"
           )}>
             {confidence}
@@ -943,7 +943,7 @@ export function UploadZone({
                 <button
                   onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
                   disabled={isAutoSorting}
-                  className="flex items-center gap-1 text-[11px] text-yellow-400 hover:text-yellow-300 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
                   title="Sort same-product variants into product families"
                 >
                   <Sparkles className="w-3 h-3" />

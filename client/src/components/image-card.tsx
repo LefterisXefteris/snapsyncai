@@ -88,7 +88,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
       ? "text-green-400 bg-green-400/10 border-green-400/20"
       : image.shopifyStatus === "failed"
         ? "text-red-400 bg-red-400/10 border-red-400/20"
-        : "text-yellow-400 bg-yellow-400/10 border-yellow-400/20";
+        : "text-amber-400 bg-amber-400/10 border-amber-400/20";
   const statusLabel = isUnpaid ? "Preview"
     : image.shopifyStatus === "synced" ? "Synced"
     : image.shopifyStatus === "failed" ? "Failed"
@@ -152,7 +152,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
           {highlighted && (
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-yellow-500/40 text-yellow-600 bg-white/90 dark:bg-black/40 dark:text-yellow-300">
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-500/40 text-amber-600 bg-white/90 dark:bg-black/40 dark:text-amber-300">
               Merged
             </Badge>
           )}
