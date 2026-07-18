@@ -39,7 +39,7 @@ export function AuroraBackground() {
 function blobGradient(blob: 1 | 2 | 3, state: AmbientState): string {
   // [aurora var, peak opacity] per blob per state
   const palette: Record<AmbientState, Record<number, [number, number]>> = {
-    idle: { 1: [3, 0.16], 2: [2, 0.08], 3: [3, 0.1] },
+    idle: { 1: [3, 0.07], 2: [2, 0.04], 3: [3, 0.05] },
     thinking: { 1: [2, 0.2], 2: [1, 0.16], 3: [3, 0.14] },
     success: { 1: [1, 0.24], 2: [1, 0.18], 3: [2, 0.12] },
   };

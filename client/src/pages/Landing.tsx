@@ -80,7 +80,7 @@ function HeroLiveDemo() {
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(circle at 35% 30%, hsl(90 30% 55% / 0.9), hsl(90 20% 35%) 55%, hsl(250 20% 12%) 100%)",
+                "radial-gradient(circle at 35% 30%, hsl(90 30% 55% / 0.9), hsl(90 20% 35%) 55%, hsl(0 0% 12%) 100%)",
             }}
           />
           {/* vase silhouette */}
