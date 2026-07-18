@@ -30,6 +30,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages, summarizeWorkspaceVariantAssignments } from "@/lib/workspace-variant-sort";
 import { apiRequest } from "@/lib/queryClient";
+import { onAppCommand } from "@/lib/app-commands";
 
 export default function Home() {
   const { data: images, isLoading } = useImages();
@@ -77,6 +78,7 @@ export default function Home() {
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const [stagedImageCount, setStagedImageCount] = useState(0);
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  const uploadSectionRef = useRef<HTMLElement>(null);
   // Panel sizing constants — collapsed = comfortable sidebar, expanded =
   // wide grouping workspace so thumbnails can be inspected at a larger size.
   const SIDEBAR_COLLAPSED_SIZE = 25;
@@ -649,19 +651,60 @@ export default function Home() {
     }
   }, [queryClient, selectedWorkspaceImages, toast]);
 
+  // Shell commands from the command palette / glass dock
+  useEffect(() => {
+    return onAppCommand((cmd) => {
+      switch (cmd) {
+        case "upload":
+          uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          break;
+        case "review-queue":
+          setShowReviewQueue(true);
+          break;
+        case "export-json":
+          handleDownloadAllJson();
+          break;
+        case "connect-shopify":
+          setShowConnectDialog(true);
+          break;
+        case "connect-etsy":
+          setShowEtsyConnectDialog(true);
+          break;
+        case "connect-amazon":
+          setShowAmazonConnectDialog(true);
+          break;
+        case "connect-instagram":
+          if (instagramOAuthConfig?.configured) handleInstagramOAuth();
+          else setShowInstagramConnectDialog(true);
+          break;
+        case "subscribe":
+          setShowSubscribeDialog(true);
+          break;
+        case "cancel-subscription":
+          setShowCancelDialog(true);
+          break;
+      }
+    });
+  });
+
   return (
-    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-transparent text-foreground overflow-hidden">
       <header className="h-14 flex items-center justify-between px-4 shrink-0 bg-transparent z-10 relative">
         <div className="flex items-center gap-2.5">
-          <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-7 h-7 rounded-sm" />
-          <span className="font-display text-base font-bold tracking-tight">SnapSync AI workspace</span>
+          <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-7 h-7 rounded-md" />
+          <span className="font-display text-base font-bold tracking-tight">SnapSync AI</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-0.5">workspace</span>
           {isSubscribed && (
-            <Badge variant="outline" className="no-default-active-elevate text-[10px] h-5 py-0 px-1.5" data-testid="badge-pro">
+            <Badge variant="outline" className="no-default-active-elevate text-[10px] h-5 py-0 px-1.5 border-primary/30 text-primary" data-testid="badge-pro">
               <Crown className="w-2.5 h-2.5 mr-0.5" />
               Pro
             </Badge>
           )}
         </div>
+        <span className="hidden md:flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground/60">
+          <kbd className="px-1.5 py-0.5 rounded bg-foreground/5 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.08)]">⌘K</kbd>
+          command
+        </span>
       </header>
 
       <div className="flex-1 min-h-0 relative">
@@ -672,12 +715,12 @@ export default function Home() {
             minSize={20}
             maxSize={hasStagedImages ? SIDEBAR_EXPANDED_MAX : SIDEBAR_COLLAPSED_MAX}
             onResize={setSidebarPanelSize}
-            className="flex flex-col border-r h-full bg-muted/20"
+            className="flex flex-col h-full bg-card/30 backdrop-blur-sm shadow-[inset_-1px_0_0_0_hsl(var(--foreground)/0.05)]"
           >
             <ScrollArea className="flex-1 h-full">
               <div className="p-4 space-y-6">
 
-                <section className="space-y-4">
+                <section ref={uploadSectionRef} className="space-y-4">
                   <h2 className="text-sm font-semibold tracking-tight">Upload Product Image</h2>
                   <UploadZone
                     onUploadingChange={setUploadingFiles}
@@ -802,7 +845,7 @@ export default function Home() {
             </ScrollArea>
 
             {/* Footer pinned at bottom */}
-            <div className="p-3 border-t border-border shrink-0">
+            <div className="p-3 shrink-0 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05)]">
               <div className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
                 <div className="flex items-center justify-between px-1">
                   <ModeToggle />
@@ -815,13 +858,13 @@ export default function Home() {
           <ResizableHandle withHandle />
 
           <ResizablePanel defaultSize={75}>
-            <div className="flex flex-col h-full bg-background overflow-hidden relative">
+            <div className="flex flex-col h-full bg-transparent overflow-hidden relative">
 
-              <div className="p-3 border-b bg-background z-10 sticky top-0">
+              <div className="p-3 bg-background/60 backdrop-blur-xl z-10 sticky top-0 shadow-[inset_0_-1px_0_0_hsl(var(--foreground)/0.05)]">
                 {unlockImages.isPending && (
-                  <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border-primary/20 border p-2 rounded-md mb-2">
-                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                    <span>Running AI Analysis on {unpaidImages.length} products...</span>
+                  <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 p-2 rounded-lg mb-2 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.2),0_0_20px_-8px_hsl(var(--primary)/0.4)]">
+                    <span className="w-2 h-2 rounded-full bg-aurora-2 animate-pulse shrink-0" />
+                    <span className="font-mono uppercase tracking-wide text-[11px]">AI analyzing {unpaidImages.length} products…</span>
                   </div>
                 )}
 
@@ -930,7 +973,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 h-full w-full bg-muted/5">
+              <ScrollArea className="flex-1 h-full w-full">
                 <div className="p-4">
                   {isLoading ? (
                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
@@ -951,19 +994,24 @@ export default function Home() {
                     <div className="space-y-6 pb-20">
                       {uploadingFiles.length > 0 && (
                         <div className="space-y-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                            Uploading ({uploadingFiles.length})
+                          <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-aurora-2 animate-pulse" />
+                            Materializing ({uploadingFiles.length})
                           </h3>
                           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                             {uploadingFiles.map((file, idx) => (
-                              <Card key={`uploading-${idx}`} className="overflow-hidden border-primary/20 bg-primary/5">
-                                <CardContent className="p-0">
-                                  <div className="h-24 w-full flex items-center justify-center bg-black/40">
-                                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                                  </div>
-                                </CardContent>
-                              </Card>
+                              <motion.div
+                                key={`uploading-${idx}`}
+                                initial={{ opacity: 0, scale: 0.8, y: 16 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                transition={{ type: "spring", stiffness: 260, damping: 22, delay: idx * 0.06 }}
+                                className="overflow-hidden rounded-2xl glass-card"
+                              >
+                                <div className="h-24 w-full flex items-center justify-center relative">
+                                  <div className="scan-line" />
+                                  <span className="w-4 h-4 rounded-full bg-primary/60 animate-pulse-glow shadow-[0_0_20px_4px_hsl(var(--primary)/0.35)]" />
+                                </div>
+                              </motion.div>
                             ))}
                           </div>
                         </div>
@@ -971,8 +1019,8 @@ export default function Home() {
 
                       {Object.entries(groupedImages).sort(([a], [b]) => a.localeCompare(b)).map(([category, entries]) => (
                         <div key={category} className="space-y-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sticky top-0 py-1 bg-background/80 backdrop-blur z-10 border-b border-white/5">
-                            {category} <span className="opacity-50">({entries.length} product{entries.length !== 1 ? "s" : ""})</span>
+                          <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground sticky top-0 py-1.5 bg-background/70 backdrop-blur-md z-10">
+                            {category} <span className="opacity-50">· {entries.length}</span>
                           </h3>
                           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                             {entries.map((entry, idx) => (
@@ -983,6 +1031,7 @@ export default function Home() {
                                 index={idx}
                                 selected={selectedIds.has(entry.primary.id)}
                                 highlighted={!!entry.primary.productGroupId && recentlyMergedGroupIds.has(entry.primary.productGroupId)}
+                                analyzing={unlockImages.isPending && entry.primary.paymentStatus !== "paid"}
                                 onSelect={handleSelect}
                                 instagramConnected={!!instagramStatus?.connected}
                                 onInstagramPost={openInstagramPostDialog}
@@ -993,12 +1042,17 @@ export default function Home() {
                       ))}
                     </div>
                   ) : (
-                    <div className="h-[40vh] flex flex-col items-center justify-center text-center">
-                      <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center mx-auto mb-3">
-                        <BrainCircuit className="w-6 h-6 text-muted-foreground/50" />
+                    <div className="h-[50vh] flex flex-col items-center justify-center text-center animate-settle">
+                      <div className="w-16 h-16 rounded-full portal-ring bg-primary/5 flex items-center justify-center mx-auto mb-5">
+                        <BrainCircuit className="w-7 h-7 text-primary/60" />
                       </div>
-                      <h3 className="text-sm font-medium">Empty Workspace</h3>
-                      <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">Upload product images in the left panel to get started.</p>
+                      <h3 className="font-display text-lg font-semibold">A quiet workspace</h3>
+                      <p className="text-xs text-muted-foreground mt-1.5 max-w-[240px]">
+                        Drop product photos into the portal on the left — the AI takes it from there.
+                      </p>
+                      <p className="font-mono text-[10px] text-muted-foreground/50 mt-4 uppercase tracking-widest">
+                        or press ⌘K
+                      </p>
                     </div>
                   )}
                 </div>

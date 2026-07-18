@@ -19,6 +19,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search, GripVertical } from "lucide-react";
 import { AiContentPanel } from "@/components/ai-content-panel";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+
+/** Parallax frame — the product photo floats and tilts a few degrees toward the cursor. */
+function TiltFrame({ children, className }: { children: React.ReactNode; className?: string }) {
+  const mx = useMotionValue(0.5);
+  const my = useMotionValue(0.5);
+  const rotateX = useSpring(useTransform(my, [0, 1], [4, -4]), { stiffness: 200, damping: 25 });
+  const rotateY = useSpring(useTransform(mx, [0, 1], [-4, 4]), { stiffness: 200, damping: 25 });
+
+  return (
+    <motion.div
+      className={className}
+      style={{ rotateX, rotateY, transformPerspective: 900 }}
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        mx.set((e.clientX - rect.left) / rect.width);
+        my.set((e.clientY - rect.top) / rect.height);
+      }}
+      onMouseLeave={() => {
+        mx.set(0.5);
+        my.set(0.5);
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 const AI_BG_REMOVAL_ENABLED = import.meta.env.VITE_FEATURE_AI_BG_REMOVAL === "true";
 const AI_PHOTOSHOOT_ENABLED = import.meta.env.VITE_FEATURE_AI_PHOTOSHOOT === "true";
@@ -182,16 +209,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="h-screen w-full flex items-center justify-center bg-transparent">
+        <span className="w-3 h-3 rounded-full bg-primary animate-pulse-glow shadow-[0_0_24px_6px_hsl(var(--primary)/0.35)]" />
       </div>
     );
   }
 
   if (!image) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-background">
-        <h2 className="text-xl font-bold mb-4">Product not found</h2>
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-transparent">
+        <h2 className="font-display text-xl font-bold mb-4">Product not found</h2>
         <Button onClick={() => setLocation("/")}>Back to Products</Button>
       </div>
     );
@@ -391,20 +418,33 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
+    <div className="h-screen bg-transparent flex flex-col overflow-hidden">
+      {/* Glowing action bar */}
+      <div className="sticky top-0 z-30 bg-background/60 backdrop-blur-xl hairline-b">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-sm font-semibold truncate max-w-[200px] md:max-w-md">
+            <h1 className="font-display text-sm font-semibold truncate max-w-[200px] md:max-w-md">
               {title || "Unnamed Product"}
             </h1>
             {image.shopifyStatus === "synced" && (
-              <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[10px] h-5 px-1.5">
+              <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-breathe mr-1" />
                 Synced
+              </Badge>
+            )}
+            {image.etsyStatus === "synced" && (
+              <Badge variant="secondary" className="bg-orange-500/10 text-orange-400 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-breathe mr-1" />
+                Etsy
+              </Badge>
+            )}
+            {image.amazonStatus === "synced" && (
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-400 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-breathe mr-1" />
+                Amazon
               </Badge>
             )}
           </div>
@@ -413,7 +453,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === 'synced' ? 'bg-secondary/50 text-muted-foreground' : 'bg-[#95bf46]/10 text-[#5e8e3e] border-[#95bf46]/30 hover:bg-[#95bf46]/20'}`}
+                className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === 'synced' ? 'text-muted-foreground' : 'bg-[#95bf46]/10 text-[#95bf46] hover:bg-[#95bf46]/20 shadow-[inset_0_0_0_1px_rgb(149_191_70/0.3),0_0_20px_-8px_rgb(149_191_70/0.4)]'}`}
                 onClick={() => pushToShopifyMutation.mutate([image.id])}
                 disabled={pushToShopifyMutation.isPending}
               >
@@ -425,7 +465,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 {image.shopifyStatus === "synced" ? "Sync updates to Shopify" : "Push to Shopify"}
               </Button>
             )}
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLocation("/")}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setLocation("/")}>
               Discard
             </Button>
             <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending || isUnpaid}>
@@ -506,20 +546,28 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       </div>
                     )}
                   </div>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    disabled={isUnpaid || rewriteDescriptionMutation.isPending}
-                    rows={3}
-                    placeholder="Product description..."
-                    className="resize-y text-sm"
-                  />
+                  {rewriteDescriptionMutation.isPending ? (
+                    <div className="space-y-1.5 rounded-lg p-3 bg-muted/20 shadow-[inset_0_0_0_1px_hsl(var(--aurora-2)/0.25)]">
+                      <div className="h-3 w-full rounded animate-shimmer" />
+                      <div className="h-3 w-11/12 rounded animate-shimmer" />
+                      <div className="h-3 w-3/5 rounded animate-shimmer" />
+                    </div>
+                  ) : (
+                    <Textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      disabled={isUnpaid}
+                      rows={3}
+                      placeholder="Product description..."
+                      className="resize-y text-sm"
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50">
+              <CardHeader className="px-4 py-3 hairline-b">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Tag className="w-3.5 h-3.5 text-muted-foreground" />
                   Pricing
@@ -589,7 +637,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50">
+              <CardHeader className="px-4 py-3 hairline-b">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Box className="w-3.5 h-3.5 text-muted-foreground" />
                   Inventory
@@ -653,7 +701,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between px-4 py-3 border-b border-border/50">
+              <CardHeader className="flex flex-row items-center justify-between px-4 py-3 hairline-b">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Box className="w-3.5 h-3.5 text-muted-foreground" />
                   Variants
@@ -803,7 +851,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50 flex flex-row items-center justify-between">
+              <CardHeader className="px-4 py-3 hairline-b flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium">
                   Media ({productImages.length} {productImages.length === 1 ? "image" : "images"})
                 </CardTitle>
@@ -1106,8 +1154,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 {/* Selected image large preview with AI tools */}
                 {displayImageId && (
                   <>
+                    <TiltFrame className="w-full">
                     <div
-                      className={`relative w-full h-44 bg-muted rounded-lg overflow-hidden border transition-all ${thumbnailDragActive ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "border-border"}`}
+                      className={`relative w-full h-44 bg-muted/40 rounded-xl overflow-hidden transition-all shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06),0_16px_40px_-16px_hsl(250_25%_2%/0.6)] ${thumbnailDragActive ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}
                       onDragOver={(e) => {
                         if (isUnpaid) return;
                         e.preventDefault();
@@ -1187,6 +1236,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         </div>
                       )}
                     </div>
+                    </TiltFrame>
 
                     {!isUnpaid && (
                       <div className="flex items-center gap-2">
@@ -1309,7 +1359,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           {/* Sidebar Column */}
           <div className="space-y-3 overflow-y-auto">
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50">
+              <CardHeader className="px-4 py-3 hairline-b">
                 <CardTitle className="text-sm font-medium">Status</CardTitle>
               </CardHeader>
               <CardContent className="p-4">
@@ -1321,7 +1371,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50">
+              <CardHeader className="px-4 py-3 hairline-b">
                 <CardTitle className="text-sm font-medium">Organization</CardTitle>
               </CardHeader>
               <CardContent className="p-4 space-y-3">
@@ -1358,7 +1408,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-4 py-3 border-b border-border/50">
+              <CardHeader className="px-4 py-3 hairline-b">
                 <CardTitle className="text-sm font-medium">Search engine listing</CardTitle>
                 <CardDescription className="text-[10px]">Edit how your product shows up in search results.</CardDescription>
               </CardHeader>

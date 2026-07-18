@@ -2,7 +2,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-interface ShinyButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+// Omit the DOM event handlers that conflict with framer-motion's own props
+// (onAnimationStart, onDrag*, etc.) when spreading onto motion.button.
+interface ShinyButtonProps
+  extends Omit<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    "onAnimationStart" | "onDrag" | "onDragStart" | "onDragEnd"
+  > {
   children: React.ReactNode;
   className?: string;
   gradient?: string;

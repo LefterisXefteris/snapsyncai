@@ -3,6 +3,7 @@ import { api, buildUrl } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
+import { useAmbient } from "@/components/ambient/AmbientProvider";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
@@ -154,8 +155,10 @@ export function useCancelSubscription() {
 export function useUploadImages() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async ({ files, productContext, brandTone, groupAsOne, hideToast }: { files: File[]; productContext?: string; brandTone?: string; groupAsOne?: boolean; hideToast?: boolean }) => {
       const formData = new FormData();
       files.forEach((file) => {
@@ -179,6 +182,7 @@ export function useUploadImages() {
       return res.json();
     },
     onSuccess: (data, variables) => {
+      endThinking(true);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       if (variables.hideToast) return;
 
@@ -191,6 +195,7 @@ export function useUploadImages() {
       });
     },
     onError: (error) => {
+      endThinking(false);
       toast({
         title: "Upload Failed",
         description: error.message,
@@ -203,13 +208,16 @@ export function useUploadImages() {
 export function useUnlockImages() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async ({ imageIds }: { imageIds: number[] }) => {
       const res = await apiRequest("POST", "/api/subscription/unlock-images", { imageIds });
       return res.json() as Promise<{ processed: number; results: any[]; message?: string }>;
     },
     onSuccess: (data) => {
+      endThinking(true);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       if (data.processed === 0) {
         toast({ title: "Already Analyzed", description: data.message || "All images already have full AI analysis." });
@@ -221,6 +229,7 @@ export function useUnlockImages() {
       }
     },
     onError: (error) => {
+      endThinking(false);
       toast({
         title: "Analysis Failed",
         description: error.message,
@@ -365,13 +374,16 @@ export function useDeleteProduct() {
 export function usePushToShopify() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async (ids: number[]) => {
       const res = await apiRequest("POST", api.images.pushToShopify.path, { ids });
       return res.json();
     },
     onSuccess: (data) => {
+      endThinking(data.failed === 0);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       const errors = Array.isArray(data.results)
         ? data.results.map((result: { error?: string }) => result.error).filter(Boolean)
@@ -400,6 +412,7 @@ export function usePushToShopify() {
       }
     },
     onError: (error: any) => {
+      endThinking(false);
       const msg = error?.message || "Push failed";
       toast({ title: "Shopify Push Failed", description: msg, variant: "destructive" });
     },
@@ -462,13 +475,16 @@ export function useEtsyDisconnect() {
 export function usePushToEtsy() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async (ids: number[]) => {
       const res = await apiRequest("POST", api.images.pushToEtsy.path, { ids });
       return res.json();
     },
     onSuccess: (data) => {
+      endThinking(data.failed === 0);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       toast({
         title: "Etsy Sync Complete",
@@ -476,6 +492,7 @@ export function usePushToEtsy() {
       });
     },
     onError: (error) => {
+      endThinking(false);
       toast({ title: "Etsy Push Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -713,17 +730,21 @@ export function useInstagramGenerateCaption() {
 export function useInstagramPost() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async ({ imageId, caption }: { imageId: number; caption?: string }) => {
       const res = await apiRequest("POST", api.instagram.postProduct.path, { imageId, caption });
       return res.json() as Promise<{ posted: boolean; postId: string; caption: string }>;
     },
     onSuccess: () => {
+      endThinking(true);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       toast({ title: "Posted to Instagram", description: "Your product has been posted to Instagram!" });
     },
     onError: (error) => {
+      endThinking(false);
       toast({ title: "Instagram Post Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -732,18 +753,24 @@ export function useInstagramPost() {
 export function usePushToAmazon() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async (ids: number[]) => {
       const res = await apiRequest("POST", api.images.pushToAmazon.path, { ids });
       return res.json();
     },
     onSuccess: (data) => {
+      endThinking(data.failed === 0);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       toast({
         title: "Amazon Sync Complete",
         description: `${data.success} products pushed, ${data.failed} failed.`,
       });
+    },
+    onError: () => {
+      endThinking(false);
     },
   });
 }
@@ -751,8 +778,10 @@ export function usePushToAmazon() {
 export function useGeneratePhotoshoot() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   return useMutation({
+    onMutate: () => beginThinking(),
     mutationFn: async ({ id, style }: { id: number; style: string }) => {
       const res = await apiRequest("POST", `/api/images/${id}/generate-photoshoot`, { style });
       if (!res.ok) {
@@ -761,10 +790,12 @@ export function useGeneratePhotoshoot() {
       return res.json();
     },
     onSuccess: () => {
+      endThinking(true);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       toast({ title: "Concept Generated", description: "Successfully rendered new AI concept." });
     },
     onError: (error) => {
+      endThinking(false);
       toast({ title: "Generation Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -844,6 +875,7 @@ export interface GeneratedContent {
 
 export function useGenerateContent() {
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   const generate = async (
     imageId: number,
@@ -854,6 +886,7 @@ export function useGenerateContent() {
   ): Promise<void> => {
     const url = buildUrl(api.images.generateContent.path, { id: imageId });
     let accumulated = "";
+    beginThinking();
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -887,6 +920,7 @@ export function useGenerateContent() {
               if (match) onDone(JSON.parse(match[0]));
               else throw new Error("Could not parse generated content");
             }
+            endThinking(true);
             return;
           }
           if (json.error) throw new Error(json.error);
@@ -896,7 +930,9 @@ export function useGenerateContent() {
           }
         }
       }
+      endThinking(false);
     } catch (err: any) {
+      endThinking(false);
       const msg = err?.message || "Content generation failed";
       toast({ title: "Generation failed", description: msg, variant: "destructive" });
       onError?.(msg);
@@ -908,6 +944,7 @@ export function useGenerateContent() {
 
 export function useRegenerateField() {
   const { toast } = useToast();
+  const { beginThinking, endThinking } = useAmbient();
 
   const regenerate = async (
     imageId: number,
@@ -919,6 +956,7 @@ export function useRegenerateField() {
   ): Promise<void> => {
     const url = buildUrl(api.images.regenerateField.path, { id: imageId });
     let accumulated = "";
+    beginThinking();
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -952,6 +990,7 @@ export function useRegenerateField() {
             } else {
               onDone(accumulated.trim());
             }
+            endThinking(true);
             return;
           }
           if (json.error) throw new Error(json.error);
@@ -961,7 +1000,9 @@ export function useRegenerateField() {
           }
         }
       }
+      endThinking(false);
     } catch (err: any) {
+      endThinking(false);
       const msg = err?.message || "Regeneration failed";
       toast({ title: "Regeneration failed", description: msg, variant: "destructive" });
       onError?.(msg);

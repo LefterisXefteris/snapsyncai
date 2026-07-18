@@ -808,35 +808,52 @@ export function UploadZone({
     >
       <input {...getInputProps()} data-testid="input-file-upload" />
 
-      {/* Drop zone */}
+      {/* Drop zone — the ambient portal */}
       <div
         onClick={() => {
           if (!isUploading) open();
         }}
         className={cn(
-          "relative group cursor-pointer overflow-hidden rounded-xl border border-dashed transition-all duration-200 text-center",
-          totalFiles > 0 ? "p-3" : "p-6",
+          "relative group cursor-pointer overflow-hidden rounded-3xl transition-all duration-500 text-center",
+          totalFiles > 0 ? "p-3" : "p-8",
           isDragActive
-            ? "border-primary bg-primary/10 scale-[1.01]"
-            : "border-border hover:border-primary/50 hover:bg-muted/50 bg-muted/20"
+            ? "bg-primary/10 scale-[1.02] shadow-[inset_0_0_0_1.5px_hsl(var(--primary)/0.6),0_0_48px_-6px_hsl(var(--primary)/0.45),inset_0_0_48px_0_hsl(var(--primary)/0.12)]"
+            : "portal-ring bg-card/40 hover:bg-card/60 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06)]"
         )}
       >
-        <div className="relative z-10 flex flex-col items-center gap-1.5">
+        {/* Aurora bleed inside the portal on drag-over */}
+        <div
+          aria-hidden
+          className={cn(
+            "absolute inset-0 pointer-events-none transition-opacity duration-500",
+            isDragActive ? "opacity-100" : "opacity-0",
+          )}
+          style={{
+            background:
+              "radial-gradient(circle at 50% 120%, hsl(var(--aurora-1) / 0.25), transparent 60%), radial-gradient(circle at 20% 0%, hsl(var(--aurora-2) / 0.18), transparent 55%)",
+          }}
+        />
+        <div className="relative z-10 flex flex-col items-center gap-2">
           <div className={cn(
-            "p-2 rounded-lg bg-muted border border-border transition-transform duration-200",
-            isDragActive ? "scale-110" : "group-hover:scale-105"
+            "rounded-full bg-primary/10 flex items-center justify-center transition-all duration-500",
+            totalFiles > 0 ? "w-9 h-9" : "w-14 h-14",
+            isDragActive
+              ? "scale-125 shadow-[0_0_32px_-4px_hsl(var(--primary)/0.6)]"
+              : "group-hover:scale-110 shadow-[0_0_20px_-8px_hsl(var(--primary)/0.35)]"
           )}>
             <UploadCloud className={cn(
               "transition-colors",
-              totalFiles > 0 ? "w-4 h-4" : "w-5 h-5",
-              isDragActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+              totalFiles > 0 ? "w-4 h-4" : "w-6 h-6",
+              isDragActive ? "text-primary" : "text-primary/70 group-hover:text-primary"
             )} />
           </div>
-          <p className={cn("font-medium text-foreground", totalFiles > 0 ? "text-xs" : "text-sm")}>
-            {isDragActive ? "Drop images here" : totalFiles > 0 ? "Drop more images" : "Drag & drop or click to upload"}
+          <p className={cn("font-display font-medium text-foreground", totalFiles > 0 ? "text-xs" : "text-sm")}>
+            {isDragActive ? "Release into the portal" : totalFiles > 0 ? "Drop more images" : "Drop product photos here"}
           </p>
           {totalFiles === 0 && (
-            <p className="text-[11px] text-muted-foreground">Up to 200 images · PNG, JPG, WEBP</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+              200 max · png jpg webp heic
+            </p>
           )}
         </div>
       </div>

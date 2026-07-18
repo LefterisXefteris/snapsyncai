@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,41 +13,141 @@ import { SiShopify, SiEtsy } from "react-icons/si";
 import { useClerk } from "@clerk/clerk-react";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 
-/* ─── Lightweight CSS-only particle field ───────────────────────────────────
-   ~18 dots animated with GPU-composited transform + opacity only.
-   No requestAnimationFrame loop, no canvas, zero JS overhead after mount.  */
-function ParticleField() {
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 18 }, (_, i) => ({
-        id: i,
-        left: `${(i * 5.7 + Math.sin(i * 1.3) * 8 + 50) % 100}%`,
-        top:  `${(i * 7.2 + Math.cos(i * 1.7) * 10 + 20) % 90}%`,
-        size: (i % 4) + 2,
-        duration: 14 + (i % 7) * 2.5,
-        delay: -(i * 2.1),
-        opacity: 0.12 + (i % 5) * 0.06,
-      })),
-    []
-  );
+/* ─── Live demo hero moment ─────────────────────────────────────────────────
+   A looping three-act animation: a product photo is scanned → the listing
+   streams in like the model is writing it → it publishes to marketplaces.
+   Pure CSS/framer-motion, no video. The global AuroraBackground breathes
+   behind everything. */
+const DEMO_TITLE = "Handwoven Ceramic Vase — Sage";
+const DEMO_DESC = "Hand-thrown stoneware with a matte sage glaze. Each piece is one of a kind…";
+
+function HeroLiveDemo() {
+  const [phase, setPhase] = useState<"scan" | "write" | "publish">("scan");
+  const [chars, setChars] = useState(0);
+
+  useEffect(() => {
+    let writeTimer: ReturnType<typeof setInterval> | undefined;
+    const cycle = () => {
+      setPhase("scan");
+      setChars(0);
+    };
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const run = () => {
+      timers.push(setTimeout(() => {
+        setPhase("write");
+        writeTimer = setInterval(() => {
+          setChars((c) => {
+            if (c >= DEMO_TITLE.length + DEMO_DESC.length) {
+              clearInterval(writeTimer);
+              return c;
+            }
+            return c + 2;
+          });
+        }, 35);
+      }, 2200));
+      timers.push(setTimeout(() => setPhase("publish"), 5600));
+      timers.push(setTimeout(() => { cycle(); run(); }, 9000));
+    };
+    run();
+    return () => {
+      timers.forEach(clearTimeout);
+      if (writeTimer) clearInterval(writeTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const titleChars = Math.min(chars, DEMO_TITLE.length);
+  const descChars = Math.max(0, chars - DEMO_TITLE.length);
+  const writing = phase !== "scan";
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden="true">
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          className="particle"
-          style={{
-            left:              p.left,
-            top:               p.top,
-            width:             p.size,
-            height:            p.size,
-            opacity:           p.opacity,
-            animationDuration: `${p.duration}s`,
-            animationDelay:    `${p.delay}s`,
-          }}
-        />
-      ))}
+    <div className="glass-panel rounded-3xl p-5 md:p-6 max-w-2xl mx-auto text-left">
+      <div className="flex items-center justify-between mb-4">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          live · photo to listing
+        </span>
+        <span className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors duration-500 ${
+          phase === "scan" ? "text-aurora-2" : phase === "write" ? "text-primary" : "text-aurora-1"
+        }`}>
+          {phase === "scan" ? "analyzing…" : phase === "write" ? "writing…" : "published"}
+        </span>
+      </div>
+
+      <div className="flex gap-5 items-stretch">
+        {/* The "photo" being scanned */}
+        <div className="relative w-28 h-28 md:w-36 md:h-36 shrink-0 rounded-2xl overflow-hidden shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.08)]">
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 35% 30%, hsl(90 30% 55% / 0.9), hsl(90 20% 35%) 55%, hsl(250 20% 12%) 100%)",
+            }}
+          />
+          {/* vase silhouette */}
+          <div className="absolute inset-x-0 bottom-3 mx-auto w-12 md:w-16 h-16 md:h-24 rounded-[45%_45%_30%_30%/60%_60%_20%_20%] bg-background/50 backdrop-blur-[2px]" />
+          {phase === "scan" && <div className="scan-line" />}
+          {phase === "publish" && (
+            <div className="absolute inset-0 animate-bloom rounded-2xl" />
+          )}
+        </div>
+
+        {/* The listing streaming in */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <p className="font-display font-semibold text-sm md:text-base leading-snug min-h-[1.4em]">
+            {writing ? DEMO_TITLE.slice(0, titleChars) : ""}
+            {phase === "write" && titleChars < DEMO_TITLE.length && (
+              <span className="inline-block w-1.5 h-3.5 bg-aurora-2 animate-pulse ml-0.5 align-baseline" />
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground leading-relaxed mt-1.5 min-h-[3em]">
+            {writing ? DEMO_DESC.slice(0, descChars) : ""}
+            {phase === "write" && titleChars >= DEMO_TITLE.length && descChars < DEMO_DESC.length && (
+              <span className="inline-block w-1.5 h-3 bg-aurora-2 animate-pulse ml-0.5 align-baseline" />
+            )}
+          </p>
+          {!writing && (
+            <div className="space-y-1.5 mt-0.5">
+              <div className="h-3.5 w-4/5 rounded animate-shimmer" />
+              <div className="h-2.5 w-full rounded animate-shimmer" />
+              <div className="h-2.5 w-2/3 rounded animate-shimmer" />
+            </div>
+          )}
+
+          {/* Marketplace publish row */}
+          <div className="mt-auto pt-3 flex items-center gap-3">
+            {[
+              { Icon: SiShopify, color: "#96BF48", delay: 0 },
+              { Icon: SiEtsy, color: "#F56400", delay: 0.15 },
+              { Icon: ShoppingCart, color: "#FF9900", delay: 0.3 },
+            ].map(({ Icon, color, delay }, i) => (
+              <motion.span
+                key={i}
+                animate={
+                  phase === "publish"
+                    ? { opacity: 1, scale: [1, 1.25, 1] }
+                    : { opacity: 0.25, scale: 1 }
+                }
+                transition={{ duration: 0.5, delay: phase === "publish" ? delay : 0 }}
+                className="inline-flex"
+              >
+                <Icon className="w-4 h-4 md:w-5 md:h-5" style={{ color }} />
+              </motion.span>
+            ))}
+            <AnimatePresence>
+              {phase === "publish" && (
+                <motion.span
+                  initial={{ opacity: 0, x: -6, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0 }}
+                  className="font-mono text-[10px] uppercase tracking-[0.15em] text-primary"
+                >
+                  live on 3 marketplaces
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -258,13 +359,13 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-transparent text-foreground">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
       {/* ── NAV ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-white/5 shadow-sm transition-all duration-300" aria-label="Main navigation">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/50 backdrop-blur-2xl hairline-b transition-all duration-300" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={snapsyncaiLogo} alt="SnapSync AI logo" className="w-8 h-8 rounded-md" width="32" height="32" />
@@ -285,42 +386,40 @@ export default function Landing() {
 
         {/* ── HERO ── */}
         <section className="relative overflow-hidden" aria-labelledby="hero-heading">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/[0.03] to-transparent pointer-events-none" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
-          <ParticleField />
+          <div className="max-w-5xl mx-auto px-6 py-24 md:py-32 relative text-center z-10">
+            <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-primary/80 mb-6 animate-in fade-in duration-500">
+              ambient commerce · est. 2027
+            </p>
 
-          <div className="max-w-5xl mx-auto px-6 py-28 md:py-40 relative text-center z-10">
-            <Badge variant="outline" className="mb-6 no-default-active-elevate gap-1.5 px-4 py-1.5 text-xs animate-in fade-in duration-500 rounded-full border-primary/40 bg-primary/10 text-primary shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="font-semibold tracking-wide">AI-Powered E-Commerce Listing Tool</span>
-            </Badge>
-
-            <h1 id="hero-heading" className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold tracking-tight leading-[1.08] mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              From Photo to Product{" "}
-              <span className="relative inline-block mt-2 md:mt-0">
-                <span className="bg-gradient-to-r from-emerald-400 via-lime-500 to-primary bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(16,185,129,0.4)]">
-                  in Seconds
-                </span>
-                <Sparkles className="absolute -top-4 -right-8 w-8 h-8 text-lime-400 opacity-60 animate-pulse" />
+            <h1 id="hero-heading" className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold tracking-tight leading-[1.05] mb-6 animate-settle">
+              <span className="text-gradient-animated">
+                Photos in.
+                <br />
+                Listings, everywhere.
               </span>
             </h1>
 
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-              Upload product images and let AI instantly generate complete{" "}
+              Drop product images into the portal and the AI writes complete{" "}
               <strong className="text-foreground font-medium">Shopify, Etsy, and Amazon listings</strong> —
-              titles, descriptions, pricing, SEO metadata, and AEO content. One click to publish everywhere.
+              titles, descriptions, pricing, SEO and AEO content. One click to publish everywhere.
             </p>
 
-            <p className="text-sm text-muted-foreground mb-10 animate-in fade-in duration-700 delay-150">
-              Trusted by e-commerce sellers in the UK. Free previews, no card required.
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground/70 mb-10 animate-in fade-in duration-700 delay-150">
+              free previews · no card required
             </p>
+
+            {/* Live demo hero moment */}
+            <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+              <HeroLiveDemo />
+            </div>
 
             <div className="flex items-center justify-center gap-4 flex-wrap mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <Button size="lg" className="h-14 px-8 text-base gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_-5px_hsl(var(--primary))] hover:shadow-[0_0_45px_-5px_hsl(var(--primary))] transition-all duration-300 hover:scale-105 group" onClick={() => openSignIn()}>
+              <Button size="lg" className="h-14 px-8 text-base gap-2 rounded-2xl hover:scale-105 transition-all duration-300 group" onClick={() => openSignIn()}>
                 Get Started Free
                 <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-xl border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300" onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}>
+              <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-2xl" onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}>
                 <Play className="w-4 h-4 mr-2" />
                 Watch Demo
               </Button>
@@ -362,7 +461,7 @@ export default function Landing() {
         </section>
 
         {/* ── STATS BAR ── */}
-        <div className="relative border-y border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden shadow-2xl">
+        <div className="relative glass-panel overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-lime-500/10 opacity-60" />
           <div className="max-w-5xl mx-auto px-6 py-12 relative z-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -371,7 +470,7 @@ export default function Landing() {
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <stat.icon className="w-4 h-4 text-primary" />
                   </div>
-                  <div className="text-3xl font-display font-bold text-foreground">{stat.value}</div>
+                  <div className="text-3xl font-display font-bold text-foreground font-mono">{stat.value}</div>
                   <div className="text-xs text-muted-foreground leading-tight">{stat.label}</div>
                 </div>
               ))}
@@ -575,7 +674,7 @@ export default function Landing() {
         </section>
 
         {/* ── SEO & AEO ── */}
-        <section className="relative bg-black/40 py-24 border-y border-white/10 overflow-hidden" aria-labelledby="seo-aeo-heading">
+        <section className="relative bg-card/40 backdrop-blur-sm py-24 overflow-hidden" aria-labelledby="seo-aeo-heading">
           <div className="absolute inset-0 bg-gradient-to-br from-lime-500/5 via-transparent to-primary/5 pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
@@ -653,7 +752,7 @@ export default function Landing() {
         </section>
 
         {/* ── PRICING ── */}
-        <section id="pricing" className="relative bg-black/40 border-y border-white/10 py-24 overflow-hidden" aria-labelledby="pricing-heading">
+        <section id="pricing" className="relative bg-card/40 backdrop-blur-sm py-24 overflow-hidden" aria-labelledby="pricing-heading">
           <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-background to-emerald-900/10 pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-lime-500/10 blur-[100px] rounded-full pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 relative z-10">

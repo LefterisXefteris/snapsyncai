@@ -2,6 +2,7 @@ import { useState, memo } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, Trash2, Lock, ChevronRight, Check } from "lucide-react";
+import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Image } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
 import { api, buildUrl } from "@shared/routes";
+import { cn } from "@/lib/utils";
 
 const CURRENCIES = [
   { code: "USD", symbol: "$" },
@@ -36,12 +38,14 @@ interface ImageCardProps {
   index: number;
   selected?: boolean;
   highlighted?: boolean;
+  /** True while AI analysis is running for this card — shows the scan-line + shimmer treatment */
+  analyzing?: boolean;
   onSelect?: (id: number, selected: boolean) => void;
   instagramConnected?: boolean;
   onInstagramPost?: (imageId: number) => void;
 }
 
-export const ImageCard = memo(function ImageCard({ image, views = [], index, selected, highlighted = false, onSelect }: ImageCardProps) {
+export const ImageCard = memo(function ImageCard({ image, views = [], index, selected, highlighted = false, analyzing = false, onSelect }: ImageCardProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const deleteMutation = useDeleteImage();
@@ -77,6 +81,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
   // ── Status ────────────────────────────────────────────────────────────────
   const isUnpaid = image.paymentStatus !== "paid";
+  const isSynced = image.shopifyStatus === "synced" || image.etsyStatus === "synced" || image.amazonStatus === "synced";
   const statusColor = isUnpaid
     ? "text-amber-400 bg-amber-400/10 border-amber-400/20"
     : image.shopifyStatus === "synced"
@@ -89,39 +94,58 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
     : image.shopifyStatus === "failed" ? "Failed"
     : "Pending";
 
+  const syncedPlatforms = [
+    image.shopifyStatus === "synced" && "shopify",
+    image.etsyStatus === "synced" && "etsy",
+    image.amazonStatus === "synced" && "amazon",
+    image.instagramStatus === "posted" && "instagram",
+  ].filter(Boolean) as string[];
+
   const allImages = [image, ...views];
   const hasViews = views.length > 0;
 
   return (
-    <div
-      className={`group relative flex flex-col overflow-hidden rounded-xl bg-card border shadow-sm hover:shadow-md transition-all animate-in fade-in duration-300 cursor-pointer ${highlighted ? "ring-2 ring-emerald-500/70 border-emerald-500/50 shadow-emerald-500/10" : ""}`}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 12, filter: "blur(6px)" }}
+      animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ type: "spring", stiffness: 300, damping: 28, delay: Math.min(index * 0.04, 0.4) }}
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-2xl glass-card cursor-pointer",
+        selected && "glow-selected",
+        highlighted && !selected && "animate-bloom ring-2 ring-primary/50",
+      )}
       data-testid={`card-product-${image.id}`}
-      style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('button, [role="checkbox"], .no-nav, input, select')) return;
         setLocation(`/product/${image.id}`);
       }}
     >
       {/* ── Main image ── */}
-      <div className="relative bg-muted flex items-center justify-center border-b" style={{ height: hasViews ? "120px" : "176px" }}>
+      <div className="relative bg-muted/40 flex items-center justify-center overflow-hidden" style={{ height: hasViews ? "120px" : "176px" }}>
         {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
         <img
           src={`/api/images/${image.id}/file?sz=${image.size}&t=${new Date(image.createdAt || Date.now()).getTime()}`}
           alt={image.altText || image.title || image.originalName}
-          className={`absolute inset-0 w-full h-full object-contain bg-muted transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}
           onError={(e) => { e.currentTarget.style.display = "none"; setImgLoaded(true); }}
           data-testid={`img-product-${image.id}`}
         />
-        {imgLoaded && <ImageIcon className="w-8 h-8 text-white/20" />}
+        {imgLoaded && <ImageIcon className="w-8 h-8 text-foreground/10" />}
+
+        {/* AI thinking scan-line */}
+        {analyzing && <div className="scan-line" />}
 
         <div className="absolute top-2.5 left-2.5">
           <Checkbox
             data-testid={`checkbox-select-${image.id}`}
             checked={selected}
             onCheckedChange={(checked) => onSelect?.(image.id, !!checked)}
-            className="border-white/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+            className={cn(
+              "border-white/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-opacity",
+              !selected && "opacity-0 group-hover:opacity-100",
+            )}
           />
         </div>
 
@@ -132,22 +156,22 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             </Badge>
           )}
           {hasViews && (
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-white/20 text-white/70 bg-black/40">
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-white/20 text-white/70 bg-black/40 font-mono">
               {allImages.length} views
             </Badge>
           )}
-          <Badge variant="outline" className={`text-[10px] ${statusColor}`}>
+          <Badge variant="outline" className={`text-[10px] font-mono uppercase tracking-wide ${statusColor} ${analyzing ? "animate-breathe" : ""}`}>
             {isUnpaid && <Lock className="w-2.5 h-2.5 mr-0.5" />}
-            {statusLabel}
+            {analyzing ? "Thinking" : statusLabel}
           </Badge>
         </div>
       </div>
 
       {/* ── Views strip ── */}
       {hasViews && (
-        <div className="flex gap-1 px-2 py-1.5 bg-muted/30 border-b border-white/5">
+        <div className="flex gap-1 px-2 py-1.5 bg-muted/30">
           {views.slice(0, 5).map((v) => (
-            <div key={v.id} className="relative w-9 h-9 shrink-0 rounded overflow-hidden border border-white/10">
+            <div key={v.id} className="relative w-9 h-9 shrink-0 rounded-md overflow-hidden bg-muted/50">
               <img
                 src={`/api/images/${v.id}/file?sz=${v.size}`}
                 alt=""
@@ -158,8 +182,8 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             </div>
           ))}
           {views.length > 5 && (
-            <div className="w-9 h-9 shrink-0 rounded bg-white/5 border border-white/10 flex items-center justify-center">
-              <span className="text-[9px] text-muted-foreground">+{views.length - 5}</span>
+            <div className="w-9 h-9 shrink-0 rounded-md bg-foreground/5 flex items-center justify-center">
+              <span className="text-[9px] font-mono text-muted-foreground">+{views.length - 5}</span>
             </div>
           )}
         </div>
@@ -167,18 +191,28 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
       {/* ── Info ── */}
       <div className="flex flex-col flex-1 p-3 space-y-2">
-        <h3 className="font-display font-medium text-sm text-foreground truncate leading-snug" title={image.title || image.originalName}>
-          {image.title || image.originalName}
-        </h3>
+        {analyzing ? (
+          // Streaming-style skeleton while the AI writes the listing
+          <div className="space-y-1.5 py-0.5">
+            <div className="h-3.5 w-4/5 rounded animate-shimmer" />
+            <div className="h-2.5 w-3/5 rounded animate-shimmer" />
+          </div>
+        ) : (
+          <>
+            <h3 className="font-display font-medium text-sm text-foreground truncate leading-snug" title={image.title || image.originalName}>
+              {image.title || image.originalName}
+            </h3>
 
-        {image.category && !isUnpaid && (
-          <p className="text-[10px] text-muted-foreground truncate" title={image.category}>
-            {image.category}
-          </p>
+            {image.category && !isUnpaid && (
+              <p className="text-[10px] text-muted-foreground truncate" title={image.category}>
+                {image.category}
+              </p>
+            )}
+          </>
         )}
 
-        {isUnpaid && (
-          <div className="p-1.5 rounded-md bg-amber-500/5 border border-amber-500/20 text-[10px] text-amber-500 flex items-center gap-1">
+        {isUnpaid && !analyzing && (
+          <div className="p-1.5 rounded-md bg-amber-500/5 text-[10px] text-amber-500 flex items-center gap-1 shadow-[inset_0_0_0_1px_hsl(38_92%_50%/0.2)]">
             <Lock className="w-2.5 h-2.5 shrink-0" />
             Preview mode — subscribe to unlock
           </div>
@@ -189,12 +223,12 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           <div className="no-nav flex items-center gap-1 mt-auto pt-1">
             {/* currency selector */}
             <Select value={currency} onValueChange={handleCurrencyChange}>
-              <SelectTrigger className="h-7 w-16 text-[11px] bg-transparent border-white/10 px-1.5 no-nav">
+              <SelectTrigger className="h-7 w-16 text-[11px] font-mono bg-transparent border-white/10 px-1.5 no-nav">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {CURRENCIES.map(c => (
-                  <SelectItem key={c.code} value={c.code} className="text-xs">
+                  <SelectItem key={c.code} value={c.code} className="text-xs font-mono">
                     {c.symbol} {c.code}
                   </SelectItem>
                 ))}
@@ -204,10 +238,10 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             {/* price input */}
             {editingPrice ? (
               <div className="flex items-center gap-1 flex-1">
-                <span className="text-xs text-muted-foreground">{getSymbol(currency)}</span>
+                <span className="text-xs font-mono text-muted-foreground">{getSymbol(currency)}</span>
                 <input
                   autoFocus
-                  className="flex-1 min-w-0 h-7 bg-white/5 border border-primary/40 rounded px-1.5 text-xs text-white focus:outline-none focus:border-primary"
+                  className="flex-1 min-w-0 h-7 bg-foreground/5 rounded-md px-1.5 text-xs font-mono text-foreground focus:outline-none shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.4)] focus:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.8),0_0_12px_-2px_hsl(var(--primary)/0.4)]"
                   value={draftPrice}
                   onChange={e => setDraftPrice(e.target.value)}
                   onBlur={savePrice}
@@ -221,10 +255,10 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
                 onClick={() => { setDraftPrice(image.price ? String(image.price) : ""); setEditingPrice(true); }}
                 title="Click to edit price"
               >
-                <span className="font-medium">
+                <span className="font-medium font-mono">
                   {savedFlash
                     ? <span className="text-green-400 flex items-center gap-0.5"><Check className="w-3 h-3" /> Saved</span>
-                    : <>{getSymbol(currency)}{image.price ? Number(image.price).toFixed(2) : <span className="text-muted-foreground italic">Add price</span>}</>
+                    : <>{getSymbol(currency)}{image.price ? Number(image.price).toFixed(2) : <span className="text-muted-foreground italic font-body">Add price</span>}</>
                   }
                 </span>
                 <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover/price:opacity-100 transition-opacity" />
@@ -233,13 +267,23 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           </div>
         )}
 
-        {/* ── Footer ── */}
-        <div className="flex items-center justify-end pt-1">
+        {/* ── Footer: mono metadata for published cards + remove ── */}
+        <div className="flex items-center justify-between pt-1 gap-2">
+          {isSynced ? (
+            <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70 truncate">
+              {syncedPlatforms.join(" · ")}
+              {image.createdAt && (
+                <> · {new Date(image.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
+              )}
+            </span>
+          ) : (
+            <span />
+          )}
           <Button
             data-testid={`button-delete-${image.id}`}
             variant="ghost"
             size="sm"
-            className="h-6 px-1.5 text-[10px] no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="h-6 px-1.5 text-[10px] no-nav text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
             onClick={(e) => {
               e.stopPropagation();
               if (image.productGroupId) {
@@ -256,6 +300,6 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           </Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 });

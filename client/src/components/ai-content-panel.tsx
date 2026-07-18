@@ -105,11 +105,16 @@ export function AiContentPanel({
     displayFaqs !== null;
 
   return (
-    <Card className="shadow-sm border-primary/20 bg-primary/[0.02]">
-      <CardHeader className="px-4 py-3 border-b border-border/50">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
+    <Card className="bg-primary/[0.03] shadow-[inset_0_1px_0_0_hsl(0_0%_100%/0.06),inset_0_0_0_1px_hsl(var(--primary)/0.15),0_8px_28px_-12px_hsl(250_25%_2%/0.5),0_0_32px_-12px_hsl(var(--primary)/0.2)]">
+      <CardHeader className="px-4 py-3 hairline-b">
+        <CardTitle className="text-sm font-medium flex items-center gap-2 font-display">
+          <Sparkles className={`w-3.5 h-3.5 text-primary ${isGenerating ? "animate-pulse" : ""}`} />
           AI Content Generator
+          {isGenerating && (
+            <span className="font-mono text-[9px] uppercase tracking-widest text-aurora-2 animate-breathe ml-auto">
+              streaming
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 space-y-3">
@@ -164,10 +169,11 @@ export function AiContentPanel({
           )}
         </Button>
 
-        {/* Streaming raw indicator */}
+        {/* Streaming raw indicator — the model writing in real time */}
         {isGenerating && streamText && (
-          <div className="text-[10px] text-muted-foreground font-mono bg-muted/50 p-2 rounded-md max-h-16 overflow-hidden">
+          <div className="text-[10px] text-muted-foreground font-mono bg-muted/40 p-2 rounded-lg max-h-16 overflow-hidden shadow-[inset_0_0_0_1px_hsl(var(--aurora-2)/0.2)]">
             {streamText.slice(-200)}
+            <span className="inline-block w-1.5 h-3 bg-aurora-2 animate-pulse ml-0.5 align-text-bottom" />
           </div>
         )}
 
@@ -281,9 +287,9 @@ function FieldPreview<T>({
   renderValue,
 }: FieldPreviewProps<T>) {
   return (
-    <div className="border border-border/60 rounded-md p-3 space-y-2 bg-background">
+    <div className="rounded-xl p-3 space-y-2 bg-background/60 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06)]">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+        <span className="font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">{label}</span>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -310,7 +316,14 @@ function FieldPreview<T>({
           </Button>
         </div>
       </div>
-      <div className="max-h-32 overflow-y-auto">{renderValue(value)}</div>
+      {isRegenerating ? (
+        <div className="space-y-1.5">
+          <div className="h-3 w-full rounded animate-shimmer" />
+          <div className="h-3 w-2/3 rounded animate-shimmer" />
+        </div>
+      ) : (
+        <div className="max-h-32 overflow-y-auto">{renderValue(value)}</div>
+      )}
     </div>
   );
 }

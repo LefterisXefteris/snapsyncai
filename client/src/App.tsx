@@ -11,6 +11,10 @@ import Landing from "@/pages/Landing";
 import ProductDetails from "@/pages/ProductDetails";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AmbientProvider } from "@/components/ambient/AmbientProvider";
+import { AuroraBackground } from "@/components/ambient/AuroraBackground";
+import { CommandPalette } from "@/components/command-palette";
+import { GlassDock } from "@/components/glass-dock";
 import { useEffect, useRef } from "react";
 
 // Clerk publishable key — baked in at build time via Vite env var.
@@ -18,6 +22,24 @@ import { useEffect, useRef } from "react";
 // the env var isn't set (e.g. legacy deploys).
 const VITE_CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+
+// Ink/aurora Clerk theme — matches the ambient design tokens in index.css
+const clerkAppearance = {
+  baseTheme: dark,
+  variables: {
+    colorPrimary: "hsl(90 65% 52%)",
+    colorBackground: "hsl(250 24% 6%)",
+    colorInputBackground: "hsl(250 18% 12%)",
+    colorText: "hsl(250 20% 96%)",
+    colorTextSecondary: "hsl(250 12% 64%)",
+    borderRadius: "1rem",
+    fontFamily: "'Instrument Sans', sans-serif",
+  },
+  elements: {
+    card: "shadow-2xl backdrop-blur-2xl",
+    formButtonPrimary: "shadow-[0_0_24px_-6px_hsl(90_65%_52%/0.6)]",
+  },
+};
 
 function AuthScreen() {
   return <Landing />;
@@ -54,6 +76,8 @@ function CacheFlusher() {
 function AuthenticatedLayout() {
   return (
     <main className="flex-1 min-w-0 w-full min-h-screen">
+      <CommandPalette />
+      <GlassDock />
       <AuthenticatedRouter />
     </main>
   );
@@ -81,7 +105,7 @@ function AppWithClerk() {
   // If the env var is present (recommended), mount immediately — no network round-trip.
   if (VITE_CLERK_KEY) {
     return (
-      <ClerkProvider publishableKey={VITE_CLERK_KEY} appearance={{ baseTheme: dark }}>
+      <ClerkProvider publishableKey={VITE_CLERK_KEY} appearance={clerkAppearance}>
         <ClerkApp />
       </ClerkProvider>
     );
@@ -120,7 +144,7 @@ function AppWithClerkFallback() {
   }
 
   return (
-    <ClerkProvider publishableKey={config.publishableKey} appearance={{ baseTheme: dark }}>
+    <ClerkProvider publishableKey={config.publishableKey} appearance={clerkAppearance}>
       <ClerkApp />
     </ClerkProvider>
   );
@@ -130,10 +154,13 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AppWithClerk />
-          <Toaster />
-        </TooltipProvider>
+        <AmbientProvider>
+          <TooltipProvider>
+            <AuroraBackground />
+            <AppWithClerk />
+            <Toaster />
+          </TooltipProvider>
+        </AmbientProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
