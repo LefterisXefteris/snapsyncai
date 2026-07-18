@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useTheme } from "next-themes";
 import {
   Upload,
   ClipboardList,
   Download,
   Crown,
-  Moon,
-  Sun,
   Package,
   Home as HomeIcon,
   ShoppingCart,
@@ -30,7 +27,6 @@ import type { Image } from "@shared/schema";
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
-  const { theme, setTheme } = useTheme();
   const { data: images } = useImages();
 
   useEffect(() => {
@@ -117,13 +113,6 @@ export function CommandPalette() {
           <CommandItem onSelect={() => runCommand("subscribe")} data-testid="cmd-billing">
             <Crown />
             Billing & subscription
-          </CommandItem>
-          <CommandItem
-            onSelect={() => run(() => setTheme(theme === "dark" ? "light" : "dark"))}
-            data-testid="cmd-toggle-theme"
-          >
-            {theme === "dark" ? <Sun /> : <Moon />}
-            Switch to {theme === "dark" ? "light" : "dark"} mode
           </CommandItem>
         </CommandGroup>
 

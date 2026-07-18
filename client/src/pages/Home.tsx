@@ -25,7 +25,6 @@ import { useSidebar } from "@/components/ui/sidebar";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 import { dark } from "@clerk/themes";
 import type { Image } from "@shared/schema";
-import { ModeToggle } from "@/components/mode-toggle";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages, summarizeWorkspaceVariantAssignments } from "@/lib/workspace-variant-sort";
@@ -847,8 +846,7 @@ export default function Home() {
             {/* Footer pinned at bottom */}
             <div className="p-3 shrink-0 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05)]">
               <div className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
-                <div className="flex items-center justify-between px-1">
-                  <ModeToggle />
+                <div className="flex items-center justify-end px-1">
                   <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
                 </div>
               </div>
