@@ -10,8 +10,9 @@ import {
   Sun,
   Package,
   Home as HomeIcon,
+  ShoppingCart,
 } from "lucide-react";
-import { SiShopify, SiEtsy, SiAmazon, SiInstagram } from "react-icons/si";
+import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
 import {
   CommandDialog,
   CommandEmpty,
@@ -97,7 +98,7 @@ export function CommandPalette() {
             Connect Etsy
           </CommandItem>
           <CommandItem onSelect={() => runCommand("connect-amazon")} data-testid="cmd-connect-amazon">
-            <SiAmazon className="text-[#FF9900]" />
+            <ShoppingCart className="text-[#FF9900]" />
             Connect Amazon
           </CommandItem>
           <CommandItem onSelect={() => runCommand("connect-instagram")} data-testid="cmd-connect-instagram">

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { ClipboardList, Command as CommandIcon, Crown, Sparkles } from "lucide-react";
-import { SiShopify, SiEtsy, SiAmazon, SiInstagram } from "react-icons/si";
+import { ClipboardList, Command as CommandIcon, Crown, ShoppingCart, Sparkles } from "lucide-react";
+import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
 import {
   useAmazonStatus,
   useEtsyStatus,
@@ -19,7 +19,7 @@ import type { Image } from "@shared/schema";
 const marketplaces = [
   { key: "shopify", label: "Shopify", Icon: SiShopify, color: "#96BF48", command: "connect-shopify" as AppCommand },
   { key: "etsy", label: "Etsy", Icon: SiEtsy, color: "#F56400", command: "connect-etsy" as AppCommand },
-  { key: "amazon", label: "Amazon", Icon: SiAmazon, color: "#FF9900", command: "connect-amazon" as AppCommand },
+  { key: "amazon", label: "Amazon", Icon: ShoppingCart, color: "#FF9900", command: "connect-amazon" as AppCommand },
   { key: "instagram", label: "Instagram", Icon: SiInstagram, color: "#E1306C", command: "connect-instagram" as AppCommand },
 ];
 
