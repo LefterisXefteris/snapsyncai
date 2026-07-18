@@ -784,10 +784,10 @@ export default function Home() {
                 <section className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
                   <h2 className="text-xs font-semibold tracking-tight text-muted-foreground uppercase">Subscription</h2>
                   {isSubscribed ? (
-                    <Card className="border-emerald-500/20 bg-emerald-500/5">
+                    <Card className="border-yellow-500/20 bg-yellow-500/5">
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-center gap-2">
-                          <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                          <Crown className="w-3.5 h-3.5 text-yellow-400" />
                           <span className="text-xs font-medium">Pro Active</span>
                         </div>
                         {subscriptionStatus?.currentPeriodEnd && (

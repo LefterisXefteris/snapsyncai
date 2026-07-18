@@ -1274,7 +1274,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className={`w-full text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50 ${!AI_PHOTOSHOOT_ENABLED ? 'opacity-50 cursor-not-allowed text-muted-foreground hover:text-muted-foreground hover:bg-transparent' : ''}`}
+                                      className={`w-full text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100/50 ${!AI_PHOTOSHOOT_ENABLED ? 'opacity-50 cursor-not-allowed text-muted-foreground hover:text-muted-foreground hover:bg-transparent' : ''}`}
                                       disabled={!AI_PHOTOSHOOT_ENABLED}
                                     >
                                       <ImageIcon className="w-4 h-4 mr-2" />

@@ -27,7 +27,7 @@ const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 const clerkAppearance = {
   baseTheme: dark,
   variables: {
-    colorPrimary: "hsl(90 65% 52%)",
+    colorPrimary: "hsl(48 100% 55%)",
     colorBackground: "hsl(0 0% 7%)",
     colorInputBackground: "hsl(0 0% 13%)",
     colorText: "hsl(0 0% 95%)",
@@ -37,7 +37,7 @@ const clerkAppearance = {
   },
   elements: {
     card: "shadow-2xl backdrop-blur-2xl",
-    formButtonPrimary: "shadow-[0_0_24px_-6px_hsl(90_65%_52%/0.6)]",
+    formButtonPrimary: "shadow-[0_0_24px_-6px_hsl(48_100%_55%/0.6)]",
   },
 };
 

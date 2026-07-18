@@ -151,7 +151,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
           {highlighted && (
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/40 text-emerald-600 bg-white/90 dark:bg-black/40 dark:text-emerald-300">
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-yellow-500/40 text-yellow-600 bg-white/90 dark:bg-black/40 dark:text-yellow-300">
               Merged
             </Badge>
           )}

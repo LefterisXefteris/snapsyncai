@@ -21,8 +21,8 @@
   --popover: 0 0% 100%;
   --popover-foreground: 0 0% 9%;
 
-  --primary: 90 55% 38%;
-  --primary-foreground: 90 80% 97%;
+  --primary: 45 95% 47%;
+  --primary-foreground: 45 100% 8%;
 
   --secondary: 0 0% 92%;
   --secondary-foreground: 0 0% 12%;
@@ -30,23 +30,23 @@
   --muted: 0 0% 92%;
   --muted-foreground: 0 0% 42%;
 
-  --accent: 90 55% 38%;
-  --accent-foreground: 0 0% 10%;
+  --accent: 45 95% 47%;
+  --accent-foreground: 45 100% 8%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
   --border: 0 0% 86%;
   --input: 0 0% 86%;
-  --ring: 90 55% 38%;
+  --ring: 45 95% 47%;
 
   --radius: 1rem;
 
-  /* Aurora accent system — lime is the star, cyan + violet are ambient co-stars.
+  /* Aurora accent system — yellow is the star, amber + gold are ambient co-stars.
      Only ever used in gradients and glows, never as flat fills. */
-  --aurora-1: 90 70% 45%;   /* lime */
-  --aurora-2: 190 85% 50%;  /* cyan */
-  --aurora-3: 262 75% 58%;  /* violet */
+  --aurora-1: 48 95% 50%;   /* yellow */
+  --aurora-2: 32 95% 52%;   /* amber */
+  --aurora-3: 55 85% 55%;   /* gold */
 }
 
 .dark {
@@ -61,8 +61,8 @@
   --popover: 0 0% 7%;
   --popover-foreground: 0 0% 95%;
 
-  --primary: 90 65% 52%;
-  --primary-foreground: 90 60% 6%;
+  --primary: 48 100% 55%;
+  --primary-foreground: 48 100% 6%;
 
   --secondary: 0 0% 13%;
   --secondary-foreground: 0 0% 95%;
@@ -70,19 +70,19 @@
   --muted: 0 0% 13%;
   --muted-foreground: 0 0% 63%;
 
-  --accent: 90 65% 52%;
-  --accent-foreground: 90 60% 6%;
+  --accent: 48 100% 55%;
+  --accent-foreground: 48 100% 6%;
 
   --destructive: 0 70% 45%;
   --destructive-foreground: 0 0% 98%;
 
   --border: 0 0% 15%;
   --input: 0 0% 15%;
-  --ring: 90 65% 52%;
+  --ring: 48 100% 55%;
 
-  --aurora-1: 90 75% 55%;
-  --aurora-2: 190 90% 55%;
-  --aurora-3: 262 80% 62%;
+  --aurora-1: 48 100% 58%;
+  --aurora-2: 32 100% 56%;
+  --aurora-3: 55 90% 60%;
 }
 
 @layer base {

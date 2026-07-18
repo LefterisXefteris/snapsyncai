@@ -943,7 +943,7 @@ export function UploadZone({
                 <button
                   onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
                   disabled={isAutoSorting}
-                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 text-[11px] text-yellow-400 hover:text-yellow-300 transition-colors disabled:opacity-50"
                   title="Sort same-product variants into product families"
                 >
                   <Sparkles className="w-3 h-3" />
