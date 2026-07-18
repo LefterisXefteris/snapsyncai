@@ -106,11 +106,11 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96, y: 12, filter: "blur(6px)" }}
-      animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+      initial={{ opacity: 0, scale: 0.96, y: 12 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 28, delay: Math.min(index * 0.04, 0.4) }}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl glass-card cursor-pointer",
+        "group relative flex flex-col overflow-hidden rounded-2xl glass-card cursor-pointer cv-auto",
         selected && "glow-selected",
         highlighted && !selected && "animate-bloom ring-2 ring-primary/50",
       )}
@@ -128,6 +128,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           alt={image.altText || image.title || image.originalName}
           className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
+          decoding="async"
           onLoad={() => setImgLoaded(true)}
           onError={(e) => { e.currentTarget.style.display = "none"; setImgLoaded(true); }}
           data-testid={`img-product-${image.id}`}
@@ -177,6 +178,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
                 alt=""
                 className="w-full h-full object-cover"
                 loading="lazy"
+                decoding="async"
                 onError={(e) => { e.currentTarget.style.display = "none"; }}
               />
             </div>

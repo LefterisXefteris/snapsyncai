@@ -5,17 +5,22 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClerkProvider, SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home";
-import Landing from "@/pages/Landing";
-import ProductDetails from "@/pages/ProductDetails";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AmbientProvider } from "@/components/ambient/AmbientProvider";
 import { AuroraBackground } from "@/components/ambient/AuroraBackground";
-import { CommandPalette } from "@/components/command-palette";
 import { GlassDock } from "@/components/glass-dock";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+
+// Route-level code splitting: each page ships as its own chunk so the
+// initial bundle stays small and loads fast.
+const Home = lazy(() => import("@/pages/Home"));
+const Landing = lazy(() => import("@/pages/Landing"));
+const ProductDetails = lazy(() => import("@/pages/ProductDetails"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const CommandPalette = lazy(() =>
+  import("@/components/command-palette").then((m) => ({ default: m.CommandPalette })),
+);
 
 // Clerk publishable key — baked in at build time via Vite env var.
 // Falls back to fetching from the server API for environments where
@@ -41,8 +46,20 @@ const clerkAppearance = {
   },
 };
 
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+    </div>
+  );
+}
+
 function AuthScreen() {
-  return <Landing />;
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <Landing />
+    </Suspense>
+  );
 }
 
 function AuthenticatedRouter() {
@@ -73,12 +90,35 @@ function CacheFlusher() {
   return null;
 }
 
+// Warms lazy chunks during idle time so navigation and the command palette
+// feel instant without blocking the initial render.
+function useIdlePreload() {
+  useEffect(() => {
+    const preload = () => {
+      import("@/pages/ProductDetails");
+      import("@/components/command-palette");
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(preload, { timeout: 3000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(preload, 1500);
+    return () => window.clearTimeout(id);
+  }, []);
+}
+
 function AuthenticatedLayout() {
+  useIdlePreload();
+
   return (
     <main className="flex-1 min-w-0 w-full min-h-screen">
-      <CommandPalette />
+      <Suspense fallback={null}>
+        <CommandPalette />
+      </Suspense>
       <GlassDock />
-      <AuthenticatedRouter />
+      <Suspense fallback={<RouteFallback />}>
+        <AuthenticatedRouter />
+      </Suspense>
     </main>
   );
 }

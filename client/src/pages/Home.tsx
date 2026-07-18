@@ -714,7 +714,7 @@ export default function Home() {
             minSize={20}
             maxSize={hasStagedImages ? SIDEBAR_EXPANDED_MAX : SIDEBAR_COLLAPSED_MAX}
             onResize={setSidebarPanelSize}
-            className="flex flex-col h-full bg-card/30 backdrop-blur-sm shadow-[inset_-1px_0_0_0_hsl(var(--foreground)/0.05)]"
+            className="flex flex-col h-full bg-card/60 shadow-[inset_-1px_0_0_0_hsl(var(--foreground)/0.05)]"
           >
             <ScrollArea className="flex-1 h-full">
               <div className="p-4 space-y-6">

@@ -2,11 +2,12 @@ import { useAmbient, type AmbientState } from "./AmbientProvider";
 import { cn } from "@/lib/utils";
 
 /**
- * Fixed full-viewport aurora layer. Three blurred gradient blobs on slow
+ * Fixed full-viewport aurora layer. Three soft gradient blobs on slow
  * GPU-composited drift. The ambient state shifts their hue and tempo:
  * calm gold when idle, pulsing amber/yellow while AI thinks, a warm yellow
  * bloom on success. Sits at -z-10, above the body background but below
- * all content.
+ * all content. Softness comes from the gradient falloff itself rather
+ * than filter: blur, which was prohibitively expensive to composite.
  */
 export function AuroraBackground() {
   const { state } = useAmbient();
@@ -44,5 +45,6 @@ function blobGradient(blob: 1 | 2 | 3, state: AmbientState): string {
     success: { 1: [1, 0.24], 2: [1, 0.18], 3: [2, 0.12] },
   };
   const [hue, opacity] = palette[state][blob];
-  return `radial-gradient(circle at center, hsl(var(--aurora-${hue}) / ${opacity}), transparent 70%)`;
+  // Gradual falloff stops replicate the softness the old blur(90px) provided.
+  return `radial-gradient(circle at center, hsl(var(--aurora-${hue}) / ${opacity}), hsl(var(--aurora-${hue}) / ${opacity * 0.55}) 30%, hsl(var(--aurora-${hue}) / ${opacity * 0.2}) 55%, transparent 78%)`;
 }

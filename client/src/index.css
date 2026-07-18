@@ -123,15 +123,18 @@
 /* ── Ambient surfaces ──
    Borderless: defined by a specular top edge + soft elevation, not strokes. */
 .glass-panel {
-  @apply bg-card/70 backdrop-blur-2xl;
+  @apply bg-card/80 backdrop-blur-lg;
   box-shadow:
     inset 0 1px 0 0 hsl(0 0% 100% / 0.07),
     inset 0 0 0 1px hsl(0 0% 100% / 0.03),
     0 12px 40px -12px hsl(0 0% 2% / 0.7);
 }
 
+/* No backdrop-filter here: this class is applied per card (N times), and
+   each backdrop-blur layer re-samples what's behind it every frame. A more
+   opaque fill gives the same perceived depth over the dark background. */
 .glass-card {
-  @apply bg-card/60 backdrop-blur-md transition-all duration-300;
+  @apply bg-card/85 transition-all duration-300;
   box-shadow:
     inset 0 1px 0 0 hsl(0 0% 100% / 0.06),
     inset 0 0 0 1px hsl(0 0% 100% / 0.02),
@@ -144,6 +147,13 @@
     inset 0 0 0 1px hsl(var(--primary) / 0.18),
     0 12px 36px -10px hsl(0 0% 2% / 0.7),
     0 0 32px -8px hsl(var(--primary) / 0.25);
+}
+
+/* Skip layout/paint for offscreen grid items (product cards). The intrinsic
+   size approximates a card so scrollbar length stays stable. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
 }
 
 /* Hairline gradient separators — replace hard borders between sections */
@@ -229,7 +239,8 @@
   }
 }
 
-/* Settle entrance — scale + blur fade, the ambient signature */
+/* Settle entrance — scale + fade, the ambient signature.
+   Opacity/transform only: animating filter forces per-frame repaints. */
 .animate-settle {
   animation: settle 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -238,13 +249,11 @@
   from {
     opacity: 0;
     transform: scale(0.97) translateY(8px);
-    filter: blur(6px);
   }
 
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-    filter: blur(0);
   }
 }
 
@@ -256,13 +265,14 @@ pre {
 }
 
 /* ── Aurora background ──
-   3 blurred radial blobs on slow GPU-composited drift. The mounting layer
-   (AuroraBackground component) swaps ambient-* classes to shift hue/tempo. */
+   3 soft radial blobs on slow GPU-composited drift. The mounting layer
+   (AuroraBackground component) swaps ambient-* classes to shift hue/tempo.
+   Softness comes from the gradient stops themselves (no filter: blur —
+   a 90px blur here made window moves/scrolls recomposite huge GPU layers). */
 .aurora-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
-  will-change: transform, opacity;
+  will-change: transform;
   transition: background 1.8s ease, opacity 1.8s ease;
 }
 
@@ -436,17 +446,14 @@ pre {
 .reveal {
   opacity: 0;
   transform: translateY(28px) scale(0.99);
-  filter: blur(4px);
   transition:
     opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .reveal.revealed {
   opacity: 1;
   transform: translateY(0) scale(1);
-  filter: blur(0);
 }
 
 .reveal.delay-1 {

@@ -365,7 +365,7 @@ export default function Landing() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
       {/* ── NAV ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/50 backdrop-blur-2xl hairline-b transition-all duration-300" aria-label="Main navigation">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-lg hairline-b transition-all duration-300" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={snapsyncaiLogo} alt="SnapSync AI logo" className="w-8 h-8 rounded-md" width="32" height="32" />
@@ -493,7 +493,7 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {TESTIMONIALS.map((t, i) => (
-              <div key={i} className={`reveal delay-${i + 1} relative rounded-2xl border border-white/10 bg-background/40 backdrop-blur-sm p-6 space-y-4 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)]`}>
+              <div key={i} className={`reveal delay-${i + 1} relative rounded-2xl border border-white/10 bg-background/70 p-6 space-y-4 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)]`}>
                 <div className="flex items-center gap-0.5">
                   {[...Array(t.stars)].map((_, j) => (
                     <Star key={j} className="w-4 h-4 fill-amber-400 text-amber-400" />
@@ -597,7 +597,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[300px] bg-primary/5 blur-[100px] rounded-full pointer-events-none" />
             {FEATURES.map((feature, i) => (
-              <Card key={i} className={`hover-elevate relative overflow-hidden group border-white/10 hover:border-primary/40 bg-background/50 backdrop-blur-sm transition-all duration-500 reveal delay-${i + 1} hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1`}>
+              <Card key={i} className={`hover-elevate relative overflow-hidden group border-white/10 hover:border-primary/40 bg-background/75 transition-all duration-500 reveal delay-${i + 1} hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1`}>
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <CardHeader className="relative z-10">
@@ -626,14 +626,14 @@ export default function Landing() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1 relative reveal">
               <div className="absolute -inset-4 bg-gradient-to-tr from-amber-500/30 to-yellow-400/30 blur-3xl rounded-[3rem] opacity-70 animate-pulse-glow" />
-              <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black/40 backdrop-blur-xl animate-float">
+              <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black/70 animate-float">
                 <img
                   src="/screenshot-workspace2.png"
                   alt="SnapSync AI workspace with AI-generated product listings"
                   className="w-full h-auto object-cover"
                   loading="lazy"
                 />
-                <div className="absolute bottom-6 left-6 right-6 p-5 rounded-2xl bg-background/80 backdrop-blur-xl border border-white/10 animate-float-delayed shadow-2xl">
+                <div className="absolute bottom-6 left-6 right-6 p-5 rounded-2xl bg-background/90 border border-white/10 animate-float-delayed shadow-2xl">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-primary flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(250,204,21,0.4)]">
                       <Sparkles className="w-6 h-6 text-white" />
@@ -674,7 +674,7 @@ export default function Landing() {
         </section>
 
         {/* ── SEO & AEO ── */}
-        <section className="relative bg-card/40 backdrop-blur-sm py-24 overflow-hidden" aria-labelledby="seo-aeo-heading">
+        <section className="relative bg-card/60 py-24 overflow-hidden" aria-labelledby="seo-aeo-heading">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-primary/5 pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16 reveal">
@@ -706,7 +706,7 @@ export default function Landing() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SEO_AEO_FEATURES.map((feature, i) => (
-                <Card key={i} className={`hover-elevate group border-white/5 hover:border-primary/40 bg-background/40 backdrop-blur-sm transition-all duration-300 reveal delay-${(i % 3) + 1} hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]`}>
+                <Card key={i} className={`hover-elevate group border-white/5 hover:border-primary/40 bg-background/70 transition-all duration-300 reveal delay-${(i % 3) + 1} hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]`}>
                   <CardContent className="flex items-start gap-3 pt-6 pb-5 relative z-10">
                     <div className="w-10 h-10 rounded-xl bg-primary/5 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors shadow-inner border border-white/5">
                       <feature.icon className="w-4 h-4 group-hover:text-primary transition-colors text-muted-foreground" />
@@ -752,7 +752,7 @@ export default function Landing() {
         </section>
 
         {/* ── PRICING ── */}
-        <section id="pricing" className="relative bg-card/40 backdrop-blur-sm py-24 overflow-hidden" aria-labelledby="pricing-heading">
+        <section id="pricing" className="relative bg-card/60 py-24 overflow-hidden" aria-labelledby="pricing-heading">
           <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-background to-amber-900/10 pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-yellow-400/10 blur-[100px] rounded-full pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 relative z-10">
@@ -775,7 +775,7 @@ export default function Landing() {
             {/* Subscription plans */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 max-w-2xl mx-auto">
               {/* Weekly */}
-              <Card className="flex flex-col reveal delay-1 bg-background/50 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl">
+              <Card className="flex flex-col reveal delay-1 bg-background/75 border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl">
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Crown className="w-4 h-4 text-primary" />
@@ -804,7 +804,7 @@ export default function Landing() {
               </Card>
 
               {/* Annual */}
-              <Card className="flex flex-col relative overflow-hidden reveal delay-2 border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-background/60 backdrop-blur-xl hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] transition-all duration-300 shadow-xl">
+              <Card className="flex flex-col relative overflow-hidden reveal delay-2 border-primary/50 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-background/80 hover:shadow-[0_0_60px_rgba(16,185,129,0.25)] transition-all duration-300 shadow-xl">
                 <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
                 <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-yellow-400 via-amber-500 to-primary" />
                 <CardHeader className="pb-4 relative z-10">
@@ -862,7 +862,7 @@ export default function Landing() {
           <div className="reveal">
             <Accordion type="single" collapsible className="w-full space-y-3">
               {FAQ_DATA.map((faq, index) => (
-                <AccordionItem key={index} value={`faq-${index}`} className="border border-white/10 bg-background/30 backdrop-blur-md rounded-xl px-4 md:px-6 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:bg-primary/5 transition-colors overflow-hidden">
+                <AccordionItem key={index} value={`faq-${index}`} className="border border-white/10 bg-background/60 rounded-xl px-4 md:px-6 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:bg-primary/5 transition-colors overflow-hidden">
                   <AccordionTrigger className="text-left text-sm md:text-base font-semibold py-5 hover:no-underline hover:text-primary transition-colors">{faq.question}</AccordionTrigger>
                   <AccordionContent className="text-muted-foreground leading-relaxed text-sm md:text-base pb-5">{faq.answer}</AccordionContent>
                 </AccordionItem>
