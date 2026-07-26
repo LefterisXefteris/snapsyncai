@@ -13,7 +13,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
+import { UploadCloud, Loader2, X, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2, AlertTriangle, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isImageLikeFile } from "@/lib/image-file-utils";
 import { useUploadImages } from "@/hooks/use-images";
@@ -808,55 +808,99 @@ export function UploadZone({
     >
       <input {...getInputProps()} data-testid="input-file-upload" />
 
-      {/* Drop zone — the ambient portal */}
-      <div
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary/80">New listing</p>
+          <h2 className="mt-1 font-display text-lg font-semibold tracking-tight text-foreground">
+            Add product photos
+          </h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Add each angle. You can group variants before AI creates the listings.
+          </p>
+        </div>
+        {totalFiles > 0 && (
+          <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-[10px] text-primary">
+            {totalFiles}/200
+          </span>
+        )}
+      </div>
+
+      {/* Empty state is a confident primary action; the staged state collapses
+          to a compact add-more row so the product groups stay in focus. */}
+      <button
+        type="button"
         onClick={() => {
           if (!isUploading) open();
         }}
+        disabled={isUploading}
+        aria-label={totalFiles > 0 ? "Add more product photos" : "Choose product photos"}
         className={cn(
-          "relative group cursor-pointer overflow-hidden rounded-3xl transition-all duration-500 text-center",
-          totalFiles > 0 ? "p-3" : "p-8",
+          "relative group w-full overflow-hidden border text-left transition-all duration-300 disabled:cursor-wait disabled:opacity-60",
+          totalFiles > 0
+            ? "rounded-2xl px-3.5 py-3"
+            : "min-h-[220px] rounded-2xl p-5 sm:p-6",
           isDragActive
-            ? "bg-primary/10 scale-[1.02] shadow-[inset_0_0_0_1.5px_hsl(var(--primary)/0.6),0_0_48px_-6px_hsl(var(--primary)/0.45),inset_0_0_48px_0_hsl(var(--primary)/0.12)]"
-            : "portal-ring bg-card/40 hover:bg-card/60 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06)]"
+            ? "border-primary bg-primary/10 shadow-[0_0_36px_-12px_hsl(var(--primary)/0.55)]"
+            : "border-dashed border-foreground/15 bg-card/35 hover:border-primary/45 hover:bg-card/55"
         )}
       >
-        {/* Aurora bleed inside the portal on drag-over */}
         <div
           aria-hidden
           className={cn(
             "absolute inset-0 pointer-events-none transition-opacity duration-500",
-            isDragActive ? "opacity-100" : "opacity-0",
+            isDragActive ? "opacity-100" : "opacity-40 group-hover:opacity-70",
           )}
           style={{
             background:
-              "radial-gradient(circle at 50% 120%, hsl(var(--aurora-1) / 0.25), transparent 60%), radial-gradient(circle at 20% 0%, hsl(var(--aurora-2) / 0.18), transparent 55%)",
+              "radial-gradient(circle at 100% 120%, hsl(var(--aurora-1) / 0.18), transparent 55%), radial-gradient(circle at 0% 0%, hsl(var(--aurora-2) / 0.12), transparent 48%)",
           }}
         />
-        <div className="relative z-10 flex flex-col items-center gap-2">
+        <div className={cn(
+          "relative z-10 flex",
+          totalFiles > 0
+            ? "items-center gap-3"
+            : "min-h-[168px] flex-col items-center justify-center text-center"
+        )}>
           <div className={cn(
-            "rounded-full bg-primary/10 flex items-center justify-center transition-all duration-500",
-            totalFiles > 0 ? "w-9 h-9" : "w-14 h-14",
-            isDragActive
-              ? "scale-125 shadow-[0_0_32px_-4px_hsl(var(--primary)/0.6)]"
-              : "group-hover:scale-110 shadow-[0_0_20px_-8px_hsl(var(--primary)/0.35)]"
+            "flex shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-105",
+            totalFiles > 0 ? "h-9 w-9" : "h-12 w-12",
+            isDragActive && "scale-110"
           )}>
-            <UploadCloud className={cn(
-              "transition-colors",
-              totalFiles > 0 ? "w-4 h-4" : "w-6 h-6",
-              isDragActive ? "text-primary" : "text-primary/70 group-hover:text-primary"
-            )} />
+            {isDragActive
+              ? <UploadCloud className={totalFiles > 0 ? "h-4 w-4" : "h-5 w-5"} />
+              : <ImagePlus className={totalFiles > 0 ? "h-4 w-4" : "h-5 w-5"} />}
           </div>
-          <p className={cn("font-display font-medium text-foreground", totalFiles > 0 ? "text-xs" : "text-sm")}>
-            {isDragActive ? "Release into the portal" : totalFiles > 0 ? "Drop more images" : "Drop product photos here"}
-          </p>
-          {totalFiles === 0 && (
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
-              200 max · png jpg webp heic
-            </p>
+
+          {totalFiles > 0 ? (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground">
+                  {isDragActive ? "Drop to add them" : "Add more photos"}
+                </p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">Drop here or browse files</p>
+              </div>
+              <span className="rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-medium text-background">
+                Browse
+              </span>
+            </>
+          ) : (
+            <>
+              <p className="mt-4 font-display text-base font-semibold text-foreground">
+                {isDragActive ? "Drop your photos here" : "Drag product photos here"}
+              </p>
+              <p className="mt-1.5 max-w-[250px] text-xs leading-relaxed text-muted-foreground">
+                One product or a full batch. We’ll keep everything editable before analysis.
+              </p>
+              <span className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[0_8px_24px_-10px_hsl(var(--primary)/0.8)]">
+                Choose photos
+              </span>
+              <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/65">
+                PNG · JPG · WEBP · HEIC · up to 200
+              </p>
+            </>
           )}
         </div>
-      </div>
+      </button>
 
       {/* Auto-grouping progress */}
       {isAutoSorting && autoGroup.isGrouping && (

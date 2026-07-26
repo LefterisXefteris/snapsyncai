@@ -3,7 +3,7 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { BrainCircuit, Download, CheckSquare, Loader2, Unplug, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, ImageDown, Send, Store, CalendarDays, XCircle, CreditCard } from "lucide-react";
+import { BrainCircuit, Download, CheckSquare, Loader2, Key, ClipboardList, Lock, Crown, Zap, PanelLeft, Instagram, Send, Store, CalendarDays, XCircle, CreditCard } from "lucide-react";
 import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
 import { useImages, usePushToShopify, useShopifyStatus, useShopifyConnect, useShopifyDisconnect, usePushToEtsy, useEtsyStatus, useEtsyConnect, useEtsyDisconnect, useAmazonStatus, useAmazonConnect, useAmazonDisconnect, usePushToAmazon, useSubscriptionStatus, useVerifySubscription, useUnlockImages, useInstagramStatus, useInstagramConnect, useInstagramDisconnect, useInstagramImport, useInstagramPost, useInstagramGenerateCaption, useInstagramOAuthConfig, useInstagramOAuthStart, usePaymentConfig, useCreateSubscriptionCheckout, useCancelSubscription } from "@/hooks/use-images";
 import { UploadZone } from "@/components/upload-zone";
@@ -29,9 +29,11 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { buildWorkspaceVariantAssignments, collectSelectedWorkspaceImages, summarizeWorkspaceVariantAssignments } from "@/lib/workspace-variant-sort";
 import { apiRequest } from "@/lib/queryClient";
-import { onAppCommand } from "@/lib/app-commands";
+import { dispatchAppCommand, onAppCommand } from "@/lib/app-commands";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Home() {
+  const isMobile = useIsMobile();
   const { data: images, isLoading } = useImages();
   const { data: shopifyStatus } = useShopifyStatus();
   const { data: etsyStatus } = useEtsyStatus();
@@ -80,10 +82,10 @@ export default function Home() {
   const uploadSectionRef = useRef<HTMLElement>(null);
   // Panel sizing constants — collapsed = comfortable sidebar, expanded =
   // wide grouping workspace so thumbnails can be inspected at a larger size.
-  const SIDEBAR_COLLAPSED_SIZE = 25;
-  const SIDEBAR_EXPANDED_SIZE = 80;
-  const SIDEBAR_COLLAPSED_MAX = 40;
-  const SIDEBAR_EXPANDED_MAX = 95;
+  const SIDEBAR_COLLAPSED_SIZE = isMobile ? 94 : 25;
+  const SIDEBAR_EXPANDED_SIZE = isMobile ? 96 : 80;
+  const SIDEBAR_COLLAPSED_MAX = isMobile ? 98 : 40;
+  const SIDEBAR_EXPANDED_MAX = isMobile ? 98 : 95;
   const hasStagedImages = stagedImageCount > 0;
   // Live size (in percent of viewport) of the sidebar panel. Drives
   // responsive thumbnail scaling inside UploadZone so images grow as the
@@ -98,7 +100,7 @@ export default function Home() {
     userDroppedThisSession.current = true;
     // Expand immediately — don't wait for the effect cycle
     sidebarPanelRef.current?.resize(SIDEBAR_EXPANDED_SIZE);
-  }, []);
+  }, [SIDEBAR_EXPANDED_SIZE]);
 
   // Collapse panel when staging empties (all uploaded or cleared).
   useEffect(() => {
@@ -106,7 +108,7 @@ export default function Home() {
       sidebarPanelRef.current?.resize(SIDEBAR_COLLAPSED_SIZE);
       userDroppedThisSession.current = false;
     }
-  }, [hasStagedImages]);
+  }, [hasStagedImages, SIDEBAR_COLLAPSED_SIZE]);
   const [instagramPostImageId, setInstagramPostImageId] = useState<number | null>(null);
   const [isVariantSorting, setIsVariantSorting] = useState(false);
   const [recentlyMergedGroupIds, setRecentlyMergedGroupIds] = useState<Set<string>>(new Set());
@@ -701,10 +703,16 @@ export default function Home() {
             </Badge>
           )}
         </div>
-        <span className="hidden md:flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground/60">
+        <button
+          type="button"
+          onClick={() => dispatchAppCommand("open-palette")}
+          data-testid="header-command-palette"
+          aria-label="Open command palette"
+          className="hidden md:flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground"
+        >
           <kbd className="px-1.5 py-0.5 rounded bg-foreground/5 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.08)]">⌘K</kbd>
           command
-        </span>
+        </button>
       </header>
 
       <div className="flex-1 min-h-0 relative">
@@ -712,134 +720,20 @@ export default function Home() {
           <ResizablePanel
             ref={sidebarPanelRef}
             defaultSize={SIDEBAR_COLLAPSED_SIZE}
-            minSize={20}
+            minSize={isMobile ? 72 : 20}
             maxSize={hasStagedImages ? SIDEBAR_EXPANDED_MAX : SIDEBAR_COLLAPSED_MAX}
             onResize={setSidebarPanelSize}
             className="flex flex-col h-full bg-card/60 shadow-[inset_-1px_0_0_0_hsl(var(--foreground)/0.05)]"
           >
             <ScrollArea className="flex-1 h-full">
-              <div className="p-4 space-y-6">
-
-                <section ref={uploadSectionRef} className="space-y-4">
-                  <h2 className="text-sm font-semibold tracking-tight">Upload Product Image</h2>
+              <div className="p-4">
+                <section ref={uploadSectionRef}>
                   <UploadZone
                     onUploadingChange={setUploadingFiles}
                     onStagedCountChange={setStagedImageCount}
                     onFreshDrop={handleFreshDrop}
                     panelSize={sidebarPanelSize}
                   />
-                </section>
-
-                <Separator className={cn(hasStagedImages && "max-w-xs")} />
-
-                <section className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
-                  <h2 className="text-xs font-semibold tracking-tight text-muted-foreground uppercase">Integrations</h2>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {shopifyStatus?.connected ? (
-                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center gap-1.5">
-                          <SiShopify className="w-3.5 h-3.5 text-[#96BF48]" /> Shopify
-                        </span>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={handleDisconnect} disabled={shopifyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-7 text-xs gap-2 px-2.5" onClick={() => setShowConnectDialog(true)}>
-                        <SiShopify className="w-3.5 h-3.5 text-[#96BF48]" /> Shopify
-                      </Button>
-                    )}
-
-                    {etsyStatus?.connected ? (
-                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center gap-1.5">
-                          <SiEtsy className="w-3.5 h-3.5 text-[#F56400]" /> Etsy
-                        </span>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={handleEtsyDisconnect} disabled={etsyDisconnect.isPending}><Unplug className="w-3 h-3" /></Button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-7 text-xs gap-2 px-2.5" onClick={() => setShowEtsyConnectDialog(true)}>
-                        <SiEtsy className="w-3.5 h-3.5 text-[#F56400]" /> Etsy
-                      </Button>
-                    )}
-
-                    {instagramStatus?.connected ? (
-                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/50 border">
-                        <span className="text-xs font-medium flex items-center gap-1.5">
-                          <SiInstagram className="w-3.5 h-3.5 text-[#E1306C]" /> @{instagramStatus.username}
-                        </span>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleInstagramImport} disabled={instagramImport.isPending} title="Import Posts"><ImageDown className="w-3 h-3" /></Button>
-                          <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={handleInstagramDisconnect} disabled={instagramDisconnect.isPending} title="Disconnect"><Unplug className="w-3 h-3" /></Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full justify-start h-7 text-xs gap-2 px-2.5" onClick={instagramOAuthConfig?.configured ? handleInstagramOAuth : () => setShowInstagramConnectDialog(true)} disabled={instagramOAuthStart.isPending}>
-                        {instagramOAuthStart.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SiInstagram className="w-3.5 h-3.5 text-[#E1306C]" />} Instagram
-                      </Button>
-                    )}
-                  </div>
-                </section>
-
-                <Separator className={cn(hasStagedImages && "max-w-xs")} />
-
-                <section className={cn("space-y-2", hasStagedImages && "max-w-xs")}>
-                  <h2 className="text-xs font-semibold tracking-tight text-muted-foreground uppercase">Subscription</h2>
-                  {isSubscribed ? (
-                    <Card className="border-amber-500/20 bg-amber-500/5">
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Crown className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="text-xs font-medium">Pro Active</span>
-                        </div>
-                        {subscriptionStatus?.currentPeriodEnd && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <CalendarDays className="w-3 h-3" />
-                            <span>Renews {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setShowCancelDialog(true)}
-                        >
-                          <XCircle className="w-3 h-3 mr-1.5" />
-                          Cancel
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card>
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Crown className="w-3.5 h-3.5" />
-                          <span className="text-xs font-medium">SnapSync AI Pro</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            onClick={() => setBillingInterval('weekly')}
-                            className={`flex flex-col items-center p-2 rounded border text-xs transition-colors ${billingInterval === 'weekly' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'}`}
-                          >
-                            <span className="font-semibold">£{weeklyPrice}/wk</span>
-                          </button>
-                          <button
-                            onClick={() => setBillingInterval('annual')}
-                            className={`flex flex-col items-center p-2 rounded border text-xs transition-colors ${billingInterval === 'annual' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:border-primary/50'}`}
-                          >
-                            <span className="font-semibold">£{annualPrice}/yr</span>
-                          </button>
-                        </div>
-                        <Button
-                          className="w-full h-7 text-xs"
-                          size="sm"
-                          onClick={() => setShowSubscribeDialog(true)}
-                          disabled={createSubscriptionCheckout.isPending}
-                        >
-                          <CreditCard className="w-3 h-3 mr-1.5" />
-                          {billingInterval === 'annual' ? `£${annualPrice}/yr` : `£${weeklyPrice}/wk`}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
                 </section>
               </div>
             </ScrollArea>
@@ -856,7 +750,7 @@ export default function Home() {
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={75}>
+          <ResizablePanel defaultSize={isMobile ? 6 : 75}>
             <div className="flex flex-col h-full bg-transparent overflow-hidden relative">
 
               <div className="p-3 bg-background/60 backdrop-blur-xl z-10 sticky top-0 shadow-[inset_0_-1px_0_0_hsl(var(--foreground)/0.05)]">
