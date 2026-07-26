@@ -17,6 +17,7 @@ import { lazy, Suspense, useEffect, useRef } from "react";
 const Home = lazy(() => import("@/pages/Home"));
 const Landing = lazy(() => import("@/pages/Landing"));
 const ProductDetails = lazy(() => import("@/pages/ProductDetails"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CommandPalette = lazy(() =>
   import("@/components/command-palette").then((m) => ({ default: m.CommandPalette })),
@@ -66,6 +67,7 @@ function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/inventory" component={Inventory} />
       <Route path="/product/:id" component={ProductDetails} />
       <Route component={NotFound} />
     </Switch>
@@ -96,6 +98,7 @@ function useIdlePreload() {
   useEffect(() => {
     const preload = () => {
       import("@/pages/ProductDetails");
+      import("@/pages/Inventory");
       import("@/components/command-palette");
     };
     if (typeof window.requestIdleCallback === "function") {

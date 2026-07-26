@@ -30,6 +30,13 @@ import {
   verifyShopifyHmac,
   verifyShopifyOAuthState,
 } from "./shopifyOAuth";
+import { registerInventoryRoutes } from "./inventoryRoutes";
+import { disableInventoryForUser, registerPublishedShopifyProduct } from "./inventoryService";
+import {
+  createShopifyProductGraphql,
+  encryptShopifyToken,
+  getShopifyShopIdentity,
+} from "./shopifyAdmin";
 
 
 const MIN_IMAGE_COUNT = 1;
@@ -859,158 +866,19 @@ function isDatabaseConnectionLimitError(error: unknown) {
 
 async function pushProductToShopify(
   image: any,
-  accessToken: string,
-  shopDomain: string,
-  imageBuffer?: Buffer,
-  viewImages?: { image: any; buffer?: Buffer }[]
-): Promise<{ shopifyProductId?: string; error?: string }> {
-  const apiUrl = `https://${shopDomain}/admin/api/2024-01/products.json`;
-
+  connection: any,
+  viewImages?: { image: any; buffer?: Buffer }[],
+): Promise<{
+  shopifyProductId?: string;
+  variants?: Array<{ id: string; sku: string | null; inventoryItem: { id: string; tracked: boolean } }>;
+  error?: string;
+}> {
   try {
-    const imageVariants = Array.isArray(image.variants) ? image.variants as { name: string; values: string[] }[] : [];
-
-    let shopifyVariants: any[] = [];
-    const shopifyOptions: any[] = [];
-
-    if (imageVariants.length > 0) {
-      shopifyOptions.push(...imageVariants.map(v => ({
-        name: v.name,
-        values: v.values,
-      })));
-
-      const combos = imageVariants.reduce<string[][]>((acc, v) => {
-        if (acc.length === 0) return v.values.map(val => [val]);
-        return acc.flatMap(combo => v.values.map(val => [...combo, val]));
-      }, []);
-
-      shopifyVariants = combos.map(combo => {
-        const variant: any = {
-          price: image.price || "0.00",
-          inventory_management: "shopify",
-        };
-        combo.forEach((val, i) => {
-          variant[`option${i + 1}`] = val;
-        });
-        return variant;
-      });
-    } else {
-      shopifyVariants = [{
-        price: image.price || "0.00",
-        inventory_management: "shopify",
-      }];
-    }
-
-    const productPayload: any = {
-      product: {
-        title: image.title || image.originalName,
-        body_html: image.description || '',
-        product_type: image.productType || image.category || "Other",
-        tags: (image.tags || []).join(", "),
-        variants: shopifyVariants,
-        status: "draft",
-        metafields_global_title_tag: image.seoTitle || image.title || "",
-        metafields_global_description_tag: image.seoDescription || "",
-      }
+    const product = await createShopifyProductGraphql({ connection, image, viewImages });
+    return {
+      shopifyProductId: product.id,
+      variants: product.variants.nodes,
     };
-
-    if (shopifyOptions.length > 0) {
-      productPayload.product.options = shopifyOptions;
-    }
-
-    // Step 1: Create product WITHOUT images so we can get variant IDs first
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
-      },
-      body: JSON.stringify(productPayload),
-    });
-
-    if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After');
-      const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
-      await delay(waitMs);
-      return pushProductToShopify(image, accessToken, shopDomain, imageBuffer, viewImages);
-    }
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("Shopify API error:", response.status, errorBody);
-      let detail = "";
-      try {
-        const parsed = JSON.parse(errorBody);
-        detail = parsed.errors ? ` — ${JSON.stringify(parsed.errors)}` : (parsed.error ? ` — ${parsed.error}` : "");
-      } catch { /* not JSON */ }
-      return { error: `Shopify API error ${response.status}${detail}` };
-    }
-
-    const result = await response.json();
-    const productId = result.product.id;
-    const createdVariants: any[] = result.product.variants || [];
-
-    // Find which option position is "Color" (option1, option2, etc.)
-    const colorOptionIdx = shopifyOptions.findIndex((o: any) => o.name === "Color");
-    const colorOptionKey = colorOptionIdx >= 0 ? `option${colorOptionIdx + 1}` : null;
-
-    // Helper: get variant_ids for a given color value
-    const variantIdsForColor = (color: string | null): number[] => {
-      if (!colorOptionKey || !color) return [];
-      return createdVariants
-        .filter(v => v[colorOptionKey]?.toLowerCase() === color.toLowerCase())
-        .map(v => v.id);
-    };
-
-    // Step 2: Add images one-by-one with variant_ids for their color
-    const imagesApiUrl = `https://${shopDomain}/admin/api/2024-01/products/${productId}/images.json`;
-
-    // Derive primary color: from imageColors[0], detectedColor, or the Color variant value
-    const colorVariant = imageVariants.find((v: any) => v.name === "Color");
-    const primaryColor = (image.aiData as any)?.imageColors?.[0]
-      || (image.aiData as any)?.detectedColor
-      || (colorVariant?.values?.length === 1 ? colorVariant.values[0] : null);
-    const allImagesData: { buffer: Buffer | undefined; color: string | null; alt: string }[] = [
-      { buffer: imageBuffer, color: primaryColor, alt: image.altText || image.title || "" },
-      ...(viewImages || []).map(v => ({
-        buffer: v.buffer,
-        color: (v.image.aiData as any)?.detectedColor || null,
-        alt: v.image.altText || v.image.originalName || "",
-      })),
-    ];
-
-    for (const img of allImagesData) {
-      if (!img.buffer) continue;
-      const variantIds = variantIdsForColor(img.color);
-      const imagePayload: any = {
-        image: {
-          attachment: img.buffer.toString('base64'),
-          alt: img.alt,
-        }
-      };
-      if (variantIds.length > 0) {
-        imagePayload.image.variant_ids = variantIds;
-      }
-      const imgRes = await fetch(imagesApiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Shopify-Access-Token": accessToken,
-        },
-        body: JSON.stringify(imagePayload),
-      });
-      if (imgRes.status === 429) {
-        const waitMs = parseInt(imgRes.headers.get('Retry-After') || '2') * 1000;
-        await delay(waitMs);
-        // Retry this image
-        await fetch(imagesApiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
-          body: JSON.stringify(imagePayload),
-        });
-      }
-    }
-
-    return { shopifyProductId: String(productId) };
   } catch (error: any) {
     console.error("Shopify push error:", error);
     return { error: error.message || "Failed to push to Shopify" };
@@ -1202,6 +1070,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   } else {
     console.log("⚠️  DEV_BYPASS_AUTH enabled — Clerk auth is disabled, using dev user");
   }
+
+  registerInventoryRoutes(app, { requireAuth, getUserId });
 
   app.get("/api/auth/clerk-config", (_req, res) => {
     const publishableKey = process.env.CLERK_PUBLISHABLE_KEY;
@@ -2209,7 +2079,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/images/group/:groupId", requireAuth(), async (req, res) => {
     try {
-      const groupId = req.params.groupId;
+      const groupId = String(req.params.groupId);
       const sessionId = getUserId(req);
       const count = await storage.deleteImagesByGroupId(groupId, sessionId);
       if (count === 0) {
@@ -2304,20 +2174,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const requiredScopes = scopes.split(",").map(scope => scope.trim()).filter(Boolean);
       const missingScopes = requiredScopes.filter(scope => !grantedScopes.has(scope));
       if (missingScopes.length > 0) {
-        return fail("missing_write_products");
+        return fail("missing_inventory_scopes");
       }
 
-      const shopResponse = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
-        headers: { "X-Shopify-Access-Token": accessToken },
+      const shopIdentity = await getShopifyShopIdentity({
+        shopDomain: shop,
+        accessToken,
       });
-      const shopData = shopResponse.ok ? await shopResponse.json() : {};
-      const shopName = shopData.shop?.name || shop.replace(".myshopify.com", "");
+      const shopName = shopIdentity.name || shop.replace(".myshopify.com", "");
 
       await storage.upsertShopifyConnection({
         sessionId: stateResult.userId,
         shopDomain: shop,
-        accessToken,
+        accessToken: encryptShopifyToken(accessToken),
         shopName,
+        grantedScopes: Array.from(grantedScopes),
       });
 
       const redirect = new URL("/", appBaseUrl);
@@ -2339,22 +2210,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const domain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
       const fullDomain = domain.includes('.myshopify.com') ? domain : `${domain}.myshopify.com`;
 
-      const shopResponse = await fetch(`https://${fullDomain}/admin/api/2024-01/shop.json`, {
-        headers: { 'X-Shopify-Access-Token': accessToken },
+      const shopIdentity = await getShopifyShopIdentity({
+        shopDomain: fullDomain,
+        accessToken,
       });
-
-      if (!shopResponse.ok) {
-        return res.status(400).json({ message: "Could not connect to Shopify. Please check your store URL and access token." });
-      }
-
-      const shopData = await shopResponse.json();
-      const shopName = shopData.shop?.name || fullDomain.replace('.myshopify.com', '');
+      const shopName = shopIdentity.name || fullDomain.replace('.myshopify.com', '');
 
       await storage.upsertShopifyConnection({
         sessionId: getUserId(req),
         shopDomain: fullDomain,
-        accessToken,
+        accessToken: encryptShopifyToken(accessToken),
         shopName,
+        grantedScopes: shopIdentity.grantedScopes,
       });
 
       res.json({ connected: true, shopName, shopDomain: fullDomain });
@@ -2366,7 +2233,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/shopify/disconnect", requireAuth(), async (req, res) => {
     try {
-      await storage.deleteShopifyConnection(getUserId(req));
+      const userId = getUserId(req);
+      await disableInventoryForUser(userId);
+      await storage.deleteShopifyConnection(userId);
       res.json({ disconnected: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to disconnect" });
@@ -2381,6 +2250,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           connected: true,
           shopName: connection.shopName || connection.shopDomain,
           shopDomain: connection.shopDomain,
+          grantedScopes: connection.grantedScopes || [],
+          inventoryReady: [
+            "read_products",
+            "write_products",
+            "read_inventory",
+            "write_inventory",
+            "read_locations",
+          ].every(scope => connection.grantedScopes?.includes(scope)),
         });
       }
       return res.json({ connected: false });
@@ -2400,9 +2277,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!connection) {
         return res.status(400).json({ message: "Shopify not connected. Please connect your store first." });
       }
-      const accessToken = connection.accessToken;
-      const shopDomain = connection.shopDomain;
-
       const selectedImages = await storage.getImagesByIds(ids);
       const imagesToPush = selectedImages.filter(img => img.sessionId === getUserId(req));
       if (imagesToPush.length === 0) {
@@ -2487,16 +2361,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
 
         const fullPrimary = (fullImageMap.get(primary.id) || primary) as any;
-        const buffer = await loadImageBuffer(fullPrimary);
         const viewData = await Promise.all(views.map(async v => {
           const fullView = (fullImageMap.get(v.id) || v) as any;
           return {
             image: fullView,
-            buffer: await loadImageBuffer(fullView) ?? undefined,
           };
         }));
-        const result = await pushProductToShopify(fullPrimary, accessToken, shopDomain, buffer || undefined, viewData);
+        const result = await pushProductToShopify(fullPrimary, connection, viewData);
         if (result.shopifyProductId) {
+          await registerPublishedShopifyProduct({
+            userId: getUserId(req),
+            image: fullPrimary,
+            productId: result.shopifyProductId,
+            variants: result.variants || [],
+          });
           // Batch-update all images in the group in one query
           if (primary.productGroupId) {
             await storage.updateImagesByGroupId(primary.productGroupId, {

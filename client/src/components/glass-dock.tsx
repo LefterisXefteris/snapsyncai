@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { ClipboardList, Command as CommandIcon, Crown, ShoppingCart, Sparkles } from "lucide-react";
+import { Boxes, ClipboardList, Command as CommandIcon, Crown, ShoppingCart, Sparkles } from "lucide-react";
 import { SiShopify, SiEtsy, SiInstagram } from "react-icons/si";
 import {
   useAmazonStatus,
@@ -112,6 +112,21 @@ export function GlassDock() {
         ))}
 
         <DockDivider />
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              data-testid="dock-inventory"
+              onClick={() => navigate("/inventory")}
+              className="relative w-8 h-8 rounded-full flex items-center justify-center hover:bg-foreground/5 transition-colors"
+            >
+              <Boxes className="w-4 h-4 text-primary" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="font-mono text-[10px] uppercase tracking-wider">
+            inventory autopilot
+          </TooltipContent>
+        </Tooltip>
 
         {/* Review queue */}
         <Tooltip>

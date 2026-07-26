@@ -221,6 +221,72 @@ export const api = {
       path: '/api/instagram/generate-caption' as const,
     },
   },
+  inventory: {
+    locations: {
+      method: 'GET' as const,
+      path: '/api/inventory/locations' as const,
+    },
+    setup: {
+      method: 'POST' as const,
+      path: '/api/inventory/setup' as const,
+    },
+    enable: {
+      method: 'POST' as const,
+      path: '/api/inventory/setup/:importId/enable' as const,
+    },
+    importStatus: {
+      method: 'GET' as const,
+      path: '/api/inventory/imports/:importId' as const,
+    },
+    overview: {
+      method: 'GET' as const,
+      path: '/api/inventory/overview' as const,
+    },
+    items: {
+      method: 'GET' as const,
+      path: '/api/inventory/items' as const,
+    },
+    adjust: {
+      method: 'POST' as const,
+      path: '/api/inventory/items/:id/adjustments' as const,
+    },
+    policy: {
+      method: 'PATCH' as const,
+      path: '/api/inventory/items/:id/policy' as const,
+    },
+    ledger: {
+      method: 'GET' as const,
+      path: '/api/inventory/items/:id/ledger' as const,
+    },
+    bundles: {
+      method: 'GET' as const,
+      path: '/api/inventory/bundles' as const,
+    },
+    createBundle: {
+      method: 'POST' as const,
+      path: '/api/inventory/bundles' as const,
+    },
+    updateBundle: {
+      method: 'PUT' as const,
+      path: '/api/inventory/bundles/:bundleItemId' as const,
+    },
+    deleteBundle: {
+      method: 'DELETE' as const,
+      path: '/api/inventory/bundles/:bundleItemId' as const,
+    },
+    notifications: {
+      method: 'GET' as const,
+      path: '/api/inventory/notifications' as const,
+    },
+    markNotificationRead: {
+      method: 'POST' as const,
+      path: '/api/inventory/notifications/:id/read' as const,
+    },
+    reconcile: {
+      method: 'POST' as const,
+      path: '/api/inventory/reconcile' as const,
+    },
+  },
   shopify: {
     status: {
       method: 'GET' as const,
@@ -230,6 +296,8 @@ export const api = {
           connected: z.boolean(),
           shopName: z.string().optional(),
           shopDomain: z.string().optional(),
+          grantedScopes: z.array(z.string()).optional(),
+          inventoryReady: z.boolean().optional(),
         }),
       },
     },

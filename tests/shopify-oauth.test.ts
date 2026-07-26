@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 
 import {
+  DEFAULT_SHOPIFY_SCOPES,
   createShopifyOAuthState,
   getShopifyOAuthConfig,
   isValidShopifyDomain,
@@ -10,6 +11,13 @@ import {
   verifyShopifyHmac,
   verifyShopifyOAuthState,
 } from "../server/shopifyOAuth.ts";
+
+test("Shopify OAuth requests the Inventory Autopilot scopes", () => {
+  assert.equal(
+    DEFAULT_SHOPIFY_SCOPES,
+    "read_products,write_products,read_inventory,write_inventory,read_locations",
+  );
+});
 
 function signShopifyQuery(query: Record<string, string>, secret: string) {
   const message = Object.entries(query)

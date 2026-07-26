@@ -12,6 +12,7 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 import { pool } from './db';
+export { processInventoryQueueMessage } from './inventoryService';
 
 const app = express();
 const httpServer = createServer(app);

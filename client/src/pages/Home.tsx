@@ -142,6 +142,7 @@ export default function Home() {
         invalid_shop: "Shopify sent an invalid shop domain. Please try connecting again.",
         invalid_hmac: "Shopify callback verification failed. Check the app callback URL and API secret.",
         missing_write_products: "SnapSync AI needs Shopify's write_products permission to create draft products.",
+        missing_inventory_scopes: "Reconnect Shopify and approve product, inventory, and location access to enable Inventory Autopilot.",
         token_exchange_failed: "Shopify authorization succeeded, but SnapSync AI could not exchange the code for an access token.",
         not_configured: "Shopify OAuth is not configured for this deployment.",
       };

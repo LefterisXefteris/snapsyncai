@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-export const DEFAULT_SHOPIFY_SCOPES = "write_products";
+export const DEFAULT_SHOPIFY_SCOPES = "read_products,write_products,read_inventory,write_inventory,read_locations";
 export const DEFAULT_APP_BASE_URL = "https://snapsyncai.co.uk";
 
 const SHOPIFY_SHOP_DOMAIN_RE = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;

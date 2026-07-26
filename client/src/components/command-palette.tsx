@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Download,
   Crown,
+  Boxes,
   Package,
   Home as HomeIcon,
   ShoppingCart,
@@ -109,6 +110,10 @@ export function CommandPalette() {
           <CommandItem onSelect={() => run(() => navigate("/"))} data-testid="cmd-go-home">
             <HomeIcon />
             Go to workspace
+          </CommandItem>
+          <CommandItem onSelect={() => run(() => navigate("/inventory"))} data-testid="cmd-inventory">
+            <Boxes />
+            Inventory Autopilot
           </CommandItem>
           <CommandItem onSelect={() => runCommand("subscribe")} data-testid="cmd-billing">
             <Crown />
