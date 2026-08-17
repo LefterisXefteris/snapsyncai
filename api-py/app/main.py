@@ -28,6 +28,7 @@ from app.routers import (
     oauth,
     webhooks,
 )
+from app.services import catalogue_cache
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ async def lifespan(_app: FastAPI):
     get_engine()
     logger.info("API starting (environment=%s)", settings.environment)
     yield
+    await catalogue_cache.close()
     await dispose_engine()
 
 

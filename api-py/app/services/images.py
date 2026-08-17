@@ -10,6 +10,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.image import Image
+from app.services import catalogue_cache
 
 LIST_COLUMNS = (
     Image.id,
@@ -136,7 +137,13 @@ async def get_image_group(session: AsyncSession, image_id: int, session_id: str)
 
 
 async def update_images_by_group_id(session: AsyncSession, group_id: str, updates: dict) -> None:
+    owner = await session.execute(
+        select(Image.session_id).where(Image.product_group_id == group_id).limit(1)
+    )
+    row = owner.one_or_none()
     await session.execute(update(Image).where(Image.product_group_id == group_id).values(**updates))
+    if row is not None:
+        await catalogue_cache.invalidate(row.session_id)
 
 
 async def persist_product_facts(
@@ -163,11 +170,17 @@ async def update_image(session: AsyncSession, image_id: int, updates: dict) -> I
         return await get_image(session, image_id)
     await session.execute(update(Image).where(Image.id == image_id).values(**payload))
     await session.flush()
-    return await get_image(session, image_id)
+    updated = await get_image(session, image_id)
+    if updated is not None:
+        await catalogue_cache.invalidate(updated.session_id)
+    return updated
 
 
 async def delete_image(session: AsyncSession, image_id: int) -> None:
+    image = await get_image(session, image_id)
     await session.execute(delete(Image).where(Image.id == image_id))
+    if image is not None:
+        await catalogue_cache.invalidate(image.session_id)
 
 
 async def delete_images_by_group_id(session: AsyncSession, group_id: str, session_id: str) -> int:
@@ -176,7 +189,10 @@ async def delete_images_by_group_id(session: AsyncSession, group_id: str, sessio
         .where(Image.product_group_id == group_id, Image.session_id == session_id)
         .returning(Image.id)
     )
-    return len(result.all())
+    count = len(result.all())
+    if count:
+        await catalogue_cache.invalidate(session_id)
+    return count
 
 
 async def create_image(session: AsyncSession, values: dict) -> Image:
@@ -184,6 +200,7 @@ async def create_image(session: AsyncSession, values: dict) -> Image:
     session.add(image)
     await session.flush()
     await session.refresh(image)
+    await catalogue_cache.invalidate(image.session_id)
     return image
 
 

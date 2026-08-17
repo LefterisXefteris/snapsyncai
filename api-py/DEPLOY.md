@@ -9,8 +9,10 @@ at `https://api.snapsyncai.co.uk`. Fly is not a deploy target.
 
 ## Local
 
-`npm run dev` starts Postgres, FastAPI (`:8000`), and Vite (`:5001`). Every
+`npm run dev` starts Postgres, Redis, FastAPI (`:8000`), and Vite (`:5001`). Every
 `/api` request from the SPA is proxied to FastAPI. Express is not started.
+The catalogue cache is on when `REDIS_URL` is set (dev.sh defaults it to local
+Redis). Unset or empty `REDIS_URL` keeps `GET /api/images` on Postgres only.
 
 ```bash
 curl -s http://localhost:5001/api/health
@@ -26,6 +28,7 @@ Set these on the service (same production values the product already uses):
 
 ```text
 DATABASE_URL
+REDIS_URL
 CLERK_SECRET_KEY
 CLERK_PUBLISHABLE_KEY
 STRIPE_SECRET_KEY
@@ -44,6 +47,10 @@ ENVIRONMENT=production
 ```
 
 `DATABASE_URL` must be the **same database the product already uses**.
+
+`REDIS_URL` is optional. Add Railway's Redis plugin and paste its URL to cache
+the Products catalogue (`GET /api/images`). Unset or a down Redis fails open to
+Postgres — the API still boots and the catalogue still loads.
 
 `APP_BASE_URL` is load-bearing: it becomes Clerk's `authorized_parties`. Use the
 **www** form — production canonicalises there. `app/config.py` accepts both

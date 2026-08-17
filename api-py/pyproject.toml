@@ -21,6 +21,7 @@ dependencies = [
     "supabase>=2.11",
     "resend>=2.6",
     "sentry-sdk[fastapi]>=2.20",
+    "redis>=8.1.0",
 ]
 
 [dependency-groups]

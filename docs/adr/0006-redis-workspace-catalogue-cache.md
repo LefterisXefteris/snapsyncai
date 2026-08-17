@@ -1,0 +1,3 @@
+# Redis cache for the workspace catalogue
+
+The Products page loads the seller's workspace catalogue from Postgres (`GET /api/images`). We cache that JSON in Redis, one key per seller, so repeat reads skip the unpaginated select. Writes (create, update, delete, group, facts, Shopify push) delete the key; a 10-minute TTL is only a backstop. Redis is optional: unset `REDIS_URL` or a down Redis fails open to Postgres. Local Redis is a compose service; production is Railway Redis. We rejected caching the Channel catalogue (Import is a different job), caching `GET /api/images/:id/group`, TTL-only freshness, and failing the API when Redis is missing.

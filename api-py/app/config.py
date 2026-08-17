@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # --- Core ---------------------------------------------------------------
     database_url: str
     database_pool_max: int = 10
+    # Optional. Unset or a down Redis: GET /api/images reads Postgres only.
+    redis_url: str | None = None
     environment: Literal["development", "production", "test"] = "development"
     port: int = 8000
     app_base_url: str = "http://localhost:5001"

@@ -22,7 +22,7 @@ from app.schemas.image import (
     PushResponse,
     PushResult,
 )
-from app.services import connections
+from app.services import catalogue_cache, connections
 from app.services import images as store
 from app.services.product_facts import (
     confirm_facts,
@@ -53,13 +53,26 @@ _LIST_EXCLUDE = {
 }
 
 
+def _catalogue_payload(items: list[ImageListOut]) -> list[dict]:
+    return [
+        item.model_dump(by_alias=True, mode="json", exclude=_LIST_EXCLUDE) for item in items
+    ]
+
+
 @router.get("/api/images", response_model=list[ImageListOut], response_model_exclude=_LIST_EXCLUDE)
-async def list_images(user_id: CurrentUser, session: SessionDep) -> list[ImageListOut]:
+async def list_images(
+    user_id: CurrentUser, session: SessionDep
+) -> list[ImageListOut] | JSONResponse:
+    cached = await catalogue_cache.get(user_id)
+    if cached is not None:
+        return JSONResponse(content=cached)
     try:
         rows = await store.list_images(session, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch images") from None
-    return [ImageListOut.model_validate(row) for row in rows]
+    items = [ImageListOut.model_validate(row) for row in rows]
+    await catalogue_cache.put(user_id, _catalogue_payload(items))
+    return items
 
 
 @router.get(

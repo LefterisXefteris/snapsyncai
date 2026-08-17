@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# Start the local stack: Postgres, FastAPI, and Vite.
+# Start the local stack: Postgres, Redis, FastAPI, and Vite.
 #
 #   postgres   docker, host port 5433
+#   redis      docker, host port 6379
 #   api        FastAPI                                    http://localhost:8000
 #   web        Vite SPA; every /api request proxied to FastAPI
 #                                                         http://localhost:5001
@@ -59,6 +60,12 @@ if [ "$SKIP_DB" != "1" ]; then
 
   info "starting postgres"
   docker compose up -d postgres >/dev/null
+  redis_started=0
+  if docker compose up -d redis >/dev/null; then
+    redis_started=1
+  else
+    warn "redis did not start — catalogue cache off until it does"
+  fi
 
   printf '%s' "${DIM}waiting for postgres${OFF}"
   for _ in $(seq 1 30); do
@@ -72,6 +79,30 @@ if [ "$SKIP_DB" != "1" ]; then
 
   docker compose exec -T postgres pg_isready -U snapsync -d snapsync >/dev/null 2>&1 \
     || fatal "postgres did not become ready in 30s — check: docker compose logs postgres"
+
+  if [ "$redis_started" = "1" ]; then
+    printf '%s' "${DIM}waiting for redis${OFF}"
+    redis_ready=0
+    for _ in $(seq 1 30); do
+      if docker compose exec -T redis redis-cli ping >/dev/null 2>&1; then
+        printf '\r%s\r' "                          "
+        info "redis ready on 6379"
+        redis_ready=1
+        break
+      fi
+      printf '.'; sleep 1
+    done
+    if [ "$redis_ready" != "1" ]; then
+      printf '\r%s\r' "                          "
+      warn "redis did not become ready — GET /api/images will use Postgres"
+    fi
+  fi
+
+  # Local default so the catalogue cache is on without editing .env.local.
+  # An explicit empty REDIS_URL still means Postgres-only.
+  if [ -z "${REDIS_URL+x}" ]; then
+    export REDIS_URL="redis://127.0.0.1:6379/0"
+  fi
 
   info "applying migrations (alembic)"
   (cd api-py && uv run alembic upgrade head 2>&1 | prefix "${DIM}[alembic]${OFF}")

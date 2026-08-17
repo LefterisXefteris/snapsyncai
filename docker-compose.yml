@@ -1,12 +1,15 @@
-# Local Postgres for development and tests.
+# Local Postgres and Redis for development and tests.
 #
-# Production runs on Supabase; this only replaces the database for local work so you
-# are never running migrations or tests against live data. Supabase Storage is a
-# separate dependency and is not stubbed here — image uploads still need real
-# SUPABASE_URL / SUPABASE_ANON_KEY, or they fail at call time (nothing else breaks).
+# Production Postgres is Supabase; production Redis is a Railway plugin. This compose
+# file only replaces those for local work so you are never pointing migrations, tests,
+# or the catalogue cache at live data. Supabase Storage is a separate dependency and
+# is not stubbed here — image uploads still need real SUPABASE_URL / SUPABASE_ANON_KEY,
+# or they fail at call time (nothing else breaks).
 #
 #   docker compose up -d
 #   cd api-py && DATABASE_URL=... uv run alembic upgrade head
+#
+# Redis is optional: if REDIS_URL is unset, GET /api/images hits Postgres only.
 #
 services:
   postgres:
@@ -29,5 +32,20 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: snapsyncai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - snapsyncai-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   snapsyncai-pgdata:
+  snapsyncai-redis:
