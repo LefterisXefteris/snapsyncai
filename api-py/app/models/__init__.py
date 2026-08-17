@@ -1,4 +1,4 @@
-"""SQLModel tables — the Python port of `shared/schema.ts`.
+"""SQLModel tables for the core loop.
 
 Importing this package registers every table on `SQLModel.metadata`, which is what
 `alembic/env.py` targets. Any new model must be re-exported here or Alembic will not see

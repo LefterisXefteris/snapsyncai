@@ -1,4 +1,4 @@
-import type { Image } from "@shared/schema";
+import type { Image } from "@/lib/image";
 
 export const EU_FIBRE_NAMES = [
   "cotton",

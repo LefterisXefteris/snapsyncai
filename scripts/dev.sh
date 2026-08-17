@@ -7,8 +7,7 @@
 #   web        Vite SPA; every /api request proxied to FastAPI
 #                                                         http://localhost:5001
 #
-# Express is not started. Production Vercel still builds from server/ until
-# Railway cutover.
+# Express is not started. Production /api is FastAPI on Railway.
 #
 # Ctrl-C stops the servers. Postgres is left running (it holds your data); stop it
 # with `docker compose down`.

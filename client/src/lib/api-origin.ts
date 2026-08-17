@@ -1,8 +1,8 @@
 /**
  * Single seam for SPA API URLs.
  *
- * Unset (local Vite proxy and current production Express): relative `/api/...`.
- * Set to `https://api.snapsyncai.co.uk` at Railway cutover: absolute URLs.
+ * Unset (local Vite proxy): relative `/api/...`.
+ * Set to `https://api.snapsyncai.co.uk`: absolute URLs to Railway.
  */
 function viteApiOrigin(): string | undefined {
   const value = import.meta.env?.VITE_API_ORIGIN;

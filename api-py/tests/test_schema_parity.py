@@ -1,12 +1,9 @@
-"""Assert the SQLModel port matches `shared/schema.ts` for the core-loop tables.
+"""SQLModel tables that remain after Express/`shared/` were deleted.
 
-Kept tables: images, shopify_connections, paid_sessions, subscriptions, user_credits.
-Dropped Autopilot/chat tables are not modelled and are not required from
-`migrations/0001_inventory_autopilot.sql`.
+Alembic is the schema source of truth. These checks guard the live core-loop
+tables the SPA still reads: images, shopify_connections, paid_sessions,
+subscriptions, user_credits.
 """
-
-import re
-from pathlib import Path
 
 from sqlalchemy import Column
 from sqlalchemy.dialects import postgresql
@@ -22,50 +19,60 @@ EXPECTED_TABLES = {
     "user_credits",
 }
 
+# Known-good literals from the live images table (not derived from SQLModel).
+IMAGE_COLUMNS = {
+    "id",
+    "original_name",
+    "mime_type",
+    "size",
+    "image_data",
+    "storage_url",
+    "title",
+    "description",
+    "price",
+    "category",
+    "main_category",
+    "product_type",
+    "tags",
+    "seo_title",
+    "seo_description",
+    "alt_text",
+    "aeo_faqs",
+    "aeo_snippet",
+    "variants",
+    "compare_at_price",
+    "cost_per_item",
+    "sku",
+    "barcode",
+    "track_quantity",
+    "inventory_quantity",
+    "media_gallery",
+    "collections",
+    "shopify_product_id",
+    "shopify_status",
+    "payment_status",
+    "product_context",
+    "brand_tone",
+    "ai_data",
+    "product_facts",
+    "product_group_id",
+    "session_id",
+    "created_at",
+}
+
 
 def _pg_type(column: Column) -> str:
     """The type as Postgres will see it — `str(ARRAY(Text))` only yields 'ARRAY'."""
     return column.type.compile(dialect=postgresql.dialect()).upper()
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_TS = REPO_ROOT / "shared" / "schema.ts"
-
-_TABLE_RE = re.compile(r'pgTable\(\s*"(?P<table>\w+)"\s*,\s*\{(?P<body>.*?)\n\}', re.DOTALL)
-_COLUMN_RE = re.compile(r'^\s{2}\w+:\s*\w+\("(?P<column>\w+)"\)', re.MULTILINE)
-
-
-def parse_drizzle_schema() -> dict[str, set[str]]:
-    source = SCHEMA_TS.read_text()
-    return {
-        m.group("table"): set(_COLUMN_RE.findall(m.group("body")))
-        for m in _TABLE_RE.finditer(source)
-    }
-
-
-DRIZZLE = parse_drizzle_schema()
-DRIZZLE_CORE = {name: cols for name, cols in DRIZZLE.items() if name in EXPECTED_TABLES}
-
-
-def test_drizzle_schema_was_parsed() -> None:
-    """Guard the parser itself — a silent regex failure would make everything below vacuous."""
-    assert DRIZZLE_CORE, "expected core-loop pgTable definitions"
-    assert "images" in DRIZZLE_CORE
-    assert "session_id" in DRIZZLE_CORE["images"]
-
-
 def test_modelled_tables_are_the_core_loop() -> None:
     assert set(SQLModel.metadata.tables) == EXPECTED_TABLES
 
 
-def test_every_kept_drizzle_table_has_a_model() -> None:
-    assert set(DRIZZLE_CORE) == EXPECTED_TABLES
-
-
-def test_columns_match_drizzle() -> None:
-    for table in sorted(EXPECTED_TABLES):
-        model_columns = {c.name for c in SQLModel.metadata.tables[table].columns}
-        assert model_columns == DRIZZLE_CORE[table], table
+def test_images_columns_match_the_live_table() -> None:
+    model_columns = {c.name for c in SQLModel.metadata.tables["images"].columns}
+    assert model_columns == IMAGE_COLUMNS
 
 
 class TestBehaviouralConstraints:
@@ -96,7 +103,6 @@ class TestImageContract:
         assert _pg_type(SQLModel.metadata.tables["images"].columns["price"]) == "NUMERIC"
 
     def test_boot_time_indexes_are_declared(self) -> None:
-        """Created by `runAppMigrations()` in server/index.ts, not by any migration file."""
         names = {i.name for i in SQLModel.metadata.tables["images"].indexes}
         assert names == {
             "idx_images_session_id",

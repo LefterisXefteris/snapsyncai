@@ -2,30 +2,7 @@
     "installCommand": "pnpm install --no-frozen-lockfile",
     "buildCommand": "npm run build",
     "outputDirectory": "dist/public",
-    "functions": {
-        "api/inventory-worker.js": {
-            "maxDuration": 60,
-            "experimentalTriggers": [
-                {
-                    "type": "queue/v2beta",
-                    "topic": "inventory-autopilot",
-                    "retryAfterSeconds": 60,
-                    "initialDelaySeconds": 0
-                }
-            ]
-        }
-    },
-    "crons": [
-        {
-            "path": "/api/inventory/cron",
-            "schedule": "0 3 * * *"
-        }
-    ],
     "rewrites": [
-        {
-            "source": "/api/(.*)",
-            "destination": "/api/index.js"
-        },
         {
             "source": "/(.*)",
             "destination": "/index.html"

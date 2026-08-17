@@ -7,8 +7,8 @@ npm run dev
 ```
 
 Starts Postgres (Docker), FastAPI on `:8000`, and Vite on `:5001`. Every `/api`
-request from the SPA is proxied to FastAPI. Express is not started; it remains
-in the repo for the production Vercel API until Railway cutover.
+request from the SPA is proxied to FastAPI. Express is gone; production `/api`
+is FastAPI on Railway (`https://api.snapsyncai.co.uk`).
 
 ```bash
 curl -s http://localhost:5001/api/health
@@ -16,7 +16,11 @@ curl -s http://localhost:5001/api/health
 ```
 
 Copy `.env.example` to `.env.local` if you do not already have one. Schema is
-applied with Alembic (`api-py`), not `npm run db:push`.
+applied with Alembic (`api-py`).
+
+```bash
+cd api-py && uv run alembic upgrade head
+```
 
 ## Shopify OAuth
 
@@ -32,16 +36,8 @@ CONNECTION_ENCRYPTION_KEY="a high-entropy secret used for AES-256-GCM token encr
 
 `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET` are also accepted for older deployments, but prefer the `SHOPIFY_API_*` names for new setup.
 
-In the Shopify app dashboard, set the app URL to `https://snapsyncai.co.uk` and add this allowed redirection URL:
+In the Shopify app dashboard, set the app URL to `https://api.snapsyncai.co.uk` and add this allowed redirection URL:
 
 ```text
-https://snapsyncai.co.uk/api/shopify/oauth/callback
-```
-
-## Database migrations
-
-Apply versioned migrations with:
-
-```bash
-npm run db:migrate
+https://api.snapsyncai.co.uk/api/shopify/oauth/callback
 ```

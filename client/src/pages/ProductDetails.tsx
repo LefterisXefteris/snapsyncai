@@ -5,10 +5,10 @@ import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup,
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
-import { api, buildUrl } from "@shared/routes";
+import { api, buildUrl } from "@/lib/api-routes";
 import { apiUrl } from "@/lib/api-origin";
 import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, emptyCare, isCompleteCare, CARE_FAMILIES, CARE_PICKS, type FibreRowDraft, type GpsrChoice, type GpsrIdentity, type CareChoice, type CareInstructions } from "@/lib/product-facts";
-import type { Image } from "@shared/schema";
+import type { Image } from "@/lib/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -4,13 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, Trash2, Lock, ChevronRight, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Image } from "@shared/schema";
+import type { Image } from "@/lib/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
-import { api, buildUrl } from "@shared/routes";
+import { api, buildUrl } from "@/lib/api-routes";
 import { apiUrl } from "@/lib/api-origin";
 import { cn } from "@/lib/utils";
 

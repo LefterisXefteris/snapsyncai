@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import type { Image } from "@shared/schema";
+import type { Image } from "@/lib/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceNavItem } from "@/lib/workspace-nav";
 
