@@ -1,20 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
+import { apiUrl } from "@/lib/api-origin";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
-export function useImages() {
+function useAppUserId(): string | undefined {
+  if (DEV_BYPASS_AUTH) return "dev_local_user";
+  // Compile-time constant: bypass builds never call useUser (no ClerkProvider).
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { user } = useUser();
-  const userId = DEV_BYPASS_AUTH ? "dev_local_user" : user?.id;
+  return user?.id;
+}
+
+export function useImages() {
+  const userId = useAppUserId();
   return useQuery({
     // Scoped by userId so different users never share the same cache entry
     queryKey: [api.images.list.path, userId],
     queryFn: async () => {
-      const res = await fetch(api.images.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.images.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch images");
       return res.json();
     },
@@ -27,7 +35,7 @@ export function usePaymentConfig() {
   return useQuery({
     queryKey: ['/api/payments/config'],
     queryFn: async () => {
-      const res = await fetch('/api/payments/config', { credentials: "include" });
+      const res = await fetch(apiUrl('/api/payments/config'), { credentials: "include" });
       if (!res.ok) throw new Error("Payment system not available");
       return res.json() as Promise<{
         publishableKey: string;
@@ -40,13 +48,12 @@ export function usePaymentConfig() {
 }
 
 export function useSubscriptionStatus() {
-  const { user } = useUser();
-  const userId = DEV_BYPASS_AUTH ? "dev_local_user" : user?.id;
+  const userId = useAppUserId();
   return useQuery({
     queryKey: ['/api/subscription/status', userId],
     queryFn: async () => {
       if (DEV_BYPASS_AUTH) return { subscribed: true, status: "active" };
-      const res = await fetch('/api/subscription/status', { credentials: "include" });
+      const res = await fetch(apiUrl('/api/subscription/status'), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check subscription");
       return res.json() as Promise<{ subscribed: boolean; status?: string; currentPeriodEnd?: string; stripeSubscriptionId?: string }>;
     },
@@ -168,7 +175,7 @@ export function useUploadImages() {
       if (brandTone) formData.append("brandTone", brandTone);
       if (groupAsOne) formData.append("groupAsOne", "true");
 
-      const res = await fetch(api.images.upload.path, {
+      const res = await fetch(apiUrl(api.images.upload.path), {
         method: api.images.upload.method,
         body: formData,
         credentials: "include",
@@ -303,7 +310,7 @@ export function useProductGroup(imageId: number | undefined) {
   return useQuery({
     queryKey: ['/api/images/group', imageId],
     queryFn: async () => {
-      const res = await fetch(`/api/images/${imageId}/group`, { credentials: "include" });
+      const res = await fetch(apiUrl(`/api/images/${imageId}/group`), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch product group");
       return res.json();
     },
@@ -419,90 +426,11 @@ export function usePushToShopify() {
   });
 }
 
-export function useEtsyStatus() {
-  return useQuery({
-    queryKey: [api.etsy.status.path],
-    queryFn: async () => {
-      const res = await fetch(api.etsy.status.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to check Etsy status");
-      return res.json();
-    },
-  });
-}
-
-export function useEtsyConnect() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ apiKeystring, accessToken, shopId }: { apiKeystring: string; accessToken: string; shopId: string }) => {
-      const res = await apiRequest("POST", api.etsy.connect.path, { apiKeystring, accessToken, shopId });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to connect to Etsy");
-      }
-      return res.json() as Promise<{ connected: boolean; shopName: string; shopId: string }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [api.etsy.status.path] });
-      toast({ title: "Etsy Connected", description: `Connected to ${data.shopName}` });
-    },
-    onError: (error) => {
-      toast({ title: "Connection Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useEtsyDisconnect() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", api.etsy.disconnect.path);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.etsy.status.path] });
-      toast({ title: "Disconnected", description: "Your Etsy store has been disconnected." });
-    },
-    onError: (error) => {
-      toast({ title: "Disconnect Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function usePushToEtsy() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { beginThinking, endThinking } = useAmbient();
-
-  return useMutation({
-    onMutate: () => beginThinking(),
-    mutationFn: async (ids: number[]) => {
-      const res = await apiRequest("POST", api.images.pushToEtsy.path, { ids });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      endThinking(data.failed === 0);
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({
-        title: "Etsy Sync Complete",
-        description: `${data.success} products pushed, ${data.failed} failed.`,
-      });
-    },
-    onError: (error) => {
-      endThinking(false);
-      toast({ title: "Etsy Push Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
 export function useShopifyStatus() {
   return useQuery({
     queryKey: [api.shopify.status.path],
     queryFn: async () => {
-      const res = await fetch(api.shopify.status.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.shopify.status.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check Shopify status");
       return res.json();
     },
@@ -515,7 +443,7 @@ export function useShopifyConnect() {
   return useMutation({
     mutationFn: async ({ shopDomain }: { shopDomain: string }) => {
       const params = new URLSearchParams({ shop: shopDomain });
-      window.location.assign(`${api.shopify.oauthStart.path}?${params.toString()}`);
+      window.location.assign(`${apiUrl(api.shopify.oauthStart.path)}?${params.toString()}`);
     },
     onError: (error) => {
       toast({ title: "Connection Failed", description: error.message || "Failed to start Shopify authorization.", variant: "destructive" });
@@ -542,330 +470,6 @@ export function useShopifyDisconnect() {
   });
 }
 
-export function useAmazonStatus() {
-  return useQuery({
-    queryKey: [api.amazon.status.path],
-    queryFn: async () => {
-      const res = await fetch(api.amazon.status.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to check Amazon status");
-      return res.json();
-    },
-  });
-}
-
-export function useAmazonConnect() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ lwaClientId, lwaClientSecret, lwaRefreshToken, sellerId, marketplaceId }: {
-      lwaClientId: string; lwaClientSecret: string; lwaRefreshToken: string; sellerId: string; marketplaceId: string;
-    }) => {
-      const res = await apiRequest("POST", api.amazon.connect.path, { lwaClientId, lwaClientSecret, lwaRefreshToken, sellerId, marketplaceId });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to connect to Amazon");
-      }
-      return res.json() as Promise<{ connected: boolean; sellerName: string; sellerId: string; marketplaceId: string }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [api.amazon.status.path] });
-      toast({ title: "Amazon Connected", description: `Connected as ${data.sellerName}` });
-    },
-    onError: (error) => {
-      toast({ title: "Connection Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useAmazonDisconnect() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", api.amazon.disconnect.path);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.amazon.status.path] });
-      toast({ title: "Disconnected", description: "Your Amazon seller account has been disconnected." });
-    },
-    onError: (error) => {
-      toast({ title: "Disconnect Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useInstagramStatus() {
-  return useQuery({
-    queryKey: [api.instagram.status.path],
-    queryFn: async () => {
-      const res = await fetch(api.instagram.status.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to check Instagram status");
-      return res.json() as Promise<{ connected: boolean; username?: string; igUserId?: string }>;
-    },
-  });
-}
-
-export function useInstagramOAuthConfig() {
-  return useQuery({
-    queryKey: [api.instagram.oauthConfig.path],
-    queryFn: async () => {
-      const res = await fetch(api.instagram.oauthConfig.path, { credentials: "include" });
-      if (!res.ok) return { configured: false };
-      return res.json() as Promise<{ configured: boolean }>;
-    },
-  });
-}
-
-export function useInstagramOAuthStart() {
-  return useMutation({
-    mutationFn: async () => {
-      const res = await fetch(api.instagram.oauthStart.path, { credentials: "include" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to start Instagram connection");
-      }
-      return res.json() as Promise<{ authUrl: string }>;
-    },
-  });
-}
-
-export function useInstagramConnect() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ accessToken }: { accessToken: string }) => {
-      const res = await apiRequest("POST", api.instagram.connect.path, { accessToken });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to connect to Instagram");
-      }
-      return res.json() as Promise<{ connected: boolean; username: string; igUserId: string }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [api.instagram.status.path] });
-      toast({ title: "Instagram Connected", description: `Connected as @${data.username}` });
-    },
-    onError: (error) => {
-      toast({ title: "Connection Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useInstagramDisconnect() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", api.instagram.disconnect.path);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.instagram.status.path] });
-      toast({ title: "Disconnected", description: "Your Instagram account has been disconnected." });
-    },
-    onError: (error) => {
-      toast({ title: "Disconnect Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useInstagramMedia() {
-  return useQuery({
-    queryKey: ['/api/instagram/media'],
-    queryFn: async () => {
-      const res = await fetch('/api/instagram/media', { credentials: "include" });
-      if (!res.ok) return { media: [] };
-      return res.json() as Promise<{ media: { id: string; caption?: string; media_type: string; media_url: string; thumbnail_url?: string; timestamp: string }[] }>;
-    },
-    enabled: false,
-  });
-}
-
-export function useInstagramImport() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ mediaIds, productContext, brandTone }: { mediaIds?: string[]; productContext?: string; brandTone?: string }) => {
-      const res = await apiRequest("POST", api.instagram.importMedia.path, { mediaIds, productContext, brandTone });
-      return res.json() as Promise<{ imported: number; images?: any[]; message?: string }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({
-        title: "Instagram Import Complete",
-        description: `${data.imported} image(s) imported from Instagram.`,
-      });
-    },
-    onError: (error) => {
-      toast({ title: "Import Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useInstagramGenerateCaption() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (imageId: number) => {
-      const res = await apiRequest("POST", api.instagram.generateCaption.path, { imageId });
-      return res.json() as Promise<{ caption: string; hashtags: string[] }>;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({ title: "Caption Generated", description: "Instagram caption has been generated for your product." });
-    },
-    onError: (error) => {
-      toast({ title: "Caption Generation Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useInstagramPost() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { beginThinking, endThinking } = useAmbient();
-
-  return useMutation({
-    onMutate: () => beginThinking(),
-    mutationFn: async ({ imageId, caption }: { imageId: number; caption?: string }) => {
-      const res = await apiRequest("POST", api.instagram.postProduct.path, { imageId, caption });
-      return res.json() as Promise<{ posted: boolean; postId: string; caption: string }>;
-    },
-    onSuccess: () => {
-      endThinking(true);
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({ title: "Posted to Instagram", description: "Your product has been posted to Instagram!" });
-    },
-    onError: (error) => {
-      endThinking(false);
-      toast({ title: "Instagram Post Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function usePushToAmazon() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { beginThinking, endThinking } = useAmbient();
-
-  return useMutation({
-    onMutate: () => beginThinking(),
-    mutationFn: async (ids: number[]) => {
-      const res = await apiRequest("POST", api.images.pushToAmazon.path, { ids });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      endThinking(data.failed === 0);
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({
-        title: "Amazon Sync Complete",
-        description: `${data.success} products pushed, ${data.failed} failed.`,
-      });
-    },
-    onError: () => {
-      endThinking(false);
-    },
-  });
-}
-
-export function useGeneratePhotoshoot() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { beginThinking, endThinking } = useAmbient();
-
-  return useMutation({
-    onMutate: () => beginThinking(),
-    mutationFn: async ({ id, style }: { id: number; style: string }) => {
-      const res = await apiRequest("POST", `/api/images/${id}/generate-photoshoot`, { style });
-      if (!res.ok) {
-        throw new Error(await res.text().catch(() => "Failed to generate photoshoot"));
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      endThinking(true);
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({ title: "Concept Generated", description: "Successfully rendered new AI concept." });
-    },
-    onError: (error) => {
-      endThinking(false);
-      toast({ title: "Generation Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useEditBackground() {
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, style }: { id: number; style: string }) => {
-      const res = await apiRequest("POST", `/api/images/${id}/edit-background`, { style });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).message || "Failed to edit background");
-      }
-      return res.json() as Promise<{ key: string; url: string }>;
-    },
-    onError: (error) => {
-      toast({ title: "Background Edit Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useApplyImage() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, bgKey, imageUrl }: { id: number; bgKey?: string; imageUrl?: string }) => {
-      const res = await apiRequest("POST", `/api/images/${id}/apply-image`, { bgKey, imageUrl });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).message || "Failed to apply image");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({ title: "Image Applied", description: "Product image has been updated successfully." });
-    },
-    onError: (error) => {
-      toast({ title: "Apply Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-export function useRewriteDescription() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, tone }: { id: number; tone: string }) => {
-      const res = await apiRequest("POST", `/api/images/${id}/rewrite-description`, { tone });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).message || "Failed to rewrite description");
-      }
-      return res.json() as Promise<{ description: string }>;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      toast({ title: "Description Rewritten", description: "Successfully generated a new description based on the selected tone." });
-    },
-    onError: (error) => {
-      toast({ title: "Rewrite Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
-
 export interface GeneratedContent {
   title: string;
   description: string;
@@ -884,7 +488,7 @@ export function useGenerateContent() {
     onDone: (parsed: GeneratedContent) => void,
     onError?: (msg: string) => void
   ): Promise<void> => {
-    const url = buildUrl(api.images.generateContent.path, { id: imageId });
+    const url = apiUrl(buildUrl(api.images.generateContent.path, { id: imageId }));
     let accumulated = "";
     beginThinking();
     try {
@@ -954,7 +558,7 @@ export function useRegenerateField() {
     onDone: (value: string | string[] | { q: string; a: string }[]) => void,
     onError?: (msg: string) => void
   ): Promise<void> => {
-    const url = buildUrl(api.images.regenerateField.path, { id: imageId });
+    const url = apiUrl(buildUrl(api.images.regenerateField.path, { id: imageId }));
     let accumulated = "";
     beginThinking();
     try {

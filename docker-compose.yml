@@ -1,0 +1,33 @@
+# Local Postgres for development and tests.
+#
+# Production runs on Supabase; this only replaces the database for local work so you
+# are never running migrations or tests against live data. Supabase Storage is a
+# separate dependency and is not stubbed here — image uploads still need real
+# SUPABASE_URL / SUPABASE_ANON_KEY, or they fail at call time (nothing else breaks).
+#
+#   docker compose up -d
+#   cd api-py && DATABASE_URL=... uv run alembic upgrade head
+#
+services:
+  postgres:
+    # Match your Supabase major version — check Settings -> Infrastructure in the
+    # dashboard. Newer projects are on 17, older ones 15.
+    image: postgres:17-alpine
+    container_name: snapsyncai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: snapsync
+      POSTGRES_PASSWORD: snapsync
+      POSTGRES_DB: snapsync
+    ports:
+      - "5433:5432" # 5433 on the host, so it can't collide with a local Postgres
+    volumes:
+      - snapsyncai-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapsync -d snapsync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  snapsyncai-pgdata:

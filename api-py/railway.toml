@@ -1,0 +1,12 @@
+# Railway service root: this directory (`api-py`).
+# Dashboard/DNS for api.snapsyncai.co.uk is ticket lisai-app-3p3.3.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

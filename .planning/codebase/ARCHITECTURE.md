@@ -72,10 +72,10 @@
 4. `WebhookHandlers.processWebhook()` dispatches events: `checkout.session.completed` (payment) → `storage.addCredits()`, (subscription) → `storage.upsertSubscription()`
 5. Credit deduction on AI analysis: `storage.deductCredits()` called atomically in DB (balance check + decrement in single UPDATE WHERE)
 
-**Marketplace Push Flow:**
+**Shopify Push Flow:**
 
-1. User connects Shopify/Etsy/Amazon/Instagram via dedicated connect endpoints; credentials stored in respective connection tables
-2. `POST /api/images/push-to-{platform}` fetches stored credentials, calls platform API, updates `images.shopifyProductId` / status columns
+1. User connects Shopify/Instagram via dedicated connect endpoints; credentials stored in respective connection tables
+2. `POST /api/images/push-to-shopify` fetches stored credentials, calls the Shopify Admin API, updates `images.shopifyProductId` / status columns
 3. Instagram additionally supports OAuth flow (`/api/instagram/oauth/start` → redirect → `/api/instagram/oauth/callback`)
 
 **State Management:**
@@ -115,8 +115,9 @@
 ## Entry Points
 
 **Local Development:**
-- Location: `server/index.ts` via `npm run dev` (`tsx server/index.ts`)
-- Triggers: `setupApp()` → `registerRoutes()` + Vite middleware; HTTP listen on port 5001
+- Location: `scripts/dev.sh` via `npm run dev`
+- Triggers: Postgres (compose) + FastAPI (`:8000`) + Vite (`:5001`); every `/api` request is proxied to FastAPI
+- Express remains in `server/` for the production Vercel handler until Railway cutover
 
 **Vercel Serverless (Production):**
 - Location: `api/index.js` → imports `dist/index.cjs` (compiled server bundle)

@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
 import { api, buildUrl } from "@shared/routes";
+import { apiUrl } from "@/lib/api-origin";
 import { cn } from "@/lib/utils";
 
 const CURRENCIES = [
@@ -41,8 +42,6 @@ interface ImageCardProps {
   /** True while AI analysis is running for this card — shows the scan-line + shimmer treatment */
   analyzing?: boolean;
   onSelect?: (id: number, selected: boolean) => void;
-  instagramConnected?: boolean;
-  onInstagramPost?: (imageId: number) => void;
 }
 
 export const ImageCard = memo(function ImageCard({ image, views = [], index, selected, highlighted = false, analyzing = false, onSelect }: ImageCardProps) {
@@ -67,8 +66,9 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
     const cleaned = draftPrice.replace(/[^0-9.]/g, "");
     if (cleaned === String(image.price)) { setEditingPrice(false); return; }
     try {
-      await fetch(buildUrl(api.images.update.path, { id: image.id }), {
+      await fetch(apiUrl(buildUrl(api.images.update.path, { id: image.id })), {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ price: cleaned || null }),
       });
@@ -81,7 +81,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
   // ── Status ────────────────────────────────────────────────────────────────
   const isUnpaid = image.paymentStatus !== "paid";
-  const isSynced = image.shopifyStatus === "synced" || image.etsyStatus === "synced" || image.amazonStatus === "synced";
+  const isSynced = image.shopifyStatus === "synced";
   const statusColor = isUnpaid
     ? "text-amber-400 bg-amber-400/10 border-amber-400/20"
     : image.shopifyStatus === "synced"
@@ -96,9 +96,6 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
   const syncedPlatforms = [
     image.shopifyStatus === "synced" && "shopify",
-    image.etsyStatus === "synced" && "etsy",
-    image.amazonStatus === "synced" && "amazon",
-    image.instagramStatus === "posted" && "instagram",
   ].filter(Boolean) as string[];
 
   const allImages = [image, ...views];
@@ -124,7 +121,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
       <div className="relative bg-muted/40 flex items-center justify-center overflow-hidden" style={{ height: hasViews ? "120px" : "176px" }}>
         {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
         <img
-          src={`/api/images/${image.id}/file?sz=${image.size}&t=${new Date(image.createdAt || Date.now()).getTime()}`}
+          src={apiUrl(`/api/images/${image.id}/file?sz=${image.size}&t=${new Date(image.createdAt || Date.now()).getTime()}`)}
           alt={image.altText || image.title || image.originalName}
           className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
@@ -174,7 +171,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           {views.slice(0, 5).map((v) => (
             <div key={v.id} className="relative w-9 h-9 shrink-0 rounded-md overflow-hidden bg-muted/50">
               <img
-                src={`/api/images/${v.id}/file?sz=${v.size}`}
+                src={apiUrl(`/api/images/${v.id}/file?sz=${v.size}`)}
                 alt=""
                 className="w-full h-full object-cover"
                 loading="lazy"

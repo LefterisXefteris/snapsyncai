@@ -1,23 +1,23 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, useEditBackground, useGeneratePhotoshoot, useApplyImage, useRewriteDescription, usePushToShopify, useUploadImages } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@shared/routes";
+import { apiUrl } from "@/lib/api-origin";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, Check, Lock, Loader2, Wand2, ImageIcon, Download, Tag, Box, BarChart3, Sparkles, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search, GripVertical } from "lucide-react";
+import { ArrowLeft, Check, Lock, Loader2, ImageIcon, Tag, Box, BarChart3, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search, GripVertical } from "lucide-react";
 import { AiContentPanel } from "@/components/ai-content-panel";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
@@ -47,19 +47,6 @@ function TiltFrame({ children, className }: { children: React.ReactNode; classNa
   );
 }
 
-const AI_BG_REMOVAL_ENABLED = import.meta.env.VITE_FEATURE_AI_BG_REMOVAL === "true";
-const AI_PHOTOSHOOT_ENABLED = import.meta.env.VITE_FEATURE_AI_PHOTOSHOOT === "true";
-
-const VALID_STYLES = ["Studio Lighting", "Minimalist Marble", "Natural Outdoor", "E-commerce White", "Neon Cyberpunk"];
-
-const BG_STYLES = [
-  { key: "studio",    label: "Studio",    color: "#f8f8f8" },
-  { key: "gradient",  label: "Gradient",  color: "#9333ea" },
-  { key: "lifestyle", label: "Lifestyle", color: "#84cc16" },
-  { key: "minimal",   label: "Minimal",   color: "#e5e5e5" },
-  { key: "dark",      label: "Dark",      color: "#1c1c1c" },
-] as const;
-
 function orderProductImages(images: Image[], mediaGallery: string[]) {
   if (mediaGallery.length === 0) return images;
 
@@ -84,7 +71,7 @@ function productImageSrc(image: Pick<Image, "id" | "size" | "createdAt">, proxy 
   if (image.size) params.set("sz", String(image.size));
   params.set("t", String(cacheKey ?? new Date(image.createdAt || Date.now()).getTime()));
   if (proxy) params.set("proxy", "1");
-  return `/api/images/${image.id}/file?${params.toString()}`;
+  return apiUrl(`/api/images/${image.id}/file?${params.toString()}`);
 }
 
 export default function ProductDetails({ params }: { params: { id: string } }) {
@@ -127,16 +114,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [pickerUploading, setPickerUploading] = useState(false);
   const [pickerDragActive, setPickerDragActive] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const editBackgroundMutation = useEditBackground();
-  const generatePhotoshootMutation = useGeneratePhotoshoot();
-  const applyImageMutation = useApplyImage();
-  const rewriteDescriptionMutation = useRewriteDescription();
-  
-  const [bgEditKey, setBgEditKey] = useState<string | null>(null);
-  const [bgEditUrl, setBgEditUrl] = useState<string | null>(null);
-  const [showBgPicker, setShowBgPicker] = useState(false);
-  const [photoshootStyle, setPhotoshootStyle] = useState(VALID_STYLES[0]);
-  const [imageKey, setImageKey] = useState(Date.now());
   const [selectedVariantRows, setSelectedVariantRows] = useState<Set<number>>(new Set());
   const [variantRowData, setVariantRowData] = useState<{ price: string; available: number; sku: string }[]>([]);
   const [bulkPrice, setBulkPrice] = useState("");
@@ -225,7 +202,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   }
 
   const isUnpaid = image.paymentStatus !== "paid";
-  const backgrounds = Array.isArray(image?.generatedBackgrounds) ? (image.generatedBackgrounds as string[]) : [];
 
   const persistMediaOrder = async (orderedIds: number[], primaryId?: number) => {
     if (!image || orderedIds.length === 0) return;
@@ -236,8 +212,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       ));
       if (primaryId) {
         setSelectedImageId(primaryId);
-        setBgEditUrl(null);
-        setBgEditKey(null);
       }
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       queryClient.invalidateQueries({ queryKey: ['/api/images/group'] });
@@ -275,19 +249,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       next.add(imageId);
       return next;
     });
-  };
-
-  const handleEditBackground = (style: string) => {
-    setShowBgPicker(false);
-    editBackgroundMutation.mutate(
-      { id: image.id, style },
-      {
-        onSuccess: (data) => {
-          setBgEditKey(data.key);
-          setBgEditUrl(data.url);
-        },
-      }
-    );
   };
 
   // ── Library picker helpers ─────────────────────────────────────────────────
@@ -353,28 +314,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const normalizePickerFiles = (files: FileList | File[]) => filterImageLikeFiles(files);
 
-  const handleApplyBackground = () => {
-    if (!bgEditKey) return;
-    applyImageMutation.mutate(
-      { id: image.id, bgKey: bgEditKey },
-      {
-        onSuccess: () => {
-          setBgEditKey(null);
-          setBgEditUrl(null);
-          setImageKey(Date.now());
-        }
-      }
-    );
-  };
-
-  const handleApplyConcept = (url: string) => {
-    applyImageMutation.mutate({ id: image.id, imageUrl: url }, {
-      onSuccess: () => {
-        setImageKey(Date.now());
-      }
-    });
-  };
-
   const applyBulkEdit = () => {
     setVariantRowData(prev => prev.map((row, i) => {
       if (!selectedVariantRows.has(i)) return row;
@@ -433,18 +372,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-breathe mr-1" />
                 Synced
-              </Badge>
-            )}
-            {image.etsyStatus === "synced" && (
-              <Badge variant="secondary" className="bg-orange-500/10 text-orange-400 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-breathe mr-1" />
-                Etsy
-              </Badge>
-            )}
-            {image.amazonStatus === "synced" && (
-              <Badge variant="secondary" className="bg-amber-500/10 text-amber-400 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-breathe mr-1" />
-                Amazon
               </Badge>
             )}
           </div>
@@ -519,49 +446,15 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium">Description</label>
-                    {!isUnpaid && (
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 text-[10px] px-2 text-primary hover:text-primary hover:bg-primary/10"
-                          onClick={() => rewriteDescriptionMutation.mutate({ id: image.id, tone: "professional" })}
-                          disabled={rewriteDescriptionMutation.isPending}
-                        >
-                          {rewriteDescriptionMutation.isPending && rewriteDescriptionMutation.variables?.tone === 'professional' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                          Professional
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 text-[10px] px-2 text-primary hover:text-primary hover:bg-primary/10"
-                          onClick={() => rewriteDescriptionMutation.mutate({ id: image.id, tone: "playful" })}
-                          disabled={rewriteDescriptionMutation.isPending}
-                        >
-                          {rewriteDescriptionMutation.isPending && rewriteDescriptionMutation.variables?.tone === 'playful' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                          Fun
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  {rewriteDescriptionMutation.isPending ? (
-                    <div className="space-y-1.5 rounded-lg p-3 bg-muted/20 shadow-[inset_0_0_0_1px_hsl(var(--aurora-2)/0.25)]">
-                      <div className="h-3 w-full rounded animate-shimmer" />
-                      <div className="h-3 w-11/12 rounded animate-shimmer" />
-                      <div className="h-3 w-3/5 rounded animate-shimmer" />
-                    </div>
-                  ) : (
-                    <Textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      disabled={isUnpaid}
-                      rows={3}
-                      placeholder="Product description..."
-                      className="resize-y text-sm"
-                    />
-                  )}
+                  <label className="text-xs font-medium">Description</label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    disabled={isUnpaid}
+                    rows={3}
+                    placeholder="Product description..."
+                    className="resize-y text-sm"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -1113,7 +1006,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         setDragOverImageId(null);
                         setThumbnailDragActive(false);
                       }}
-                      onClick={() => { setSelectedImageId(img.id); setBgEditUrl(null); setBgEditKey(null); }}
+                      onClick={() => { setSelectedImageId(img.id); }}
                     >
                       <img
                         src={productImageSrc(img, proxyImageIds.has(img.id))}
@@ -1151,10 +1044,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   ))}
                 </div>
 
-                {/* Selected image large preview with AI tools */}
+                {/* Selected image large preview */}
                 {displayImageId && (
-                  <>
-                    <TiltFrame className="w-full">
+                  <TiltFrame className="w-full">
                     <div
                       className={`relative w-full h-44 bg-muted/40 rounded-xl overflow-hidden transition-all shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06),0_16px_40px_-16px_hsl(250_25%_2%/0.6)] ${thumbnailDragActive ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}
                       onDragOver={(e) => {
@@ -1175,7 +1067,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       }}
                     >
                       <img
-                        src={bgEditUrl ?? productImageSrc(displayImage, proxyImageIds.has(displayImage.id), imageKey)}
+                        src={productImageSrc(displayImage, proxyImageIds.has(displayImage.id))}
                         alt={image.altText || image.title || "Product Image"}
                         className="w-full h-full object-contain"
                         onError={() => handleImageLoadError(displayImage.id)}
@@ -1187,170 +1079,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                           </div>
                         </div>
                       )}
-
-                      {editBackgroundMutation.isPending && (
-                        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center z-30 gap-2">
-                          <Wand2 className="w-6 h-6 text-primary animate-pulse" />
-                          <span className="text-xs font-medium">Editing background…</span>
-                        </div>
-                      )}
-
-                      {showBgPicker && AI_BG_REMOVAL_ENABLED && !editBackgroundMutation.isPending && !applyImageMutation.isPending && (
-                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 p-3">
-                          <p className="text-sm font-semibold">Select Background</p>
-                          <div className="flex flex-wrap gap-2 justify-center max-w-[250px]">
-                            {BG_STYLES.map((s) => (
-                              <button
-                                key={s.key}
-                                onClick={() => handleEditBackground(s.key)}
-                                className="flex flex-col items-center gap-1 group/btn"
-                                title={s.label}
-                              >
-                                <span
-                                  className="w-8 h-8 rounded-full border border-border group-hover/btn:border-primary group-hover/btn:scale-110 transition-all block shadow-sm"
-                                  style={{ background: s.color }}
-                                />
-                                <span className="text-[10px] text-muted-foreground group-hover/btn:text-foreground">{s.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => setShowBgPicker(false)} className="mt-2 h-7 text-xs">Cancel</Button>
-                        </div>
-                      )}
-
-                      {bgEditUrl && !showBgPicker && !editBackgroundMutation.isPending && (
-                        <div className="absolute bottom-2 left-0 w-full flex justify-center z-20">
-                          <Button
-                            size="sm"
-                            onClick={handleApplyBackground}
-                            disabled={applyImageMutation.isPending}
-                            className="shadow-lg"
-                          >
-                            {applyImageMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                              <Check className="w-4 h-4 mr-2" />
-                            )}
-                            Save as Product Image
-                          </Button>
-                        </div>
-                      )}
                     </div>
-                    </TiltFrame>
-
-                    {!isUnpaid && (
-                      <div className="flex items-center gap-2">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex-1">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className={`w-full ${AI_BG_REMOVAL_ENABLED && showBgPicker ? 'border-primary/50 text-primary bg-primary/5' : ''} ${!AI_BG_REMOVAL_ENABLED ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  onClick={() => AI_BG_REMOVAL_ENABLED && setShowBgPicker(v => !v)}
-                                  disabled={!AI_BG_REMOVAL_ENABLED || editBackgroundMutation.isPending || applyImageMutation.isPending}
-                                >
-                                  <Wand2 className="w-4 h-4 mr-2" />
-                                  AI Background
-                                  {!AI_BG_REMOVAL_ENABLED && <span className="ml-1.5 text-[9px] font-medium text-muted-foreground">SOON</span>}
-                                </Button>
-                              </span>
-                            </TooltipTrigger>
-                            {!AI_BG_REMOVAL_ENABLED && (
-                              <TooltipContent side="top">
-                                <p className="text-xs">Coming soon</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        </TooltipProvider>
-
-                        <Dialog>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="flex-1">
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className={`w-full text-amber-600 hover:text-amber-700 hover:bg-amber-100/50 ${!AI_PHOTOSHOOT_ENABLED ? 'opacity-50 cursor-not-allowed text-muted-foreground hover:text-muted-foreground hover:bg-transparent' : ''}`}
-                                      disabled={!AI_PHOTOSHOOT_ENABLED}
-                                    >
-                                      <ImageIcon className="w-4 h-4 mr-2" />
-                                      AI Photoshoot
-                                      {!AI_PHOTOSHOOT_ENABLED && <span className="ml-1.5 text-[9px] font-medium">SOON</span>}
-                                    </Button>
-                                  </DialogTrigger>
-                                </span>
-                              </TooltipTrigger>
-                              {!AI_PHOTOSHOOT_ENABLED && (
-                                <TooltipContent side="top">
-                                  <p className="text-xs">Coming soon</p>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                          </TooltipProvider>
-                          <DialogContent className="max-w-3xl">
-                            <DialogHeader>
-                              <DialogTitle>AI Concept Generator</DialogTitle>
-                              <DialogDescription>
-                                Generate high-quality 4k photorealistic environments based on "{image.title}".
-                              </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="flex items-center gap-3 py-4">
-                              <Select value={photoshootStyle} onValueChange={setPhotoshootStyle}>
-                                <SelectTrigger className="w-[200px] border">
-                                  <SelectValue placeholder="Select Style" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {VALID_STYLES.map(style => (
-                                    <SelectItem key={style} value={style}>{style}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-
-                              <Button
-                                onClick={() => generatePhotoshootMutation.mutate({ id: image.id, style: photoshootStyle })}
-                                disabled={generatePhotoshootMutation.isPending}
-                              >
-                                {generatePhotoshootMutation.isPending ? "Rendering (10-15s)..." : "Generate Concept"}
-                              </Button>
-                            </div>
-
-                            {backgrounds.length > 0 && (
-                              <div className="mt-4">
-                                <h4 className="text-sm font-medium mb-3 text-muted-foreground">Generated Concepts</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2">
-                                  {backgrounds.map((url, i) => (
-                                    <div key={i} className="relative group/concept rounded-lg overflow-hidden border aspect-square">
-                                      <img src={url} alt="Generated Concept" className="w-full h-full object-cover" loading="lazy" />
-                                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/concept:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                                        <Button
-                                          size="sm"
-                                          className="w-[140px]"
-                                          onClick={() => handleApplyConcept(url)}
-                                          disabled={applyImageMutation.isPending}
-                                        >
-                                          <Check className="w-3.5 h-3.5 mr-1.5" />
-                                          Set as Product
-                                        </Button>
-                                        <Button size="sm" variant="secondary" onClick={() => window.open(url, '_blank')} className="w-[140px]">
-                                          <Download className="w-3.5 h-3.5 mr-1.5" />
-                                          Download Hires
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    )}
-                  </>
+                  </TiltFrame>
                 )}
               </CardContent>
             </Card>
