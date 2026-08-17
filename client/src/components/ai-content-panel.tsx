@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, Check, RefreshCw } from "lucide-react";
 import { useGenerateContent, useRegenerateField, type GeneratedContent } from "@/hooks/use-images";
+import { withDescriptionBlocks, type ProductFactsRecord } from "@/lib/product-facts";
 
 const STYLE_TONES = [
   "Professional & trustworthy",
@@ -19,6 +20,7 @@ interface AiContentPanelProps {
   imageId: number;
   defaultCategory?: string;
   canGenerate: boolean;
+  facts: ProductFactsRecord | null;
   onAcceptTitle: (value: string) => void;
   onAcceptDescription: (value: string) => void;
   onAcceptTags: (value: string[]) => void;
@@ -29,6 +31,7 @@ export function AiContentPanel({
   imageId,
   defaultCategory,
   canGenerate,
+  facts,
   onAcceptTitle,
   onAcceptDescription,
   onAcceptTags,
@@ -69,7 +72,10 @@ export function AiContentPanel({
       { category, styleTone, audience },
       (text) => setStreamText(text),
       (parsed) => {
-        setGenerated(parsed);
+        setGenerated({
+          ...parsed,
+          description: withDescriptionBlocks(parsed.description, facts),
+        });
         setIsGenerating(false);
         setStreamText("");
       },
@@ -87,7 +93,7 @@ export function AiContentPanel({
       () => {}, // no mid-stream UI update for single field
       (value) => {
         if (field === "title") setPendingTitle(value as string);
-        else if (field === "description") setPendingDescription(value as string);
+        else if (field === "description") setPendingDescription(withDescriptionBlocks(value as string, facts));
         else if (field === "seoKeywords") setPendingTags(value as string[]);
         else if (field === "aeoFaqs") setPendingFaqs(value as { q: string; a: string }[]);
         setRegeneratingField(null);

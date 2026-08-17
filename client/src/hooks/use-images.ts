@@ -475,11 +475,19 @@ export function useConfirmProductFacts() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ imageId, isTextile }: { imageId: number; isTextile: boolean }) => {
+    mutationFn: async ({
+      imageId,
+      isTextile,
+      composition,
+    }: {
+      imageId: number;
+      isTextile: boolean;
+      composition?: { name: string; percent: number | null; otherName?: string }[];
+    }) => {
       const res = await apiRequest(
         "POST",
         buildUrl(api.images.confirmProductFacts.path, { id: imageId }),
-        { isTextile },
+        { isTextile, composition },
       );
       return res.json();
     },

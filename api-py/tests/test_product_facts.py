@@ -1,8 +1,10 @@
 """Product-facts module — listing copy stays gated until facts are confirmed."""
 
 from app.services.product_facts import (
+    apply_description_blocks,
     apply_suggested,
     confirm_facts,
+    description_blocks,
     facts_from_stored,
     listing_copy_constraints,
     may_generate_listing_copy,
@@ -79,6 +81,126 @@ def test_confirming_a_textile_without_composition_does_not_open_the_gate() -> No
     assert result.ok is False
     assert result.error == "Fibre composition is required to confirm a textile product."
     assert may_generate_listing_copy(result.facts) is False
+
+
+def test_eighty_percent_cotton_alone_cannot_confirm() -> None:
+    facts = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    result = confirm_facts(
+        facts, is_textile=True, composition=[{"name": "cotton", "percent": 80}]
+    )
+    assert result.ok is False
+    assert result.error == "Fibre percentages must be integers that sum to 100."
+    assert may_generate_listing_copy(result.facts) is False
+    assert result.facts.confirmed is None
+
+
+def test_fibre_row_without_percentage_cannot_confirm() -> None:
+    facts = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    result = confirm_facts(facts, is_textile=True, composition=[{"name": "cotton"}])
+    assert result.ok is False
+    assert result.error == "Each fibre row needs a name and a percentage."
+    assert may_generate_listing_copy(result.facts) is False
+
+
+COTTON_POLYESTER = [
+    {"name": "cotton", "percent": 80},
+    {"name": "polyester", "percent": 20},
+]
+
+
+def test_confirmed_textile_composition_opens_the_gate() -> None:
+    facts = persistable_from_vision(
+        {**VISION_WITH_LISTING_COPY, "isTextile": True, "fibreNames": ["cotton", "silk"]}
+    ).facts
+    result = confirm_facts(facts, is_textile=True, composition=COTTON_POLYESTER)
+    assert result.ok is True
+    assert result.facts.confirmed is not None
+    assert result.facts.confirmed.is_textile is True
+    assert may_generate_listing_copy(result.facts) is True
+
+
+def test_description_html_contains_composition_not_gpsr() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+    ).facts
+    html = description_blocks(facts)
+    assert html == "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+    assert "gpsr" not in html.lower()
+    assert "manufacturer" not in html.lower()
+    assert "responsible person" not in html.lower()
+
+
+def test_tags_and_aeo_use_confirmed_fibre_names_not_suggested() -> None:
+    facts = confirm_facts(
+        persistable_from_vision(
+            {**VISION_WITH_LISTING_COPY, "isTextile": True, "fibreNames": ["cotton", "silk"]}
+        ).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+    ).facts
+    constraints = listing_copy_constraints(facts)
+    assert (
+        "Tags and AEO may use only these confirmed fibre names: cotton, polyester."
+        in constraints
+    )
+    assert "silk" not in constraints
+
+
+def test_other_fibre_name_appears_in_composition_block() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=[
+            {"name": "cotton", "percent": 90},
+            {"name": "Other", "percent": 10, "otherName": "hemp"},
+        ],
+    ).facts
+    assert may_generate_listing_copy(facts) is True
+    assert description_blocks(facts) == "<p>Fibre composition: 90% cotton, 10% hemp.</p>"
+
+
+def test_unofficial_fibre_name_must_use_other() -> None:
+    result = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=[{"name": "hemp", "percent": 100}],
+    )
+    assert result.ok is False
+    assert may_generate_listing_copy(result.facts) is False
+
+
+def test_confirmed_composition_survives_storage() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+    ).facts
+    restored = facts_from_stored(stored_from_facts(facts))
+    assert may_generate_listing_copy(restored) is True
+    assert description_blocks(restored) == "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+
+
+def test_apply_description_blocks_inserts_module_html() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+    ).facts
+    html = apply_description_blocks("<p>A soft everyday tee.</p>", facts)
+    assert html == (
+        "<p>A soft everyday tee.</p>\n"
+        "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+    )
+    replaced = apply_description_blocks(
+        "<p>A soft tee.</p><p>Fibre composition: 100% silk.</p>", facts
+    )
+    assert replaced == (
+        "<p>A soft tee.</p>\n"
+        "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+    )
+    assert "silk" not in replaced
 
 
 def test_suggested_fibre_names_drop_percentages() -> None:

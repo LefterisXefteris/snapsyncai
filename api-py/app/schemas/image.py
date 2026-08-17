@@ -101,8 +101,15 @@ class ImageUpdate(CamelModel):
         return value
 
 
+class FibreRowIn(CamelModel):
+    name: str
+    percent: int | None = None
+    other_name: str | None = None
+
+
 class ConfirmProductFactsBody(CamelModel):
     is_textile: bool
+    composition: list[FibreRowIn] | None = None
 
 
 class AssignGroupBody(CamelModel):

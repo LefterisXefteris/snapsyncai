@@ -145,7 +145,13 @@ async def confirm_product_facts(
     current = merge_product_facts(
         [img.product_facts for img in group] or [image.product_facts]
     )
-    result = confirm_facts(current, is_textile=body.is_textile)
+    result = confirm_facts(
+        current,
+        is_textile=body.is_textile,
+        composition=[row.model_dump() for row in body.composition]
+        if body.composition is not None
+        else None,
+    )
     if not result.ok:
         raise HTTPException(status_code=400, detail=result.error)
     updated = await store.persist_product_facts(

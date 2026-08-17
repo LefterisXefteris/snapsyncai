@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@shared/routes";
 import { apiUrl } from "@/lib/api-origin";
-import { mayGenerateListingCopy, productFacts } from "@/lib/product-facts";
+import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, type FibreRowDraft } from "@/lib/product-facts";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -125,6 +125,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [dragOverImageId, setDragOverImageId] = useState<number | null>(null);
   const [thumbnailDragActive, setThumbnailDragActive] = useState(false);
   const [proxyImageIds, setProxyImageIds] = useState<Set<number>>(new Set());
+  const [compositionRows, setCompositionRows] = useState<FibreRowDraft[]>([
+    { name: "cotton", percent: "", otherName: "" },
+  ]);
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -164,6 +167,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       setInventoryQuantity(image.inventoryQuantity || 0);
       setTags(Array.isArray(image.tags) ? image.tags : []);
       setAeoFaqs(Array.isArray(image.aeoFaqs) ? (image.aeoFaqs as { question: string; answer: string }[]).map((f) => ({ q: f.question, a: f.answer })) : []);
+      setCompositionRows(draftComposition(productFacts(image)));
       const imgVariants = Array.isArray(image.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
       const combos = imgVariants.reduce<string[][]>((acc, v) => {
         if (acc.length === 0) return v.values.map((val: string) => [val]);
@@ -432,13 +436,13 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 <CardHeader className="px-4 py-3">
                   <CardTitle className="text-sm font-medium">Product facts</CardTitle>
                   <CardDescription className="text-xs">
-                    Confirm this product is not a textile before listing copy can be generated.
+                    Confirm this is not a textile, or enter fibre composition that sums to 100%.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 space-y-3">
                   {facts?.suggested?.isTextile === true && (
                     <p className="text-xs text-muted-foreground">
-                      Vision suggests this may be a textile. Confirm if it is not.
+                      Vision suggests this may be a textile. Confirm if it is not, or enter composition.
                     </p>
                   )}
                   {facts?.suggested?.isTextile === false && (
@@ -448,6 +452,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   )}
                   <Button
                     size="sm"
+                    variant="outline"
                     className="h-8 text-xs"
                     onClick={() => confirmFactsMutation.mutate({ imageId: image.id, isTextile: false })}
                     disabled={confirmFactsMutation.isPending}
@@ -457,6 +462,107 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     ) : null}
                     Confirm: not a textile
                   </Button>
+                  <div className="space-y-2 pt-1">
+                    <label className="text-xs font-medium">Fibre composition</label>
+                    {compositionRows.map((row, index) => (
+                      <div key={index} className="flex flex-wrap items-center gap-2">
+                        <Select
+                          value={row.name}
+                          onValueChange={(name) => {
+                            setCompositionRows((rows) =>
+                              rows.map((item, i) => (i === index ? { ...item, name } : item))
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EU_FIBRE_NAMES.map((name) => (
+                              <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                            <SelectItem value={OTHER_FIBRE}>{OTHER_FIBRE}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {row.name === OTHER_FIBRE && (
+                          <Input
+                            value={row.otherName}
+                            onChange={(e) => {
+                              const otherName = e.target.value;
+                              setCompositionRows((rows) =>
+                                rows.map((item, i) => (i === index ? { ...item, otherName } : item))
+                              );
+                            }}
+                            placeholder="Fibre name"
+                            className="h-8 text-xs w-[140px]"
+                          />
+                        )}
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={row.percent}
+                          onChange={(e) => {
+                            const percent = e.target.value;
+                            setCompositionRows((rows) =>
+                              rows.map((item, i) => (i === index ? { ...item, percent } : item))
+                            );
+                          }}
+                          placeholder="%"
+                          className="h-8 text-xs w-[72px]"
+                        />
+                        {compositionRows.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setCompositionRows((rows) => rows.filter((_, i) => i !== index))}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() =>
+                          setCompositionRows((rows) => [...rows, { name: "cotton", percent: "", otherName: "" }])
+                        }
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add fibre
+                      </Button>
+                      <p className="text-[11px] text-muted-foreground font-mono">
+                        {compositionRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0)} / 100
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() =>
+                        confirmFactsMutation.mutate({
+                          imageId: image.id,
+                          isTextile: true,
+                          composition: compositionRows.map((row) => ({
+                            name: row.name,
+                            percent: row.percent === "" ? null : Number(row.percent),
+                            otherName: row.otherName || undefined,
+                          })),
+                        })
+                      }
+                      disabled={confirmFactsMutation.isPending}
+                    >
+                      {confirmFactsMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : null}
+                      Confirm textile composition
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -465,8 +571,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 imageId={image.id}
                 defaultCategory={category}
                 canGenerate={canGenerate}
+                facts={facts}
                 onAcceptTitle={(v) => setTitle(v)}
-                onAcceptDescription={(v) => setDescription(v)}
+                onAcceptDescription={(v) => setDescription(withDescriptionBlocks(v, facts))}
                 onAcceptTags={(v) => setTags(v)}
                 onAcceptAeoFaqs={(v) => setAeoFaqs(v)}
               />
