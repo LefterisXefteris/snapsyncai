@@ -2,11 +2,12 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import field_serializer, field_validator
 
 from app.schemas.base import CamelModel
+from app.schemas.gpsr import GpsrIdentityIn
 
 LIST_EXCLUDE = frozenset(
     {
@@ -110,6 +111,8 @@ class FibreRowIn(CamelModel):
 class ConfirmProductFactsBody(CamelModel):
     is_textile: bool
     composition: list[FibreRowIn] | None = None
+    gpsr_choice: Literal["skip", "shop_default", "override"]
+    gpsr_identity: GpsrIdentityIn | None = None
 
 
 class AssignGroupBody(CamelModel):

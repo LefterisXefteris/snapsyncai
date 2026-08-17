@@ -24,6 +24,43 @@ export type FibreRowDraft = {
   otherName: string;
 };
 
+export type GpsrParty = {
+  name: string;
+  postalAddress: string;
+  email: string;
+};
+
+export type GpsrIdentity = {
+  manufacturer: GpsrParty;
+  manufacturerInEu: boolean;
+  euResponsiblePerson?: GpsrParty | null;
+};
+
+export type GpsrChoice = "skip" | "shop_default" | "override";
+
+export function emptyGpsrParty(): GpsrParty {
+  return { name: "", postalAddress: "", email: "" };
+}
+
+export function emptyGpsrIdentity(): GpsrIdentity {
+  return {
+    manufacturer: emptyGpsrParty(),
+    manufacturerInEu: false,
+    euResponsiblePerson: emptyGpsrParty(),
+  };
+}
+
+export function isCompleteGpsr(identity: GpsrIdentity | null | undefined): boolean {
+  if (!identity) return false;
+  if (!partyComplete(identity.manufacturer)) return false;
+  if (identity.manufacturerInEu) return true;
+  return partyComplete(identity.euResponsiblePerson);
+}
+
+function partyComplete(party: GpsrParty | null | undefined): boolean {
+  return Boolean(party?.name?.trim() && party.postalAddress?.trim() && party.email?.trim());
+}
+
 export type ProductFactsRecord = {
   suggested?: {
     isTextile?: boolean | null;
@@ -32,6 +69,8 @@ export type ProductFactsRecord = {
   confirmed?: {
     isTextile?: boolean;
     composition?: { name?: string; percent?: number }[];
+    gpsrChoice?: GpsrChoice;
+    gpsrIdentity?: GpsrIdentity;
   };
 };
 
@@ -72,13 +111,42 @@ export function compositionBlockHtml(facts: ProductFactsRecord | null): string {
   return `<p>Fibre composition: ${parts.join(", ")}.</p>`;
 }
 
+export function gpsrBlockHtml(identity: GpsrIdentity | null | undefined): string {
+  if (!identity || !partyComplete(identity.manufacturer)) return "";
+  const maker = identity.manufacturer;
+  let html = `<p>Manufacturer: ${maker.name}, ${maker.postalAddress}, ${maker.email}.</p>`;
+  if (!identity.manufacturerInEu && partyComplete(identity.euResponsiblePerson)) {
+    const person = identity.euResponsiblePerson!;
+    html += `<p>EU responsible person: ${person.name}, ${person.postalAddress}, ${person.email}.</p>`;
+  }
+  return html;
+}
+
+export function effectiveGpsrIdentity(
+  facts: ProductFactsRecord | null,
+  shopGpsr: GpsrIdentity | null | undefined,
+): GpsrIdentity | null {
+  const choice = facts?.confirmed?.gpsrChoice;
+  if (!choice || choice === "skip") return null;
+  if (choice === "override") {
+    return isCompleteGpsr(facts?.confirmed?.gpsrIdentity) ? facts!.confirmed!.gpsrIdentity! : null;
+  }
+  return isCompleteGpsr(shopGpsr) ? shopGpsr! : null;
+}
+
 export function withDescriptionBlocks(
   description: string,
   facts: ProductFactsRecord | null,
+  shopGpsr?: GpsrIdentity | null,
 ): string {
-  const block = compositionBlockHtml(facts);
-  const stripped = description.replace(/<p>Fibre composition:.*?<\/p>/gi, "").trim();
-  if (!block) return stripped || description;
+  const composition = compositionBlockHtml(facts);
+  const gpsr = gpsrBlockHtml(effectiveGpsrIdentity(facts, shopGpsr));
+  const block = [composition, gpsr].filter(Boolean).join("\n");
+  const stripped = description
+    .replace(/<p>Fibre composition:.*?<\/p>/gi, "")
+    .replace(/<p>Manufacturer:.*?<\/p>(?:\s*<p>EU responsible person:.*?<\/p>)?/gi, "")
+    .trim();
+  if (!block) return stripped;
   return stripped ? `${stripped}\n${block}` : block;
 }
 

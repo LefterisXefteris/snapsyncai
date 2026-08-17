@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useShopifyStatus, useSaveShopGpsrIdentity } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@shared/routes";
 import { apiUrl } from "@/lib/api-origin";
-import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, type FibreRowDraft } from "@/lib/product-facts";
+import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, type FibreRowDraft, type GpsrChoice, type GpsrIdentity } from "@/lib/product-facts";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Check, Lock, Loader2, ImageIcon, Tag, Box, BarChart3, Plus, ImagePlus, Store, Trash2, X, UploadCloud, Search, GripVertical } from "lucide-react";
 import { AiContentPanel } from "@/components/ai-content-panel";
+import { GpsrIdentityFields } from "@/components/gpsr-identity-fields";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 /** Parallax frame — the product photo floats and tilts a few degrees toward the cursor. */
@@ -83,6 +84,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const updateMutation = useUpdateImage();
   const pushToShopifyMutation = usePushToShopify();
   const confirmFactsMutation = useConfirmProductFacts();
+  const { data: shopifyStatus } = useShopifyStatus();
+  const saveShopGpsr = useSaveShopGpsrIdentity();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -128,6 +131,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [compositionRows, setCompositionRows] = useState<FibreRowDraft[]>([
     { name: "cotton", percent: "", otherName: "" },
   ]);
+  const [gpsrChoice, setGpsrChoice] = useState<GpsrChoice | "">("");
+  const [gpsrDraft, setGpsrDraft] = useState<GpsrIdentity>(emptyGpsrIdentity());
+  const [shopGpsrDraft, setShopGpsrDraft] = useState<GpsrIdentity>(emptyGpsrIdentity());
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -181,6 +187,14 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     }
   }, [image]);
 
+  useEffect(() => {
+    const identity = shopifyStatus?.gpsrIdentity as GpsrIdentity | undefined;
+    if (identity && isCompleteGpsr(identity)) {
+      setShopGpsrDraft(identity);
+      setGpsrChoice((current) => (current === "" ? "shop_default" : current));
+    }
+  }, [shopifyStatus?.gpsrIdentity]);
+
   const variants = Array.isArray(image?.variants) ? (image.variants as { name: string; values: string[] }[]) : [];
   const mediaGallery = Array.isArray(image?.mediaGallery) ? (image.mediaGallery as string[]) : [];
   const productImages = orderProductImages(rawProductImages, mediaGallery);
@@ -210,6 +224,18 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const isUnpaid = image.paymentStatus !== "paid";
   const facts = productFacts(image);
   const canGenerate = mayGenerateListingCopy(image);
+  const shopGpsr = (shopifyStatus?.gpsrIdentity ?? null) as GpsrIdentity | null;
+  const shopConnected = Boolean(shopifyStatus?.connected);
+  const shopHasGpsr = isCompleteGpsr(shopGpsr);
+
+  const gpsrConfirmFields = {
+    gpsrChoice: gpsrChoice as GpsrChoice,
+    gpsrIdentity: gpsrChoice === "override" ? gpsrDraft : undefined,
+  };
+  const gpsrReady =
+    gpsrChoice === "skip" ||
+    (gpsrChoice === "shop_default" && shopHasGpsr) ||
+    (gpsrChoice === "override" && isCompleteGpsr(gpsrDraft));
 
   const persistMediaOrder = async (orderedIds: number[], primaryId?: number) => {
     if (!image || orderedIds.length === 0) return;
@@ -450,12 +476,43 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       Vision suggests this is not a textile.
                     </p>
                   )}
+                  <div className="space-y-2 pt-1">
+                    <label className="text-xs font-medium">GPSR identity</label>
+                    <Select
+                      value={gpsrChoice || undefined}
+                      onValueChange={(value) => setGpsrChoice(value as GpsrChoice)}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Choose skip, shop default, or enter" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="skip">Skip — omit from the listing</SelectItem>
+                        {shopConnected && (
+                          <SelectItem value="shop_default" disabled={!shopHasGpsr}>
+                            Use shop default{shopHasGpsr ? "" : " (save a shop default first)"}
+                          </SelectItem>
+                        )}
+                        <SelectItem value="override">
+                          {shopConnected ? "Override for this product" : "Enter for this product"}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {gpsrChoice === "override" && (
+                      <GpsrIdentityFields value={gpsrDraft} onChange={setGpsrDraft} />
+                    )}
+                  </div>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-8 text-xs"
-                    onClick={() => confirmFactsMutation.mutate({ imageId: image.id, isTextile: false })}
-                    disabled={confirmFactsMutation.isPending}
+                    onClick={() =>
+                      confirmFactsMutation.mutate({
+                        imageId: image.id,
+                        isTextile: false,
+                        ...gpsrConfirmFields,
+                      })
+                    }
+                    disabled={confirmFactsMutation.isPending || !gpsrReady}
                   >
                     {confirmFactsMutation.isPending ? (
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -553,9 +610,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                             percent: row.percent === "" ? null : Number(row.percent),
                             otherName: row.otherName || undefined,
                           })),
+                          ...gpsrConfirmFields,
                         })
                       }
-                      disabled={confirmFactsMutation.isPending}
+                      disabled={confirmFactsMutation.isPending || !gpsrReady}
                     >
                       {confirmFactsMutation.isPending ? (
                         <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -566,14 +624,41 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 </CardContent>
               </Card>
             )}
+            {shopConnected && (
+              <Card className="shadow-sm">
+                <CardHeader className="px-4 py-3">
+                  <CardTitle className="text-sm font-medium">Shop GPSR identity</CardTitle>
+                  <CardDescription className="text-xs">
+                    Saved once for this Shopify shop. Products can use it as the default.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 space-y-3">
+                  <GpsrIdentityFields value={shopGpsrDraft} onChange={setShopGpsrDraft} />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={saveShopGpsr.isPending || !isCompleteGpsr(shopGpsrDraft)}
+                    onClick={() => saveShopGpsr.mutate(shopGpsrDraft)}
+                  >
+                    {saveShopGpsr.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : null}
+                    Save shop GPSR identity
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             {!isUnpaid && (
               <AiContentPanel
                 imageId={image.id}
                 defaultCategory={category}
                 canGenerate={canGenerate}
                 facts={facts}
+                shopGpsr={shopGpsr}
                 onAcceptTitle={(v) => setTitle(v)}
-                onAcceptDescription={(v) => setDescription(withDescriptionBlocks(v, facts))}
+                onAcceptDescription={(v) => setDescription(withDescriptionBlocks(v, facts, shopGpsr))}
                 onAcceptTags={(v) => setTags(v)}
                 onAcceptAeoFaqs={(v) => setAeoFaqs(v)}
               />

@@ -24,6 +24,7 @@ from app.schemas.ai import (
     RegenerateFieldBody,
 )
 from app.schemas.image import ImageOut
+from app.services import connections
 from app.services import images as store
 from app.services.image_analysis import (
     full_analyze_image,
@@ -146,8 +147,13 @@ def _refuse_ungated_listing_copy(facts) -> JSONResponse | None:
     return None
 
 
-def _generation_system(base: str, facts) -> str:
-    extra = listing_copy_constraints(facts)
+async def _shop_gpsr(session, user_id: str):
+    connection = await connections.get_shopify(session, user_id)
+    return connection.gpsr_identity if connection is not None else None
+
+
+def _generation_system(base: str, facts, shop_gpsr=None) -> str:
+    extra = listing_copy_constraints(facts, shop_gpsr)
     return f"{base}\n{extra}" if extra else base
 
 
@@ -390,8 +396,9 @@ async def generate_content(
         f"Target audience: {body.audience or 'general buyers'}\n"
         f"Product title context: {image.title or image.original_name or ''}"
     )
+    shop_gpsr = await _shop_gpsr(session, user_id)
     messages = [
-        {"role": "system", "content": _generation_system(GENERATE_CONTENT_SYSTEM, facts)},
+        {"role": "system", "content": _generation_system(GENERATE_CONTENT_SYSTEM, facts, shop_gpsr)},
         {
             "role": "user",
             "content": [
@@ -434,8 +441,9 @@ async def regenerate_field(
         f"Target audience: {body.audience or 'general buyers'}\n"
         f"Product title context: {image.title or image.original_name or ''}"
     )
+    shop_gpsr = await _shop_gpsr(session, user_id)
     messages = [
-        {"role": "system", "content": _generation_system(system_prompt, facts)},
+        {"role": "system", "content": _generation_system(system_prompt, facts, shop_gpsr)},
         {
             "role": "user",
             "content": [

@@ -73,6 +73,7 @@ PROTECTED_BILLING_POST = [
 PROTECTED_CONNECT = [
     ("GET", "/api/shopify/oauth/start"),
     ("POST", "/api/shopify/connect"),
+    ("PUT", "/api/shopify/gpsr-identity"),
 ]
 
 
@@ -149,6 +150,7 @@ class TestResponseContract:
             "shopDomain",
             "grantedScopes",
             "inventoryReady",
+            "gpsrIdentity",
         }
         assert set(schemas["SubscriptionStatusResponse"]["properties"]) == {
             "subscribed",
@@ -191,6 +193,7 @@ class TestResponseContract:
             "/api/shopify/oauth/start",
             "/api/shopify/oauth/callback",
             "/api/shopify/connect",
+            "/api/shopify/gpsr-identity",
             "/api/images/upload",
             "/api/images/{image_id}/generate-content",
             "/api/images/{image_id}/regenerate-field",

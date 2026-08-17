@@ -92,6 +92,7 @@ export const shopifyConnections = pgTable("shopify_connections", {
   accessToken: text("access_token").notNull(),
   shopName: text("shop_name"),
   grantedScopes: text("granted_scopes").array(),
+  gpsrIdentity: jsonb("gpsr_identity"),
   webhooksRegisteredAt: timestamp("webhooks_registered_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

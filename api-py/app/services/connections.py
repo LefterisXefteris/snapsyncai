@@ -54,5 +54,18 @@ async def upsert_shopify(session: AsyncSession, **values) -> ShopifyConnection:
     return await _upsert(session, ShopifyConnection, values)
 
 
+async def update_shopify_gpsr(
+    session: AsyncSession, user_id: str, identity: dict
+) -> ShopifyConnection | None:
+    connection = await get_shopify(session, user_id)
+    if connection is None:
+        return None
+    connection.gpsr_identity = identity
+    session.add(connection)
+    await session.flush()
+    await session.refresh(connection)
+    return connection
+
+
 async def delete_shopify(session: AsyncSession, user_id: str) -> None:
     await _delete(session, ShopifyConnection, user_id)

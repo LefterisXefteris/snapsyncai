@@ -21,6 +21,12 @@ _NON_TEXTILE_CONSTRAINTS = (
     "This product is not a textile. Do not invent fibre composition, "
     "care instructions, manufacturer identity, or GPSR / EU responsible person details."
 )
+_GPSR_REQUIRED = "GPSR identity must be filled or explicitly skipped."
+_GPSR_INCOMPLETE = "GPSR identity is incomplete."
+_GPSR_SHOP_MISSING = "Shop GPSR identity is missing. Fill it on the product, or skip."
+_GPSR_SKIP = "skip"
+_GPSR_SHOP_DEFAULT = "shop_default"
+_GPSR_OVERRIDE = "override"
 
 _PERCENT = re.compile(r"\s*\(?\s*\d+\s*%\s*\)?", re.IGNORECASE)
 
@@ -54,9 +60,25 @@ class FibreRow:
 
 
 @dataclass(frozen=True)
+class GpsrParty:
+    name: str
+    postal_address: str
+    email: str
+
+
+@dataclass(frozen=True)
+class GpsrIdentity:
+    manufacturer: GpsrParty
+    manufacturer_in_eu: bool
+    eu_responsible_person: GpsrParty | None = None
+
+
+@dataclass(frozen=True)
 class ConfirmedFacts:
     is_textile: bool
     composition: tuple[FibreRow, ...] = ()
+    gpsr_choice: str | None = None
+    gpsr_override: GpsrIdentity | None = None
 
 
 @dataclass(frozen=True)
@@ -148,7 +170,16 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
             if error or parsed is None:
                 return ProductFacts(suggested=suggested, confirmed=None)
             composition = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
-        confirmed = ConfirmedFacts(is_textile=is_textile, composition=composition)
+        confirmed = ConfirmedFacts(
+            is_textile=is_textile,
+            composition=composition,
+            gpsr_choice=_gpsr_choice(
+                confirmed_raw.get("gpsrChoice", confirmed_raw.get("gpsr_choice"))
+            ),
+            gpsr_override=_identity_or_none(
+                confirmed_raw.get("gpsrIdentity", confirmed_raw.get("gpsr_identity"))
+            ),
+        )
     return ProductFacts(suggested=suggested, confirmed=confirmed)
 
 
@@ -165,6 +196,12 @@ def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
             stored["confirmed"]["composition"] = [
                 {"name": row.name, "percent": row.percent} for row in facts.confirmed.composition
             ]
+        if facts.confirmed.gpsr_choice:
+            stored["confirmed"]["gpsrChoice"] = facts.confirmed.gpsr_choice
+        if facts.confirmed.gpsr_override is not None:
+            stored["confirmed"]["gpsrIdentity"] = stored_gpsr_identity(
+                facts.confirmed.gpsr_override
+            )
     return stored
 
 
@@ -173,28 +210,42 @@ def confirm_facts(
     *,
     is_textile: bool,
     composition: Sequence[Mapping[str, Any]] | None = None,
+    gpsr_choice: str | None = None,
+    gpsr_identity: Mapping[str, Any] | None = None,
+    shop_gpsr: Mapping[str, Any] | None = None,
 ) -> ConfirmResult:
+    choice = _gpsr_choice(gpsr_choice)
+    if choice is None:
+        return ConfirmResult(facts=facts, error=_GPSR_REQUIRED)
+    composition_rows: tuple[FibreRow, ...] = ()
     if is_textile:
         if not composition:
             return ConfirmResult(facts=facts, error=_TEXTILE_NEEDS_COMPOSITION)
         parsed, error = _parse_composition(composition)
         if error or parsed is None:
             return ConfirmResult(facts=facts, error=error or _TEXTILE_NEEDS_COMPOSITION)
-        return ConfirmResult(
-            facts=ProductFacts(
-                suggested=facts.suggested,
-                confirmed=ConfirmedFacts(
-                    is_textile=True,
-                    composition=tuple(
-                        FibreRow(name=name, percent=percent) for name, percent in parsed
-                    ),
-                ),
-            )
-        )
+        composition_rows = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
+    override: GpsrIdentity | None = None
+    if choice == _GPSR_SKIP:
+        override = None
+    elif choice == _GPSR_SHOP_DEFAULT:
+        identity, error = parse_gpsr_identity(shop_gpsr)
+        if error or identity is None:
+            return ConfirmResult(facts=facts, error=_GPSR_SHOP_MISSING)
+    else:
+        identity, error = parse_gpsr_identity(gpsr_identity)
+        if error or identity is None:
+            return ConfirmResult(facts=facts, error=error or _GPSR_INCOMPLETE)
+        override = identity
     return ConfirmResult(
         facts=ProductFacts(
             suggested=facts.suggested,
-            confirmed=ConfirmedFacts(is_textile=False),
+            confirmed=ConfirmedFacts(
+                is_textile=is_textile,
+                composition=composition_rows,
+                gpsr_choice=choice,
+                gpsr_override=override,
+            ),
         )
     )
 
@@ -214,38 +265,116 @@ def generation_blocked_reason(facts: ProductFacts) -> str | None:
     return _GATE_CLOSED
 
 
-def listing_copy_constraints(facts: ProductFacts) -> str:
+def listing_copy_constraints(
+    facts: ProductFacts, shop_gpsr: Mapping[str, Any] | None = None
+) -> str:
     confirmed = facts.confirmed
     if confirmed is None:
         return ""
+    parts: list[str] = []
+    blocks = description_blocks(facts, shop_gpsr)
+    if blocks:
+        parts.append(
+            f"Include this English facts block in the description HTML, unchanged: {blocks}"
+        )
     if confirmed.is_textile is False:
-        return _NON_TEXTILE_CONSTRAINTS
+        if effective_gpsr(facts, shop_gpsr) is None:
+            parts.append(_NON_TEXTILE_CONSTRAINTS)
+        else:
+            parts.append(
+                "This product is not a textile. "
+                "Do not invent fibre composition or care instructions."
+            )
+        return "\n".join(parts)
     names = ", ".join(row.name for row in confirmed.composition)
-    blocks = description_blocks(facts)
-    return (
-        f"Include this English composition block in the description HTML, unchanged: {blocks}\n"
+    parts.append(
         f"Tags and AEO may use only these confirmed fibre names: {names}. "
-        "Do not use suggested or guessed materials.\n"
-        "Do not invent care instructions, manufacturer identity, "
-        "or GPSR / EU responsible person details."
+        "Do not use suggested or guessed materials."
+    )
+    if effective_gpsr(facts, shop_gpsr) is None:
+        parts.append(
+            "Do not invent care instructions, manufacturer identity, "
+            "or GPSR / EU responsible person details."
+        )
+    else:
+        parts.append("Do not invent care instructions.")
+    return "\n".join(parts)
+
+
+def description_blocks(
+    facts: ProductFacts, shop_gpsr: Mapping[str, Any] | None = None
+) -> str:
+    chunks: list[str] = []
+    confirmed = facts.confirmed
+    if confirmed is not None and confirmed.is_textile and confirmed.composition:
+        parts = ", ".join(f"{row.percent}% {row.name}" for row in confirmed.composition)
+        chunks.append(f"<p>Fibre composition: {parts}.</p>")
+    identity = effective_gpsr(facts, shop_gpsr)
+    if identity is not None:
+        chunks.append(_gpsr_html(identity))
+    return "".join(chunks) if len(chunks) == 1 else "\n".join(chunks)
+
+
+def effective_gpsr(
+    facts: ProductFacts, shop_gpsr: Mapping[str, Any] | None = None
+) -> GpsrIdentity | None:
+    confirmed = facts.confirmed
+    if confirmed is None:
+        return None
+    choice = confirmed.gpsr_choice
+    if choice == _GPSR_SKIP or choice is None:
+        return None
+    if choice == _GPSR_OVERRIDE:
+        return confirmed.gpsr_override
+    identity, error = parse_gpsr_identity(shop_gpsr)
+    if error or identity is None:
+        return None
+    return identity
+
+
+def parse_gpsr_identity(
+    raw: Mapping[str, Any] | None,
+) -> tuple[GpsrIdentity | None, str | None]:
+    if not isinstance(raw, Mapping):
+        return None, _GPSR_INCOMPLETE
+    manufacturer = _gpsr_party(raw.get("manufacturer"))
+    if manufacturer is None:
+        return None, _GPSR_INCOMPLETE
+    in_eu = _as_bool(raw.get("manufacturerInEu", raw.get("manufacturer_in_eu")))
+    if in_eu is None:
+        in_eu = False
+    responsible = None
+    if not in_eu:
+        responsible = _gpsr_party(
+            raw.get("euResponsiblePerson", raw.get("eu_responsible_person"))
+        )
+        if responsible is None:
+            return None, _GPSR_INCOMPLETE
+    return (
+        GpsrIdentity(
+            manufacturer=manufacturer,
+            manufacturer_in_eu=in_eu,
+            eu_responsible_person=responsible,
+        ),
+        None,
     )
 
 
-def description_blocks(facts: ProductFacts) -> str:
-    confirmed = facts.confirmed
-    if confirmed is None or not confirmed.is_textile or not confirmed.composition:
-        return ""
-    parts = ", ".join(f"{row.percent}% {row.name}" for row in confirmed.composition)
-    return f"<p>Fibre composition: {parts}.</p>"
-
-
 _COMPOSITION_BLOCK = re.compile(r"<p>Fibre composition:.*?</p>", re.IGNORECASE | re.DOTALL)
+_GPSR_BLOCK = re.compile(
+    r"<p>Manufacturer:.*?</p>(?:\s*<p>EU responsible person:.*?</p>)?",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
-def apply_description_blocks(description: str, facts: ProductFacts) -> str:
+def apply_description_blocks(
+    description: str,
+    facts: ProductFacts,
+    shop_gpsr: Mapping[str, Any] | None = None,
+) -> str:
     """Put the module's English blocks into listing-copy description HTML."""
-    stripped = _COMPOSITION_BLOCK.sub("", description).strip()
-    blocks = description_blocks(facts)
+    stripped = _GPSR_BLOCK.sub("", _COMPOSITION_BLOCK.sub("", description)).strip()
+    blocks = description_blocks(facts, shop_gpsr)
     if not blocks:
         return stripped
     return f"{stripped}\n{blocks}" if stripped else blocks
@@ -289,6 +418,62 @@ def _as_bool(value: Any) -> bool | None:
         if lowered in ("false", "no"):
             return False
     return None
+
+
+def _gpsr_choice(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    choice = value.strip().lower().replace("-", "_")
+    if choice in {_GPSR_SKIP, _GPSR_SHOP_DEFAULT, _GPSR_OVERRIDE}:
+        return choice
+    return None
+
+
+def _gpsr_party(raw: Any) -> GpsrParty | None:
+    if not isinstance(raw, Mapping):
+        return None
+    name = _text(raw.get("name"))
+    address = _text(raw.get("postalAddress") or raw.get("postal_address"))
+    email = _text(raw.get("email"))
+    if not name or not address or not email:
+        return None
+    return GpsrParty(name=name, postal_address=address, email=email)
+
+
+def _identity_or_none(raw: Any) -> GpsrIdentity | None:
+    identity, error = parse_gpsr_identity(raw if isinstance(raw, Mapping) else None)
+    if error or identity is None:
+        return None
+    return identity
+
+
+def stored_gpsr_identity(identity: GpsrIdentity) -> dict[str, Any]:
+    stored: dict[str, Any] = {
+        "manufacturer": {
+            "name": identity.manufacturer.name,
+            "postalAddress": identity.manufacturer.postal_address,
+            "email": identity.manufacturer.email,
+        },
+        "manufacturerInEu": identity.manufacturer_in_eu,
+    }
+    if identity.eu_responsible_person is not None:
+        stored["euResponsiblePerson"] = {
+            "name": identity.eu_responsible_person.name,
+            "postalAddress": identity.eu_responsible_person.postal_address,
+            "email": identity.eu_responsible_person.email,
+        }
+    return stored
+
+
+def _gpsr_html(identity: GpsrIdentity) -> str:
+    maker = identity.manufacturer
+    html = f"<p>Manufacturer: {maker.name}, {maker.postal_address}, {maker.email}.</p>"
+    if identity.eu_responsible_person is not None:
+        person = identity.eu_responsible_person
+        html += (
+            f"<p>EU responsible person: {person.name}, {person.postal_address}, {person.email}.</p>"
+        )
+    return html
 
 
 def _canonical_fibre(name: str) -> str:

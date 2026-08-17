@@ -302,6 +302,7 @@ export const api = {
           shopDomain: z.string().optional(),
           grantedScopes: z.array(z.string()).optional(),
           inventoryReady: z.boolean().optional(),
+          gpsrIdentity: z.unknown().optional(),
         }),
       },
     },
@@ -316,6 +317,10 @@ export const api = {
     disconnect: {
       method: 'POST' as const,
       path: '/api/shopify/disconnect' as const,
+    },
+    gpsrIdentity: {
+      method: 'PUT' as const,
+      path: '/api/shopify/gpsr-identity' as const,
     },
   },
 };

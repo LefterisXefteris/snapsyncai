@@ -145,12 +145,17 @@ async def confirm_product_facts(
     current = merge_product_facts(
         [img.product_facts for img in group] or [image.product_facts]
     )
+    connection = await connections.get_shopify(session, user_id)
+    shop_gpsr = connection.gpsr_identity if connection is not None else None
     result = confirm_facts(
         current,
         is_textile=body.is_textile,
         composition=[row.model_dump() for row in body.composition]
         if body.composition is not None
         else None,
+        gpsr_choice=body.gpsr_choice,
+        gpsr_identity=body.gpsr_identity.model_dump(by_alias=True) if body.gpsr_identity else None,
+        shop_gpsr=shop_gpsr,
     )
     if not result.ok:
         raise HTTPException(status_code=400, detail=result.error)

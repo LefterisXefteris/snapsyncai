@@ -10,10 +10,11 @@ Tokens here are sensitive. Shopify's `access_token` is AES-256-GCM encrypted by
 """
 
 from datetime import datetime
+from typing import Any
 
 from sqlmodel import Field, SQLModel
 
-from app.models.base import timestamp, txt, txt_array
+from app.models.base import jsonb, timestamp, txt, txt_array
 
 
 class ShopifyConnection(SQLModel, table=True):
@@ -25,5 +26,6 @@ class ShopifyConnection(SQLModel, table=True):
     access_token: str = Field(sa_column=txt(nullable=False))
     shop_name: str | None = Field(default=None, sa_column=txt())
     granted_scopes: list[str] | None = Field(default=None, sa_column=txt_array())
+    gpsr_identity: Any | None = Field(default=None, sa_column=jsonb())
     webhooks_registered_at: datetime | None = Field(default=None, sa_column=timestamp())
     created_at: datetime | None = Field(default=None, sa_column=timestamp(now=True))

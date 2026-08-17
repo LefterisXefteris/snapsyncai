@@ -451,6 +451,36 @@ export function useShopifyConnect() {
   });
 }
 
+export function useSaveShopGpsrIdentity() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (gpsrIdentity: {
+      manufacturer: { name: string; postalAddress: string; email: string };
+      manufacturerInEu: boolean;
+      euResponsiblePerson?: { name: string; postalAddress: string; email: string } | null;
+    }) => {
+      const res = await apiRequest("PUT", api.shopify.gpsrIdentity.path, gpsrIdentity);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData([api.shopify.status.path], data);
+      toast({
+        title: "Shop GPSR identity saved",
+        description: "New products can use this as the default.",
+      });
+    },
+    onError: (error: { message?: string }) => {
+      toast({
+        title: "Could not save shop GPSR identity",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 export function useShopifyDisconnect() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -479,15 +509,23 @@ export function useConfirmProductFacts() {
       imageId,
       isTextile,
       composition,
+      gpsrChoice,
+      gpsrIdentity,
     }: {
       imageId: number;
       isTextile: boolean;
       composition?: { name: string; percent: number | null; otherName?: string }[];
+      gpsrChoice: "skip" | "shop_default" | "override";
+      gpsrIdentity?: {
+        manufacturer: { name: string; postalAddress: string; email: string };
+        manufacturerInEu: boolean;
+        euResponsiblePerson?: { name: string; postalAddress: string; email: string } | null;
+      };
     }) => {
       const res = await apiRequest(
         "POST",
         buildUrl(api.images.confirmProductFacts.path, { id: imageId }),
-        { isTextile, composition },
+        { isTextile, composition, gpsrChoice, gpsrIdentity },
       );
       return res.json();
     },

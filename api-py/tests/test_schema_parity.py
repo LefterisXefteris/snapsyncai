@@ -105,6 +105,11 @@ class TestImageContract:
         }
 
 
+def test_shopify_connection_gpsr_identity_is_jsonb() -> None:
+    columns = SQLModel.metadata.tables["shopify_connections"].columns
+    assert _pg_type(columns["gpsr_identity"]) == "JSONB"
+
+
 def test_full_schema_compiles_to_postgres_ddl() -> None:
     """The baseline revision runs `create_all`; this proves that emits valid DDL.
 

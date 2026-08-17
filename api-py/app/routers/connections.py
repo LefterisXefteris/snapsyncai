@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.clerk import CurrentUser
 from app.db import SessionDep
 from app.schemas.base import CamelModel
+from app.schemas.gpsr import GpsrIdentityIn
 from app.services import connections
+from app.services.product_facts import parse_gpsr_identity, stored_gpsr_identity
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,7 @@ class ShopifyStatus(CamelModel):
     shop_domain: str | None = None
     granted_scopes: list[str] | None = None
     inventory_ready: bool | None = None
+    gpsr_identity: GpsrIdentityIn | None = None
 
 
 async def _safe_get(getter, session: AsyncSession, user_id: str, channel: str):
@@ -58,6 +61,12 @@ async def shopify_status(user_id: CurrentUser, session: SessionDep) -> ShopifySt
         return ShopifyStatus(connected=False)
 
     granted = connection.granted_scopes or []
+    identity, _error = parse_gpsr_identity(connection.gpsr_identity)
+    gpsr = (
+        GpsrIdentityIn.model_validate(stored_gpsr_identity(identity))
+        if identity is not None
+        else None
+    )
     return ShopifyStatus(
         connected=True,
         # Express falls back to the domain when no display name was captured.
@@ -65,7 +74,26 @@ async def shopify_status(user_id: CurrentUser, session: SessionDep) -> ShopifySt
         shop_domain=connection.shop_domain,
         granted_scopes=granted,
         inventory_ready=all(scope in granted for scope in INVENTORY_SCOPES),
+        gpsr_identity=gpsr,
     )
+
+
+@router.put("/api/shopify/gpsr-identity", response_model=ShopifyStatus)
+async def put_shop_gpsr_identity(
+    body: GpsrIdentityIn, user_id: CurrentUser, session: SessionDep
+) -> ShopifyStatus:
+    identity, error = parse_gpsr_identity(body.model_dump(by_alias=True))
+    if error or identity is None:
+        raise HTTPException(status_code=400, detail=error or "GPSR identity is incomplete.")
+    updated = await connections.update_shopify_gpsr(
+        session, user_id, stored_gpsr_identity(identity)
+    )
+    if updated is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Connect Shopify before saving shop GPSR identity.",
+        )
+    return await shopify_status(user_id, session)
 
 
 class DisconnectResponse(CamelModel):
