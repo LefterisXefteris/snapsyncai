@@ -27,6 +27,45 @@ _GPSR_SHOP_MISSING = "Shop GPSR identity is missing. Fill it on the product, or 
 _GPSR_SKIP = "skip"
 _GPSR_SHOP_DEFAULT = "shop_default"
 _GPSR_OVERRIDE = "override"
+_CARE_REQUIRED = "Care instructions must be filled or explicitly skipped."
+_CARE_INCOMPLETE = "Care instructions must be a complete five-family set or an explicit skip."
+_CARE_SKIP = "skip"
+_CARE_FILL = "fill"
+
+CARE_PICKS: dict[str, dict[str, str]] = {
+    "washing": {
+        "do_not_wash": "Do not wash",
+        "hand_wash": "Hand wash",
+        "wash_30c": "Wash at 30°C",
+        "wash_40c": "Wash at 40°C",
+        "wash_60c": "Wash at 60°C",
+        "wash_95c": "Wash at 95°C",
+    },
+    "bleaching": {
+        "any_bleach": "Any bleach",
+        "non_chlorine_bleach": "Non-chlorine bleach only",
+        "do_not_bleach": "Do not bleach",
+    },
+    "drying": {
+        "tumble_dry_normal": "Tumble dry normal",
+        "tumble_dry_low": "Tumble dry low",
+        "do_not_tumble_dry": "Do not tumble dry",
+        "line_dry": "Line dry",
+    },
+    "ironing": {
+        "iron_high": "Iron high",
+        "iron_medium": "Iron medium",
+        "iron_low": "Iron low",
+        "do_not_iron": "Do not iron",
+    },
+    "professional_textile_care": {
+        "dry_clean": "Dry clean",
+        "do_not_dry_clean": "Do not dry clean",
+        "professional_wet_clean": "Professional wet clean",
+    },
+}
+
+CARE_FAMILIES = tuple(CARE_PICKS.keys())
 
 _PERCENT = re.compile(r"\s*\(?\s*\d+\s*%\s*\)?", re.IGNORECASE)
 
@@ -74,11 +113,22 @@ class GpsrIdentity:
 
 
 @dataclass(frozen=True)
+class CareInstructions:
+    washing: str
+    bleaching: str
+    drying: str
+    ironing: str
+    professional_textile_care: str
+
+
+@dataclass(frozen=True)
 class ConfirmedFacts:
     is_textile: bool
     composition: tuple[FibreRow, ...] = ()
     gpsr_choice: str | None = None
     gpsr_override: GpsrIdentity | None = None
+    care_choice: str | None = None
+    care: CareInstructions | None = None
 
 
 @dataclass(frozen=True)
@@ -170,6 +220,19 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
             if error or parsed is None:
                 return ProductFacts(suggested=suggested, confirmed=None)
             composition = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
+        care_choice = None
+        care = None
+        if is_textile:
+            care_choice = _care_choice(
+                confirmed_raw.get("careChoice", confirmed_raw.get("care_choice"))
+            )
+            if care_choice == _CARE_FILL:
+                parsed_care, care_error = parse_care_instructions(
+                    confirmed_raw.get("care")
+                )
+                if care_error or parsed_care is None:
+                    return ProductFacts(suggested=suggested, confirmed=None)
+                care = parsed_care
         confirmed = ConfirmedFacts(
             is_textile=is_textile,
             composition=composition,
@@ -179,6 +242,8 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
             gpsr_override=_identity_or_none(
                 confirmed_raw.get("gpsrIdentity", confirmed_raw.get("gpsr_identity"))
             ),
+            care_choice=care_choice,
+            care=care,
         )
     return ProductFacts(suggested=suggested, confirmed=confirmed)
 
@@ -202,6 +267,10 @@ def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
             stored["confirmed"]["gpsrIdentity"] = stored_gpsr_identity(
                 facts.confirmed.gpsr_override
             )
+        if facts.confirmed.care_choice:
+            stored["confirmed"]["careChoice"] = facts.confirmed.care_choice
+        if facts.confirmed.care is not None:
+            stored["confirmed"]["care"] = stored_care_instructions(facts.confirmed.care)
     return stored
 
 
@@ -213,11 +282,15 @@ def confirm_facts(
     gpsr_choice: str | None = None,
     gpsr_identity: Mapping[str, Any] | None = None,
     shop_gpsr: Mapping[str, Any] | None = None,
+    care_choice: str | None = None,
+    care: Mapping[str, Any] | None = None,
 ) -> ConfirmResult:
     choice = _gpsr_choice(gpsr_choice)
     if choice is None:
         return ConfirmResult(facts=facts, error=_GPSR_REQUIRED)
     composition_rows: tuple[FibreRow, ...] = ()
+    stored_care_choice: str | None = None
+    care_value: CareInstructions | None = None
     if is_textile:
         if not composition:
             return ConfirmResult(facts=facts, error=_TEXTILE_NEEDS_COMPOSITION)
@@ -225,6 +298,14 @@ def confirm_facts(
         if error or parsed is None:
             return ConfirmResult(facts=facts, error=error or _TEXTILE_NEEDS_COMPOSITION)
         composition_rows = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
+        stored_care_choice = _care_choice(care_choice)
+        if stored_care_choice is None:
+            return ConfirmResult(facts=facts, error=_CARE_REQUIRED)
+        if stored_care_choice == _CARE_FILL:
+            parsed_care, care_error = parse_care_instructions(care)
+            if care_error or parsed_care is None:
+                return ConfirmResult(facts=facts, error=care_error or _CARE_INCOMPLETE)
+            care_value = parsed_care
     override: GpsrIdentity | None = None
     if choice == _GPSR_SKIP:
         override = None
@@ -245,6 +326,8 @@ def confirm_facts(
                 composition=composition_rows,
                 gpsr_choice=choice,
                 gpsr_override=override,
+                care_choice=stored_care_choice,
+                care=care_value,
             ),
         )
     )
@@ -291,13 +374,13 @@ def listing_copy_constraints(
         f"Tags and AEO may use only these confirmed fibre names: {names}. "
         "Do not use suggested or guessed materials."
     )
+    invent: list[str] = []
+    if confirmed.care is None:
+        invent.append("care instructions")
     if effective_gpsr(facts, shop_gpsr) is None:
-        parts.append(
-            "Do not invent care instructions, manufacturer identity, "
-            "or GPSR / EU responsible person details."
-        )
-    else:
-        parts.append("Do not invent care instructions.")
+        invent.append("manufacturer identity, or GPSR / EU responsible person details")
+    if invent:
+        parts.append("Do not invent " + ", ".join(invent) + ".")
     return "\n".join(parts)
 
 
@@ -309,6 +392,8 @@ def description_blocks(
     if confirmed is not None and confirmed.is_textile and confirmed.composition:
         parts = ", ".join(f"{row.percent}% {row.name}" for row in confirmed.composition)
         chunks.append(f"<p>Fibre composition: {parts}.</p>")
+    if confirmed is not None and confirmed.is_textile and confirmed.care is not None:
+        chunks.append(_care_html(confirmed.care))
     identity = effective_gpsr(facts, shop_gpsr)
     if identity is not None:
         chunks.append(_gpsr_html(identity))
@@ -361,6 +446,7 @@ def parse_gpsr_identity(
 
 
 _COMPOSITION_BLOCK = re.compile(r"<p>Fibre composition:.*?</p>", re.IGNORECASE | re.DOTALL)
+_CARE_BLOCK = re.compile(r"<p>Care instructions:.*?</p>", re.IGNORECASE | re.DOTALL)
 _GPSR_BLOCK = re.compile(
     r"<p>Manufacturer:.*?</p>(?:\s*<p>EU responsible person:.*?</p>)?",
     re.IGNORECASE | re.DOTALL,
@@ -373,7 +459,9 @@ def apply_description_blocks(
     shop_gpsr: Mapping[str, Any] | None = None,
 ) -> str:
     """Put the module's English blocks into listing-copy description HTML."""
-    stripped = _GPSR_BLOCK.sub("", _COMPOSITION_BLOCK.sub("", description)).strip()
+    stripped = _GPSR_BLOCK.sub(
+        "", _CARE_BLOCK.sub("", _COMPOSITION_BLOCK.sub("", description))
+    ).strip()
     blocks = description_blocks(facts, shop_gpsr)
     if not blocks:
         return stripped
@@ -429,6 +517,15 @@ def _gpsr_choice(value: Any) -> str | None:
     return None
 
 
+def _care_choice(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    choice = value.strip().lower().replace("-", "_")
+    if choice in {_CARE_SKIP, _CARE_FILL}:
+        return choice
+    return None
+
+
 def _gpsr_party(raw: Any) -> GpsrParty | None:
     if not isinstance(raw, Mapping):
         return None
@@ -463,6 +560,50 @@ def stored_gpsr_identity(identity: GpsrIdentity) -> dict[str, Any]:
             "email": identity.eu_responsible_person.email,
         }
     return stored
+
+
+def parse_care_instructions(
+    raw: Mapping[str, Any] | None,
+) -> tuple[CareInstructions | None, str | None]:
+    if not isinstance(raw, Mapping):
+        return None, _CARE_INCOMPLETE
+    codes: dict[str, str] = {}
+    for family in CARE_FAMILIES:
+        camel = _camel_family(family)
+        code = raw.get(camel, raw.get(family))
+        if not isinstance(code, str) or code not in CARE_PICKS[family]:
+            return None, _CARE_INCOMPLETE
+        codes[family] = code
+    return (
+        CareInstructions(
+            washing=codes["washing"],
+            bleaching=codes["bleaching"],
+            drying=codes["drying"],
+            ironing=codes["ironing"],
+            professional_textile_care=codes["professional_textile_care"],
+        ),
+        None,
+    )
+
+
+def stored_care_instructions(care: CareInstructions) -> dict[str, str]:
+    return {
+        "washing": care.washing,
+        "bleaching": care.bleaching,
+        "drying": care.drying,
+        "ironing": care.ironing,
+        "professionalTextileCare": care.professional_textile_care,
+    }
+
+
+def _camel_family(family: str) -> str:
+    parts = family.split("_")
+    return parts[0] + "".join(part.title() for part in parts[1:])
+
+
+def _care_html(care: CareInstructions) -> str:
+    phrases = [CARE_PICKS[family][getattr(care, family)] for family in CARE_FAMILIES]
+    return f"<p>Care instructions: {'. '.join(phrases)}.</p>"
 
 
 def _gpsr_html(identity: GpsrIdentity) -> str:

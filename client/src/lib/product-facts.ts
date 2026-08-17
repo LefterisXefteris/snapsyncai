@@ -38,6 +38,73 @@ export type GpsrIdentity = {
 
 export type GpsrChoice = "skip" | "shop_default" | "override";
 
+export type CareChoice = "skip" | "fill";
+
+export type CareFamily =
+  | "washing"
+  | "bleaching"
+  | "drying"
+  | "ironing"
+  | "professionalTextileCare";
+
+export type CareInstructions = Record<CareFamily, string>;
+
+export const CARE_FAMILIES: { key: CareFamily; label: string }[] = [
+  { key: "washing", label: "Washing" },
+  { key: "bleaching", label: "Bleaching" },
+  { key: "drying", label: "Drying" },
+  { key: "ironing", label: "Ironing" },
+  { key: "professionalTextileCare", label: "Professional textile care" },
+];
+
+export const CARE_PICKS: Record<CareFamily, { code: string; label: string }[]> = {
+  washing: [
+    { code: "do_not_wash", label: "Do not wash" },
+    { code: "hand_wash", label: "Hand wash" },
+    { code: "wash_30c", label: "Wash at 30°C" },
+    { code: "wash_40c", label: "Wash at 40°C" },
+    { code: "wash_60c", label: "Wash at 60°C" },
+    { code: "wash_95c", label: "Wash at 95°C" },
+  ],
+  bleaching: [
+    { code: "any_bleach", label: "Any bleach" },
+    { code: "non_chlorine_bleach", label: "Non-chlorine bleach only" },
+    { code: "do_not_bleach", label: "Do not bleach" },
+  ],
+  drying: [
+    { code: "tumble_dry_normal", label: "Tumble dry normal" },
+    { code: "tumble_dry_low", label: "Tumble dry low" },
+    { code: "do_not_tumble_dry", label: "Do not tumble dry" },
+    { code: "line_dry", label: "Line dry" },
+  ],
+  ironing: [
+    { code: "iron_high", label: "Iron high" },
+    { code: "iron_medium", label: "Iron medium" },
+    { code: "iron_low", label: "Iron low" },
+    { code: "do_not_iron", label: "Do not iron" },
+  ],
+  professionalTextileCare: [
+    { code: "dry_clean", label: "Dry clean" },
+    { code: "do_not_dry_clean", label: "Do not dry clean" },
+    { code: "professional_wet_clean", label: "Professional wet clean" },
+  ],
+};
+
+export function emptyCare(): CareInstructions {
+  return {
+    washing: "",
+    bleaching: "",
+    drying: "",
+    ironing: "",
+    professionalTextileCare: "",
+  };
+}
+
+export function isCompleteCare(care: CareInstructions | null | undefined): boolean {
+  if (!care) return false;
+  return CARE_FAMILIES.every(({ key }) => Boolean(care[key]));
+}
+
 export function emptyGpsrParty(): GpsrParty {
   return { name: "", postalAddress: "", email: "" };
 }
@@ -71,6 +138,8 @@ export type ProductFactsRecord = {
     composition?: { name?: string; percent?: number }[];
     gpsrChoice?: GpsrChoice;
     gpsrIdentity?: GpsrIdentity;
+    careChoice?: CareChoice;
+    care?: CareInstructions;
   };
 };
 
@@ -111,6 +180,16 @@ export function compositionBlockHtml(facts: ProductFactsRecord | null): string {
   return `<p>Fibre composition: ${parts.join(", ")}.</p>`;
 }
 
+export function careBlockHtml(care: CareInstructions | null | undefined): string {
+  if (!care || !isCompleteCare(care)) return "";
+  const phrases = CARE_FAMILIES.map(({ key }) => {
+    const pick = CARE_PICKS[key].find((item) => item.code === care[key]);
+    return pick?.label ?? "";
+  });
+  if (phrases.some((phrase) => !phrase)) return "";
+  return `<p>Care instructions: ${phrases.join(". ")}.</p>`;
+}
+
 export function gpsrBlockHtml(identity: GpsrIdentity | null | undefined): string {
   if (!identity || !partyComplete(identity.manufacturer)) return "";
   const maker = identity.manufacturer;
@@ -140,10 +219,15 @@ export function withDescriptionBlocks(
   shopGpsr?: GpsrIdentity | null,
 ): string {
   const composition = compositionBlockHtml(facts);
+  const care =
+    facts?.confirmed?.isTextile && facts.confirmed.careChoice === "fill"
+      ? careBlockHtml(facts.confirmed.care)
+      : "";
   const gpsr = gpsrBlockHtml(effectiveGpsrIdentity(facts, shopGpsr));
-  const block = [composition, gpsr].filter(Boolean).join("\n");
+  const block = [composition, care, gpsr].filter(Boolean).join("\n");
   const stripped = description
     .replace(/<p>Fibre composition:.*?<\/p>/gi, "")
+    .replace(/<p>Care instructions:.*?<\/p>/gi, "")
     .replace(/<p>Manufacturer:.*?<\/p>(?:\s*<p>EU responsible person:.*?<\/p>)?/gi, "")
     .trim();
   if (!block) return stripped;

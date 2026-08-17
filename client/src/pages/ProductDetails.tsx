@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@shared/routes";
 import { apiUrl } from "@/lib/api-origin";
-import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, type FibreRowDraft, type GpsrChoice, type GpsrIdentity } from "@/lib/product-facts";
+import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, emptyCare, isCompleteCare, CARE_FAMILIES, CARE_PICKS, type FibreRowDraft, type GpsrChoice, type GpsrIdentity, type CareChoice, type CareInstructions } from "@/lib/product-facts";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -134,6 +134,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [gpsrChoice, setGpsrChoice] = useState<GpsrChoice | "">("");
   const [gpsrDraft, setGpsrDraft] = useState<GpsrIdentity>(emptyGpsrIdentity());
   const [shopGpsrDraft, setShopGpsrDraft] = useState<GpsrIdentity>(emptyGpsrIdentity());
+  const [careChoice, setCareChoice] = useState<CareChoice | "">("");
+  const [careDraft, setCareDraft] = useState<CareInstructions>(emptyCare());
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
 
@@ -236,6 +238,12 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     gpsrChoice === "skip" ||
     (gpsrChoice === "shop_default" && shopHasGpsr) ||
     (gpsrChoice === "override" && isCompleteGpsr(gpsrDraft));
+  const careConfirmFields = {
+    careChoice: careChoice as CareChoice,
+    care: careChoice === "fill" ? careDraft : undefined,
+  };
+  const careReady =
+    careChoice === "skip" || (careChoice === "fill" && isCompleteCare(careDraft));
 
   const persistMediaOrder = async (orderedIds: number[], primaryId?: number) => {
     if (!image || orderedIds.length === 0) return;
@@ -462,7 +470,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 <CardHeader className="px-4 py-3">
                   <CardTitle className="text-sm font-medium">Product facts</CardTitle>
                   <CardDescription className="text-xs">
-                    Confirm this is not a textile, or enter fibre composition that sums to 100%.
+                    Confirm this is not a textile, or enter fibre composition that sums to 100% and care instructions (or explicitly skip care instructions).
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 space-y-3">
@@ -598,6 +606,44 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         {compositionRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0)} / 100
                       </p>
                     </div>
+                    <div className="space-y-2 pt-1">
+                      <label className="text-xs font-medium">Care instructions</label>
+                      <Select
+                        value={careChoice || undefined}
+                        onValueChange={(value) => setCareChoice(value as CareChoice)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Fill all five, or skip" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="skip">Skip — omit from the listing</SelectItem>
+                          <SelectItem value="fill">Enter care instructions</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {careChoice === "fill" &&
+                        CARE_FAMILIES.map(({ key, label }) => (
+                          <div key={key} className="space-y-1">
+                            <label className="text-[11px] text-muted-foreground">{label}</label>
+                            <Select
+                              value={careDraft[key] || undefined}
+                              onValueChange={(code) =>
+                                setCareDraft((current) => ({ ...current, [key]: code }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder={`Choose ${label.toLowerCase()}`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CARE_PICKS[key].map((pick) => (
+                                  <SelectItem key={pick.code} value={pick.code}>
+                                    {pick.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                    </div>
                     <Button
                       size="sm"
                       className="h-8 text-xs"
@@ -611,9 +657,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                             otherName: row.otherName || undefined,
                           })),
                           ...gpsrConfirmFields,
+                          ...careConfirmFields,
                         })
                       }
-                      disabled={confirmFactsMutation.isPending || !gpsrReady}
+                      disabled={confirmFactsMutation.isPending || !gpsrReady || !careReady}
                     >
                       {confirmFactsMutation.isPending ? (
                         <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />

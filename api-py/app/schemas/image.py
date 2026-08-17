@@ -108,11 +108,21 @@ class FibreRowIn(CamelModel):
     other_name: str | None = None
 
 
+class CareInstructionsIn(CamelModel):
+    washing: str
+    bleaching: str
+    drying: str
+    ironing: str
+    professional_textile_care: str
+
+
 class ConfirmProductFactsBody(CamelModel):
     is_textile: bool
     composition: list[FibreRowIn] | None = None
     gpsr_choice: Literal["skip", "shop_default", "override"]
     gpsr_identity: GpsrIdentityIn | None = None
+    care_choice: Literal["skip", "fill"] | None = None
+    care: CareInstructionsIn | None = None
 
 
 class AssignGroupBody(CamelModel):

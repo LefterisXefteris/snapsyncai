@@ -156,6 +156,8 @@ async def confirm_product_facts(
         gpsr_choice=body.gpsr_choice,
         gpsr_identity=body.gpsr_identity.model_dump(by_alias=True) if body.gpsr_identity else None,
         shop_gpsr=shop_gpsr,
+        care_choice=body.care_choice,
+        care=body.care.model_dump(by_alias=True) if body.care else None,
     )
     if not result.ok:
         raise HTTPException(status_code=400, detail=result.error)

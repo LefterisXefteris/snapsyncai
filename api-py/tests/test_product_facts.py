@@ -119,7 +119,7 @@ def test_confirmed_textile_composition_opens_the_gate() -> None:
         {**VISION_WITH_LISTING_COPY, "isTextile": True, "fibreNames": ["cotton", "silk"]}
     ).facts
     result = confirm_facts(
-        facts, is_textile=True, composition=COTTON_POLYESTER, gpsr_choice="skip"
+        facts, is_textile=True, composition=COTTON_POLYESTER, gpsr_choice="skip", care_choice="skip"
     )
     assert result.ok is True
     assert result.facts.confirmed is not None
@@ -133,6 +133,7 @@ def test_description_html_contains_composition_not_gpsr() -> None:
         is_textile=True,
         composition=COTTON_POLYESTER,
         gpsr_choice="skip",
+        care_choice="skip",
     ).facts
     html = description_blocks(facts)
     assert html == "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
@@ -149,6 +150,7 @@ def test_tags_and_aeo_use_confirmed_fibre_names_not_suggested() -> None:
         is_textile=True,
         composition=COTTON_POLYESTER,
         gpsr_choice="skip",
+        care_choice="skip",
     ).facts
     constraints = listing_copy_constraints(facts)
     assert (
@@ -167,6 +169,7 @@ def test_other_fibre_name_appears_in_composition_block() -> None:
             {"name": "Other", "percent": 10, "otherName": "hemp"},
         ],
         gpsr_choice="skip",
+        care_choice="skip",
     ).facts
     assert may_generate_listing_copy(facts) is True
     assert description_blocks(facts) == "<p>Fibre composition: 90% cotton, 10% hemp.</p>"
@@ -189,6 +192,7 @@ def test_confirmed_composition_survives_storage() -> None:
         is_textile=True,
         composition=COTTON_POLYESTER,
         gpsr_choice="skip",
+        care_choice="skip",
     ).facts
     restored = facts_from_stored(stored_from_facts(facts))
     assert may_generate_listing_copy(restored) is True
@@ -201,6 +205,7 @@ def test_apply_description_blocks_inserts_module_html() -> None:
         is_textile=True,
         composition=COTTON_POLYESTER,
         gpsr_choice="skip",
+        care_choice="skip",
     ).facts
     html = apply_description_blocks("<p>A soft everyday tee.</p>", facts)
     assert html == (
@@ -388,6 +393,7 @@ def test_gpsr_block_follows_composition() -> None:
         composition=COTTON_POLYESTER,
         gpsr_choice="override",
         gpsr_identity=COMPLETE_GPSR,
+        care_choice="skip",
     ).facts
     html = description_blocks(facts)
     assert html == (
@@ -400,3 +406,161 @@ def test_gpsr_block_follows_composition() -> None:
         "<p>A soft everyday tee.</p>\n"
         "<p>Fibre composition: 80% cotton, 20% polyester.</p>\n" + GPSR_BLOCK
     )
+
+
+def test_empty_care_is_not_a_skip() -> None:
+    facts = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    result = confirm_facts(
+        facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+    )
+    assert result.ok is False
+    assert result.error == "Care instructions must be filled or explicitly skipped."
+    assert may_generate_listing_copy(result.facts) is False
+
+
+COMPLETE_CARE = {
+    "washing": "wash_40c",
+    "bleaching": "do_not_bleach",
+    "drying": "line_dry",
+    "ironing": "iron_low",
+    "professionalTextileCare": "dry_clean",
+}
+
+CARE_BLOCK = (
+    "<p>Care instructions: Wash at 40°C. Do not bleach. Line dry. Iron low. Dry clean.</p>"
+)
+
+PICTOGRAM_CHARS = "△□○◯🧺"
+
+
+def test_skip_omits_the_care_block() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+        care_choice="skip",
+    ).facts
+    html = description_blocks(facts)
+    assert html == "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+    assert "care" not in html.lower()
+    constraints = listing_copy_constraints(facts)
+    assert "Do not invent care instructions" in constraints
+    assert CARE_BLOCK not in constraints
+    stripped = apply_description_blocks(f"<p>A tee.</p>{CARE_BLOCK}", facts)
+    assert stripped == (
+        "<p>A tee.</p>\n<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+    )
+    assert "Care instructions" not in stripped
+
+
+def test_partial_care_cannot_confirm() -> None:
+    facts = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    missing_family = confirm_facts(
+        facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+        care_choice="fill",
+        care={
+            "washing": "wash_40c",
+            "bleaching": "do_not_bleach",
+            "drying": "line_dry",
+            "ironing": "iron_low",
+        },
+    )
+    assert missing_family.ok is False
+    assert missing_family.error == (
+        "Care instructions must be a complete five-family set or an explicit skip."
+    )
+    assert may_generate_listing_copy(missing_family.facts) is False
+
+    invalid_pick = confirm_facts(
+        facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+        care_choice="fill",
+        care={**COMPLETE_CARE, "washing": "machine_wash_delicate"},
+    )
+    assert invalid_pick.ok is False
+    assert may_generate_listing_copy(invalid_pick.facts) is False
+
+    fill_without_codes = confirm_facts(
+        facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+        care_choice="fill",
+    )
+    assert fill_without_codes.ok is False
+    assert may_generate_listing_copy(fill_without_codes.facts) is False
+
+
+def test_rendered_care_matches_picks_and_contains_no_pictograms() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+        care_choice="fill",
+        care=COMPLETE_CARE,
+    ).facts
+    html = description_blocks(facts)
+    assert html == (
+        "<p>Fibre composition: 80% cotton, 20% polyester.</p>\n" + CARE_BLOCK
+    )
+    for char in PICTOGRAM_CHARS:
+        assert char not in html
+    assert "Wash at 40°C" in html
+    assert "Do not bleach" in html
+    assert "Line dry" in html
+    assert "Iron low" in html
+    assert "Dry clean" in html
+    constraints = listing_copy_constraints(facts)
+    assert CARE_BLOCK in constraints
+    assert "Do not invent care instructions" not in constraints
+    restored = facts_from_stored(stored_from_facts(facts))
+    assert description_blocks(restored) == html
+
+
+def test_care_block_sits_between_composition_and_gpsr() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="override",
+        gpsr_identity=COMPLETE_GPSR,
+        care_choice="fill",
+        care=COMPLETE_CARE,
+    ).facts
+    html = description_blocks(facts)
+    assert html == (
+        "<p>Fibre composition: 80% cotton, 20% polyester.</p>\n"
+        + CARE_BLOCK
+        + "\n"
+        + GPSR_BLOCK
+    )
+
+
+def test_non_textile_does_not_require_or_show_care() -> None:
+    facts = confirm_facts(
+        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
+        is_textile=False,
+        gpsr_choice="skip",
+    ).facts
+    assert may_generate_listing_copy(facts) is True
+    assert description_blocks(facts) == ""
+    assert "care" not in description_blocks(facts).lower()
+    filled_anyway = confirm_facts(
+        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
+        is_textile=False,
+        gpsr_choice="skip",
+        care_choice="fill",
+        care=COMPLETE_CARE,
+    ).facts
+    assert description_blocks(filled_anyway) == ""
+    assert "Care instructions" not in listing_copy_constraints(filled_anyway)

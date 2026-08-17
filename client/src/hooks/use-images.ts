@@ -511,6 +511,8 @@ export function useConfirmProductFacts() {
       composition,
       gpsrChoice,
       gpsrIdentity,
+      careChoice,
+      care,
     }: {
       imageId: number;
       isTextile: boolean;
@@ -521,11 +523,19 @@ export function useConfirmProductFacts() {
         manufacturerInEu: boolean;
         euResponsiblePerson?: { name: string; postalAddress: string; email: string } | null;
       };
+      careChoice?: "skip" | "fill";
+      care?: {
+        washing: string;
+        bleaching: string;
+        drying: string;
+        ironing: string;
+        professionalTextileCare: string;
+      };
     }) => {
       const res = await apiRequest(
         "POST",
         buildUrl(api.images.confirmProductFacts.path, { id: imageId }),
-        { isTextile, composition, gpsrChoice, gpsrIdentity },
+        { isTextile, composition, gpsrChoice, gpsrIdentity, careChoice, care },
       );
       return res.json();
     },
