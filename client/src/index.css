@@ -42,6 +42,18 @@
   --ring: 45 70% 50%;
 
   --radius: 1rem;
+  --spacing-4: 1rem;
+
+  --sidebar: 0 0% 6%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-border: 0 0% 15%;
+  --sidebar-ring: 45 70% 50%;
+  --sidebar-primary: 45 70% 50%;
+  --sidebar-primary-foreground: 45 90% 6%;
+  --sidebar-accent: 0 0% 13%;
+  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar-primary-border: hsl(45 70% 50% / 0.3);
+  --sidebar-accent-border: hsl(0 0% 100% / 0.06);
 
   /* Aurora accent system — yellow is the star, amber + gold are ambient co-stars.
      Only ever used in gradients and glows, never as flat fills. */
@@ -84,6 +96,15 @@
   --aurora-1: 45 70% 52%;
   --aurora-2: 32 65% 50%;
   --aurora-3: 50 55% 55%;
+
+  --sidebar: 0 0% 6%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-border: 0 0% 15%;
+  --sidebar-ring: 45 70% 50%;
+  --sidebar-primary: 45 70% 50%;
+  --sidebar-primary-foreground: 45 90% 6%;
+  --sidebar-accent: 0 0% 13%;
+  --sidebar-accent-foreground: 0 0% 95%;
 }
 
 @layer base {

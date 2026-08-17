@@ -9,19 +9,21 @@ import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AmbientProvider } from "@/components/ambient/AmbientProvider";
 import { AuroraBackground } from "@/components/ambient/AuroraBackground";
-import { GlassDock } from "@/components/glass-dock";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { lazy, Suspense, useEffect, useRef } from "react";
 
 // Route-level code splitting: each page ships as its own chunk so the
 // initial bundle stays small and loads fast.
-const Home = lazy(() => import("@/pages/Home"));
+const Products = lazy(() => import("@/pages/Products"));
+const NewListing = lazy(() => import("@/pages/NewListing"));
+const ImportPage = lazy(() => import("@/pages/Import"));
+const InventoryPage = lazy(() => import("@/pages/Inventory"));
+const BulkSeoPage = lazy(() => import("@/pages/BulkSeo"));
+const Settings = lazy(() => import("@/pages/Settings"));
 const Landing = lazy(() => import("@/pages/Landing"));
 const ProductDetails = lazy(() => import("@/pages/ProductDetails"));
-const Inventory = lazy(() => import("@/pages/Inventory"));
 const NotFound = lazy(() => import("@/pages/not-found"));
-const CommandPalette = lazy(() =>
-  import("@/components/command-palette").then((m) => ({ default: m.CommandPalette })),
-);
 
 // Clerk publishable key — baked in at build time via Vite env var.
 // Falls back to fetching from the server API for environments where
@@ -66,8 +68,12 @@ function AuthScreen() {
 function AuthenticatedRouter() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/inventory" component={Inventory} />
+      <Route path="/" component={Products} />
+      <Route path="/new" component={NewListing} />
+      <Route path="/import" component={ImportPage} />
+      <Route path="/inventory" component={InventoryPage} />
+      <Route path="/bulk-seo" component={BulkSeoPage} />
+      <Route path="/settings" component={Settings} />
       <Route path="/product/:id" component={ProductDetails} />
       <Route component={NotFound} />
     </Switch>
@@ -92,14 +98,14 @@ function CacheFlusher() {
   return null;
 }
 
-// Warms lazy chunks during idle time so navigation and the command palette
-// feel instant without blocking the initial render.
+// Warms lazy chunks during idle time so navigation feels instant without
+// blocking the initial render.
 function useIdlePreload() {
   useEffect(() => {
     const preload = () => {
       import("@/pages/ProductDetails");
-      import("@/pages/Inventory");
-      import("@/components/command-palette");
+      import("@/pages/NewListing");
+      import("@/pages/Settings");
     };
     if (typeof window.requestIdleCallback === "function") {
       const id = window.requestIdleCallback(preload, { timeout: 3000 });
@@ -114,15 +120,19 @@ function AuthenticatedLayout() {
   useIdlePreload();
 
   return (
-    <main className="flex-1 min-w-0 w-full min-h-screen">
-      <Suspense fallback={null}>
-        <CommandPalette />
-      </Suspense>
-      <GlassDock />
-      <Suspense fallback={<RouteFallback />}>
-        <AuthenticatedRouter />
-      </Suspense>
-    </main>
+    <SidebarProvider className="min-h-svh">
+      <AppSidebar />
+      <SidebarInset className="min-h-svh min-w-0 overflow-hidden bg-transparent">
+        <header className="flex h-12 items-center gap-2 px-2 md:hidden shrink-0">
+          <SidebarTrigger />
+        </header>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <Suspense fallback={<RouteFallback />}>
+            <AuthenticatedRouter />
+          </Suspense>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
@@ -200,7 +210,7 @@ function App() {
         <AmbientProvider>
           <TooltipProvider>
             <AuroraBackground />
-            <AppWithClerk />
+            {DEV_BYPASS_AUTH ? <AuthenticatedLayout /> : <AppWithClerk />}
             <Toaster />
           </TooltipProvider>
         </AmbientProvider>
