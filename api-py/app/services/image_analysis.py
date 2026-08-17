@@ -43,6 +43,8 @@ class QuickPreview(TypedDict):
     mainCategory: str
     productType: str
     tags: list[str]
+    isTextile: bool | None
+    fibreNames: list[str]
 
 
 class ProductAnalysis(TypedDict, total=False):
@@ -60,6 +62,8 @@ class ProductAnalysis(TypedDict, total=False):
     aeoSnippet: str
     variants: list[dict[str, Any]]
     imageColors: list[str]
+    isTextile: bool | None
+    fibreNames: list[str]
 
 
 def _strip_ext(name: str) -> str:
@@ -98,6 +102,8 @@ def _failed_analysis(original_name: str, plural: bool = False) -> ProductAnalysi
         "aeoFaqs": [],
         "aeoSnippet": "",
         "variants": [],
+        "isTextile": None,
+        "fibreNames": [],
     }
 
 
@@ -108,6 +114,8 @@ def _failed_preview(original_name: str) -> QuickPreview:
         "mainCategory": "Uncategorized",
         "productType": "",
         "tags": [],
+        "isTextile": None,
+        "fibreNames": [],
     }
 
 
@@ -126,6 +134,10 @@ def _as_analysis(parsed: dict, original_name: str) -> ProductAnalysis:
         "aeoFaqs": parsed["aeoFaqs"] if isinstance(parsed.get("aeoFaqs"), list) else [],
         "aeoSnippet": parsed.get("aeoSnippet") or "",
         "variants": parsed["variants"] if isinstance(parsed.get("variants"), list) else [],
+        "isTextile": parsed.get("isTextile"),
+        "fibreNames": [str(n) for n in parsed["fibreNames"]]
+        if isinstance(parsed.get("fibreNames"), list)
+        else [],
     }
 
 
@@ -165,7 +177,11 @@ async def quick_preview_image(
                         '  "mainCategory": "One broad, top-level product grouping (e.g. \'Shoes\', '
                         "'Outerwear', 'Accessories', 'Electronics', 'Home Decor', 'Jewelry')\",\n"
                         '  "productType": "Short Shopify product_type label",\n'
-                        '  "tags": ["5 specific tags: brand, type, material, color, use case"]\n'
+                        '  "tags": ["5 specific tags: brand, type, material, color, use case"],\n'
+                        '  "isTextile": true or false — whether the product itself is a textile '
+                        "(garment, fabric, or soft furnishing), not merely photographed on fabric,\n"
+                        '  "fibreNames": ["likely fibre names with NO percentages, e.g. cotton, '
+                        'polyester. Empty if not a textile"]\n'
                         "}"
                     ),
                 },
@@ -198,6 +214,12 @@ async def quick_preview_image(
                 "productType": parsed.get("productType") or "",
                 "tags": [str(t) for t in parsed["tags"]]
                 if isinstance(parsed.get("tags"), list)
+                else [],
+                "isTextile": parsed.get("isTextile")
+                if isinstance(parsed.get("isTextile"), bool)
+                else None,
+                "fibreNames": [str(n) for n in parsed["fibreNames"]]
+                if isinstance(parsed.get("fibreNames"), list)
                 else [],
             }
         raise RuntimeError("No JSON in quick preview: " + content[:200])
@@ -242,6 +264,10 @@ async def full_analyze_image(
                             '  "productType": "Short Shopify product_type label",\n'
                             '  "tags": ["8 specific tags: brand, type, material, color, use case, '
                             'audience, style, occupation"],\n'
+                            '  "isTextile": true or false — whether the product itself is a textile '
+                            "(garment, fabric, or soft furnishing), not merely photographed on fabric,\n"
+                            '  "fibreNames": ["likely fibre names with NO percentages, e.g. cotton, '
+                            'polyester. Empty if not a textile"],\n'
                             '  "seoTitle": "SEO title (50-60 chars) with brand and product name",\n'
                             '  "seoDescription": "Meta description (140-160 chars) with brand, product, '
                             'benefit, CTA",\n'
@@ -349,6 +375,10 @@ async def full_analyze_multiple_images(
                             '  "productType": "Short Shopify product_type label",\n'
                             '  "tags": ["8 specific tags: brand, type, material, colors, use case, '
                             'audience, style, occasion"],\n'
+                            '  "isTextile": true or false — whether the product itself is a textile '
+                            "(garment, fabric, or soft furnishing), not merely photographed on fabric,\n"
+                            '  "fibreNames": ["likely fibre names with NO percentages, e.g. cotton, '
+                            'polyester. Empty if not a textile"],\n'
                             '  "seoTitle": "SEO title (50-60 chars) with brand and product name",\n'
                             '  "seoDescription": "Meta description (140-160 chars) with brand, product, '
                             'benefit, CTA",\n'
@@ -454,7 +484,11 @@ async def quick_preview_multiple_images(
                         '  "mainCategory": "One broad, top-level product grouping (e.g. \'Shoes\', '
                         "'Outerwear', 'Accessories', 'Electronics', 'Home Decor', 'Jewelry')\",\n"
                         '  "productType": "Short Shopify product_type label",\n'
-                        '  "tags": ["5 specific tags: brand, type, material, color, use case"]\n'
+                        '  "tags": ["5 specific tags: brand, type, material, color, use case"],\n'
+                        '  "isTextile": true or false — whether the product itself is a textile '
+                        "(garment, fabric, or soft furnishing), not merely photographed on fabric,\n"
+                        '  "fibreNames": ["likely fibre names with NO percentages, e.g. cotton, '
+                        'polyester. Empty if not a textile"]\n'
                         "}"
                     ),
                 },
@@ -482,6 +516,12 @@ async def quick_preview_multiple_images(
                 "productType": parsed.get("productType") or "",
                 "tags": [str(t) for t in parsed["tags"]]
                 if isinstance(parsed.get("tags"), list)
+                else [],
+                "isTextile": parsed.get("isTextile")
+                if isinstance(parsed.get("isTextile"), bool)
+                else None,
+                "fibreNames": [str(n) for n in parsed["fibreNames"]]
+                if isinstance(parsed.get("fibreNames"), list)
                 else [],
             }
         raise RuntimeError("No JSON in multi-image quick preview")

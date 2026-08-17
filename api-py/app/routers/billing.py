@@ -31,6 +31,12 @@ from app.schemas.billing import (
 from app.services import billing, image_analysis
 from app.services import images as image_store
 from app.services.billing import WEEKLY_PRODUCT_LIMIT
+from app.services.product_facts import (
+    apply_suggested,
+    facts_from_stored,
+    persistable_from_vision,
+    stored_from_facts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -538,26 +544,7 @@ async def unlock_images(
                         await image_store.update_image(
                             session,
                             image.id,
-                            {
-                                "payment_status": "paid",
-                            "description": image.description
-                            or (
-                                f"Premium {image.title or image.original_name or 'product'} listing"
-                            ),
-                                "price": str(image.price) if image.price is not None else "19.99",
-                                "seo_title": image.seo_title
-                                or image.title
-                                or image.original_name
-                                or "Product",
-                                "seo_description": image.seo_description
-                                or image.description
-                                or image.title
-                                or "Product listing",
-                                "alt_text": image.alt_text
-                                or image.title
-                                or image.original_name
-                                or "Product image",
-                            },
+                            {"payment_status": "paid"},
                         )
                     return UnlockResult(
                         id=image.id,
@@ -598,28 +585,20 @@ async def unlock_images(
                 )
 
                 if analysis and analysis.get("description") != "Failed to analyze image.":
+                    persistable = persistable_from_vision(analysis)
+                    facts = apply_suggested(
+                        facts_from_stored(image.product_facts),
+                        persistable.facts.suggested,
+                    )
+                    updates = persistable.as_image_updates()
+                    updates["product_facts"] = stored_from_facts(facts)
+                    updates["payment_status"] = "paid"
                     async with db_lock:
-                        await image_store.update_image(
-                            session,
-                            image.id,
-                            {
-                                "title": analysis["title"],
-                                "description": analysis["description"],
-                                "price": analysis["price"],
-                                "category": analysis["category"],
-                                "product_type": analysis["productType"],
-                                "tags": analysis["tags"],
-                                "seo_title": analysis["seoTitle"],
-                                "seo_description": analysis["seoDescription"],
-                                "alt_text": analysis["altText"],
-                                "aeo_faqs": analysis["aeoFaqs"],
-                                "aeo_snippet": analysis["aeoSnippet"],
-                                "variants": analysis["variants"],
-                                "ai_data": analysis,
-                                "payment_status": "paid",
-                            },
+                        await image_store.update_image(session, image.id, updates)
+                        await image_store.persist_product_facts(
+                            session, image, stored_from_facts(facts)
                         )
-                    return UnlockResult(id=image.id, title=analysis["title"])
+                    return UnlockResult(id=image.id, title=image.title)
 
                 async with db_lock:
                     await image_store.update_image(session, image.id, {"payment_status": "paid"})

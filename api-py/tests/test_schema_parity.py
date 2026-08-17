@@ -89,6 +89,7 @@ class TestImageContract:
         assert _pg_type(columns["media_gallery"]) == "TEXT[]"
         assert _pg_type(columns["aeo_faqs"]) == "JSONB"
         assert _pg_type(columns["variants"]) == "JSONB"
+        assert _pg_type(columns["product_facts"]) == "JSONB"
 
     def test_price_is_numeric_not_float(self) -> None:
         """Money must not round-trip through a float."""

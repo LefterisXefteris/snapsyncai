@@ -40,6 +40,7 @@ LIST_COLUMNS = (
     Image.shopify_product_id,
     Image.shopify_status,
     Image.payment_status,
+    Image.product_facts,
     Image.product_group_id,
     Image.session_id,
     Image.created_at,
@@ -136,6 +137,21 @@ async def get_image_group(session: AsyncSession, image_id: int, session_id: str)
 
 async def update_images_by_group_id(session: AsyncSession, group_id: str, updates: dict) -> None:
     await session.execute(update(Image).where(Image.product_group_id == group_id).values(**updates))
+
+
+async def persist_product_facts(
+    session: AsyncSession, image: Image, facts_record: dict
+) -> Image | None:
+    """Write one facts record onto the product (all grouped photos, or this standalone)."""
+    if image.product_group_id:
+        await update_images_by_group_id(
+            session, image.product_group_id, {"product_facts": facts_record}
+        )
+        await session.flush()
+        return await get_image(session, image.id) if image.id is not None else image
+    if image.id is None:
+        return image
+    return await update_image(session, image.id, {"product_facts": facts_record})
 
 
 async def update_image(session: AsyncSession, image_id: int, updates: dict) -> Image | None:

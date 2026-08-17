@@ -18,6 +18,7 @@ const STYLE_TONES = [
 interface AiContentPanelProps {
   imageId: number;
   defaultCategory?: string;
+  canGenerate: boolean;
   onAcceptTitle: (value: string) => void;
   onAcceptDescription: (value: string) => void;
   onAcceptTags: (value: string[]) => void;
@@ -27,6 +28,7 @@ interface AiContentPanelProps {
 export function AiContentPanel({
   imageId,
   defaultCategory,
+  canGenerate,
   onAcceptTitle,
   onAcceptDescription,
   onAcceptTags,
@@ -53,6 +55,7 @@ export function AiContentPanel({
   const [pendingFaqs, setPendingFaqs] = useState<{ q: string; a: string }[] | null>(null);
 
   const handleGenerate = async () => {
+    if (!canGenerate) return;
     setIsGenerating(true);
     setStreamText("");
     setGenerated(null);
@@ -75,6 +78,7 @@ export function AiContentPanel({
   };
 
   const handleRegenerateField = async (field: "title" | "description" | "seoKeywords" | "aeoFaqs") => {
+    if (!canGenerate) return;
     setRegeneratingField(field);
     await regenerate(
       imageId,
@@ -155,12 +159,18 @@ export function AiContentPanel({
           </div>
         </div>
 
+        {!canGenerate && (
+          <p className="text-[11px] text-muted-foreground">
+            Confirm product facts before generating listing copy.
+          </p>
+        )}
+
         {/* Generate button */}
         <Button
           size="sm"
           className="w-full h-8 text-xs"
           onClick={handleGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || !canGenerate}
         >
           {isGenerating ? (
             <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />Generating&hellip;</>
@@ -186,6 +196,7 @@ export function AiContentPanel({
                 label="Title"
                 value={displayTitle}
                 isRegenerating={regeneratingField === "title"}
+                canRegenerate={canGenerate}
                 onAccept={() => {
                   onAcceptTitle(displayTitle);
                   setPendingTitle(null);
@@ -202,6 +213,7 @@ export function AiContentPanel({
                 label="Description"
                 value={displayDescription}
                 isRegenerating={regeneratingField === "description"}
+                canRegenerate={canGenerate}
                 onAccept={() => {
                   onAcceptDescription(displayDescription);
                   setPendingDescription(null);
@@ -220,6 +232,7 @@ export function AiContentPanel({
                 label="SEO Keywords"
                 value={displayTags}
                 isRegenerating={regeneratingField === "seoKeywords"}
+                canRegenerate={canGenerate}
                 onAccept={() => {
                   onAcceptTags(displayTags);
                   setPendingTags(null);
@@ -244,6 +257,7 @@ export function AiContentPanel({
                 label="AEO FAQ Pairs"
                 value={displayFaqs}
                 isRegenerating={regeneratingField === "aeoFaqs"}
+                canRegenerate={canGenerate}
                 onAccept={() => {
                   onAcceptAeoFaqs(displayFaqs);
                   setPendingFaqs(null);
@@ -273,6 +287,7 @@ interface FieldPreviewProps<T> {
   label: string;
   value: T;
   isRegenerating: boolean;
+  canRegenerate: boolean;
   onAccept: () => void;
   onRegenerate: () => void;
   renderValue: (v: T) => React.ReactNode;
@@ -282,6 +297,7 @@ function FieldPreview<T>({
   label,
   value,
   isRegenerating,
+  canRegenerate,
   onAccept,
   onRegenerate,
   renderValue,
@@ -296,7 +312,7 @@ function FieldPreview<T>({
             size="sm"
             className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground"
             onClick={onRegenerate}
-            disabled={isRegenerating}
+            disabled={isRegenerating || !canRegenerate}
           >
             {isRegenerating ? (
               <Loader2 className="w-3 h-3 animate-spin" />

@@ -9,7 +9,6 @@ import asyncio
 import base64
 import json
 import logging
-import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -34,6 +33,13 @@ from app.services.image_analysis import (
 )
 from app.services.image_buffers import set_image_buffer
 from app.services.openai_client import get_openai
+from app.services.product_facts import (
+    PersistableVision,
+    generation_blocked_reason,
+    listing_copy_constraints,
+    merge_product_facts,
+    persistable_from_vision,
+)
 from app.services.subscriptions import has_active_subscription
 from app.services.supabase_storage import upload_file_to_storage
 from app.services.upload_langgraph import resolve_upload_processing_mode
@@ -81,12 +87,68 @@ def _message(status: int, message: str, **extra: Any) -> JSONResponse:
     return JSONResponse(status_code=status, content={"message": message, **extra})
 
 
-def _strip_ext(name: str) -> str:
-    return re.sub(r"\.[^/.]+$", "", name)
+def _new_image_values(
+    *,
+    name: str,
+    mime: str,
+    size: int,
+    user_id: str,
+    context: str,
+    tone: str,
+    payment_status: str,
+    persistable: PersistableVision | None = None,
+    group_id: str | None = None,
+    include_commerce: bool = True,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "original_name": name,
+        "mime_type": mime,
+        "size": size,
+        "image_data": None,
+        "title": None,
+        "description": None,
+        "tags": [],
+        "shopify_status": "pending",
+        "payment_status": payment_status,
+        "product_context": context or None,
+        "brand_tone": tone,
+        "session_id": user_id,
+    }
+    if persistable is not None:
+        updates = persistable.as_image_updates()
+        if not include_commerce:
+            updates.pop("price", None)
+            updates.pop("variants", None)
+        values.update(updates)
+    if group_id:
+        values["product_group_id"] = group_id
+    if extra:
+        values.update(extra)
+    return values
 
 
 def _owned(image, user_id: str) -> bool:
     return image is not None and image.session_id == user_id
+
+
+async def _facts_for_product(session, image, user_id: str):
+    group = await store.get_image_group(session, image.id, user_id)
+    return merge_product_facts(
+        [img.product_facts for img in group] or [image.product_facts]
+    )
+
+
+def _refuse_ungated_listing_copy(facts) -> JSONResponse | None:
+    reason = generation_blocked_reason(facts)
+    if reason:
+        return _message(409, reason)
+    return None
+
+
+def _generation_system(base: str, facts) -> str:
+    extra = listing_copy_constraints(facts)
+    return f"{base}\n{extra}" if extra else base
 
 
 async def run_with_concurrency(items: list, limit: int, fn) -> list:
@@ -159,104 +221,60 @@ async def upload_images(
                 (buf, f.content_type or "application/octet-stream", f.filename or "image")
                 for f, buf in loaded
             ]
-            analysis: dict[str, Any] | None = None
-            analysis_succeeded = False
             if upload_mode == "groupedPaid":
                 analysis = await full_analyze_multiple_images(
                     file_inputs, tone, context or None
                 )
-                analysis_succeeded = analysis["description"] != "Failed to analyze images."
             else:
                 analysis = await quick_preview_multiple_images(
                     file_inputs, context or None, tone
                 )
-                analysis_succeeded = True
 
+            persistable = persistable_from_vision(analysis)
             results = []
             for idx, (upload, buf) in enumerate(loaded):
                 is_primary = idx == 0
                 mime = upload.content_type or "application/octet-stream"
                 name = upload.filename or "image"
                 try:
-                    if upload_mode == "groupedPaid" and analysis_succeeded:
-                        a = analysis
-                        colors = a.get("imageColors") or []
+                    extra: dict[str, Any] = {}
+                    if upload_mode == "groupedPaid":
+                        colors = (analysis or {}).get("imageColors") or []
                         detected = colors[idx] if idx < len(colors) else None
-                        values = {
-                            "original_name": name,
-                            "mime_type": mime,
-                            "size": len(buf),
-                            "image_data": None,
-                            "title": a["title"] if is_primary else f"{a['title']} (view {idx + 1})",
-                            "description": a.get("description") if is_primary else None,
-                            "price": a.get("price") if is_primary else None,
-                            "category": a.get("category"),
-                            "main_category": a.get("mainCategory"),
-                            "product_type": a.get("productType"),
-                            "tags": a.get("tags") if is_primary else [],
-                            "seo_title": a.get("seoTitle") if is_primary else None,
-                            "seo_description": a.get("seoDescription") if is_primary else None,
-                            "alt_text": (
-                                f"{detected} {a.get('altText') or a['title']}"
-                                if detected
-                                else a.get("altText")
-                            ),
-                            "aeo_faqs": a.get("aeoFaqs") if is_primary else None,
-                            "aeo_snippet": a.get("aeoSnippet") if is_primary else None,
-                            "variants": a.get("variants") if is_primary else None,
-                            "ai_data": (
-                                a
-                                if is_primary
-                                else ({"detectedColor": detected} if detected else None)
-                            ),
-                            "shopify_status": "pending",
-                            "payment_status": "paid",
-                            "product_context": context or None,
-                            "brand_tone": tone,
-                            "product_group_id": group_id,
-                            "session_id": user_id,
-                        }
-                    else:
-                        a = analysis
-                        values = {
-                            "original_name": name,
-                            "mime_type": mime,
-                            "size": len(buf),
-                            "image_data": None,
-                            "title": a["title"] if is_primary else f"{a['title']} (view {idx + 1})",
-                            "category": a.get("category"),
-                            "main_category": a.get("mainCategory"),
-                            "product_type": a.get("productType"),
-                            "tags": a.get("tags") if is_primary else [],
-                            "shopify_status": "pending",
-                            "payment_status": "paid" if upload_mode == "groupedPaid" else "unpaid",
-                            "product_context": context or None,
-                            "brand_tone": tone,
-                            "product_group_id": group_id,
-                            "session_id": user_id,
-                        }
-                    image = await store.create_image(session, values)
+                        if detected:
+                            extra["ai_data"] = {"detectedColor": detected}
+                    image = await store.create_image(
+                        session,
+                        _new_image_values(
+                            name=name,
+                            mime=mime,
+                            size=len(buf),
+                            user_id=user_id,
+                            context=context,
+                            tone=tone,
+                            payment_status="paid" if upload_mode == "groupedPaid" else "unpaid",
+                            persistable=persistable,
+                            group_id=group_id,
+                            include_commerce=is_primary,
+                            extra=extra or None,
+                        ),
+                    )
                     image = await _persist_storage(session, image, buf, mime, name)
                     results.append(ImageOut.model_validate(image))
                 except Exception:
                     logger.exception("Failed to store grouped image %s", name)
                     fallback = await store.create_image(
                         session,
-                        {
-                            "original_name": name,
-                            "mime_type": mime,
-                            "size": len(buf),
-                            "image_data": None,
-                            "title": _strip_ext(name),
-                            "category": "Other",
-                            "tags": [],
-                            "shopify_status": "pending",
-                            "payment_status": "paid" if paid else "unpaid",
-                            "product_context": context or None,
-                            "brand_tone": tone,
-                            "product_group_id": group_id,
-                            "session_id": user_id,
-                        },
+                        _new_image_values(
+                            name=name,
+                            mime=mime,
+                            size=len(buf),
+                            user_id=user_id,
+                            context=context,
+                            tone=tone,
+                            payment_status="paid" if paid else "unpaid",
+                            group_id=group_id,
+                        ),
                     )
                     fallback = await _persist_storage(session, fallback, buf, mime, name)
                     results.append(ImageOut.model_validate(fallback))
@@ -271,33 +289,19 @@ async def upload_images(
                     analysis = await full_analyze_image(
                         buf, mime, name, tone, context or None
                     )
-                    ok = analysis["description"] != "Failed to analyze image."
+                    persistable = persistable_from_vision(analysis)
                     image = await store.create_image(
                         session,
-                        {
-                            "original_name": name,
-                            "mime_type": mime,
-                            "size": len(buf),
-                            "image_data": None,
-                            "title": analysis["title"] if ok else _strip_ext(name),
-                            "description": analysis.get("description") if ok else None,
-                            "price": analysis.get("price") if ok else None,
-                            "category": analysis.get("category") if ok else "Other",
-                            "product_type": analysis.get("productType") if ok else None,
-                            "tags": analysis.get("tags") if ok else [],
-                            "seo_title": analysis.get("seoTitle") if ok else None,
-                            "seo_description": analysis.get("seoDescription") if ok else None,
-                            "alt_text": analysis.get("altText") if ok else None,
-                            "aeo_faqs": analysis.get("aeoFaqs") if ok else None,
-                            "aeo_snippet": analysis.get("aeoSnippet") if ok else None,
-                            "variants": analysis.get("variants") if ok else None,
-                            "ai_data": analysis if ok else None,
-                            "shopify_status": "pending",
-                            "payment_status": "paid",
-                            "product_context": context or None,
-                            "brand_tone": tone,
-                            "session_id": user_id,
-                        },
+                        _new_image_values(
+                            name=name,
+                            mime=mime,
+                            size=len(buf),
+                            user_id=user_id,
+                            context=context,
+                            tone=tone,
+                            payment_status="paid",
+                            persistable=persistable,
+                        ),
                     )
                     image = await _persist_storage(session, image, buf, mime, name)
                     return ImageOut.model_validate(image)
@@ -305,21 +309,17 @@ async def upload_images(
                 preview = await quick_preview_image(buf, mime, name, context or None, tone)
                 image = await store.create_image(
                     session,
-                    {
-                        "original_name": name,
-                        "mime_type": mime,
-                        "size": len(buf),
-                        "image_data": None,
-                        "title": preview["title"],
-                        "category": preview["category"],
-                        "product_type": preview["productType"],
-                        "tags": preview["tags"],
-                        "shopify_status": "pending",
-                        "payment_status": "unpaid",
-                        "product_context": context or None,
-                        "brand_tone": tone,
-                        "session_id": user_id,
-                    },
+                    _new_image_values(
+                        name=name,
+                        mime=mime,
+                        size=len(buf),
+                        user_id=user_id,
+                        context=context,
+                        tone=tone,
+                        payment_status="unpaid",
+                        persistable=persistable_from_vision(preview),
+                        include_commerce=False,
+                    ),
                 )
                 image = await _persist_storage(session, image, buf, mime, name)
                 return ImageOut.model_validate(image)
@@ -327,20 +327,15 @@ async def upload_images(
                 logger.exception("Failed to process %s", name)
                 fallback = await store.create_image(
                     session,
-                    {
-                        "original_name": name,
-                        "mime_type": mime,
-                        "size": len(buf),
-                        "image_data": None,
-                        "title": _strip_ext(name),
-                        "category": "Other",
-                        "tags": [],
-                        "shopify_status": "pending",
-                        "payment_status": "paid" if upload_mode == "singlePaid" else "unpaid",
-                        "product_context": context or None,
-                        "brand_tone": tone,
-                        "session_id": user_id,
-                    },
+                    _new_image_values(
+                        name=name,
+                        mime=mime,
+                        size=len(buf),
+                        user_id=user_id,
+                        context=context,
+                        tone=tone,
+                        payment_status="paid" if upload_mode == "singlePaid" else "unpaid",
+                    ),
                 )
                 fallback = await _persist_storage(session, fallback, buf, mime, name)
                 return ImageOut.model_validate(fallback)
@@ -381,6 +376,10 @@ async def generate_content(
     image = await store.get_image(session, image_id)
     if not _owned(image, user_id):
         return _message(404, "Image not found")
+    facts = await _facts_for_product(session, image, user_id)
+    refused = _refuse_ungated_listing_copy(facts)
+    if refused is not None:
+        return refused
     buf = await store.load_image_bytes(image)
     if buf is None:
         return _message(400, "Image not available for AI analysis")
@@ -392,7 +391,7 @@ async def generate_content(
         f"Product title context: {image.title or image.original_name or ''}"
     )
     messages = [
-        {"role": "system", "content": GENERATE_CONTENT_SYSTEM},
+        {"role": "system", "content": _generation_system(GENERATE_CONTENT_SYSTEM, facts)},
         {
             "role": "user",
             "content": [
@@ -418,6 +417,10 @@ async def regenerate_field(
     image = await store.get_image(session, image_id)
     if not _owned(image, user_id):
         return _message(404, "Image not found")
+    facts = await _facts_for_product(session, image, user_id)
+    refused = _refuse_ungated_listing_copy(facts)
+    if refused is not None:
+        return refused
     buf = await store.load_image_bytes(image)
     if buf is None:
         return _message(400, "Image not available for AI analysis")
@@ -432,7 +435,7 @@ async def regenerate_field(
         f"Product title context: {image.title or image.original_name or ''}"
     )
     messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": _generation_system(system_prompt, facts)},
         {
             "role": "user",
             "content": [

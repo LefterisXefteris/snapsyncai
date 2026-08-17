@@ -51,6 +51,7 @@ class ImageOut(CamelModel):
     product_context: str | None = None
     brand_tone: str | None = None
     ai_data: Any | None = None
+    product_facts: Any | None = None
     product_group_id: str | None = None
     session_id: str | None = None
     created_at: datetime | None = None
@@ -98,6 +99,10 @@ class ImageUpdate(CamelModel):
         if value == "":
             return None
         return value
+
+
+class ConfirmProductFactsBody(CamelModel):
+    is_textile: bool
 
 
 class AssignGroupBody(CamelModel):

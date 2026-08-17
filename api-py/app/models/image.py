@@ -81,6 +81,7 @@ class Image(SQLModel, table=True):
     product_context: str | None = Field(default=None, sa_column=txt())
     brand_tone: str | None = Field(default=None, sa_column=txt(server_default="professional"))
     ai_data: Any | None = Field(default=None, sa_column=jsonb())
+    product_facts: Any | None = Field(default=None, sa_column=jsonb())
 
     # --- Grouping / tenancy -------------------------------------------------------
     product_group_id: str | None = Field(default=None, sa_column=txt())

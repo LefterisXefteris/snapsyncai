@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@shared/routes";
 import { apiUrl } from "@/lib/api-origin";
+import { mayGenerateListingCopy, productFacts } from "@/lib/product-facts";
 import type { Image } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const { data: images, isLoading } = useImages();
   const updateMutation = useUpdateImage();
   const pushToShopifyMutation = usePushToShopify();
+  const confirmFactsMutation = useConfirmProductFacts();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -202,6 +204,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   }
 
   const isUnpaid = image.paymentStatus !== "paid";
+  const facts = productFacts(image);
+  const canGenerate = mayGenerateListingCopy(image);
 
   const persistMediaOrder = async (orderedIds: number[], primaryId?: number) => {
     if (!image || orderedIds.length === 0) return;
@@ -423,10 +427,44 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-0">
           {/* Main Content Column */}
           <div className="md:col-span-2 space-y-3 overflow-y-auto">
+            {!canGenerate && (
+              <Card className="shadow-sm">
+                <CardHeader className="px-4 py-3">
+                  <CardTitle className="text-sm font-medium">Product facts</CardTitle>
+                  <CardDescription className="text-xs">
+                    Confirm this product is not a textile before listing copy can be generated.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 space-y-3">
+                  {facts?.suggested?.isTextile === true && (
+                    <p className="text-xs text-muted-foreground">
+                      Vision suggests this may be a textile. Confirm if it is not.
+                    </p>
+                  )}
+                  {facts?.suggested?.isTextile === false && (
+                    <p className="text-xs text-muted-foreground">
+                      Vision suggests this is not a textile.
+                    </p>
+                  )}
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => confirmFactsMutation.mutate({ imageId: image.id, isTextile: false })}
+                    disabled={confirmFactsMutation.isPending}
+                  >
+                    {confirmFactsMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : null}
+                    Confirm: not a textile
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             {!isUnpaid && (
               <AiContentPanel
                 imageId={image.id}
                 defaultCategory={category}
+                canGenerate={canGenerate}
                 onAcceptTitle={(v) => setTitle(v)}
                 onAcceptDescription={(v) => setDescription(v)}
                 onAcceptTags={(v) => setTags(v)}

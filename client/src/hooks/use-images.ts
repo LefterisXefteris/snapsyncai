@@ -470,6 +470,37 @@ export function useShopifyDisconnect() {
   });
 }
 
+export function useConfirmProductFacts() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ imageId, isTextile }: { imageId: number; isTextile: boolean }) => {
+      const res = await apiRequest(
+        "POST",
+        buildUrl(api.images.confirmProductFacts.path, { id: imageId }),
+        { isTextile },
+      );
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      toast({
+        title: "Facts confirmed",
+        description: "You can generate listing copy for this product.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not confirm facts",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 export interface GeneratedContent {
   title: string;
   description: string;

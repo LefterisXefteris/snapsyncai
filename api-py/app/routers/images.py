@@ -11,6 +11,7 @@ from app.db import SessionDep
 from app.schemas.image import (
     AssignGroupBatchBody,
     AssignGroupBody,
+    ConfirmProductFactsBody,
     DeletedResponse,
     ImageListOut,
     ImageOut,
@@ -23,6 +24,11 @@ from app.schemas.image import (
 )
 from app.services import connections
 from app.services import images as store
+from app.services.product_facts import (
+    confirm_facts,
+    merge_product_facts,
+    stored_from_facts,
+)
 from app.services.shopify import push_product_to_shopify
 
 logger = logging.getLogger(__name__)
@@ -32,6 +38,12 @@ router = APIRouter(tags=["images"])
 
 def _owned(image, user_id: str) -> bool:
     return image is not None and image.session_id == user_id
+
+
+async def _sync_product_facts(session, user_id: str, image) -> None:
+    group = await store.get_image_group(session, image.id, user_id)
+    merged = merge_product_facts([img.product_facts for img in group])
+    await store.persist_product_facts(session, image, stored_from_facts(merged))
 
 
 _LIST_EXCLUDE = {
@@ -91,6 +103,9 @@ async def assign_group_batch(
                 session, body.primary_image_id, {"product_group_id": body.product_group_id}
             )
             updated += 1
+    synced = await store.get_image(session, body.image_ids[0])
+    if _owned(synced, user_id):
+        await _sync_product_facts(session, user_id, synced)
     return OkUpdatedResponse(updated=updated)
 
 
@@ -110,7 +125,35 @@ async def assign_group(
             await store.update_image(
                 session, body.primary_image_id, {"product_group_id": body.product_group_id}
             )
+    refreshed = await store.get_image(session, image_id)
+    if _owned(refreshed, user_id):
+        await _sync_product_facts(session, user_id, refreshed)
     return OkResponse()
+
+
+@router.post("/api/images/{image_id}/product-facts/confirm", response_model=ImageOut)
+async def confirm_product_facts(
+    image_id: int,
+    body: ConfirmProductFactsBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+) -> ImageOut:
+    image = await store.get_image(session, image_id)
+    if not _owned(image, user_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    group = await store.get_image_group(session, image_id, user_id)
+    current = merge_product_facts(
+        [img.product_facts for img in group] or [image.product_facts]
+    )
+    result = confirm_facts(current, is_textile=body.is_textile)
+    if not result.ok:
+        raise HTTPException(status_code=400, detail=result.error)
+    updated = await store.persist_product_facts(
+        session, image, stored_from_facts(result.facts)
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return ImageOut.model_validate(updated)
 
 
 @router.get("/api/images/{image_id}/file")
