@@ -14,6 +14,8 @@ LIST_EXCLUDE = frozenset(
         "image_data",
         "ai_data",
         "aeo_faqs",
+        "description_blocks",
+        "may_generate_listing_copy",
     }
 )
 
@@ -56,6 +58,9 @@ class ImageOut(CamelModel):
     product_group_id: str | None = None
     session_id: str | None = None
     created_at: datetime | None = None
+    listing_copy_stale: bool = False
+    may_generate_listing_copy: bool = False
+    description_blocks: str = ""
 
     @field_serializer("price", "compare_at_price", "cost_per_item")
     def _decimal_as_string(self, value: Decimal | str | None) -> str | None:
@@ -68,6 +73,18 @@ class ImageListOut(ImageOut):
     image_data: str | None = None
     ai_data: Any | None = None
     aeo_faqs: Any | None = None
+
+
+def with_facts_outcomes(image, shop_gpsr=None, *, list_item: bool = False):
+    """Copy Product facts outcomes onto the HTTP payload. Do not re-encode the rules here."""
+    from app.services.product_facts import facts_from_stored, payload_outcomes
+
+    facts = facts_from_stored(getattr(image, "product_facts", None))
+    if list_item:
+        return ImageListOut.model_validate(image).model_copy(
+            update={"listing_copy_stale": facts.listing_copy_stale}
+        )
+    return ImageOut.model_validate(image).model_copy(update=payload_outcomes(facts, shop_gpsr))
 
 
 class ImageUpdate(CamelModel):

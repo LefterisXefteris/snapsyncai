@@ -40,4 +40,7 @@ export type Image = {
   productGroupId?: string | null;
   sessionId?: string | null;
   createdAt?: string | null;
+  listingCopyStale?: boolean;
+  mayGenerateListingCopy?: boolean;
+  descriptionBlocks?: string | null;
 };

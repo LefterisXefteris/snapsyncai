@@ -461,12 +461,19 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </div>
           </div>
         )}
+        {image.listingCopyStale && (
+          <div className="mb-3 shrink-0 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500">
+            <p className="font-medium text-xs">Listing copy no longer matches the confirmed facts.</p>
+            <p className="text-[10px] opacity-80">
+              Generate again to update it. Existing title and description are unchanged.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-0">
           {/* Main Content Column */}
           <div className="md:col-span-2 space-y-3 overflow-y-auto">
-            {!canGenerate && (
-              <Card className="shadow-sm">
+            <Card className="shadow-sm">
                 <CardHeader className="px-4 py-3">
                   <CardTitle className="text-sm font-medium">Product facts</CardTitle>
                   <CardDescription className="text-xs">
@@ -670,7 +677,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   </div>
                 </CardContent>
               </Card>
-            )}
             {shopConnected && (
               <Card className="shadow-sm">
                 <CardHeader className="px-4 py-3">

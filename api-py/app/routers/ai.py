@@ -23,7 +23,7 @@ from app.schemas.ai import (
     GenerateContentBody,
     RegenerateFieldBody,
 )
-from app.schemas.image import ImageOut
+from app.schemas.image import ImageOut, with_facts_outcomes
 from app.services import connections
 from app.services import images as store
 from app.services.image_analysis import (
@@ -266,7 +266,7 @@ async def upload_images(
                         ),
                     )
                     image = await _persist_storage(session, image, buf, mime, name)
-                    results.append(ImageOut.model_validate(image))
+                    results.append(with_facts_outcomes(image))
                 except Exception:
                     logger.exception("Failed to store grouped image %s", name)
                     fallback = await store.create_image(
@@ -283,7 +283,7 @@ async def upload_images(
                         ),
                     )
                     fallback = await _persist_storage(session, fallback, buf, mime, name)
-                    results.append(ImageOut.model_validate(fallback))
+                    results.append(with_facts_outcomes(fallback))
             return results
 
         async def process_one(item: tuple[UploadFile, bytes], _idx: int):
@@ -310,7 +310,7 @@ async def upload_images(
                         ),
                     )
                     image = await _persist_storage(session, image, buf, mime, name)
-                    return ImageOut.model_validate(image)
+                    return with_facts_outcomes(image)
 
                 preview = await quick_preview_image(buf, mime, name, context or None, tone)
                 image = await store.create_image(
@@ -328,7 +328,7 @@ async def upload_images(
                     ),
                 )
                 image = await _persist_storage(session, image, buf, mime, name)
-                return ImageOut.model_validate(image)
+                return with_facts_outcomes(image)
             except Exception:
                 logger.exception("Failed to process %s", name)
                 fallback = await store.create_image(
@@ -344,7 +344,7 @@ async def upload_images(
                     ),
                 )
                 fallback = await _persist_storage(session, fallback, buf, mime, name)
-                return ImageOut.model_validate(fallback)
+                return with_facts_outcomes(fallback)
 
         results = await run_with_concurrency(loaded, CONCURRENCY_LIMIT, process_one)
         return results

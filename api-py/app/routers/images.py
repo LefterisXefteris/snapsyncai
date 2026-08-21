@@ -9,6 +9,7 @@ from app.auth.clerk import CurrentUser
 from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.image import (
+    LIST_EXCLUDE,
     AssignGroupBatchBody,
     AssignGroupBody,
     ConfirmProductFactsBody,
@@ -21,6 +22,7 @@ from app.schemas.image import (
     PushIdsBody,
     PushResponse,
     PushResult,
+    with_facts_outcomes,
 )
 from app.services import catalogue_cache, connections
 from app.services import images as store
@@ -46,20 +48,32 @@ async def _sync_product_facts(session, user_id: str, image) -> None:
     await store.persist_product_facts(session, image, stored_from_facts(merged))
 
 
-_LIST_EXCLUDE = {
-    "image_data",
-    "ai_data",
-    "aeo_faqs",
-}
+def _product_listing_copy(images) -> dict:
+    def first(attr):
+        for img in images:
+            value = getattr(img, attr, None)
+            if value:
+                return value
+        return None
+
+    return {
+        "title": first("title"),
+        "description": first("description"),
+        "tags": first("tags"),
+        "seo_title": first("seo_title"),
+        "seo_description": first("seo_description"),
+        "aeo_faqs": first("aeo_faqs"),
+        "aeo_snippet": first("aeo_snippet"),
+    }
 
 
 def _catalogue_payload(items: list[ImageListOut]) -> list[dict]:
     return [
-        item.model_dump(by_alias=True, mode="json", exclude=_LIST_EXCLUDE) for item in items
+        item.model_dump(by_alias=True, mode="json", exclude=LIST_EXCLUDE) for item in items
     ]
 
 
-@router.get("/api/images", response_model=list[ImageListOut], response_model_exclude=_LIST_EXCLUDE)
+@router.get("/api/images", response_model=list[ImageListOut], response_model_exclude=LIST_EXCLUDE)
 async def list_images(
     user_id: CurrentUser, session: SessionDep
 ) -> list[ImageListOut] | JSONResponse:
@@ -70,7 +84,7 @@ async def list_images(
         rows = await store.list_images(session, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch images") from None
-    items = [ImageListOut.model_validate(row) for row in rows]
+    items = [with_facts_outcomes(row, list_item=True) for row in rows]
     await catalogue_cache.put(user_id, _catalogue_payload(items))
     return items
 
@@ -78,14 +92,14 @@ async def list_images(
 @router.get(
     "/api/images/{image_id}/group",
     response_model=list[ImageListOut],
-    response_model_exclude=_LIST_EXCLUDE,
+    response_model_exclude=LIST_EXCLUDE,
 )
 async def get_group(image_id: int, user_id: CurrentUser, session: SessionDep) -> list[ImageListOut]:
     try:
         rows = await store.get_image_group(session, image_id, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch product group") from None
-    return [ImageListOut.model_validate(row) for row in rows]
+    return [with_facts_outcomes(row, list_item=True) for row in rows]
 
 
 @router.post("/api/images/{image_id}/unlink-from-group", response_model=OkResponse)
@@ -171,6 +185,7 @@ async def confirm_product_facts(
         shop_gpsr=shop_gpsr,
         care_choice=body.care_choice,
         care=body.care.model_dump(by_alias=True) if body.care else None,
+        listing_copy=_product_listing_copy([image, *group]),
     )
     if not result.ok:
         raise HTTPException(status_code=400, detail=result.error)
@@ -179,7 +194,7 @@ async def confirm_product_facts(
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    return ImageOut.model_validate(updated)
+    return with_facts_outcomes(updated, shop_gpsr)
 
 
 @router.get("/api/images/{image_id}/file")
@@ -221,7 +236,9 @@ async def update_image(
         raise HTTPException(status_code=400, detail="Invalid update data") from exc
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    return ImageOut.model_validate(updated)
+    connection = await connections.get_shopify(session, user_id)
+    shop_gpsr = connection.gpsr_identity if connection is not None else None
+    return with_facts_outcomes(updated, shop_gpsr)
 
 
 @router.delete("/api/images/{image_id}", status_code=204)

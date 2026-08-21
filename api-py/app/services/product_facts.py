@@ -135,6 +135,7 @@ class ConfirmedFacts:
 class ProductFacts:
     suggested: SuggestedFacts | None = None
     confirmed: ConfirmedFacts | None = None
+    listing_copy_stale: bool = False
 
 
 @dataclass(frozen=True)
@@ -218,7 +219,11 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
                 confirmed_raw.get("composition") or ()
             )
             if error or parsed is None:
-                return ProductFacts(suggested=suggested, confirmed=None)
+                return ProductFacts(
+                    suggested=suggested,
+                    confirmed=None,
+                    listing_copy_stale=_listing_copy_stale(record),
+                )
             composition = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
         care_choice = None
         care = None
@@ -231,7 +236,11 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
                     confirmed_raw.get("care")
                 )
                 if care_error or parsed_care is None:
-                    return ProductFacts(suggested=suggested, confirmed=None)
+                    return ProductFacts(
+                        suggested=suggested,
+                        confirmed=None,
+                        listing_copy_stale=_listing_copy_stale(record),
+                    )
                 care = parsed_care
         confirmed = ConfirmedFacts(
             is_textile=is_textile,
@@ -245,7 +254,11 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
             care_choice=care_choice,
             care=care,
         )
-    return ProductFacts(suggested=suggested, confirmed=confirmed)
+    return ProductFacts(
+        suggested=suggested,
+        confirmed=confirmed,
+        listing_copy_stale=_listing_copy_stale(record),
+    )
 
 
 def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
@@ -271,6 +284,7 @@ def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
             stored["confirmed"]["careChoice"] = facts.confirmed.care_choice
         if facts.confirmed.care is not None:
             stored["confirmed"]["care"] = stored_care_instructions(facts.confirmed.care)
+    stored["listingCopyStale"] = facts.listing_copy_stale
     return stored
 
 
@@ -284,6 +298,7 @@ def confirm_facts(
     shop_gpsr: Mapping[str, Any] | None = None,
     care_choice: str | None = None,
     care: Mapping[str, Any] | None = None,
+    listing_copy: Mapping[str, Any] | None = None,
 ) -> ConfirmResult:
     choice = _gpsr_choice(gpsr_choice)
     if choice is None:
@@ -318,17 +333,22 @@ def confirm_facts(
         if error or identity is None:
             return ConfirmResult(facts=facts, error=error or _GPSR_INCOMPLETE)
         override = identity
+    confirmed = ConfirmedFacts(
+        is_textile=is_textile,
+        composition=composition_rows,
+        gpsr_choice=choice,
+        gpsr_override=override,
+        care_choice=stored_care_choice,
+        care=care_value,
+    )
+    stale = facts.listing_copy_stale
+    if confirmed != facts.confirmed and _listing_copy_present(listing_copy):
+        stale = True
     return ConfirmResult(
         facts=ProductFacts(
             suggested=facts.suggested,
-            confirmed=ConfirmedFacts(
-                is_textile=is_textile,
-                composition=composition_rows,
-                gpsr_choice=choice,
-                gpsr_override=override,
-                care_choice=stored_care_choice,
-                care=care_value,
-            ),
+            confirmed=confirmed,
+            listing_copy_stale=stale,
         )
     )
 
@@ -470,7 +490,11 @@ def apply_description_blocks(
 
 def apply_suggested(facts: ProductFacts, suggested: SuggestedFacts | None) -> ProductFacts:
     """Refresh suggested facts from vision without clearing a confirmation."""
-    return ProductFacts(suggested=suggested, confirmed=facts.confirmed)
+    return ProductFacts(
+        suggested=suggested,
+        confirmed=facts.confirmed,
+        listing_copy_stale=facts.listing_copy_stale,
+    )
 
 
 def merge_product_facts(records: Sequence[Mapping[str, Any] | None]) -> ProductFacts:
@@ -483,11 +507,52 @@ def merge_product_facts(records: Sequence[Mapping[str, Any] | None]) -> ProductF
     return ProductFacts(
         suggested=confirmed.suggested or suggested,
         confirmed=confirmed.confirmed,
+        listing_copy_stale=confirmed.listing_copy_stale,
     )
+
+
+def payload_outcomes(
+    facts: ProductFacts, shop_gpsr: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """Outcomes HTTP copies onto the product payload. Adapters must not re-encode these."""
+    return {
+        "may_generate_listing_copy": may_generate_listing_copy(facts),
+        "listing_copy_stale": facts.listing_copy_stale,
+        "description_blocks": description_blocks(facts, shop_gpsr),
+    }
 
 
 def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _listing_copy_stale(record: Mapping[str, Any]) -> bool:
+    return bool(record.get("listingCopyStale", record.get("listing_copy_stale")))
+
+
+def _listing_copy_present(listing_copy: Mapping[str, Any] | None) -> bool:
+    if not listing_copy:
+        return False
+    for key in (
+        "title",
+        "description",
+        "seoTitle",
+        "seo_title",
+        "seoDescription",
+        "seo_description",
+        "aeoSnippet",
+        "aeo_snippet",
+    ):
+        if _text(listing_copy.get(key)):
+            return True
+    tags = listing_copy.get("tags")
+    if isinstance(tags, Sequence) and not isinstance(tags, (str, bytes)):
+        if any(_text(tag) for tag in tags if isinstance(tag, str)):
+            return True
+    faqs = listing_copy.get("aeoFaqs", listing_copy.get("aeo_faqs"))
+    if isinstance(faqs, Sequence) and not isinstance(faqs, (str, bytes)) and len(faqs) > 0:
+        return True
+    return False
 
 
 def _price(value: Any) -> str | None:
