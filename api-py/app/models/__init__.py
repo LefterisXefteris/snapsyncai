@@ -8,9 +8,29 @@ it and will propose dropping the table.
 from app.models.billing import PaidSession, Subscription, UserCredits
 from app.models.connections import ShopifyConnection
 from app.models.image import Image
+from app.models.inventory import (
+    InventoryBundleComponent,
+    InventoryChannelLink,
+    InventoryImportJob,
+    InventoryItem,
+    InventoryLedgerEntry,
+    InventoryNotification,
+    InventoryOutboxJob,
+    InventorySettings,
+    InventoryWebhookEvent,
+)
 
 __all__ = [
     "Image",
+    "InventoryBundleComponent",
+    "InventoryChannelLink",
+    "InventoryImportJob",
+    "InventoryItem",
+    "InventoryLedgerEntry",
+    "InventoryNotification",
+    "InventoryOutboxJob",
+    "InventorySettings",
+    "InventoryWebhookEvent",
     "PaidSession",
     "ShopifyConnection",
     "Subscription",

@@ -30,8 +30,7 @@ export const WORKSPACE_NAV: WorkspaceNavItem[] = [
     id: "inventory",
     label: "Inventory",
     path: "/inventory",
-    stub: true,
-    emptyState: "Stock on hand is not available yet.",
+    stub: false,
   },
   {
     id: "bulk-seo",

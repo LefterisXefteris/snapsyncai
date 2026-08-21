@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     )
     connection_encryption_key: str | None = None
 
+    # --- Inventory Autopilot ------------------------------------------------
+    inventory_autopilot_enabled: bool = False
+    cron_secret: str | None = None
+    resend_api_key: str | None = None
+    inventory_alert_from_email: str | None = None
+
     # Browser origins allowed to call this API with credentials (api. subdomain).
     # Comma-separated or JSON list. Empty means CORS middleware is not mounted
     # (same-origin Vite proxy / current production Express).

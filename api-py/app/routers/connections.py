@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.clerk import CurrentUser
+from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.schemas.gpsr import GpsrIdentityIn
@@ -102,8 +103,13 @@ class DisconnectResponse(CamelModel):
 
 
 @router.post("/api/shopify/disconnect", response_model=DisconnectResponse)
-async def shopify_disconnect(user_id: CurrentUser, session: SessionDep) -> DisconnectResponse:
+async def shopify_disconnect(
+    user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> DisconnectResponse:
     try:
+        from app.services.inventory.service import disable_inventory_for_user
+
+        await disable_inventory_for_user(session, settings, user_id)
         await connections.delete_shopify(session, user_id)
         return DisconnectResponse(disconnected=True)
     except Exception:

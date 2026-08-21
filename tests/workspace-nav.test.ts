@@ -28,9 +28,9 @@ test("New listing is a photo-entry destination, not a stub", () => {
   assert.equal(item.stub, false);
 });
 
-test("Import, Inventory, and Bulk SEO are stubs", () => {
+test("Import and Bulk SEO are stubs; Inventory is live", () => {
   assert.equal(workspaceNavItem("import").stub, true);
-  assert.equal(workspaceNavItem("inventory").stub, true);
+  assert.equal(workspaceNavItem("inventory").stub, false);
   assert.equal(workspaceNavItem("bulk-seo").stub, true);
   assert.equal(workspaceNavItem("import").path, "/import");
   assert.equal(workspaceNavItem("inventory").path, "/inventory");
@@ -62,7 +62,6 @@ test("an unknown path activates nothing", () => {
 
 test("stub copy names the job and does not pretend the backend exists", () => {
   assert.equal(workspaceStubCopy("import").body, "Importing products from a channel is not available yet.");
-  assert.equal(workspaceStubCopy("inventory").body, "Stock on hand is not available yet.");
   assert.equal(
     workspaceStubCopy("bulk-seo").body,
     "Changing listing copy for many products at once is not available yet.",

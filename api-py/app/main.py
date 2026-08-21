@@ -10,6 +10,7 @@ module-level instance, so importing this module has no side effects and does not
 require a complete environment — Alembic and the OpenAPI export both rely on that.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -25,6 +26,7 @@ from app.routers import (
     connections,
     health,
     images,
+    inventory,
     oauth,
     webhooks,
 )
@@ -39,7 +41,21 @@ async def lifespan(_app: FastAPI):
     settings = get_settings()
     get_engine()
     logger.info("API starting (environment=%s)", settings.environment)
+    stop = asyncio.Event()
+    worker_task = None
+    if settings.inventory_autopilot_enabled:
+        from app.services.inventory.jobs import run_inventory_worker
+
+        worker_task = asyncio.create_task(run_inventory_worker(stop))
+        logger.info("Inventory Autopilot worker started in-process")
     yield
+    stop.set()
+    if worker_task:
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
     await catalogue_cache.close()
     await dispose_engine()
 
@@ -78,4 +94,5 @@ def create_app() -> FastAPI:
     app.include_router(ai.router)
     app.include_router(billing.router)
     app.include_router(webhooks.router)
+    app.include_router(inventory.router)
     return app

@@ -334,6 +334,16 @@ async def push_to_shopify(
             view_images = [full_map.get(view.id) or view for view in views]
             result = await push_product_to_shopify(full_primary, connection, settings, view_images)
             if result.get("shopify_product_id"):
+                from app.services.inventory.service import register_published_shopify_product
+
+                await register_published_shopify_product(
+                    session,
+                    settings,
+                    user_id=user_id,
+                    image=full_primary,
+                    product_id=result["shopify_product_id"],
+                    variants=result.get("variants") or [],
+                )
                 updates = {
                     "shopify_product_id": result["shopify_product_id"],
                     "shopify_status": "synced",

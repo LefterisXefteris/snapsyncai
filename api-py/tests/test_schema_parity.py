@@ -1,8 +1,7 @@
 """SQLModel tables that remain after Express/`shared/` were deleted.
 
 Alembic is the schema source of truth. These checks guard the live core-loop
-tables the SPA still reads: images, shopify_connections, paid_sessions,
-subscriptions, user_credits.
+tables the SPA still reads, plus Inventory Autopilot (restored in 0006).
 """
 
 from sqlalchemy import Column
@@ -17,6 +16,15 @@ EXPECTED_TABLES = {
     "paid_sessions",
     "subscriptions",
     "user_credits",
+    "inventory_settings",
+    "inventory_items",
+    "inventory_channel_links",
+    "inventory_ledger_entries",
+    "inventory_bundle_components",
+    "inventory_import_jobs",
+    "inventory_webhook_events",
+    "inventory_outbox_jobs",
+    "inventory_notifications",
 }
 
 # Known-good literals from the live images table (not derived from SQLModel).
@@ -79,6 +87,9 @@ class TestBehaviouralConstraints:
     def test_connections_are_unique_per_user(self) -> None:
         """What makes `INSERT ... ON CONFLICT` viable instead of read-then-write."""
         assert SQLModel.metadata.tables["shopify_connections"].columns["session_id"].unique is True
+
+    def test_inventory_settings_are_unique_per_user(self) -> None:
+        assert SQLModel.metadata.tables["inventory_settings"].columns["user_id"].unique is True
 
 
 class TestImageContract:
