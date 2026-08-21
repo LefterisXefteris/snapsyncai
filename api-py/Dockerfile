@@ -24,4 +24,5 @@ ENV PATH="/srv/.venv/bin:$PATH"
 
 EXPOSE 8000
 
-CMD uvicorn app.main:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}
+# sh -c keeps ${PORT:-8000} for Railway; exec makes uvicorn PID 1 so SIGTERM lands.
+CMD ["sh", "-c", "exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
