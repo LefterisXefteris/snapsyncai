@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@/lib/api-routes";
 import { apiUrl } from "@/lib/api-origin";
-import { mayGenerateListingCopy, productFacts, draftComposition, withDescriptionBlocks, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, emptyCare, isCompleteCare, CARE_FAMILIES, CARE_PICKS, type FibreRowDraft, type GpsrChoice, type GpsrIdentity, type CareChoice, type CareInstructions } from "@/lib/product-facts";
+import { productFacts, draftComposition, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, emptyCare, isCompleteCare, CARE_FAMILIES, CARE_PICKS, type FibreRowDraft, type GpsrChoice, type GpsrIdentity, type CareChoice, type CareInstructions } from "@/lib/product-facts";
 import type { Image } from "@/lib/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -225,7 +225,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const isUnpaid = image.paymentStatus !== "paid";
   const facts = productFacts(image);
-  const canGenerate = mayGenerateListingCopy(image);
+  const canGenerate = image.mayGenerateListingCopy === true;
   const shopGpsr = (shopifyStatus?.gpsrIdentity ?? null) as GpsrIdentity | null;
   const shopConnected = Boolean(shopifyStatus?.connected);
   const shopHasGpsr = isCompleteGpsr(shopGpsr);
@@ -708,10 +708,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 imageId={image.id}
                 defaultCategory={category}
                 canGenerate={canGenerate}
-                facts={facts}
-                shopGpsr={shopGpsr}
                 onAcceptTitle={(v) => setTitle(v)}
-                onAcceptDescription={(v) => setDescription(withDescriptionBlocks(v, facts, shopGpsr))}
+                onAcceptDescription={(v) => setDescription(v)}
                 onAcceptTags={(v) => setTags(v)}
                 onAcceptAeoFaqs={(v) => setAeoFaqs(v)}
               />

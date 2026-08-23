@@ -149,13 +149,6 @@ export function productFacts(image: Pick<Image, "productFacts"> | undefined): Pr
   return raw as ProductFactsRecord;
 }
 
-export function mayGenerateListingCopy(image: Pick<Image, "productFacts"> | undefined): boolean {
-  const confirmed = productFacts(image)?.confirmed;
-  if (!confirmed) return false;
-  if (confirmed.isTextile === false) return true;
-  return confirmed.isTextile === true && (confirmed.composition?.length ?? 0) > 0;
-}
-
 export function draftComposition(facts: ProductFactsRecord | null): FibreRowDraft[] {
   const names = facts?.suggested?.fibreNames ?? [];
   if (names.length === 0) {
@@ -168,70 +161,6 @@ export function draftComposition(facts: ProductFactsRecord | null): FibreRowDraf
     }
     return { name: OTHER_FIBRE, percent: "", otherName: raw };
   });
-}
-
-export function compositionBlockHtml(facts: ProductFactsRecord | null): string {
-  const rows = facts?.confirmed?.composition;
-  if (!facts?.confirmed?.isTextile || !rows?.length) return "";
-  const parts = rows
-    .filter((row) => row.name && typeof row.percent === "number")
-    .map((row) => `${row.percent}% ${row.name}`);
-  if (!parts.length) return "";
-  return `<p>Fibre composition: ${parts.join(", ")}.</p>`;
-}
-
-export function careBlockHtml(care: CareInstructions | null | undefined): string {
-  if (!care || !isCompleteCare(care)) return "";
-  const phrases = CARE_FAMILIES.map(({ key }) => {
-    const pick = CARE_PICKS[key].find((item) => item.code === care[key]);
-    return pick?.label ?? "";
-  });
-  if (phrases.some((phrase) => !phrase)) return "";
-  return `<p>Care instructions: ${phrases.join(". ")}.</p>`;
-}
-
-export function gpsrBlockHtml(identity: GpsrIdentity | null | undefined): string {
-  if (!identity || !partyComplete(identity.manufacturer)) return "";
-  const maker = identity.manufacturer;
-  let html = `<p>Manufacturer: ${maker.name}, ${maker.postalAddress}, ${maker.email}.</p>`;
-  if (!identity.manufacturerInEu && partyComplete(identity.euResponsiblePerson)) {
-    const person = identity.euResponsiblePerson!;
-    html += `<p>EU responsible person: ${person.name}, ${person.postalAddress}, ${person.email}.</p>`;
-  }
-  return html;
-}
-
-export function effectiveGpsrIdentity(
-  facts: ProductFactsRecord | null,
-  shopGpsr: GpsrIdentity | null | undefined,
-): GpsrIdentity | null {
-  const choice = facts?.confirmed?.gpsrChoice;
-  if (!choice || choice === "skip") return null;
-  if (choice === "override") {
-    return isCompleteGpsr(facts?.confirmed?.gpsrIdentity) ? facts!.confirmed!.gpsrIdentity! : null;
-  }
-  return isCompleteGpsr(shopGpsr) ? shopGpsr! : null;
-}
-
-export function withDescriptionBlocks(
-  description: string,
-  facts: ProductFactsRecord | null,
-  shopGpsr?: GpsrIdentity | null,
-): string {
-  const composition = compositionBlockHtml(facts);
-  const care =
-    facts?.confirmed?.isTextile && facts.confirmed.careChoice === "fill"
-      ? careBlockHtml(facts.confirmed.care)
-      : "";
-  const gpsr = gpsrBlockHtml(effectiveGpsrIdentity(facts, shopGpsr));
-  const block = [composition, care, gpsr].filter(Boolean).join("\n");
-  const stripped = description
-    .replace(/<p>Fibre composition:.*?<\/p>/gi, "")
-    .replace(/<p>Care instructions:.*?<\/p>/gi, "")
-    .replace(/<p>Manufacturer:.*?<\/p>(?:\s*<p>EU responsible person:.*?<\/p>)?/gi, "")
-    .trim();
-  if (!block) return stripped;
-  return stripped ? `${stripped}\n${block}` : block;
 }
 
 function canonicalFibre(name: string): string {

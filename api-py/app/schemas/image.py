@@ -15,7 +15,6 @@ LIST_EXCLUDE = frozenset(
         "ai_data",
         "aeo_faqs",
         "description_blocks",
-        "may_generate_listing_copy",
     }
 )
 
@@ -80,11 +79,9 @@ def with_facts_outcomes(image, shop_gpsr=None, *, list_item: bool = False):
     from app.services.product_facts import facts_from_stored, payload_outcomes
 
     facts = facts_from_stored(getattr(image, "product_facts", None))
-    if list_item:
-        return ImageListOut.model_validate(image).model_copy(
-            update={"listing_copy_stale": facts.listing_copy_stale}
-        )
-    return ImageOut.model_validate(image).model_copy(update=payload_outcomes(facts, shop_gpsr))
+    outcomes = payload_outcomes(facts, shop_gpsr)
+    model = ImageListOut if list_item else ImageOut
+    return model.model_validate(image).model_copy(update=outcomes)
 
 
 class ImageUpdate(CamelModel):

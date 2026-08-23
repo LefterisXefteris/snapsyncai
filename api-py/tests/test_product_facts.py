@@ -7,6 +7,7 @@ from app.services.product_facts import (
     description_blocks,
     effective_gpsr,
     facts_from_stored,
+    generation_blocked_reason,
     listing_copy_constraints,
     may_generate_listing_copy,
     merge_product_facts,
@@ -61,6 +62,18 @@ def test_unconfirmed_facts_cannot_generate() -> None:
     assert may_generate_listing_copy(facts) is False
     grandfathered = facts_from_stored({})
     assert may_generate_listing_copy(grandfathered) is False
+
+
+def test_unconfirmed_facts_return_a_generate_conflict() -> None:
+    assert generation_blocked_reason(facts_from_stored(None)) == (
+        "Confirm product facts before generating listing copy."
+    )
+    confirmed = confirm_facts(
+        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
+        is_textile=False,
+        gpsr_choice="skip",
+    ).facts
+    assert generation_blocked_reason(confirmed) is None
 
 
 def test_confirming_not_a_textile_opens_the_gate() -> None:
