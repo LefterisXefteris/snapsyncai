@@ -22,6 +22,11 @@ async def get_subscription(session: AsyncSession, user_id: str) -> Subscription 
     return result.scalar_one_or_none()
 
 
+def is_local_pro(settings: Settings) -> bool:
+    """Auth bypass is a full Pro workspace. Never true in production."""
+    return bool(settings.dev_bypass_auth) and not settings.is_production
+
+
 async def is_dev_free_user(user_id: str, settings: Settings) -> bool:
     if settings.is_production:
         return False
@@ -46,6 +51,8 @@ async def is_dev_free_user(user_id: str, settings: Settings) -> bool:
 async def has_active_subscription(
     session: AsyncSession, user_id: str, settings: Settings
 ) -> bool:
+    if is_local_pro(settings):
+        return True
     if await is_dev_free_user(user_id, settings):
         return True
     sub = await get_subscription(session, user_id)

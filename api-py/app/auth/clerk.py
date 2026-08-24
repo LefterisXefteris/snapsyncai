@@ -95,21 +95,4 @@ async def current_user_id(
     return user_id
 
 
-async def optional_user_id(
-    request: Request,
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> str | None:
-    """For routes that behave differently when signed in but do not require it."""
-    if settings.dev_bypass_auth and not settings.is_production:
-        return DEV_USER_ID
-    try:
-        return await authenticate(request, settings)
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("clerk: authentication failed unexpectedly")
-        return None
-
-
 CurrentUser = Annotated[str, Depends(current_user_id)]
-OptionalUser = Annotated[str | None, Depends(optional_user_id)]

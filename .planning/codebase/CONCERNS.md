@@ -98,7 +98,7 @@
 - Recommendations: Add a hard guard that throws if `DEV_BYPASS_AUTH=true` and `NODE_ENV=production`
 
 **Third-party API credentials stored in plaintext DB columns:**
-- Risk: Shopify access tokens, Etsy access tokens, Amazon LWA refresh tokens, Instagram long-lived tokens are all stored as plaintext text columns
+- Risk: Shopify access tokens and Instagram long-lived tokens are stored as plaintext text columns
 - Files: `shared/schema.ts` lines 60-130; `server/storage.ts`
 - Current mitigation: Access is scoped by `sessionId`; DB connection is over SSL
 - Recommendations: Encrypt sensitive columns at rest; use Postgres `pgcrypto` or application-level encryption before storing tokens
@@ -155,7 +155,7 @@
 
 **`use-images.ts` exports 30+ hooks from one file:**
 - Files: `client/src/hooks/use-images.ts` (867 lines)
-- Why fragile: All mutations for every platform (Shopify, Etsy, Amazon, Instagram), AI features, and payments are in one hook file; barrel-export makes tree-shaking ineffective
+- Why fragile: All mutations for Shopify, Instagram, AI features, and payments are in one hook file; barrel-export makes tree-shaking ineffective
 - Safe modification: Split into domain-specific hook files (`use-shopify.ts`, `use-instagram.ts`, `use-payments.ts`)
 - Test coverage: None
 
@@ -184,10 +184,10 @@
 - Limit: OOM crash if enough edits are made before server restart
 - Scaling path: Apply a size cap or store results in Supabase Storage
 
-**Sequential push to Etsy/Amazon:**
+**Sequential Shopify push:**
 - Current capacity: Each product is pushed one at a time in a `for` loop
 - Limit: At 10+ products the request takes 10+ seconds; Vercel serverless has a 10-second request timeout on hobby plans
-- Scaling path: Use `runWithConcurrency` (already present in the codebase) for Etsy and Amazon pushes the same way it's used for image analysis
+- Scaling path: Use `runWithConcurrency` (already present in the codebase) for Shopify pushes the same way it's used for image analysis
 
 ---
 

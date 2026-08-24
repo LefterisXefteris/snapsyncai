@@ -41,7 +41,7 @@ from app.services.product_facts import (
     merge_product_facts,
     persistable_from_vision,
 )
-from app.services.subscriptions import has_active_subscription
+from app.services.subscriptions import has_active_subscription, is_local_pro
 from app.services.supabase_storage import upload_file_to_storage
 from app.services.upload_langgraph import resolve_upload_processing_mode
 
@@ -86,6 +86,10 @@ Rules:
 def _message(status: int, message: str, **extra: Any) -> JSONResponse:
     """Express-shaped error body: `{ message }` (the SPA reads this key)."""
     return JSONResponse(status_code=status, content={"message": message, **extra})
+
+
+def _image_out(image, settings) -> ImageOut:
+    return with_facts_outcomes(image, force_paid=is_local_pro(settings))
 
 
 def _new_image_values(
@@ -266,7 +270,7 @@ async def upload_images(
                         ),
                     )
                     image = await _persist_storage(session, image, buf, mime, name)
-                    results.append(with_facts_outcomes(image))
+                    results.append(_image_out(image, settings))
                 except Exception:
                     logger.exception("Failed to store grouped image %s", name)
                     fallback = await store.create_image(
@@ -283,7 +287,7 @@ async def upload_images(
                         ),
                     )
                     fallback = await _persist_storage(session, fallback, buf, mime, name)
-                    results.append(with_facts_outcomes(fallback))
+                    results.append(_image_out(fallback, settings))
             return results
 
         async def process_one(item: tuple[UploadFile, bytes], _idx: int):
@@ -310,7 +314,7 @@ async def upload_images(
                         ),
                     )
                     image = await _persist_storage(session, image, buf, mime, name)
-                    return with_facts_outcomes(image)
+                    return _image_out(image, settings)
 
                 preview = await quick_preview_image(buf, mime, name, context or None, tone)
                 image = await store.create_image(
@@ -328,7 +332,7 @@ async def upload_images(
                     ),
                 )
                 image = await _persist_storage(session, image, buf, mime, name)
-                return with_facts_outcomes(image)
+                return _image_out(image, settings)
             except Exception:
                 logger.exception("Failed to process %s", name)
                 fallback = await store.create_image(
@@ -344,7 +348,7 @@ async def upload_images(
                     ),
                 )
                 fallback = await _persist_storage(session, fallback, buf, mime, name)
-                return with_facts_outcomes(fallback)
+                return _image_out(fallback, settings)
 
         results = await run_with_concurrency(loaded, CONCURRENCY_LIMIT, process_one)
         return results

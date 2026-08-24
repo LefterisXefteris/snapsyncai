@@ -23,7 +23,7 @@ from sqlalchemy.types import String
 from app.auth.clerk import _client
 from app.config import Settings, get_settings
 from app.models import Image, ShopifyConnection
-from app.models.billing import PaidSession, Subscription, UserCredits
+from app.models.billing import PaidSession, Subscription
 from app.routers.config import (
     SUBSCRIPTION_ANNUAL_PRICE_PENCE,
     SUBSCRIPTION_WEEKLY_PRICE_PENCE,
@@ -34,6 +34,7 @@ from app.services.subscriptions import (
     DEV_FREE_EMAIL,
     get_subscription,
     is_dev_free_user,
+    is_local_pro,
 )
 
 logger = logging.getLogger(__name__)
@@ -278,45 +279,6 @@ async def claim_paid_session(session: AsyncSession, checkout_session_id: str) ->
     return True
 
 
-async def add_credits(session: AsyncSession, user_id: str, amount: int) -> UserCredits:
-    result = await session.execute(
-        select(UserCredits).where(UserCredits.user_id == user_id).with_for_update()
-    )
-    row = result.scalar_one_or_none()
-    if row is None:
-        row = UserCredits(user_id=user_id, balance=amount, lifetime_credits=amount)
-        session.add(row)
-    else:
-        row.balance = (row.balance or 0) + amount
-        row.lifetime_credits = (row.lifetime_credits or 0) + amount
-    await session.flush()
-    return row
-
-
-async def claim_and_grant_credits(
-    session: AsyncSession,
-    *,
-    checkout_session_id: str,
-    user_id: str,
-    credits: int,
-    amount_paid: int = 0,
-) -> bool:
-    """Claim the checkout row then grant credits in the same transaction.
-
-    Returns False when the session was already claimed — caller must not grant again.
-    """
-    await ensure_paid_session(
-        session,
-        checkout_session_id=checkout_session_id,
-        session_id=user_id,
-        amount_paid=amount_paid,
-    )
-    if not await claim_paid_session(session, checkout_session_id):
-        return False
-    await add_credits(session, user_id, credits)
-    return True
-
-
 async def get_weekly_product_count(session: AsyncSession, user_id: str) -> int:
     week_start = get_week_start_utc()
     result = await session.execute(
@@ -452,8 +414,6 @@ __all__ = [
     "ACTIVE_STATUSES",
     "DEV_FREE_EMAIL",
     "WEEKLY_PRODUCT_LIMIT",
-    "add_credits",
-    "claim_and_grant_credits",
     "claim_paid_session",
     "claim_paid_session_statement",
     "clerk_primary_email",
@@ -471,6 +431,7 @@ __all__ = [
     "get_weekly_product_count",
     "is_active_status",
     "is_dev_free_user",
+    "is_local_pro",
     "mark_paid_session_used",
     "migrate_session",
     "next_monday_utc",

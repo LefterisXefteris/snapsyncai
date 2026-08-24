@@ -32,6 +32,7 @@ from app.services.product_facts import (
     stored_from_facts,
 )
 from app.services.shopify import push_product_to_shopify
+from app.services.subscriptions import is_local_pro
 
 logger = logging.getLogger(__name__)
 
@@ -73,18 +74,30 @@ def _catalogue_payload(items: list[ImageListOut]) -> list[dict]:
     ]
 
 
+def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False):
+    return with_facts_outcomes(
+        image,
+        shop_gpsr,
+        list_item=list_item,
+        force_paid=is_local_pro(settings),
+    )
+
+
 @router.get("/api/images", response_model=list[ImageListOut], response_model_exclude=LIST_EXCLUDE)
 async def list_images(
-    user_id: CurrentUser, session: SessionDep
+    user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> list[ImageListOut] | JSONResponse:
     cached = await catalogue_cache.get(user_id)
     if cached is not None:
+        if is_local_pro(settings):
+            for item in cached:
+                item["paymentStatus"] = "paid"
         return JSONResponse(content=cached)
     try:
         rows = await store.list_images(session, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch images") from None
-    items = [with_facts_outcomes(row, list_item=True) for row in rows]
+    items = [_image_out(row, settings, list_item=True) for row in rows]
     await catalogue_cache.put(user_id, _catalogue_payload(items))
     return items
 
@@ -94,12 +107,14 @@ async def list_images(
     response_model=list[ImageListOut],
     response_model_exclude=LIST_EXCLUDE,
 )
-async def get_group(image_id: int, user_id: CurrentUser, session: SessionDep) -> list[ImageListOut]:
+async def get_group(
+    image_id: int, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> list[ImageListOut]:
     try:
         rows = await store.get_image_group(session, image_id, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch product group") from None
-    return [with_facts_outcomes(row, list_item=True) for row in rows]
+    return [_image_out(row, settings, list_item=True) for row in rows]
 
 
 @router.post("/api/images/{image_id}/unlink-from-group", response_model=OkResponse)
@@ -164,6 +179,7 @@ async def confirm_product_facts(
     body: ConfirmProductFactsBody,
     user_id: CurrentUser,
     session: SessionDep,
+    settings: SettingsDep,
 ) -> ImageOut:
     image = await store.get_image(session, image_id)
     if not _owned(image, user_id):
@@ -194,7 +210,7 @@ async def confirm_product_facts(
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    return with_facts_outcomes(updated, shop_gpsr)
+    return _image_out(updated, settings, shop_gpsr)
 
 
 @router.get("/api/images/{image_id}/file")
@@ -224,7 +240,11 @@ async def image_file(
 
 @router.put("/api/images/{image_id}", response_model=ImageOut)
 async def update_image(
-    image_id: int, body: ImageUpdate, user_id: CurrentUser, session: SessionDep
+    image_id: int,
+    body: ImageUpdate,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
 ) -> ImageOut:
     image = await store.get_image(session, image_id)
     if not _owned(image, user_id):
@@ -238,7 +258,7 @@ async def update_image(
         raise HTTPException(status_code=404, detail="Image not found")
     connection = await connections.get_shopify(session, user_id)
     shop_gpsr = connection.gpsr_identity if connection is not None else None
-    return with_facts_outcomes(updated, shop_gpsr)
+    return _image_out(updated, settings, shop_gpsr)
 
 
 @router.delete("/api/images/{image_id}", status_code=204)
@@ -305,7 +325,7 @@ async def push_to_shopify(
             raise HTTPException(status_code=400, detail="No images found for given IDs")
 
         unpaid = [img for img in images_to_push if img.payment_status != "paid"]
-        if unpaid:
+        if unpaid and not is_local_pro(settings):
             return JSONResponse(
                 status_code=402,
                 content={

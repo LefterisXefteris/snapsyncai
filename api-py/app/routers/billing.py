@@ -84,7 +84,9 @@ async def subscription_status(
     user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> SubscriptionStatusResponse:
     try:
-        if await billing.is_dev_free_user(user_id, settings):
+        if billing.is_local_pro(settings) or await billing.is_dev_free_user(
+            user_id, settings
+        ):
             return SubscriptionStatusResponse(
                 subscribed=True,
                 status="active",
@@ -482,9 +484,12 @@ async def unlock_images(
         if not unpaid:
             return UnlockResponse(processed=0, message="All selected images are already unlocked.")
 
+        local_pro = billing.is_local_pro(settings)
         dev_free = await billing.is_dev_free_user(user_id, settings)
         sub = await billing.get_subscription(session, user_id)
-        is_subscribed = dev_free or (sub is not None and billing.is_active_status(sub.status))
+        is_subscribed = local_pro or dev_free or (
+            sub is not None and billing.is_active_status(sub.status)
+        )
         if not is_subscribed:
             return JSONResponse(
                 status_code=403,
@@ -496,6 +501,8 @@ async def unlock_images(
 
         weekly_count = await billing.get_weekly_product_count(session, user_id)
         remaining = WEEKLY_PRODUCT_LIMIT - weekly_count
+        if local_pro:
+            remaining = len(unpaid)
         if remaining <= 0:
             return JSONResponse(
                 status_code=403,

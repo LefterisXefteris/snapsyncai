@@ -13,14 +13,13 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, Package, Plus, Ungroup, Images, Trash2, Sparkles, CheckCircle2, AlertTriangle, ImagePlus } from "lucide-react";
+import { UploadCloud, Loader2, X, Package, Plus, Ungroup, Images, Trash2, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isImageLikeFile } from "@/lib/image-file-utils";
 import { useUploadImages } from "@/hooks/use-images";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
-import { useAutoGroup } from "@/hooks/use-auto-group";
 import { useGroupSelection } from "@/hooks/use-group-selection";
 
 // Soft advisory threshold (GROUP-08) — groups larger than this render an
@@ -361,20 +360,9 @@ export function UploadZone({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadingQueue, setUploadingQueue] = useState<File[]>([]);
-  const [isAutoSorting, setIsAutoSorting] = useState(false);
   const uploadMutation = useUploadImages();
   const { toast } = useToast();
   const { loadStaged, saveBlob, deleteBlob, saveGroups, clearAll } = useStagedImages();
-  const autoGroup = useAutoGroup();
-  const allItemsRef = useRef<FileItem[]>([]);
-  const [fallbackBannerDismissed, setFallbackBannerDismissed] = useState(false);
-
-  // Re-show the fallback banner each time a new auto-group run begins.
-  useEffect(() => {
-    if (autoGroup.isGrouping) {
-      setFallbackBannerDismissed(false);
-    }
-  }, [autoGroup.isGrouping]);
 
   // Revoke object URLs on unmount
   const urlsRef = useRef<string[]>([]);
@@ -399,50 +387,6 @@ export function UploadZone({
   // Notify parent whenever staged item count changes so the workspace can
   // expand the sidebar to give the grouping grid more room.
   useEffect(() => { onStagedCountChange?.(totalFiles); }, [totalFiles, onStagedCountChange]);
-
-  const sortVariantsIntoProducts = useCallback((items: FileItem[]) => {
-    if (items.length === 0) return;
-    allItemsRef.current = items;
-    setIsAutoSorting(true);
-    autoGroup.startGrouping(items, undefined, "variant-family");
-  }, [autoGroup]);
-
-  // ── Auto-group: map streamed results to Group[] state ─────────────────────
-  useEffect(() => {
-    if (!isAutoSorting) return;
-    if (autoGroup.groups.length === 0) return;
-
-    const allItems = allItemsRef.current;
-    if (allItems.length === 0) return;
-
-    const newGroups: GroupWithLabel[] = autoGroup.groups.map(ag => ({
-      id: crypto.randomUUID(),
-      items: ag.imageIndices
-        .map(idx => allItems[idx])
-        .filter(Boolean),
-      maxImages: Number.MAX_SAFE_INTEGER,
-      label: ag.label,
-      confidence: ag.confidence,
-    })).filter(g => g.items.length > 0);
-
-    setGroups(newGroups);
-    saveGroups(newGroups);
-  }, [autoGroup.groups.length, isAutoSorting]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Auto-group finished (success or idle) ─────────────────────────────────
-  useEffect(() => {
-    if (isAutoSorting && !autoGroup.isGrouping && autoGroup.totalGroups !== null) {
-      setIsAutoSorting(false);
-    }
-  }, [isAutoSorting, autoGroup.isGrouping, autoGroup.totalGroups]);
-
-  // ── Auto-group error → toast + clear sorting flag ─────────────────────────
-  useEffect(() => {
-    if (autoGroup.error) {
-      toast({ title: "Auto-grouping failed", description: autoGroup.error, variant: "destructive" });
-      setIsAutoSorting(false);
-    }
-  }, [autoGroup.error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── DnD sensors ─────────────────────────────────────────────────────────────
   const sensors = useSensors(
@@ -902,62 +846,6 @@ export function UploadZone({
         </div>
       </button>
 
-      {/* Auto-grouping progress */}
-      {isAutoSorting && autoGroup.isGrouping && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/20">
-          <Loader2 className="w-4 h-4 animate-spin text-primary" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-white">
-              AI is sorting your variants... {autoGroup.groups.length} product{autoGroup.groups.length !== 1 ? 's' : ''} found
-            </p>
-            <p className="text-[11px] text-white/40">Groups appear as they are identified</p>
-          </div>
-          <button
-            onClick={() => { autoGroup.cancel(); setIsAutoSorting(false); }}
-            className="text-xs text-white/40 hover:text-white/80 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Auto-grouping completion summary */}
-      {!isAutoSorting && autoGroup.totalGroups !== null && !autoGroup.isGrouping && groups.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-500/5 border border-green-500/20">
-          <CheckCircle2 className="w-4 h-4 text-green-400" />
-          <p className="text-xs text-white/80">
-            AI identified <span className="font-medium text-white">{groups.length} products</span> — review groupings below, then confirm
-          </p>
-        </div>
-      )}
-
-      {/* Fallback warning banner — shown when AI embedding grouping degraded to filename-only */}
-      {autoGroup.fallbackInfo.used && !fallbackBannerDismissed && (
-        <div
-          role="alert"
-          data-testid="auto-group-fallback-banner"
-          className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30"
-        >
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-amber-100">
-              Grouped by filename — AI grouping unavailable
-            </p>
-            <p className="text-[11px] text-amber-100/70 mt-0.5">
-              These groupings are less accurate than usual. Review carefully before confirming.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFallbackBannerDismissed(true)}
-            aria-label="Dismiss warning"
-            className="text-amber-100/60 hover:text-amber-100 transition-colors shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {/* Groups section — manual-first: renders unconditionally when any files exist */}
       {totalFiles > 0 && !isUploading && (
         <DndContext
@@ -981,19 +869,6 @@ export function UploadZone({
                   <span className="text-[11px] font-medium text-white/80">{groups.length}</span>
                 </div>
               </div>
-
-              {/* Sort Variants — secondary AI button (GROUP-11) */}
-              {totalFiles > 1 && (
-                <button
-                  onClick={() => sortVariantsIntoProducts(groups.flatMap(g => g.items))}
-                  disabled={isAutoSorting}
-                  className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
-                  title="Sort same-product variants into product families"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span className="hidden sm:inline">Sort variants</span>
-                </button>
-              )}
 
               <button
                 onClick={open}

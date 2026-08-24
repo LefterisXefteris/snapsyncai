@@ -14,9 +14,9 @@
 
 **Functions:**
 - React components: PascalCase — `ImageCard`, `UploadZone`, `DraggableThumbnail`
-- Custom hooks: `use` prefix, camelCase — `useImages`, `useShopifyConnect`, `usePushToEtsy`
+- Custom hooks: `use` prefix, camelCase — `useImages`, `useShopifyConnect`, `usePushToShopify`
 - Server utility functions: camelCase — `loadImageBuffer`, `runWithConcurrency`, `getOrCreateCreditPackPriceId`
-- Server route handler functions: camelCase — `pushProductToShopify`, `pushProductToEtsy`, `getAmazonAccessToken`
+- Server route handler functions: camelCase — `pushProductToShopify`
 - Helper functions: camelCase — `buildUrl`, `imageHashNormalizer`, `chunkArray`
 
 **Variables:**
@@ -45,7 +45,7 @@
 - `skipLibCheck: true` — skip type checking of `.d.ts` files
 - `moduleResolution: "bundler"` for modern ESM resolution
 - Explicit `as const` used on literal arrays — `BG_STYLES`, `CREDIT_PACKS`
-- `as unknown as X` cast used sparingly; `as any` used in complex Shopify/Amazon payload building where typing is impractical
+- `as unknown as X` cast used sparingly; `as any` used in complex Shopify payload building where typing is impractical
 
 **Line Length / Blocks:**
 - No hard limit enforced

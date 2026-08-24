@@ -12,17 +12,6 @@
         "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task"
       }
     ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "command": "bd prime",
-            "type": "command"
-          }
-        ],
-        "matcher": ""
-      }
-    ],
     "PreToolUse": [
       {
         "hooks": [
@@ -43,15 +32,6 @@
             "type": "command"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "bd prime",
-            "type": "command"
-          }
-        ],
-        "matcher": ""
       }
     ]
   },

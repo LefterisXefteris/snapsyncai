@@ -79,31 +79,6 @@ export function useCreateSubscriptionCheckout() {
   });
 }
 
-export function useRecoverSubscriptionByEmail() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/recover-by-email", {});
-      return res.json() as Promise<{ recovered: boolean; subscribed?: boolean; message?: string }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/subscription/status'] });
-      if (data.recovered && data.subscribed) {
-        toast({ title: "Subscription Restored", description: "Your Pro subscription has been linked to this account." });
-      } else if (data.recovered) {
-        toast({ title: "Account Linked", description: data.message || "Your account has been updated." });
-      } else {
-        toast({ title: "No Subscription Found", description: "No active subscription was found for your email address.", variant: "destructive" });
-      }
-    },
-    onError: (error) => {
-      toast({ title: "Recovery Failed", description: error.message, variant: "destructive" });
-    },
-  });
-}
-
 export function useVerifySubscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -205,40 +180,6 @@ export function useUploadImages() {
       endThinking(false);
       toast({
         title: "Upload Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-}
-
-export function useUnlockImages() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { beginThinking, endThinking } = useAmbient();
-
-  return useMutation({
-    onMutate: () => beginThinking(),
-    mutationFn: async ({ imageIds }: { imageIds: number[] }) => {
-      const res = await apiRequest("POST", "/api/subscription/unlock-images", { imageIds });
-      return res.json() as Promise<{ processed: number; results: any[]; message?: string }>;
-    },
-    onSuccess: (data) => {
-      endThinking(true);
-      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
-      if (data.processed === 0) {
-        toast({ title: "Already Analyzed", description: data.message || "All images already have full AI analysis." });
-      } else {
-        toast({
-          title: "Analysis Complete",
-          description: `Full AI analysis completed for ${data.processed} products. You can now review and push to your stores.`,
-        });
-      }
-    },
-    onError: (error) => {
-      endThinking(false);
-      toast({
-        title: "Analysis Failed",
         description: error.message,
         variant: "destructive",
       });

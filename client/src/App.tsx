@@ -136,7 +136,7 @@ function AuthenticatedLayout() {
   );
 }
 
-function ClerkApp() {
+function WorkspaceOrAuth() {
   // In dev bypass mode, skip Clerk sign-in gates and go straight to the app.
   if (DEV_BYPASS_AUTH) {
     return <AuthenticatedLayout />;
@@ -151,6 +151,20 @@ function ClerkApp() {
         <AuthenticatedLayout />
       </SignedIn>
     </>
+  );
+}
+
+function ClerkApp() {
+  // /page and /landing always show the marketing page, even with auth bypass,
+  // so the signed-out story can be previewed on the main dev server.
+  return (
+    <Switch>
+      <Route path="/page" component={AuthScreen} />
+      <Route path="/landing" component={AuthScreen} />
+      <Route>
+        <WorkspaceOrAuth />
+      </Route>
+    </Switch>
   );
 }
 
@@ -210,7 +224,17 @@ function App() {
         <AmbientProvider>
           <TooltipProvider>
             <AuroraBackground />
-            {DEV_BYPASS_AUTH ? <AuthenticatedLayout /> : <AppWithClerk />}
+            {DEV_BYPASS_AUTH && !VITE_CLERK_KEY ? (
+              <Switch>
+                <Route path="/page" component={AuthScreen} />
+                <Route path="/landing" component={AuthScreen} />
+                <Route>
+                  <AuthenticatedLayout />
+                </Route>
+              </Switch>
+            ) : (
+              <AppWithClerk />
+            )}
             <Toaster />
           </TooltipProvider>
         </AmbientProvider>

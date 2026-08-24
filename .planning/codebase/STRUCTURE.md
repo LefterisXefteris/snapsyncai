@@ -95,7 +95,7 @@ lisai-app/
 
 **`client/src/hooks/`:**
 - Purpose: All server state lives here via TanStack Query `useQuery` / `useMutation` hooks
-- Contains: One main file `use-images.ts` (31 KB) exporting ~30 hooks covering images, subscriptions, credits, Shopify, Etsy, Amazon, Instagram
+- Contains: One main file `use-images.ts` (31 KB) exporting ~30 hooks covering images, subscriptions, credits, Shopify, Instagram
 - Key files: `use-images.ts` — the primary data layer for the entire client
 
 **`client/src/lib/`:**

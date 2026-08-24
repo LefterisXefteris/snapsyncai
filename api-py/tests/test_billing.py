@@ -12,9 +12,10 @@ from app.services.billing import (
     get_week_start_utc,
     is_active_status,
     is_dev_free_user,
+    is_local_pro,
     next_monday_utc,
 )
-from app.services.subscriptions import ACTIVE_STATUSES
+from app.services.subscriptions import ACTIVE_STATUSES, has_active_subscription
 
 
 def test_active_statuses_match_express() -> None:
@@ -71,3 +72,25 @@ def test_week_helpers_are_timezone_stable() -> None:
     now = datetime.now(UTC)
     start = get_week_start_utc()
     assert start <= now.replace(tzinfo=None)
+
+
+def _settings(**kwargs) -> Settings:
+    return Settings(
+        database_url="postgresql://u:p@localhost:5432/db",
+        **kwargs,
+    )
+
+
+def test_local_pro_follows_auth_bypass() -> None:
+    assert is_local_pro(_settings(environment="development", dev_bypass_auth=True)) is True
+    assert is_local_pro(_settings(environment="development", dev_bypass_auth=False)) is False
+
+
+def test_local_pro_never_runs_in_production() -> None:
+    assert is_local_pro(_settings(environment="production", dev_bypass_auth=True)) is False
+
+
+@pytest.mark.asyncio
+async def test_local_pro_counts_as_subscribed_without_stripe() -> None:
+    settings = _settings(environment="development", dev_bypass_auth=True)
+    assert await has_active_subscription(None, "dev_local_user", settings) is True

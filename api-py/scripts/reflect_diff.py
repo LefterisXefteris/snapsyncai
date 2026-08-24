@@ -1,9 +1,8 @@
 """Diff the SQLModel definitions against a live database.
 
 `shared/schema.ts` is gone with Express. Production omitted CHECKs and `DESC`
-all 8 CHECK constraints and the `DESC` ordering on 4 indexes that
-`migrations/0001_inventory_autopilot.sql` actually created. So the models cannot be
-validated against the Drizzle schema; they have to be validated against a real database.
+ordering on some indexes that the old Drizzle SQL created. The models cannot be
+validated against that schema; they have to be validated against a real database.
 
 Run this before `alembic stamp head`:
 

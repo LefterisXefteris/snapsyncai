@@ -74,12 +74,16 @@ class ImageListOut(ImageOut):
     aeo_faqs: Any | None = None
 
 
-def with_facts_outcomes(image, shop_gpsr=None, *, list_item: bool = False):
+def with_facts_outcomes(
+    image, shop_gpsr=None, *, list_item: bool = False, force_paid: bool = False
+):
     """Copy Product facts outcomes onto the HTTP payload. Do not re-encode the rules here."""
     from app.services.product_facts import facts_from_stored, payload_outcomes
 
     facts = facts_from_stored(getattr(image, "product_facts", None))
     outcomes = payload_outcomes(facts, shop_gpsr)
+    if force_paid:
+        outcomes = {**outcomes, "payment_status": "paid"}
     model = ImageListOut if list_item else ImageOut
     return model.model_validate(image).model_copy(update=outcomes)
 

@@ -5,31 +5,16 @@
 ## APIs & External Services
 
 **AI / Machine Learning:**
-- OpenAI (via Replit AI Integrations proxy) — Product listing generation, SEO copy, background image generation, chat conversations
+- OpenAI (via Replit AI Integrations proxy) — Product listing generation and SEO copy
   - SDK/Client: `openai` npm package (`server/replit_integrations/image/client.ts`, `server/routes.ts`)
   - Auth: `AI_INTEGRATIONS_OPENAI_API_KEY` + `AI_INTEGRATIONS_OPENAI_BASE_URL`
-  - Models used: `gpt-5.2` (product text generation), `gpt-image-1` (background image generation/editing), `dall-e-3` (alternative image generation), `gpt-5.1` (chat), `gpt-audio` (audio)
+  - Models used: `gpt-5.2` (product text generation)
 
 **E-commerce Marketplaces:**
-- Shopify — Publish product listings directly to a store via Shopify Admin REST API
+- Shopify — Publish product listings directly to a store via Shopify Admin API
   - Auth: OAuth access token stored per-session in `shopify_connections` table
-  - Connection: `server/routes.ts` (`/api/shopify/connect`, `/api/shopify/push`)
+  - Connection: `/api/shopify/connect`, `/api/images/push-to-shopify`
   - Schema: `shared/schema.ts` `shopifyConnections` table
-- Etsy — Publish listings to Etsy shops via Etsy API v3
-  - Auth: API key + OAuth access token stored per-session in `etsy_connections` table
-  - Connection: `server/routes.ts` (`/api/etsy/connect`, `/api/etsy/push`)
-  - Endpoint: `https://api.etsy.com/v3/application/shops/{shopId}/listings`
-  - Schema: `shared/schema.ts` `etsyConnections` table
-- Amazon Selling Partner API (SP-API) — Publish listings to Amazon
-  - Auth: LWA (Login with Amazon) OAuth2 with refresh token, stored in `amazon_connections` table
-  - Connection: `server/routes.ts` (`/api/amazon/connect`, `/api/amazon/push`)
-  - Endpoints: Regional (`sellingpartnerapi-na`, `-eu`, `-fe`) based on marketplace ID
-  - Schema: `shared/schema.ts` `amazonConnections` table
-- Instagram (Facebook Graph API v21.0) — Publish product images as posts
-  - Auth: Facebook OAuth2 PKCS flow via `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_CONFIG_ID`
-  - Callback: `/api/instagram/oauth/callback`
-  - Connection: `server/routes.ts` starting at line 2258
-  - Schema: `shared/schema.ts` `instagramConnections` table
 
 ## Data Storage
 
@@ -39,7 +24,7 @@
   - Client: Drizzle ORM + `pg` Pool (`server/db.ts`)
   - Pool config: max 10 connections, 30s idle timeout, 10s connection timeout, SSL enabled when URL contains "supabase"
   - Schema managed by Drizzle Kit at `shared/schema.ts`, migrations in `migrations/`
-  - Tables: `images`, `shopify_connections`, `etsy_connections`, `amazon_connections`, `instagram_connections`, `paid_sessions`, `subscriptions`, `user_credits`
+  - Tables: `images`, `shopify_connections`, `paid_sessions`, `subscriptions`, `user_credits`
   - Runtime migrations run on startup via `server/index.ts` `runAppMigrations()`
 
 **File Storage:**
@@ -106,31 +91,13 @@
 
 **Outgoing:**
 - Shopify Admin REST API — product creation and image upload requests
-- Etsy API v3 — listing creation and image attachment requests
-- Amazon SP-API — listing creation via LWA token exchange
-- Facebook Graph API v21.0 — Instagram OAuth token exchange and post creation
-- OpenAI API — AI text and image generation requests
+- OpenAI API — AI text generation requests
 
 ## OAuth Flows
 
 **Shopify:**
 - Custom OAuth exchange: store domain + access token stored in `shopify_connections`
-- Route: `POST /api/shopify/connect`
-
-**Etsy:**
-- API key + access token stored in `etsy_connections`
-- Route: `POST /api/etsy/connect`
-
-**Amazon:**
-- LWA client ID, client secret, refresh token stored in `amazon_connections`
-- Token endpoint: `https://api.amazon.com/auth/o2/token`
-- Route: `POST /api/amazon/connect`
-
-**Instagram:**
-- Facebook OAuth2 code flow with HMAC-signed state parameter (anti-CSRF)
-- Start: `GET /api/instagram/oauth/start` → redirects to `https://www.facebook.com/v21.0/dialog/oauth`
-- Callback: `GET /api/instagram/oauth/callback` → exchanges code, fetches IG user ID, stores in `instagram_connections`
-- Post-auth communication to opener window via `postMessage`
+- Route: `POST /api/shopify/connect` / `GET /api/shopify/oauth/start`
 
 ## Environment Configuration
 
@@ -144,9 +111,6 @@
 - `VITE_CLERK_PUBLISHABLE_KEY` — Clerk publishable key (baked into Vite client build)
 - `AI_INTEGRATIONS_OPENAI_API_KEY` — OpenAI API key (via Replit proxy)
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` — OpenAI base URL (Replit AI proxy endpoint)
-- `FACEBOOK_APP_ID` — Facebook App ID for Instagram OAuth
-- `FACEBOOK_APP_SECRET` — Facebook App Secret for Instagram OAuth
-- `FACEBOOK_CONFIG_ID` — Facebook Login Configuration ID for Instagram OAuth
 
 **Optional env vars:**
 - `DEV_BYPASS_AUTH` — Set `true` to skip Clerk auth on server

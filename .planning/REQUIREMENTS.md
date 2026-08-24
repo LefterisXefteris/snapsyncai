@@ -16,9 +16,6 @@
 ### Credentials
 
 - [ ] **CRED-01**: Shopify OAuth access tokens are encrypted before being written to `shopify_connections`
-- [ ] **CRED-02**: Etsy OAuth tokens are encrypted before being written to `etsy_connections`
-- [ ] **CRED-03**: Amazon LWA refresh tokens are encrypted before being written to `amazon_connections`
-- [ ] **CRED-04**: Instagram long-lived tokens are encrypted before being written to `instagram_connections`
 - [ ] **CRED-05**: Tokens are decrypted transparently on read so all existing platform push flows continue working without changes to callers
 
 ### Infrastructure
@@ -48,13 +45,6 @@
 - [x] **GROUP-03**: After confirming groupings, full AI analysis (title, description, SEO, AEO, pricing) runs automatically per product group
 - [x] **GROUP-04**: Manual drag-and-drop grouping flow remains available as an alternative to AI auto-grouping
 
-### Embeddings Variant Clustering (Phase 8)
-
-- [x] **CLUSTER-01**: Same-product / variant image grouping uses Cohere Embed v4 multimodal embeddings plus threshold-based cosine similarity + union-find clustering, replacing the GPT-5.2 vision batch loop inside `runAutoGrouping`
-- [x] **CLUSTER-02**: End-to-end latency for the auto-group flow on a 50-image input is less than or equal to the existing VLM path baseline (verified during human checkpoint)
-- [x] **CLUSTER-03**: Cost per 100 images is strictly less than the GPT-5.2 vision baseline (verified via Cohere dashboard usage readout during human checkpoint)
-- [ ] **CLUSTER-04**: On any Cohere failure after one retry with exponential backoff (including timeouts), `runAutoGrouping` falls back to filename-only grouping via the existing `mergeAutoGroupsByFamily` apparel-token merger and surfaces a "Grouped by filename — AI grouping unavailable" warning banner (pre-upload SSE flow) or destructive toast (workspace Sort Variants flow)
-
 ### Manual Grouping-First UX (Phase 9)
 
 - [x] **GROUP-05**: Drag-and-drop staging is the primary grouping UX; the mode chooser ("Auto-group / Sort Variants / Group manually") is removed, manual mode starts immediately on file drop.
@@ -63,7 +53,7 @@
 - [x] **GROUP-08**: The per-group maxImages counter, the +/− controls, and the PRESETS = [1..5] toolbar are removed; groups larger than LARGE_GROUP_THRESHOLD (20) show a soft warning badge but no hard cap.
 - [x] **GROUP-09**: An invalid drop (over === null) animates the dragged thumbnail back to its origin using dnd-kit's built-in dropAnimation instead of vanishing instantly.
 - [x] **GROUP-10**: Confirming the staged layout pushes each group to Supabase by calling POST /api/images/upload with groupAsOne=true once per group (CONCURRENCY=2); on per-group success the IDB blobs are cleared for that group, on per-group failure the failed group remains in staging with a retry affordance.
-- [x] **GROUP-11**: The AI auto-group / "Sort variants" flow remains accessible as a secondary toolbar button (not hidden) but is no longer the landing UX; useAutoGroup and the Phase 8 fallback banner continue to work unchanged.
+- [x] **GROUP-11**: Upload staging is drag-and-drop first; AI auto-group / Sort Variants was removed.
 - [x] **GROUP-12**: A "+ New group" drop target is always visible at the end of the group grid so users can create an empty group by dropping onto it.
 
 ## Out of Scope
@@ -85,19 +75,12 @@
 | PAY-01 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Pending |
 | CRED-01 | Phase 3 | Pending |
-| CRED-02 | Phase 3 | Pending |
-| CRED-03 | Phase 3 | Pending |
-| CRED-04 | Phase 3 | Pending |
 | CRED-05 | Phase 3 | Pending |
 | INFRA-01 | Phase 4 | Pending |
 | GROUP-01 | Phase 7 | Complete |
 | GROUP-02 | Phase 7 | Complete |
 | GROUP-03 | Phase 7 | Complete |
 | GROUP-04 | Phase 7 | Complete |
-| CLUSTER-01 | Phase 8 | Complete |
-| CLUSTER-02 | Phase 8 | Complete |
-| CLUSTER-03 | Phase 8 | Complete |
-| CLUSTER-04 | Phase 8 | Pending |
 | GROUP-05 | Phase 9 | Complete |
 | GROUP-06 | Phase 9 | Complete |
 | GROUP-07 | Phase 9 | Complete |

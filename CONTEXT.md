@@ -89,9 +89,9 @@ The seller states they do not have care instructions or GPSR identity. Those blo
 _Avoid_: Optional field, empty field (an empty field is not a skip)
 
 **Stale listing copy**:
-Listing copy that no longer matches the confirmed facts because the facts were edited after generation.
+Listing copy that no longer matches the confirmed facts, or the Shop GPSR identity those facts use, because those were changed after generation. It is not a second generate or publish gate.
 _Avoid_: Out of date, dirty
 
 **Shop GPSR identity**:
-The default GPSR identity for a connected Shopify shop. A product may override it.
+The default GPSR identity for a connected Shopify shop. A product may override it. Changing it stales listing copy on products that use the shop default.
 _Avoid_: Account compliance, store settings (as the fact itself)

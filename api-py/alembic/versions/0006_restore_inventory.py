@@ -16,8 +16,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute(
-        """
+    sql = """
         CREATE TABLE IF NOT EXISTS inventory_settings (
           id SERIAL PRIMARY KEY,
           user_id TEXT NOT NULL UNIQUE,
@@ -176,7 +175,8 @@ def upgrade() -> None:
           ON inventory_notifications(user_id, dedupe_key)
           WHERE resolved_at IS NULL;
         """
-    )
+    for statement in (part.strip() for part in sql.split(";") if part.strip()):
+        op.execute(statement)
 
 
 def downgrade() -> None:

@@ -101,12 +101,6 @@ Recent decisions affecting current work:
 - [Phase 07-ai-auto-grouping-agent]: OffscreenCanvas + createImageBitmap for image resizing: avoids DOM canvas, works in Web Workers
 - [Phase 07-ai-auto-grouping-agent]: allItemsRef stores flat FileItem[] snapshot at auto-group start for stable index mapping
 - [Phase 07-ai-auto-grouping-agent]: GroupWithLabel extends Group locally for optional label/confidence without modifying shared interface
-- [Phase 08-embeddings-variant-clustering]: Use CohereClientV2 (not legacy CohereClient) — only V2 exposes outputDimension and batched images in cohere-ai@8.x
-- [Phase 08-embeddings-variant-clustering]: Default Matryoshka embedding dimension = 512 (bandwidth/quality sweet spot)
-- [Phase 08-embeddings-variant-clustering]: getCohereClient checks cache before env var so tests can inject without COHERE_API_KEY
-- [Phase 08-embeddings-variant-clustering]: runAutoGrouping embedding path: variant-family threshold 0.78, default 0.88, MAX_ATTEMPTS=2, BACKOFF_MS=750 linear, TIMEOUT_MS=60000
-- [Phase 08-embeddings-variant-clustering]: fallbackUsed signal propagated via new SSE 'fallback' event + JSON response field; embedding success path does NOT run mergeAutoGroupsByFamily (fallback-only)
-- [Phase 08-embeddings-variant-clustering]: Promise.race timeout handle is explicitly cleared in finally to prevent event-loop pinning on successful embed calls
 - [Phase 09]: Phase 9 LARGE_GROUP_THRESHOLD locked at 20 images — soft warning only, no hard cap
 - [Phase 09]: Phase 9 upload path reuses POST /api/images/upload?groupAsOne=true with CONCURRENCY=2 per-group failure isolation
 - [Phase 09]: Phase 9 AI auto-sort stays as secondary toolbar button, not hidden
@@ -134,7 +128,7 @@ Recent decisions affecting current work:
 
 ### Roadmap Evolution
 
-- Phase 8 added: Replace VLM variant sorter with embeddings-based clustering
+- Phase 8 added then reverted: embeddings-based clustering; auto-grouping is GPT-5.2 vision again, with filename fallback
 - Phase 9 added: Manual Grouping-First UX — drag-drop becomes primary, AI sort optional; remove staging prompt; push grouped images to Supabase as products
 
 ### Pending Todos
@@ -145,7 +139,6 @@ None yet.
 
 - PAY-01 fix requires atomic read-modify-write on `paidSessions.used` — concurrent requests from verify + webhook must not both pass the check; implementation must use a single UPDATE WHERE or SELECT FOR UPDATE
 - CRED-01–05 require a new `ENCRYPTION_KEY` env var to be provisioned in Vercel before Phase 3 deploys — deployment without it would break all platform connection writes
-- Phase 8 requires `COHERE_API_KEY` env var provisioned in Vercel before deploy — deployment without it causes every auto-group call to fall back to filename-only grouping with a warning banner. Treat this identically to the Phase 3 `ENCRYPTION_KEY` deploy prerequisite.
 - Phase 10 requires `MIGRATION_SECRET` env var provisioned in Vercel before running migrate-to-new-price or archive-old-price endpoints — without it both return 403.
 
 ## Session Continuity
