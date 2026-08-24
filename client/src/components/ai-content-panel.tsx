@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -109,19 +108,12 @@ export function AiContentPanel({
     displayFaqs !== null;
 
   return (
-    <Card className="bg-primary/[0.03] shadow-[inset_0_1px_0_0_hsl(0_0%_100%/0.06),inset_0_0_0_1px_hsl(var(--primary)/0.15),0_8px_28px_-12px_hsl(250_25%_2%/0.5),0_0_32px_-12px_hsl(var(--primary)/0.2)]">
-      <CardHeader className="px-4 py-3 hairline-b">
-        <CardTitle className="text-sm font-medium flex items-center gap-2 font-display">
-          <Sparkles className={`w-3.5 h-3.5 text-primary ${isGenerating ? "animate-pulse" : ""}`} />
-          AI Content Generator
-          {isGenerating && (
-            <span className="font-mono text-[9px] uppercase tracking-widest text-aurora-2 animate-breathe ml-auto">
-              streaming
-            </span>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-3 space-y-3">
+    <div className="space-y-3">
+      {isGenerating && (
+        <p className="font-mono text-xs uppercase tracking-widest text-aurora-2 animate-breathe">
+          streaming
+        </p>
+      )}
         {/* Guided inputs */}
         <div className="grid grid-cols-1 gap-3">
           <div className="space-y-1.5">
@@ -160,7 +152,7 @@ export function AiContentPanel({
         </div>
 
         {!canGenerate && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Confirm product facts before generating listing copy.
           </p>
         )}
@@ -278,8 +270,7 @@ export function AiContentPanel({
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
