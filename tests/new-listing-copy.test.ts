@@ -21,3 +21,8 @@ test("New listing grouping copy does not call grouping variants", () => {
 test("Confirm is labeled Create N products", () => {
   assert.match(inspector, /Create \{n\} product/);
 });
+
+test("filmstrip has a click control to set the thumbnail", () => {
+  assert.match(inspector, /Set as thumbnail/);
+  assert.match(inspector, /onSetThumbnail\(photo\.id\)/);
+});

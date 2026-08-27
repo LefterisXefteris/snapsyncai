@@ -135,6 +135,14 @@ export function ListingInspector({
                 </button>
                 <button
                   type="button"
+                  title="Set as thumbnail"
+                  className="absolute bottom-0 left-0 rounded-tr bg-black/70 p-0.5 text-white/80 hover:text-primary"
+                  onClick={() => onSetThumbnail(photo.id)}
+                >
+                  <Star className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
                   className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5 text-[10px] text-white/80 hover:bg-red-600"
                   aria-label="Delete photo"
                   onClick={() => onDeletePhoto(photo.id)}
@@ -183,14 +191,6 @@ export function ListingInspector({
         )}
         <Button size="sm" variant="outline" disabled={selectedIds.size === 0 || isUploading} onClick={onSeparate}>
           <Unplug /> Separate
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!preview || isUploading}
-          onClick={() => preview && onSetThumbnail(preview.id)}
-        >
-          <Star /> Set as thumbnail
         </Button>
         {focus && focus.items.length > 1 && (
           <Button size="sm" variant="ghost" disabled={isUploading} onClick={() => onSplit(focus.id)}>

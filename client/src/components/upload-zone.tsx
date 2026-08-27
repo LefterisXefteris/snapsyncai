@@ -326,7 +326,7 @@ export function UploadZone({
     } else {
       toast({
         title: "Some uploads failed",
-        description: `${failed.length} of ${snapshot.length} groups failed. Click Retry on each.`,
+        description: `${failed.length} of ${snapshot.length} draft products failed. Click Retry on each.`,
         variant: "destructive",
       });
     }
