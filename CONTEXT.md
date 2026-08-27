@@ -10,11 +10,19 @@ _Avoid_: Platform, integration, marketplace (as the general term), store (when y
 
 **Product**:
 The sellable thing the seller is listing. One product may have several photos. Listing copy and product facts belong to the product, not to a single photo.
-_Avoid_: Image (as the sellable thing), listing (as the thing being sold), snap
+_Avoid_: Image (as the sellable thing), listing (as the thing being sold), snap, variant (as the sellable thing)
 
 **Photo**:
 A picture of a product. Several photos may belong to one product.
 _Avoid_: Image (when you mean the sellable thing), snap
+
+**Draft product**:
+A product on the New listing canvas that is not yet in the catalogue. Each photo starts as its own draft product.
+_Avoid_: Upload, staged image, group (as the sellable thing)
+
+**Variant**:
+A channel-level option of a product, such as color. Grouping photos in New listing does not create variants.
+_Avoid_: Group, listing (as a color/size option)
 
 **New listing**:
 The job of creating a product from photos.

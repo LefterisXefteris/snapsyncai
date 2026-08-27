@@ -1,333 +1,27 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
-import {
-  DndContext, DragOverlay, useDroppable,
-  MouseSensor, TouchSensor, useSensor, useSensors,
-  defaultDropAnimationSideEffects,
-  type DragEndEvent, type DragStartEvent, type DropAnimation,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  rectSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { UploadCloud, Loader2, X, Package, Plus, Ungroup, Images, Trash2, ImagePlus } from "lucide-react";
+import { UploadCloud, Loader2, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isImageLikeFile } from "@/lib/image-file-utils";
 import { useUploadImages } from "@/hooks/use-images";
-import { ShinyButton } from "@/components/ui/shiny-button";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 import { useGroupSelection } from "@/hooks/use-group-selection";
-
-// Soft advisory threshold (GROUP-08) — groups larger than this render an
-// amber "consider splitting" badge but are NEVER blocked from accepting drops.
-const LARGE_GROUP_THRESHOLD = 20;
-
-// Thumbnail scale tiers. panelSize is the sidebar panel's current width as a
-// percentage of the viewport (react-resizable-panels units). As the user
-// drags the sidebar wider, thumbnails step up through these tiers so images
-// are easy to inspect before upload.
-function getThumbSize(panelSize: number | undefined, isHero: boolean): string {
-  const size = panelSize ?? 25;
-  if (size < 35) return isHero ? "w-16 h-16" : "w-10 h-10"; // default compact
-  if (size < 50) return isHero ? "w-24 h-24" : "w-20 h-20";
-  if (size < 65) return isHero ? "w-36 h-36" : "w-28 h-28";
-  return isHero ? "w-48 h-48" : "w-40 h-40"; // zoomed inspection mode
-}
-
-// Complementary spacing tiers so the card layout breathes as thumbs scale up.
-// Keeps default compact mode untouched; relaxes gap/padding/min-h at each
-// zoom tier and drops the list's 480px scroll cap once thumbs go large
-// (parent ScrollArea handles overflow at that point).
-function getGroupSpacing(panelSize: number | undefined) {
-  const size = panelSize ?? 25;
-  if (size < 35) return {
-    innerGap: "gap-2",
-    innerPad: "p-3",
-    innerMinH: "min-h-[120px]",
-    headerPad: "px-3 py-2",
-    cardSpacing: "space-y-2",
-    listPad: "p-2.5",
-    listMaxH: "max-h-[480px]",
-  };
-  if (size < 50) return {
-    innerGap: "gap-3",
-    innerPad: "p-4",
-    innerMinH: "min-h-[160px]",
-    headerPad: "px-4 py-2.5",
-    cardSpacing: "space-y-3",
-    listPad: "p-3",
-    listMaxH: "",
-  };
-  if (size < 65) return {
-    innerGap: "gap-4",
-    innerPad: "p-5",
-    innerMinH: "min-h-[200px]",
-    headerPad: "px-5 py-3",
-    cardSpacing: "space-y-4",
-    listPad: "p-4",
-    listMaxH: "",
-  };
-  return {
-    innerGap: "gap-6",
-    innerPad: "p-6",
-    innerMinH: "min-h-[220px]",
-    headerPad: "px-6 py-3.5",
-    cardSpacing: "space-y-5",
-    listPad: "p-5",
-    listMaxH: "",
-  };
-}
-
-// Snap-back drop animation — keeps DragOverlay child mounted long enough for
-// dnd-kit's built-in return-to-origin transition to play on invalid drops.
-const dropAnimation: DropAnimation = {
-  duration: 250,
-  easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
-  sideEffects: defaultDropAnimationSideEffects({
-    styles: { active: { opacity: "0.4" } },
-  }),
-};
+import { ListingInspector } from "@/components/listing-inspector";
+import {
+  addToDraft,
+  extractAsDraft,
+  separateAsDraft,
+  setThumbnail,
+} from "@/lib/draft-products";
 
 interface GroupWithLabel extends Group {
   label?: string;
   confidence?: "high" | "medium" | "low";
 }
 
-// ── Sortable thumbnail (handles within-group sort AND between-group drag) ─────
-function SortableThumbnail({
-  item, groupId, onRemove, isHero, isSelected, onSelect, selectedIds: allSelectedIds, panelSize,
-}: {
-  item: FileItem;
-  groupId: string;
-  onRemove: () => void;
-  isHero?: boolean;
-  isSelected?: boolean;
-  onSelect: (id: string, groupId: string, e: React.MouseEvent) => void;
-  selectedIds: Set<string>;
-  panelSize?: number;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: item.id,
-    data: { selectedIds: Array.from(allSelectedIds) },
-  });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
-
-  const size = getThumbSize(panelSize, !!isHero);
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="relative group/thumb flex-shrink-0 cursor-grab active:cursor-grabbing"
-      {...attributes}
-      {...listeners}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(item.id, groupId, e);
-      }}
-    >
-      <img
-        src={item.url}
-        alt={item.file.name}
-        draggable={false}
-        className={cn(
-          size,
-          "rounded-lg object-cover select-none ring-1 transition-all",
-          isSelected
-            ? "ring-2 ring-primary ring-offset-1 ring-offset-black/50"
-            : "ring-white/10 group-hover/thumb:ring-primary/50 group-hover/thumb:ring-2"
-        )}
-      />
-      {isHero && (
-        <div className="absolute -top-1 -left-1 w-3.5 h-3.5 bg-primary rounded-full flex items-center justify-center shadow-sm">
-          <span className="text-[7px] font-bold text-white">1</span>
-        </div>
-      )}
-      <button
-        className="absolute -top-1 -right-1 w-4 h-4 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity hover:bg-red-500/80"
-        onClick={(e) => { e.stopPropagation(); onRemove(); }}
-        onPointerDown={e => e.stopPropagation()}
-      >
-        <X className="w-2.5 h-2.5 text-white" />
-      </button>
-    </div>
-  );
-}
-
-// ── Droppable product group card ─────────────────────────────────────────────
-function DroppableGroup({
-  groupId, groupIdx, items, onRemoveItem, onSplit, onDeleteGroup, totalGroups,
-  selectedIds, onSelect, label, confidence, isFailed, onRetry, panelSize,
-}: {
-  groupId: string;
-  groupIdx: number;
-  items: FileItem[];
-  onRemoveItem: (itemId: string) => void;
-  onSplit: () => void;
-  onDeleteGroup: () => void;
-  totalGroups: number;
-  selectedIds: Set<string>;
-  onSelect: (id: string, groupId: string, e: React.MouseEvent) => void;
-  label?: string;
-  confidence?: "high" | "medium" | "low";
-  isFailed?: boolean;
-  onRetry?: () => void;
-  panelSize?: number;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: groupId });
-  const spacing = getGroupSpacing(panelSize);
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        "relative rounded-xl border transition-all duration-200 overflow-hidden",
-        isFailed
-          ? "border-destructive bg-destructive/[0.06]"
-          : isOver
-          ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)] scale-[1.02]"
-          : "border-white/[0.08] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.03]"
-      )}
-    >
-      {isOver && (
-        <div className="absolute inset-0 rounded-xl bg-primary/10 border-2 border-primary/60 pointer-events-none z-10 flex items-center justify-center">
-          <div className="bg-primary/20 rounded-lg px-3 py-1">
-            <span className="text-xs text-primary font-medium">Drop here</span>
-          </div>
-        </div>
-      )}
-
-      {/* Card header */}
-      <div className={cn("flex items-center gap-2 border-b border-white/[0.06]", spacing.headerPad)}>
-        <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
-          <span className="text-[10px] font-bold text-primary">{groupIdx + 1}</span>
-        </div>
-        <span className="text-xs font-medium text-white/90">
-          {label || `Product ${groupIdx + 1}`}
-        </span>
-        {confidence && (
-          <span className={cn(
-            "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-            confidence === "high" ? "bg-green-500/20 text-green-400" :
-            confidence === "medium" ? "bg-amber-500/20 text-amber-400" :
-            "bg-red-500/20 text-red-400"
-          )}>
-            {confidence}
-          </span>
-        )}
-        <span className="text-[10px] text-white/40 ml-0.5">
-          {items.length} {items.length === 1 ? "image" : "images"}
-        </span>
-        {items.length > LARGE_GROUP_THRESHOLD && (
-          <span
-            className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900"
-            title="Large group — consider splitting into multiple products"
-            data-testid={`large-group-warning-${groupId}`}
-          >
-            Large group ({items.length}) — consider splitting
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-1">
-          {isFailed && onRetry && (
-            <button
-              onPointerDown={e => e.stopPropagation()}
-              onClick={onRetry}
-              data-testid={`retry-group-${groupId}`}
-              className="flex items-center gap-1 text-[10px] text-red-100 bg-red-500/80 hover:bg-red-500 transition-colors px-2 py-0.5 rounded font-medium"
-              title="Retry uploading this product"
-            >
-              <span>Retry</span>
-            </button>
-          )}
-          {items.length > 1 && (
-            <button
-              onPointerDown={e => e.stopPropagation()}
-              onClick={onSplit}
-              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/80 transition-colors px-1.5 py-0.5 rounded hover:bg-white/5"
-              title="Split into individual products"
-            >
-              <Ungroup className="w-3 h-3" />
-              <span className="hidden sm:inline">Split</span>
-            </button>
-          )}
-          <button
-            onPointerDown={e => e.stopPropagation()}
-            onClick={onDeleteGroup}
-            className="flex items-center gap-1 text-[10px] text-white/40 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10"
-            title="Remove this product"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
-
-      {/* Images area — SortableContext enables within-group reordering */}
-      <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
-        <div className={cn("flex flex-wrap", spacing.innerGap, spacing.innerPad, spacing.innerMinH)}>
-          {items.map((item, idx) => (
-            <SortableThumbnail
-              key={item.id}
-              item={item}
-              groupId={groupId}
-              onRemove={() => onRemoveItem(item.id)}
-              isHero={idx === 0}
-              isSelected={selectedIds.has(item.id)}
-              onSelect={onSelect}
-              selectedIds={selectedIds}
-              panelSize={panelSize}
-            />
-          ))}
-          {isOver && (
-            <div className={cn(
-              getThumbSize(panelSize, false),
-              "rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center shrink-0 animate-pulse",
-            )}>
-              <Plus className="w-3 h-3 text-primary/60" />
-            </div>
-          )}
-        </div>
-      </SortableContext>
-    </div>
-  );
-}
-
-// ── Droppable "New Product" zone ─────────────────────────────────────────────
-function DroppableNewGroup() {
-  const { setNodeRef, isOver } = useDroppable({ id: "new-group" });
-  return (
-    <div
-      ref={setNodeRef}
-      data-testid="droppable-new-group"
-      className={cn(
-        "flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed transition-all duration-200",
-        isOver
-          ? "border-primary bg-primary/10 text-primary shadow-[0_0_16px_-4px_hsl(var(--primary)/0.3)]"
-          : "border-white/10 text-white/30 hover:border-white/20 hover:text-white/50"
-      )}
-    >
-      <Plus className="w-3.5 h-3.5" />
-      <span className="text-xs">Drop here to create a new product</span>
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
+
 export function UploadZone({
   onUploadingChange,
   onStagedCountChange,
@@ -344,7 +38,6 @@ export function UploadZone({
   panelSize?: number;
 }) {
   const [groups, setGroups] = useState<GroupWithLabel[]>([]);
-  const [activeItem, setActiveItem] = useState<FileItem | null>(null);
   const orderedItemIds = useMemo(
     () => groups.flatMap(g => g.items.map(i => i.id)),
     [groups],
@@ -382,31 +75,10 @@ export function UploadZone({
   useEffect(() => { onUploadingChange?.(uploadingQueue); }, [uploadingQueue, onUploadingChange]);
 
   const totalFiles = groups.reduce((sum, g) => sum + g.items.length, 0);
-  const listSpacing = getGroupSpacing(panelSize);
 
   // Notify parent whenever staged item count changes so the workspace can
   // expand the sidebar to give the grouping grid more room.
   useEffect(() => { onStagedCountChange?.(totalFiles); }, [totalFiles, onStagedCountChange]);
-
-  // ── DnD sensors ─────────────────────────────────────────────────────────────
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-  );
-
-  const handleDragStart = ({ active }: DragStartEvent) => {
-    const activeId = active.id as string;
-    const dragged = groups.flatMap(g => g.items).find(i => i.id === activeId) ?? null;
-    setActiveItem(dragged);
-
-    // Preserve multi-selection if the dragged item is part of it; otherwise
-    // reset selection to just this item so a grab on an unselected thumb
-    // doesn't accidentally carry stale range-selection state.
-    if (!(selectedIds.has(activeId) && selectedIds.size > 1)) {
-      clearSelection();
-      setSelected(new Set([activeId]));
-    }
-  };
 
   // ── Thumbnail click adapter: update focused group + delegate to hook ───────
   const onThumbnailSelect = useCallback(
@@ -437,97 +109,6 @@ export function UploadZone({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [groups, focusedGroupId, clearSelection, setSelected]);
 
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    // Invalid drop: defer clearing activeItem to the next microtask so the
-    // DragOverlay child stays mounted long enough for dnd-kit's snap-back
-    // dropAnimation to play. Do NOT touch selection — the user may want to
-    // retry the same drag.
-    if (!over) {
-      queueMicrotask(() => setActiveItem(null));
-      return;
-    }
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    // Resolve source + target groups (target may be a group UUID or an item UUID).
-    const activeGroup = groups.find(g => g.items.some(i => i.id === activeId));
-    const overGroup =
-      groups.find(g => g.id === overId) ??
-      groups.find(g => g.items.some(i => i.id === overId));
-
-    // ── Branch 1: Intra-group single-item reorder ────────────────────────────
-    // PRESERVED from Phase 5 — drag-reorder-to-front re-elects the hero image.
-    // Falls through ONLY when source group === target group AND selection is
-    // at most one item (i.e., not a batch move).
-    if (
-      activeGroup &&
-      overGroup &&
-      activeGroup.id === overGroup.id &&
-      selectedIds.size <= 1
-    ) {
-      setActiveItem(null);
-      setGroups(prev => {
-        const next = prev.map(g => {
-          if (g.id !== activeGroup.id) return g;
-          const oldIndex = g.items.findIndex(i => i.id === activeId);
-          const newIndex = g.items.findIndex(i => i.id === overId);
-          if (oldIndex === newIndex) return g;
-          const reordered = arrayMove(g.items, oldIndex, newIndex);
-          return { ...g, items: reordered };
-        });
-        saveGroups(next); // fire-and-forget
-        return next;
-      });
-      // Selection state is intentionally unchanged here — Phase 5 behavior.
-      return;
-    }
-
-    // ── Branch 2: Cross-group OR batch move ──────────────────────────────────
-    setActiveItem(null);
-    const draggedIds: string[] = selectedIds.has(activeId) && selectedIds.size > 1
-      ? Array.from(selectedIds)
-      : [activeId];
-
-    setGroups(prev => {
-      const next = prev.map(g => ({ ...g, items: [...g.items] }));
-
-      if (overId === "new-group") {
-        const toMove: FileItem[] = [];
-        for (const g of next) {
-          const moved = g.items.filter(i => draggedIds.includes(i.id));
-          g.items = g.items.filter(i => !draggedIds.includes(i.id));
-          toMove.push(...moved);
-        }
-        if (toMove.length > 0) {
-          next.push({ id: crypto.randomUUID(), items: toMove, maxImages: Number.MAX_SAFE_INTEGER });
-        }
-      } else {
-        // Two-step overId resolution: direct group-ID match OR group that
-        // owns the hovered thumbnail (RESEARCH Pitfall 2).
-        const toGroup =
-          next.find(g => g.id === overId) ??
-          next.find(g => g.items.some(i => i.id === overId));
-        if (!toGroup) return prev;
-        const toMove: FileItem[] = [];
-        for (const g of next) {
-          if (g.id === toGroup.id) continue;
-          const moved = g.items.filter(i => draggedIds.includes(i.id));
-          g.items = g.items.filter(i => !draggedIds.includes(i.id));
-          toMove.push(...moved);
-        }
-        toGroup.items = [...toGroup.items, ...toMove];
-      }
-
-      const filtered = next.filter(g => g.items.length > 0);
-      saveGroups(filtered); // fire-and-forget
-      return filtered;
-    });
-
-    clearSelection(); // clear after successful cross-group / batch move
-  };
-
-  // ── File drop ────────────────────────────────────────────────────────────────
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newItems: FileItem[] = acceptedFiles.map(f => {
       const url = URL.createObjectURL(f);
@@ -628,6 +209,59 @@ export function UploadZone({
         .filter(g => g.items.length > 0);
       saveGroups(next); // fire-and-forget
       return next;
+    });
+  };
+
+  const stampDrafts = (next: { id: string; items: FileItem[] }[], prev: GroupWithLabel[]): GroupWithLabel[] =>
+    next.map(d => ({
+      id: d.id,
+      items: d.items,
+      maxImages: prev.find(g => g.id === d.id)?.maxImages ?? Number.MAX_SAFE_INTEGER,
+    }));
+
+  const handleGroup = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length < 2) return;
+    const newId = crypto.randomUUID();
+    setGroups(prev => {
+      const stamped = stampDrafts(extractAsDraft(prev, ids, newId), prev);
+      saveGroups(stamped);
+      return stamped;
+    });
+    setFocusedGroupId(newId);
+    clearSelection();
+  };
+
+  const handleAddTo = (destId: string) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setGroups(prev => {
+      const stamped = stampDrafts(addToDraft(prev, ids, destId), prev);
+      saveGroups(stamped);
+      return stamped;
+    });
+    setFocusedGroupId(destId);
+    clearSelection();
+  };
+
+  const handleSeparate = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const newId = crypto.randomUUID();
+    setGroups(prev => {
+      const stamped = stampDrafts(separateAsDraft(prev, ids, newId), prev);
+      saveGroups(stamped);
+      return stamped;
+    });
+    setFocusedGroupId(newId);
+    clearSelection();
+  };
+
+  const handleSetThumbnail = (photoId: string) => {
+    setGroups(prev => {
+      const stamped = stampDrafts(setThumbnail(prev, photoId), prev);
+      saveGroups(stamped);
+      return stamped;
     });
   };
 
@@ -743,30 +377,32 @@ export function UploadZone({
     }
   };
 
+  useEffect(() => {
+    if (focusedGroupId && groups.some(g => g.id === focusedGroupId)) return;
+    setFocusedGroupId(groups[0]?.id ?? null);
+  }, [groups, focusedGroupId]);
+
   // ────────────────────────────────────────────────────────────────────────────
   return (
     <div
       {...getRootProps({
-        className: "w-full max-w-3xl mx-auto space-y-4",
+        className: "flex h-full min-h-0 w-full flex-col",
       })}
     >
       <input {...getInputProps()} data-testid="input-file-upload" />
 
+      {totalFiles === 0 && !isUploading && (
+      <div className="mx-auto w-full max-w-3xl space-y-4 p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary/80">New listing</p>
           <h2 className="mt-1 font-display text-lg font-semibold tracking-tight text-foreground">
-            Add product photos
+            Create products from photos
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Add each angle. You can group variants before AI creates the listings.
+            Choose photos. Each photo starts as its own draft product. Group angles of the same product before you create.
           </p>
         </div>
-        {totalFiles > 0 && (
-          <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-[10px] text-primary">
-            {totalFiles}/200
-          </span>
-        )}
       </div>
 
       {/* Empty state is a confident primary action; the staged state collapses
@@ -777,12 +413,9 @@ export function UploadZone({
           if (!isUploading) open();
         }}
         disabled={isUploading}
-        aria-label={totalFiles > 0 ? "Add more product photos" : "Choose product photos"}
+        aria-label="Choose product photos"
         className={cn(
-          "relative group w-full overflow-hidden border text-left transition-all duration-300 disabled:cursor-wait disabled:opacity-60",
-          totalFiles > 0
-            ? "rounded-2xl px-3.5 py-3"
-            : "min-h-[220px] rounded-2xl p-5 sm:p-6",
+          "relative group w-full overflow-hidden border text-left transition-all duration-300 disabled:cursor-wait disabled:opacity-60 min-h-[220px] rounded-2xl p-5 sm:p-6",
           isDragActive
             ? "border-primary bg-primary/10 shadow-[0_0_36px_-12px_hsl(var(--primary)/0.55)]"
             : "border-dashed border-foreground/15 bg-card/35 hover:border-primary/45 hover:bg-card/55"
@@ -800,169 +433,66 @@ export function UploadZone({
           }}
         />
         <div className={cn(
-          "relative z-10 flex",
-          totalFiles > 0
-            ? "items-center gap-3"
-            : "min-h-[168px] flex-col items-center justify-center text-center"
+          "relative z-10 flex min-h-[168px] flex-col items-center justify-center text-center"
         )}>
           <div className={cn(
-            "flex shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-105",
-            totalFiles > 0 ? "h-9 w-9" : "h-12 w-12",
+            "flex shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-105 h-12 w-12",
             isDragActive && "scale-110"
           )}>
             {isDragActive
-              ? <UploadCloud className={totalFiles > 0 ? "h-4 w-4" : "h-5 w-5"} />
-              : <ImagePlus className={totalFiles > 0 ? "h-4 w-4" : "h-5 w-5"} />}
+              ? <UploadCloud className="h-5 w-5" />
+              : <ImagePlus className="h-5 w-5" />}
           </div>
 
-          {totalFiles > 0 ? (
-            <>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground">
-                  {isDragActive ? "Drop to add them" : "Add more photos"}
-                </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">Drop here or browse files</p>
-              </div>
-              <span className="rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-medium text-background">
-                Browse
-              </span>
-            </>
-          ) : (
-            <>
-              <p className="mt-4 font-display text-base font-semibold text-foreground">
-                {isDragActive ? "Drop your photos here" : "Drag product photos here"}
-              </p>
-              <p className="mt-1.5 max-w-[250px] text-xs leading-relaxed text-muted-foreground">
-                One product or a full batch. We’ll keep everything editable before analysis.
-              </p>
-              <span className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[0_8px_24px_-10px_hsl(var(--primary)/0.8)]">
-                Choose photos
-              </span>
-              <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/65">
-                PNG · JPG · WEBP · HEIC · up to 200
-              </p>
-            </>
-          )}
+          <p className="mt-4 font-display text-base font-semibold text-foreground">
+            {isDragActive ? "Drop your photos here" : "Choose product photos"}
+          </p>
+          <p className="mt-1.5 max-w-[250px] text-xs leading-relaxed text-muted-foreground">
+            Each photo starts as its own draft product. Group several photos of one product, then create.
+          </p>
+          <span className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[0_8px_24px_-10px_hsl(var(--primary)/0.8)]">
+            Choose photos
+          </span>
+          <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/65">
+            PNG · JPG · WEBP · HEIC · up to 200
+          </p>
         </div>
       </button>
-
-      {/* Groups section — manual-first: renders unconditionally when any files exist */}
-      {totalFiles > 0 && !isUploading && (
-        <DndContext
-          sensors={sensors}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveItem(null)}
-        >
-
-          {/* ── Toolbar ─────────────────────────────────────────────────── */}
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
-            <div className="flex items-center gap-3 px-3.5 py-2.5 border-b border-white/[0.06]">
-              {/* Summary pills */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1">
-                  <Images className="w-3 h-3 text-primary" />
-                  <span className="text-[11px] font-medium text-white/80">{totalFiles}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1">
-                  <Package className="w-3 h-3 text-primary" />
-                  <span className="text-[11px] font-medium text-white/80">{groups.length}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={open}
-                className="ml-auto flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                <span className="hidden sm:inline">Add more</span>
-              </button>
-            </div>
-
-            {/* Hint */}
-            <div className="px-3.5 py-1.5 bg-white/[0.015] border-b border-white/[0.04]">
-              <p className="text-[10px] text-white/30">
-                Drag to regroup — click thumbnails to multi-select
-              </p>
-            </div>
-
-            {/* ── Product groups list ─────────────────────────────────── */}
-            <div className={cn(
-              "overflow-y-auto",
-              listSpacing.listPad,
-              listSpacing.cardSpacing,
-              listSpacing.listMaxH,
-            )}>
-              {groups.map((group, idx) => (
-                <DroppableGroup
-                  key={group.id}
-                  groupId={group.id}
-                  groupIdx={idx}
-                  items={group.items}
-                  label={group.label}
-                  confidence={group.confidence}
-                  onRemoveItem={removeItem}
-                  onSplit={() => splitGroup(group.id)}
-                  onDeleteGroup={() => deleteGroup(group.id)}
-                  totalGroups={groups.length}
-                  selectedIds={selectedIds}
-                  onSelect={onThumbnailSelect}
-                  isFailed={failedGroupIds.has(group.id)}
-                  onRetry={failedGroupIds.has(group.id) ? () => retryGroup(group.id) : undefined}
-                  panelSize={panelSize}
-                />
-              ))}
-              {groups.length > 0 && <DroppableNewGroup />}
-            </div>
-          </div>
-
-          {/* Drag overlay — floating thumbnail with count badge for multi-select */}
-          <DragOverlay dropAnimation={dropAnimation}>
-            {activeItem ? (
-              selectedIds.size > 1 && selectedIds.has(activeItem.id) ? (
-                // Multi-select ghost: stack badge
-                <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
-                  <div className={cn("relative", getThumbSize(panelSize, true))}>
-                    <div className="absolute inset-0 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20 translate-x-1 translate-y-1 opacity-50">
-                      <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
-                    </div>
-                    <div className="absolute inset-0 rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20">
-                      <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
-                    </div>
-                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                      <span className="text-[9px] font-bold text-white">{selectedIds.size}</span>
-                    </div>
-                  </div>
-                  <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">
-                    {selectedIds.size} images
-                  </span>
-                </div>
-              ) : (
-                // Single item ghost (existing)
-                <div className="flex flex-col items-center gap-1 rotate-2 scale-105">
-                  <div className={cn(getThumbSize(panelSize, true), "rounded-lg overflow-hidden ring-2 ring-primary shadow-2xl shadow-primary/20")}>
-                    <img src={activeItem.url} alt="" className="w-full h-full object-cover" draggable={false} />
-                  </div>
-                  <span className="text-[9px] text-white bg-black/80 px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-lg">
-                    {activeItem.file.name.replace(/\.[^/.]+$/, "").slice(0, 14)}
-                  </span>
-                </div>
-              )
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+      </div>
       )}
 
-      {/* Upload progress */}
+      {totalFiles > 0 && !isUploading && (
+        <div className="min-h-0 flex-1">
+          <ListingInspector
+            drafts={groups}
+            selectedIds={selectedIds}
+            focusedDraftId={focusedGroupId}
+            failedDraftIds={failedGroupIds}
+            isUploading={isUploading}
+            onChoosePhotos={open}
+            onFocusDraft={setFocusedGroupId}
+            onSelectPhoto={onThumbnailSelect}
+            onGroup={handleGroup}
+            onAddTo={handleAddTo}
+            onSeparate={handleSeparate}
+            onSetThumbnail={handleSetThumbnail}
+            onSplit={splitGroup}
+            onDeleteDraft={deleteGroup}
+            onDeletePhoto={removeItem}
+            onConfirm={handleConfirm}
+            onRetry={retryGroup}
+          />
+        </div>
+      )}
+
       {isUploading && (
         <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
           <div className="flex items-center gap-3">
             <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-medium text-white">
-                Analyzing product {uploadProgress.current} of {uploadProgress.total}...
+                Creating product {uploadProgress.current} of {uploadProgress.total}...
               </p>
-              <p className="text-[11px] text-muted-foreground">Products appear below as they complete</p>
             </div>
           </div>
           <div className="w-full bg-white/10 rounded-full h-1.5">
@@ -971,21 +501,6 @@ export function UploadZone({
               style={{ width: uploadProgress.total > 0 ? `${(uploadProgress.current / uploadProgress.total) * 100}%` : "0%" }}
             />
           </div>
-        </div>
-      )}
-
-      {/* Analyze / Confirm button */}
-      {!isUploading && groups.length > 0 && (
-        <div className="flex justify-center">
-          <ShinyButton
-            onClick={handleConfirm}
-            disabled={groups.length === 0}
-            className="w-full sm:w-auto min-w-[200px]"
-            data-testid="button-upload-preview"
-          >
-            <UploadCloud className="w-4 h-4 mr-2" />
-            {`Confirm & Create ${groups.length} Product${groups.length === 1 ? "" : "s"}`}
-          </ShinyButton>
         </div>
       )}
     </div>
