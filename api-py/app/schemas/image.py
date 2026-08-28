@@ -120,6 +120,16 @@ class ImageUpdate(CamelModel):
         return value
 
 
+class AcceptGeneratedListingCopyBody(CamelModel):
+    title: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    seo_title: str | None = None
+    seo_description: str | None = None
+    aeo_faqs: list[dict[str, str]] | None = None
+    aeo_snippet: str | None = None
+
+
 class FibreRowIn(CamelModel):
     name: str
     percent: int | None = None

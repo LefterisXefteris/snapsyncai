@@ -16,6 +16,10 @@ export const api = {
       method: "POST" as const,
       path: "/api/images/:id/product-facts/confirm" as const,
     },
+    acceptListingCopy: {
+      method: "POST" as const,
+      path: "/api/images/:id/listing-copy/accept" as const,
+    },
   },
   shopify: {
     status: { method: "GET" as const, path: "/api/shopify/status" as const },

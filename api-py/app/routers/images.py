@@ -10,6 +10,7 @@ from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.image import (
     LIST_EXCLUDE,
+    AcceptGeneratedListingCopyBody,
     AssignGroupBatchBody,
     AssignGroupBody,
     ConfirmProductFactsBody,
@@ -27,6 +28,7 @@ from app.schemas.image import (
 from app.services import catalogue_cache, connections
 from app.services import images as store
 from app.services.product_facts import (
+    accept_generated_listing_copy,
     confirm_facts,
     merge_product_facts,
     stored_from_facts,
@@ -207,6 +209,41 @@ async def confirm_product_facts(
         raise HTTPException(status_code=400, detail=result.error)
     updated = await store.persist_product_facts(
         session, image, stored_from_facts(result.facts)
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return _image_out(updated, settings, shop_gpsr)
+
+
+@router.post("/api/images/{image_id}/listing-copy/accept", response_model=ImageOut)
+async def accept_generated_listing_copy_route(
+    image_id: int,
+    body: AcceptGeneratedListingCopyBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> ImageOut:
+    image = await store.get_image(session, image_id)
+    if not _owned(image, user_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    group = await store.get_image_group(session, image_id, user_id)
+    current = merge_product_facts(
+        [img.product_facts for img in group] or [image.product_facts]
+    )
+    connection = await connections.get_shopify(session, user_id)
+    shop_gpsr = connection.gpsr_identity if connection is not None else None
+    accepted = accept_generated_listing_copy(
+        current,
+        body.model_dump(exclude_unset=True),
+        shop_gpsr,
+    )
+    if accepted.listing_copy:
+        written = await store.update_image(session, image_id, accepted.listing_copy)
+        if written is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+        image = written
+    updated = await store.persist_product_facts(
+        session, image, stored_from_facts(accepted.facts)
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")

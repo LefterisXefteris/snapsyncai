@@ -5,6 +5,7 @@ import { apiUrl } from "@/lib/api-origin";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
+import type { Image } from "@/lib/image";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
@@ -272,6 +273,7 @@ export function useUpdateImage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
       toast({ title: "Product Updated", description: "Product details saved." });
     },
     onError: (error) => {
@@ -437,6 +439,49 @@ export function useShopifyDisconnect() {
     },
     onError: (error) => {
       toast({ title: "Disconnect Failed", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export type GeneratedListingCopy = {
+  title?: string;
+  description?: string;
+  tags?: string[];
+  seoTitle?: string;
+  seoDescription?: string;
+  aeoFaqs?: { q: string; a: string }[] | { question: string; answer: string }[];
+  aeoSnippet?: string;
+};
+
+export function useAcceptGeneratedListingCopy() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      imageId,
+      generated,
+    }: {
+      imageId: number;
+      generated: GeneratedListingCopy;
+    }) => {
+      const res = await apiRequest(
+        "POST",
+        buildUrl(api.images.acceptListingCopy.path, { id: imageId }),
+        generated,
+      );
+      return res.json() as Promise<Image>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not accept listing copy",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }

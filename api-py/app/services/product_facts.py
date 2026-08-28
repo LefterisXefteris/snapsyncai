@@ -1,7 +1,7 @@
 """Product facts — the seam that keeps listing copy from inventing legal facts.
 
-Upload, Generate, regenerate, and description-block assembly call this module.
-Vision and HTTP do not own these rules.
+Upload, Generate, regenerate, Accept generated listing copy, and description-block
+assembly call this module. Vision and HTTP do not own these rules.
 """
 
 from __future__ import annotations
@@ -172,6 +172,12 @@ class ConfirmResult:
     @property
     def ok(self) -> bool:
         return self.error is None
+
+
+@dataclass(frozen=True)
+class AcceptedListingCopy:
+    facts: ProductFacts
+    listing_copy: dict[str, Any]
 
 
 def persistable_from_vision(vision: Mapping[str, Any] | None) -> PersistableVision:
@@ -488,6 +494,28 @@ def apply_description_blocks(
     return f"{stripped}\n{blocks}" if stripped else blocks
 
 
+def accept_generated_listing_copy(
+    facts: ProductFacts,
+    generated: Mapping[str, Any],
+    shop_gpsr: Mapping[str, Any] | None = None,
+) -> AcceptedListingCopy:
+    """Persist generated listing copy. Description Accept stamps blocks and clears stale."""
+    listing_copy = _generated_listing_copy_fields(generated)
+    description = _text(generated.get("description"))
+    if not description:
+        listing_copy.pop("description", None)
+        return AcceptedListingCopy(facts=facts, listing_copy=listing_copy)
+    listing_copy["description"] = apply_description_blocks(description, facts, shop_gpsr)
+    return AcceptedListingCopy(
+        facts=ProductFacts(
+            suggested=facts.suggested,
+            confirmed=facts.confirmed,
+            listing_copy_stale=False,
+        ),
+        listing_copy=listing_copy,
+    )
+
+
 def apply_suggested(facts: ProductFacts, suggested: SuggestedFacts | None) -> ProductFacts:
     """Refresh suggested facts from vision without clearing a confirmation."""
     return ProductFacts(
@@ -528,6 +556,27 @@ def _text(value: Any) -> str:
 
 def _listing_copy_stale(record: Mapping[str, Any]) -> bool:
     return bool(record.get("listingCopyStale", record.get("listing_copy_stale")))
+
+
+def _generated_listing_copy_fields(generated: Mapping[str, Any]) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    mapping = (
+        ("title", "title"),
+        ("description", "description"),
+        ("tags", "tags"),
+        ("seoTitle", "seo_title"),
+        ("seo_title", "seo_title"),
+        ("seoDescription", "seo_description"),
+        ("seo_description", "seo_description"),
+        ("aeoSnippet", "aeo_snippet"),
+        ("aeo_snippet", "aeo_snippet"),
+        ("aeoFaqs", "aeo_faqs"),
+        ("aeo_faqs", "aeo_faqs"),
+    )
+    for src, dest in mapping:
+        if src in generated and dest not in updates:
+            updates[dest] = generated[src]
+    return updates
 
 
 def _listing_copy_present(listing_copy: Mapping[str, Any] | None) -> bool:

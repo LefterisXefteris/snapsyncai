@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useShopifyStatus, useSaveShopGpsrIdentity } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useShopifyStatus, useSaveShopGpsrIdentity } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
@@ -66,6 +66,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const updateMutation = useUpdateImage();
   const pushToShopifyMutation = usePushToShopify();
   const confirmFactsMutation = useConfirmProductFacts();
+  const acceptListingCopy = useAcceptGeneratedListingCopy();
   const { data: shopifyStatus } = useShopifyStatus();
   const saveShopGpsr = useSaveShopGpsrIdentity();
 
@@ -115,6 +116,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [careDraft, setCareDraft] = useState<CareInstructions>(emptyCare());
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
+  const imageId = image?.id;
 
   // Fetch all images in the product group directly from the server
   const { data: groupImages } = useProductGroup(image?.id);
@@ -132,29 +134,36 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const displayImageId = selectedImageId ?? image?.id;
 
-  // Initialize form when image data is available
+  // Re-hydrate when switching products, not on every catalogue refetch.
   useEffect(() => {
-    if (image) {
-      setTitle(image.title || image.originalName || "");
-      setDescription(image.description || "");
-      setPrice(image.price || "0.00");
-      setCategory(image.category || "");
-      setProductType(image.productType || "");
-      setSeoTitle(image.seoTitle || "");
-      setSeoDescription(image.seoDescription || "");
-      setAltText(image.altText || "");
-      setAeoSnippet(image.aeoSnippet || "");
-      setCompareAtPrice(image.compareAtPrice || "");
-      setCostPerItem(image.costPerItem || "");
-      setSku(image.sku || "");
-      setBarcode(image.barcode || "");
-      setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
-      setInventoryQuantity(image.inventoryQuantity || 0);
-      setTags(Array.isArray(image.tags) ? image.tags : []);
-      setAeoFaqs(Array.isArray(image.aeoFaqs) ? (image.aeoFaqs as { question: string; answer: string }[]).map((f) => ({ q: f.question, a: f.answer })) : []);
-      setCompositionRows(draftComposition(productFacts(image)));
-    }
-  }, [image]);
+    if (!image) return;
+    setTitle(image.title || image.originalName || "");
+    setDescription(image.description || "");
+    setPrice(image.price || "0.00");
+    setCategory(image.category || "");
+    setProductType(image.productType || "");
+    setSeoTitle(image.seoTitle || "");
+    setSeoDescription(image.seoDescription || "");
+    setAltText(image.altText || "");
+    setAeoSnippet(image.aeoSnippet || "");
+    setCompareAtPrice(image.compareAtPrice || "");
+    setCostPerItem(image.costPerItem || "");
+    setSku(image.sku || "");
+    setBarcode(image.barcode || "");
+    setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
+    setInventoryQuantity(image.inventoryQuantity || 0);
+    setTags(Array.isArray(image.tags) ? image.tags : []);
+    setAeoFaqs(
+      Array.isArray(image.aeoFaqs)
+        ? (image.aeoFaqs as { q?: string; a?: string; question?: string; answer?: string }[]).map((f) => ({
+            q: f.q ?? f.question ?? "",
+            a: f.a ?? f.answer ?? "",
+          }))
+        : [],
+    );
+    setCompositionRows(draftComposition(productFacts(image)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset local listing copy when the product changes
+  }, [imageId]);
 
   useEffect(() => {
     const identity = shopifyStatus?.gpsrIdentity as GpsrIdentity | undefined;
@@ -1001,10 +1010,59 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     imageId={image.id}
                     defaultCategory={category}
                     canGenerate={canGenerate}
-                    onAcceptTitle={(v) => setTitle(v)}
-                    onAcceptDescription={(v) => setDescription(v)}
-                    onAcceptTags={(v) => setTags(v)}
-                    onAcceptAeoFaqs={(v) => setAeoFaqs(v)}
+                    onGenerated={(parsed) => {
+                      setTitle(parsed.title);
+                      setDescription(parsed.description);
+                      if (parsed.seoKeywords) setTags(parsed.seoKeywords);
+                      if (parsed.aeoFaqs) setAeoFaqs(parsed.aeoFaqs);
+                    }}
+                    onAcceptTitle={(v) => {
+                      setTitle(v);
+                      acceptListingCopy.mutate(
+                        { imageId: image.id, generated: { title: v } },
+                        { onSuccess: (product) => { if (product.title) setTitle(product.title); } },
+                      );
+                    }}
+                    onAcceptDescription={(v) => {
+                      setDescription(v);
+                      acceptListingCopy.mutate(
+                        { imageId: image.id, generated: { description: v } },
+                        {
+                          onSuccess: (product) => {
+                            if (product.description) setDescription(product.description);
+                          },
+                        },
+                      );
+                    }}
+                    onAcceptTags={(v) => {
+                      setTags(v);
+                      acceptListingCopy.mutate(
+                        { imageId: image.id, generated: { tags: v } },
+                        { onSuccess: (product) => { if (product.tags) setTags(product.tags); } },
+                      );
+                    }}
+                    onAcceptAeoFaqs={(v) => {
+                      setAeoFaqs(v);
+                      acceptListingCopy.mutate(
+                        {
+                          imageId: image.id,
+                          generated: {
+                            aeoFaqs: v.map((f) => ({ question: f.q, answer: f.a })),
+                          },
+                        },
+                        {
+                          onSuccess: (product) => {
+                            if (!Array.isArray(product.aeoFaqs)) return;
+                            setAeoFaqs(
+                              (product.aeoFaqs as { q?: string; a?: string; question?: string; answer?: string }[]).map((f) => ({
+                                q: f.q ?? f.question ?? "",
+                                a: f.a ?? f.answer ?? "",
+                              })),
+                            );
+                          },
+                        },
+                      );
+                    }}
                   />
                 )}
                 <div className="space-y-1.5">

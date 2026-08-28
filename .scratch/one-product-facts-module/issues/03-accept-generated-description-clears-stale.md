@@ -6,11 +6,15 @@
 
 **Blocked by:** 01 — Confirm marks listing copy stale; 02 — Generate follows the server gate
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Accept of generated description persists on a path distinct from ordinary product update
-- [ ] That persist applies current fact blocks, writes listing copy, and clears stale; the banner goes
-- [ ] Title-only, tags-only, or AEO-only Accept does not clear stale
-- [ ] Ordinary Save (typo, price, media order) does not clear stale and does not assemble blocks
-- [ ] Generate stream completion does not persist and does not clear stale
-- [ ] Tests hit the Product facts module: description Accept clears stale and stamps blocks; title-only does not clear
+- [x] Accept of generated description persists on a path distinct from ordinary product update
+- [x] That persist applies current fact blocks, writes listing copy, and clears stale; the banner goes
+- [x] Title-only, tags-only, or AEO-only Accept does not clear stale
+- [x] Ordinary Save (typo, price, media order) does not clear stale and does not assemble blocks
+- [x] Generate stream completion does not persist and does not clear stale
+- [x] Tests hit the Product facts module: description Accept clears stale and stamps blocks; title-only does not clear
+
+## Answer
+
+Accept of generated listing copy is a Product facts module outcome: description Accept stamps current fact blocks and clears stale; title/tags/AEO-only Accept leave the mark. HTTP persists that on `POST /api/images/:id/listing-copy/accept` (listing copy first, then the stale mark) so ordinary Save cannot be mistaken for a regenerate. Generate still only fills the form; the banner stays until description Accept succeeds. Ordinary PUT Save still does not assemble blocks or clear stale.

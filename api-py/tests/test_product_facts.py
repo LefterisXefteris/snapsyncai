@@ -1,6 +1,7 @@
 """Product-facts module — listing copy stays gated until facts are confirmed."""
 
 from app.services.product_facts import (
+    accept_generated_listing_copy,
     apply_description_blocks,
     apply_suggested,
     confirm_facts,
@@ -766,3 +767,77 @@ def test_changing_care_gpsr_or_textile_with_listing_copy_marks_stale() -> None:
     )
     assert not_textile.facts.listing_copy_stale is True
     assert may_generate_listing_copy(not_textile.facts) is True
+
+
+def test_accept_generated_description_applies_blocks_and_clears_stale() -> None:
+    stale = _confirm_textile(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        listing_copy={"title": "Organic Cotton Tee"},
+    ).facts
+    accepted = accept_generated_listing_copy(
+        stale, {"description": "<p>A soft everyday tee.</p>"}
+    )
+    assert accepted.facts.listing_copy_stale is False
+    assert may_generate_listing_copy(accepted.facts) is True
+    assert accepted.listing_copy["description"] == (
+        "<p>A soft everyday tee.</p>\n"
+        "<p>Fibre composition: 80% cotton, 20% polyester.</p>"
+    )
+
+
+def test_accept_generated_title_only_leaves_stale() -> None:
+    stale = _confirm_textile(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        listing_copy={"title": "Organic Cotton Tee"},
+    ).facts
+    accepted = accept_generated_listing_copy(stale, {"title": "Everyday Tee"})
+    assert accepted.facts.listing_copy_stale is True
+    assert may_generate_listing_copy(accepted.facts) is True
+    assert accepted.listing_copy == {"title": "Everyday Tee"}
+
+
+def test_accept_generated_tags_or_aeo_leaves_stale() -> None:
+    stale = _confirm_textile(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        listing_copy={"title": "Organic Cotton Tee"},
+    ).facts
+    tags = accept_generated_listing_copy(stale, {"tags": ["cotton", "tee"]})
+    assert tags.facts.listing_copy_stale is True
+    assert tags.listing_copy == {"tags": ["cotton", "tee"]}
+    aeo = accept_generated_listing_copy(
+        stale, {"aeoFaqs": [{"q": "Is it cotton?", "a": "Yes."}]}
+    )
+    assert aeo.facts.listing_copy_stale is True
+    assert aeo.listing_copy == {"aeo_faqs": [{"q": "Is it cotton?", "a": "Yes."}]}
+
+
+def test_empty_description_accept_does_not_clear_stale() -> None:
+    stale = _confirm_textile(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        listing_copy={"title": "Organic Cotton Tee"},
+    ).facts
+    accepted = accept_generated_listing_copy(stale, {"description": "  "})
+    assert accepted.facts.listing_copy_stale is True
+    assert may_generate_listing_copy(accepted.facts) is True
+    assert "description" not in accepted.listing_copy
+
+
+def test_accept_generated_description_stamps_shop_gpsr_block() -> None:
+    stale = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="shop_default",
+        shop_gpsr=COMPLETE_GPSR,
+        care_choice="skip",
+        listing_copy={"title": "Organic Cotton Tee"},
+    ).facts
+    accepted = accept_generated_listing_copy(
+        stale, {"description": "<p>A soft everyday tee.</p>"}, shop_gpsr=COMPLETE_GPSR
+    )
+    assert accepted.facts.listing_copy_stale is False
+    assert accepted.listing_copy["description"] == (
+        "<p>A soft everyday tee.</p>\n"
+        "<p>Fibre composition: 80% cotton, 20% polyester.</p>\n"
+        f"{GPSR_BLOCK}"
+    )

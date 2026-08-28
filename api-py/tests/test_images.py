@@ -29,6 +29,7 @@ PROTECTED = [
     ("POST", "/api/images/assign-group-batch"),
     ("POST", "/api/images/upload"),
     ("POST", "/api/images/1/generate-content"),
+    ("POST", "/api/images/1/listing-copy/accept"),
     ("POST", "/api/images/push-to-shopify"),
 ]
 

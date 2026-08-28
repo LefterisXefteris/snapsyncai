@@ -18,6 +18,7 @@ interface AiContentPanelProps {
   imageId: number;
   defaultCategory?: string;
   canGenerate: boolean;
+  onGenerated: (parsed: GeneratedContent) => void;
   onAcceptTitle: (value: string) => void;
   onAcceptDescription: (value: string) => void;
   onAcceptTags: (value: string[]) => void;
@@ -28,6 +29,7 @@ export function AiContentPanel({
   imageId,
   defaultCategory,
   canGenerate,
+  onGenerated,
   onAcceptTitle,
   onAcceptDescription,
   onAcceptTags,
@@ -71,6 +73,7 @@ export function AiContentPanel({
         setGenerated(parsed);
         setIsGenerating(false);
         setStreamText("");
+        onGenerated(parsed);
       },
       () => setIsGenerating(false)
     );
