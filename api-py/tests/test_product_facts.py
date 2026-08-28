@@ -13,6 +13,7 @@ from app.services.product_facts import (
     may_generate_listing_copy,
     merge_product_facts,
     persistable_from_vision,
+    stale_for_shop_gpsr_save,
     stored_from_facts,
 )
 
@@ -841,3 +842,55 @@ def test_accept_generated_description_stamps_shop_gpsr_block() -> None:
         "<p>Fibre composition: 80% cotton, 20% polyester.</p>\n"
         f"{GPSR_BLOCK}"
     )
+
+
+def test_shop_gpsr_save_stales_shop_default_product_with_listing_copy() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="shop_default",
+        shop_gpsr=COMPLETE_GPSR,
+        care_choice="skip",
+    ).facts
+    assert facts.listing_copy_stale is False
+    staled = stale_for_shop_gpsr_save(facts, {"title": "Generated Tee"})
+    assert staled.listing_copy_stale is True
+    assert may_generate_listing_copy(staled) is True
+    assert staled.confirmed == facts.confirmed
+
+
+def test_shop_gpsr_save_does_not_stale_override_skip_or_empty_copy() -> None:
+    listing_copy = {"title": "Generated Tee"}
+    override = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="override",
+        gpsr_identity=COMPLETE_GPSR,
+        care_choice="skip",
+    ).facts
+    assert stale_for_shop_gpsr_save(override, listing_copy).listing_copy_stale is False
+    assert may_generate_listing_copy(override) is True
+
+    skip = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="skip",
+        care_choice="skip",
+    ).facts
+    assert stale_for_shop_gpsr_save(skip, listing_copy).listing_copy_stale is False
+
+    shop_default = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        gpsr_choice="shop_default",
+        shop_gpsr=COMPLETE_GPSR,
+        care_choice="skip",
+    ).facts
+    for empty in (None, {}, {"title": ""}, {"title": "  "}, {"tags": []}):
+        assert (
+            stale_for_shop_gpsr_save(shop_default, empty).listing_copy_stale is False
+        ), empty

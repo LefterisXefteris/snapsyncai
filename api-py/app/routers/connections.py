@@ -21,7 +21,14 @@ from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.schemas.gpsr import GpsrIdentityIn
 from app.services import connections
-from app.services.product_facts import parse_gpsr_identity, stored_gpsr_identity
+from app.services import images as store
+from app.services.product_facts import (
+    merge_product_facts,
+    parse_gpsr_identity,
+    stale_for_shop_gpsr_save,
+    stored_from_facts,
+    stored_gpsr_identity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +86,25 @@ async def shopify_status(user_id: CurrentUser, session: SessionDep) -> ShopifySt
     )
 
 
+async def _stale_shop_default_products(session, user_id: str) -> None:
+    rows = await store.list_images(session, user_id)
+    seen: set[str | int] = set()
+    for image in rows:
+        key: str | int | None = image.product_group_id or image.id
+        if key is None or key in seen:
+            continue
+        seen.add(key)
+        group = (
+            [img for img in rows if img.product_group_id == image.product_group_id]
+            if image.product_group_id
+            else [image]
+        )
+        facts = merge_product_facts([img.product_facts for img in group])
+        staled = stale_for_shop_gpsr_save(facts, store.listing_copy_from_images(group))
+        if staled.listing_copy_stale != facts.listing_copy_stale:
+            await store.persist_product_facts(session, image, stored_from_facts(staled))
+
+
 @router.put("/api/shopify/gpsr-identity", response_model=ShopifyStatus)
 async def put_shop_gpsr_identity(
     body: GpsrIdentityIn, user_id: CurrentUser, session: SessionDep
@@ -94,6 +120,7 @@ async def put_shop_gpsr_identity(
             status_code=400,
             detail="Connect Shopify before saving shop GPSR identity.",
         )
+    await _stale_shop_default_products(session, user_id)
     return await shopify_status(user_id, session)
 
 

@@ -409,6 +409,8 @@ export function useSaveShopGpsrIdentity() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData([api.shopify.status.path], data);
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
       toast({
         title: "Shop GPSR identity saved",
         description: "New products can use this as the default.",

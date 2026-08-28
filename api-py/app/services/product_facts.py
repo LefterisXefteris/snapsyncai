@@ -1,7 +1,7 @@
 """Product facts — the seam that keeps listing copy from inventing legal facts.
 
-Upload, Generate, regenerate, Accept generated listing copy, and description-block
-assembly call this module. Vision and HTTP do not own these rules.
+Upload, Generate, regenerate, Accept generated listing copy, Shop GPSR save,
+and description-block assembly call this module. Vision and HTTP do not own these rules.
 """
 
 from __future__ import annotations
@@ -513,6 +513,26 @@ def accept_generated_listing_copy(
             listing_copy_stale=False,
         ),
         listing_copy=listing_copy,
+    )
+
+
+def stale_for_shop_gpsr_save(
+    facts: ProductFacts,
+    listing_copy: Mapping[str, Any] | None = None,
+) -> ProductFacts:
+    """Stale listing copy on shop-default products when Shop GPSR identity is saved."""
+    stale = facts.listing_copy_stale
+    confirmed = facts.confirmed
+    if (
+        confirmed is not None
+        and confirmed.gpsr_choice == _GPSR_SHOP_DEFAULT
+        and _listing_copy_present(listing_copy)
+    ):
+        stale = True
+    return ProductFacts(
+        suggested=facts.suggested,
+        confirmed=facts.confirmed,
+        listing_copy_stale=stale,
     )
 
 

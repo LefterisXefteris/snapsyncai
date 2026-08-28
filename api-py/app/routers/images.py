@@ -51,25 +51,6 @@ async def _sync_product_facts(session, user_id: str, image) -> None:
     await store.persist_product_facts(session, image, stored_from_facts(merged))
 
 
-def _product_listing_copy(images) -> dict:
-    def first(attr):
-        for img in images:
-            value = getattr(img, attr, None)
-            if value:
-                return value
-        return None
-
-    return {
-        "title": first("title"),
-        "description": first("description"),
-        "tags": first("tags"),
-        "seo_title": first("seo_title"),
-        "seo_description": first("seo_description"),
-        "aeo_faqs": first("aeo_faqs"),
-        "aeo_snippet": first("aeo_snippet"),
-    }
-
-
 def _catalogue_payload(items: list[ImageListOut]) -> list[dict]:
     return [
         item.model_dump(by_alias=True, mode="json", exclude=LIST_EXCLUDE) for item in items
@@ -203,7 +184,7 @@ async def confirm_product_facts(
         shop_gpsr=shop_gpsr,
         care_choice=body.care_choice,
         care=body.care.model_dump(by_alias=True) if body.care else None,
-        listing_copy=_product_listing_copy([image, *group]),
+        listing_copy=store.listing_copy_from_images([image, *group]),
     )
     if not result.ok:
         raise HTTPException(status_code=400, detail=result.error)

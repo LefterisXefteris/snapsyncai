@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
 
 import httpx
@@ -28,6 +29,7 @@ LIST_COLUMNS = (
     Image.seo_title,
     Image.seo_description,
     Image.alt_text,
+    Image.aeo_faqs,
     Image.aeo_snippet,
     Image.variants,
     Image.compare_at_price,
@@ -159,6 +161,25 @@ async def persist_product_facts(
     if image.id is None:
         return image
     return await update_image(session, image.id, {"product_facts": facts_record})
+
+
+def listing_copy_from_images(images: Sequence[Image]) -> dict:
+    def first(attr: str):
+        for img in images:
+            value = getattr(img, attr, None)
+            if value:
+                return value
+        return None
+
+    return {
+        "title": first("title"),
+        "description": first("description"),
+        "tags": first("tags"),
+        "seo_title": first("seo_title"),
+        "seo_description": first("seo_description"),
+        "aeo_faqs": first("aeo_faqs"),
+        "aeo_snippet": first("aeo_snippet"),
+    }
 
 
 async def update_image(session: AsyncSession, image_id: int, updates: dict) -> Image | None:
