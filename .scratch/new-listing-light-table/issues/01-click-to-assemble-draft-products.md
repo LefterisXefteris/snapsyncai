@@ -6,7 +6,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done (canvas superseded by issue 02)
 
 - [x] New listing is a product inspector (draft rail + large photo + filmstrip), not one card per 1-photo draft and not a light-table grid
 - [x] Choose photos still stages files; each file is its own draft product; drag-in is optional
@@ -24,4 +24,4 @@
 
 Prototype (throwaway, in-memory stub) captured on branch `prototype/new-listing-ui` (`/new?variant=A|B|C`).
 
-**Verdict:** C — Product inspector. Question settled: New listing should inspect one draft product at a time (rail + large photo + filmstrip), not a toolbar light table (A) or cluster islands + dock (B). Rewrite against real staging; do not merge that branch as production.
+**Verdict:** C — Product inspector. *Superseded:* seller later rejected this canvas. Current pick is issue 02 / prototype B (grid + dock) on `prototype/new-listing-light-table-dock`.

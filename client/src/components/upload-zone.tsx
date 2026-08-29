@@ -7,7 +7,7 @@ import { useUploadImages } from "@/hooks/use-images";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
 import { useGroupSelection } from "@/hooks/use-group-selection";
-import { ListingInspector } from "@/components/listing-inspector";
+import { ListingLightTable } from "@/components/listing-light-table";
 import {
   addToDraft,
   extractAsDraft,
@@ -48,7 +48,6 @@ export function UploadZone({
     clear: clearSelection,
     setSelected,
   } = useGroupSelection(orderedItemIds);
-  const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
   const [failedGroupIds, setFailedGroupIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
@@ -80,34 +79,22 @@ export function UploadZone({
   // expand the sidebar to give the grouping grid more room.
   useEffect(() => { onStagedCountChange?.(totalFiles); }, [totalFiles, onStagedCountChange]);
 
-  // ── Thumbnail click adapter: update focused group + delegate to hook ───────
-  const onThumbnailSelect = useCallback(
-    (id: string, groupId: string, e: React.MouseEvent) => {
-      setFocusedGroupId(groupId);
-      handleThumbnailClick(id, e);
-    },
-    [handleThumbnailClick],
-  );
-
-  // ── Esc clears selection; Cmd/Ctrl+A selects everything in focused group ──
+  // ── Esc clears selection; Cmd/Ctrl+A selects every photo on the light table ──
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         clearSelection();
-        setFocusedGroupId(null);
         return;
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === "a" || e.key === "A")) {
-        if (focusedGroupId === null) return; // no focused group → let browser default run
-        const focusedGroup = groups.find(g => g.id === focusedGroupId);
-        if (!focusedGroup) return;
+        if (orderedItemIds.length === 0) return;
         e.preventDefault();
-        setSelected(new Set(focusedGroup.items.map(i => i.id)));
+        setSelected(new Set(orderedItemIds));
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [groups, focusedGroupId, clearSelection, setSelected]);
+  }, [orderedItemIds, clearSelection, setSelected]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newItems: FileItem[] = acceptedFiles.map(f => {
@@ -228,7 +215,6 @@ export function UploadZone({
       saveGroups(stamped);
       return stamped;
     });
-    setFocusedGroupId(newId);
     clearSelection();
   };
 
@@ -240,7 +226,6 @@ export function UploadZone({
       saveGroups(stamped);
       return stamped;
     });
-    setFocusedGroupId(destId);
     clearSelection();
   };
 
@@ -253,7 +238,6 @@ export function UploadZone({
       saveGroups(stamped);
       return stamped;
     });
-    setFocusedGroupId(newId);
     clearSelection();
   };
 
@@ -377,11 +361,6 @@ export function UploadZone({
     }
   };
 
-  useEffect(() => {
-    if (focusedGroupId && groups.some(g => g.id === focusedGroupId)) return;
-    setFocusedGroupId(groups[0]?.id ?? null);
-  }, [groups, focusedGroupId]);
-
   // ────────────────────────────────────────────────────────────────────────────
   return (
     <div
@@ -463,15 +442,13 @@ export function UploadZone({
 
       {totalFiles > 0 && !isUploading && (
         <div className="min-h-0 flex-1">
-          <ListingInspector
+          <ListingLightTable
             drafts={groups}
             selectedIds={selectedIds}
-            focusedDraftId={focusedGroupId}
             failedDraftIds={failedGroupIds}
             isUploading={isUploading}
             onChoosePhotos={open}
-            onFocusDraft={setFocusedGroupId}
-            onSelectPhoto={onThumbnailSelect}
+            onSelectPhoto={handleThumbnailClick}
             onGroup={handleGroup}
             onAddTo={handleAddTo}
             onSeparate={handleSeparate}

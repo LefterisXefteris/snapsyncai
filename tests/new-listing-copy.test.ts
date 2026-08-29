@@ -6,23 +6,33 @@ import path from "node:path";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const uploadZone = readFileSync(path.join(root, "client/src/components/upload-zone.tsx"), "utf8");
-const inspector = readFileSync(path.join(root, "client/src/components/listing-inspector.tsx"), "utf8");
+const lightTable = readFileSync(
+  path.join(root, "client/src/components/listing-light-table.tsx"),
+  "utf8",
+);
 
 test("New listing copy does not tell the seller to drag to regroup", () => {
   assert.doesNotMatch(uploadZone, /Drag to regroup/);
-  assert.doesNotMatch(inspector, /Drag to regroup/);
+  assert.doesNotMatch(lightTable, /Drag to regroup/);
 });
 
 test("New listing grouping copy does not call grouping variants", () => {
   assert.doesNotMatch(uploadZone, /group variants/i);
-  assert.doesNotMatch(inspector, /group variants/i);
+  assert.doesNotMatch(lightTable, /group variants/i);
 });
 
 test("Confirm is labeled Create N products", () => {
-  assert.match(inspector, /Create \{n\} product/);
+  assert.match(lightTable, /Create \{n\} product/);
 });
 
-test("filmstrip has a click control to set the thumbnail", () => {
-  assert.match(inspector, /Set as thumbnail/);
-  assert.match(inspector, /onSetThumbnail\(photo\.id\)/);
+test("thumbnail can be set from the selection dock without drag", () => {
+  assert.match(lightTable, /onSetThumbnail/);
+  assert.match(lightTable, /Thumbnail/);
+});
+
+test("selected photos collect in a dock with Group Add to Separate and Create", () => {
+  assert.match(lightTable, /collect/i);
+  assert.match(lightTable, /\bGroup\b/);
+  assert.match(lightTable, /Add to/);
+  assert.match(lightTable, /\bSeparate\b/);
 });

@@ -68,6 +68,12 @@ test("Confirm count is every draft after grouping, including leftover one-photo 
   assert.equal(confirmCount(grouped), 2);
 });
 
+test("Confirm count drops when a draft is deleted", () => {
+  const drafts = [draft("a", ["p1"]), draft("b", ["p2"]), draft("c", ["p3"])];
+  assert.equal(confirmCount(drafts), 3);
+  assert.equal(confirmCount(drafts.filter((d) => d.id !== "b")), 2);
+});
+
 test("Set as thumbnail moves that photo to the front of its draft", () => {
   const drafts = [draft("coat", ["c1", "c2", "c3"])];
   const next = setThumbnail(drafts, "c3");
