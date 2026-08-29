@@ -42,6 +42,8 @@ LIST_COLUMNS = (
     Image.collections,
     Image.shopify_product_id,
     Image.shopify_status,
+    Image.shopify_product_status,
+    Image.shopify_publication_ids,
     Image.payment_status,
     Image.product_facts,
     Image.product_group_id,

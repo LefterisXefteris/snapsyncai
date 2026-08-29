@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useShopifyStatus, useSaveShopGpsrIdentity } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
@@ -26,12 +26,19 @@ import {
   PRODUCT_EDITOR_FACTS_TITLE,
   PRODUCT_EDITOR_LISTING_COPY_TITLE,
   PRODUCT_EDITOR_SELLING_TITLE,
+  PRODUCT_EDITOR_SHOPIFY_TITLE,
+  PRODUCT_EDITOR_AVAILABLE_ON_LABEL,
+  PRODUCT_EDITOR_SHOPIFY_STATUS_LABEL,
+  PRODUCT_EDITOR_SHOPIFY_CONNECT,
+  PRODUCT_EDITOR_SHOPIFY_RECONNECT,
   PRODUCT_EDITOR_WORK,
   UNPAID_PREVIEW_DETAIL,
   UNPAID_PREVIEW_TITLE,
   listingCopyTagsAfterAdd,
   listingCopyTagsAfterRemove,
   productEditorShowsVariants,
+  publicationIdsAfterToggle,
+  shopifyProductStatus,
 } from "@/lib/product-editor-copy";
 
 function orderProductImages(images: Image[], mediaGallery: string[]) {
@@ -93,6 +100,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [barcode, setBarcode] = useState("");
   const [trackQuantity, setTrackQuantity] = useState(true);
   const [inventoryQuantity, setInventoryQuantity] = useState(0);
+  const [shopifyListingStatus, setShopifyListingStatus] = useState<"DRAFT" | "ACTIVE">("DRAFT");
+  const [selectedPublicationIds, setSelectedPublicationIds] = useState<string[]>([]);
 
   const deleteImageMutation = useDeleteImage();
   const unlinkFromGroupMutation = useUnlinkFromGroup();
@@ -121,6 +130,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
   const imageId = image?.id;
+  const { data: shopifyPublications } = useShopifyPublications(imageId);
 
   // Fetch all images in the product group directly from the server
   const { data: groupImages } = useProductGroup(image?.id);
@@ -157,6 +167,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
     setInventoryQuantity(image.inventoryQuantity || 0);
     setTags(Array.isArray(image.tags) ? image.tags : []);
+    setShopifyListingStatus(shopifyProductStatus(image.shopifyProductStatus));
+    setSelectedPublicationIds(
+      Array.isArray(image.shopifyPublicationIds) ? image.shopifyPublicationIds : [],
+    );
     setAeoFaqs(
       Array.isArray(image.aeoFaqs)
         ? (image.aeoFaqs as { q?: string; a?: string; question?: string; answer?: string }[]).map((f) => ({
@@ -168,6 +182,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     setCompositionRows(draftComposition(productFacts(image)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset local listing copy when the product changes
   }, [imageId]);
+
+  useEffect(() => {
+    if (!shopifyPublications?.productStatus) return;
+    setShopifyListingStatus(shopifyProductStatus(shopifyPublications.productStatus));
+    setSelectedPublicationIds(
+      (shopifyPublications.publications ?? [])
+        .filter((publication) => publication.published)
+        .map((publication) => publication.id),
+    );
+  }, [imageId, shopifyPublications?.productStatus, shopifyPublications?.publications]);
 
   useEffect(() => {
     const identity = shopifyStatus?.gpsrIdentity as GpsrIdentity | undefined;
@@ -354,6 +378,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           inventoryQuantity,
           tags,
           aeoFaqs: aeoFaqs.map((f) => ({ question: f.q, answer: f.a })),
+          shopifyProductStatus: shopifyListingStatus,
+          shopifyPublicationIds: selectedPublicationIds,
         },
       },
     );
@@ -379,22 +405,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!isUnpaid && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === 'synced' ? 'text-muted-foreground' : 'bg-[#95bf46]/10 text-[#95bf46] hover:bg-[#95bf46]/20 shadow-[inset_0_0_0_1px_rgb(149_191_70/0.3),0_0_20px_-8px_rgb(149_191_70/0.4)]'}`}
-                onClick={() => pushToShopifyMutation.mutate([image.id])}
-                disabled={pushToShopifyMutation.isPending}
-              >
-                {pushToShopifyMutation.isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <Store className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                {image.shopifyStatus === "synced" ? "Sync updates to Shopify" : "Push to Shopify"}
-              </Button>
-            )}
             <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending || isUnpaid}>
               {updateMutation.isPending ? (
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -1304,6 +1314,112 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <span className="text-sm font-medium">{(((Number(price) - Number(costPerItem)) / Number(price)) * 100).toFixed(1)}%</span>
                     </div>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm" data-testid="card-shopify-publications">
+              <CardHeader className="px-4 py-3 hairline-b">
+                <CardTitle className="text-sm font-medium">{PRODUCT_EDITOR_SHOPIFY_TITLE}</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-4">
+                {!shopConnected ? (
+                  <p className="text-xs text-muted-foreground">
+                    {PRODUCT_EDITOR_SHOPIFY_CONNECT}{" "}
+                    <button type="button" className="underline" onClick={() => setLocation("/settings")}>
+                      Settings
+                    </button>
+                  </p>
+                ) : (
+                  <>
+                    {shopifyPublications && shopifyPublications.publicationsReady === false && (
+                      <p className="text-xs text-muted-foreground">
+                        {PRODUCT_EDITOR_SHOPIFY_RECONNECT}{" "}
+                        <button type="button" className="underline" onClick={() => setLocation("/settings")}>
+                          Settings
+                        </button>
+                      </p>
+                    )}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium">{PRODUCT_EDITOR_SHOPIFY_STATUS_LABEL}</label>
+                      <Select
+                        value={shopifyListingStatus}
+                        onValueChange={(value) => setShopifyListingStatus(shopifyProductStatus(value))}
+                        disabled={isUnpaid}
+                      >
+                        <SelectTrigger className="h-8 text-sm" data-testid="select-shopify-product-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DRAFT">Draft</SelectItem>
+                          <SelectItem value="ACTIVE">Active</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium">{PRODUCT_EDITOR_AVAILABLE_ON_LABEL}</label>
+                      {(shopifyPublications?.publications ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          {shopifyPublications?.publicationsReady
+                            ? "This shop has no publications yet."
+                            : "Publications load after Shopify is reconnected."}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(shopifyPublications?.publications ?? []).map((publication) => (
+                            <div key={publication.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`publication-${publication.id}`}
+                                checked={selectedPublicationIds.includes(publication.id)}
+                                onCheckedChange={(checked) =>
+                                  setSelectedPublicationIds(
+                                    publicationIdsAfterToggle(
+                                      selectedPublicationIds,
+                                      publication.id,
+                                      checked === true,
+                                    ),
+                                  )
+                                }
+                                disabled={isUnpaid || shopifyPublications?.publicationsReady === false}
+                                className="w-4 h-4"
+                              />
+                              <label
+                                htmlFor={`publication-${publication.id}`}
+                                className="text-xs font-medium leading-none text-muted-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {publication.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {!isUnpaid && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === "synced" ? "text-muted-foreground" : "bg-[#95bf46]/10 text-[#95bf46] hover:bg-[#95bf46]/20 shadow-[inset_0_0_0_1px_rgb(149_191_70/0.3),0_0_20px_-8px_rgb(149_191_70/0.4)]"}`}
+                        onClick={() =>
+                          pushToShopifyMutation.mutate({
+                            ids: [image.id],
+                            publicationIds: selectedPublicationIds,
+                            productStatus: shopifyListingStatus,
+                          })
+                        }
+                        disabled={
+                          pushToShopifyMutation.isPending ||
+                          shopifyPublications?.publicationsReady !== true
+                        }
+                      >
+                        {pushToShopifyMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Store className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        {image.shopifyStatus === "synced" ? "Sync updates to Shopify" : "Push to Shopify"}
+                      </Button>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

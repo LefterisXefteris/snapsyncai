@@ -19,7 +19,8 @@ from urllib.parse import urlencode
 from app.config import Settings
 
 DEFAULT_SHOPIFY_SCOPES = (
-    "read_products,write_products,read_inventory,write_inventory,read_locations"
+    "read_products,write_products,read_inventory,write_inventory,read_locations,"
+    "read_publications,write_publications"
 )
 DEFAULT_APP_BASE_URL = "https://snapsyncai.co.uk"
 

@@ -11,6 +11,9 @@ import {
   listingCopyTagsAfterAdd,
   listingCopyTagsAfterRemove,
   productEditorShowsVariants,
+  PRODUCT_EDITOR_AVAILABLE_ON_LABEL,
+  publicationIdsAfterToggle,
+  shopifyProductStatus,
 } from "../client/src/lib/product-editor-copy.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -71,4 +74,36 @@ test("the product editor has no Discard, Add options, AI Content Generator, or S
   assert.doesNotMatch(editorPage, /AI Content Generator/);
   assert.doesNotMatch(listingCopyPanel, /AI Content Generator/);
   assert.doesNotMatch(editorPage, /CardTitle[^>]*>Status</);
+});
+
+test("Shopify publications are Available on, never called channels", () => {
+  assert.equal(PRODUCT_EDITOR_AVAILABLE_ON_LABEL, "Available on");
+  assert.match(editorPage, /PRODUCT_EDITOR_AVAILABLE_ON_LABEL/);
+  assert.match(editorPage, /PRODUCT_EDITOR_SHOPIFY_TITLE/);
+  assert.doesNotMatch(editorPage, /available channels/i);
+});
+
+test("Draft is the default Shopify product status and publications start unticked", () => {
+  assert.equal(shopifyProductStatus(undefined), "DRAFT");
+  assert.equal(shopifyProductStatus("ACTIVE"), "ACTIVE");
+  assert.deepEqual(publicationIdsAfterToggle([], "gid://shopify/Publication/1", true), [
+    "gid://shopify/Publication/1",
+  ]);
+  assert.deepEqual(
+    publicationIdsAfterToggle(["gid://shopify/Publication/1"], "gid://shopify/Publication/1", false),
+    [],
+  );
+});
+
+test("the Shopify Channel row is Draft/Active and Available on, not Shopify admin leftovers", () => {
+  assert.match(editorPage, /PRODUCT_EDITOR_SHOPIFY_STATUS_LABEL/);
+  assert.match(editorPage, /PRODUCT_EDITOR_SHOPIFY_RECONNECT/);
+  assert.match(editorPage, /card-shopify-publications/);
+  assert.match(editorPage, /publicationsReady !== true/);
+  assert.doesNotMatch(editorPage, /\bWix\b/);
+  assert.doesNotMatch(editorPage, /\bVinted\b/);
+  assert.doesNotMatch(editorPage, /\bVendor\b/);
+  assert.doesNotMatch(editorPage, /theme template/i);
+  assert.doesNotMatch(editorPage, /collections/i);
+  assert.doesNotMatch(editorPage, /shipping/i);
 });

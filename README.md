@@ -29,7 +29,7 @@ Set these environment variables in production before connecting Shopify stores:
 ```bash
 SHOPIFY_API_KEY="your Shopify app client ID"
 SHOPIFY_API_SECRET="your Shopify app client secret"
-SHOPIFY_SCOPES="read_products,write_products,read_inventory,write_inventory,read_locations"
+SHOPIFY_SCOPES="read_products,write_products,read_inventory,write_inventory,read_locations,read_publications,write_publications"
 APP_BASE_URL="https://snapsyncai.co.uk"
 CONNECTION_ENCRYPTION_KEY="a high-entropy secret used for AES-256-GCM token encryption"
 ```

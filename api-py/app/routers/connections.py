@@ -12,7 +12,7 @@ swallow to the lookup — a 500 from the DB still gets logged here, which Expres
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.clerk import CurrentUser
@@ -42,6 +42,10 @@ INVENTORY_SCOPES = (
     "write_inventory",
     "read_locations",
 )
+PUBLICATION_SCOPES = (
+    "read_publications",
+    "write_publications",
+)
 
 
 class ShopifyStatus(CamelModel):
@@ -50,7 +54,21 @@ class ShopifyStatus(CamelModel):
     shop_domain: str | None = None
     granted_scopes: list[str] | None = None
     inventory_ready: bool | None = None
+    publications_ready: bool | None = None
     gpsr_identity: GpsrIdentityIn | None = None
+
+
+class ShopifyPublicationOut(CamelModel):
+    id: str
+    name: str
+    published: bool = False
+
+
+class ShopifyPublicationsResponse(CamelModel):
+    connected: bool
+    publications_ready: bool
+    product_status: str | None = None
+    publications: list[ShopifyPublicationOut]
 
 
 async def _safe_get(getter, session: AsyncSession, user_id: str, channel: str):
@@ -82,7 +100,61 @@ async def shopify_status(user_id: CurrentUser, session: SessionDep) -> ShopifySt
         shop_domain=connection.shop_domain,
         granted_scopes=granted,
         inventory_ready=all(scope in granted for scope in INVENTORY_SCOPES),
+        publications_ready=all(scope in granted for scope in PUBLICATION_SCOPES),
         gpsr_identity=gpsr,
+    )
+
+
+@router.get("/api/shopify/publications", response_model=ShopifyPublicationsResponse)
+async def shopify_publications(
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+    image_id: int | None = Query(default=None, alias="imageId"),
+) -> ShopifyPublicationsResponse:
+    connection = await _safe_get(connections.get_shopify, session, user_id, "shopify")
+    if connection is None:
+        return ShopifyPublicationsResponse(connected=False, publications_ready=False, publications=[])
+
+    granted = connection.granted_scopes or []
+    ready = all(scope in granted for scope in PUBLICATION_SCOPES)
+    if not ready:
+        return ShopifyPublicationsResponse(connected=True, publications_ready=False, publications=[])
+
+    from app.services.shopify import list_shopify_publications, product_publishing
+
+    try:
+        listed = await list_shopify_publications(connection, settings)
+    except Exception:
+        logger.exception("Shopify publications lookup failed for user %s", user_id)
+        return ShopifyPublicationsResponse(connected=True, publications_ready=False, publications=[])
+
+    published: set[str] = set()
+    product_status = None
+    if image_id is not None:
+        image = await store.get_image(session, image_id)
+        if image is not None and image.session_id == user_id and image.shopify_product_id:
+            try:
+                product_status, published = await product_publishing(
+                    connection, settings, image.shopify_product_id
+                )
+            except Exception:
+                logger.exception(
+                    "Shopify product publications lookup failed for image %s", image_id
+                )
+
+    return ShopifyPublicationsResponse(
+        connected=True,
+        publications_ready=True,
+        product_status=product_status,
+        publications=[
+            ShopifyPublicationOut(
+                id=item["id"],
+                name=item["name"],
+                published=item["id"] in published,
+            )
+            for item in listed
+        ],
     )
 
 

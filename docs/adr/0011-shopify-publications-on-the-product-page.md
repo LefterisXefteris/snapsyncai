@@ -1,0 +1,3 @@
+# Shopify publications and Draft/Active live on the product page
+
+The product page has one Channel row for Shopify. Inside it the seller picks Draft or Active and which publications the product is available on. The list is the connected shop’s live publications. First Push and later Sync send that exact set — unticked publications are unpublished. Default is Draft with none ticked: Available on Online Store is not the storefront until the product is Active. Vendor, collections, shipping/weight, and theme template stay in Shopify admin. Wix and Vinted do not appear yet. We rejected cloning Shopify admin, a hardcoded Online Store + POS list, and calling publications Channel.

@@ -32,6 +32,8 @@ export type Image = {
   collections?: string[] | null;
   shopifyProductId?: string | null;
   shopifyStatus?: string | null;
+  shopifyProductStatus?: string | null;
+  shopifyPublicationIds?: string[] | null;
   paymentStatus?: string | null;
   productContext?: string | null;
   brandTone?: string | null;

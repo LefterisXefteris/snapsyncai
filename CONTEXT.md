@@ -8,6 +8,10 @@ Textile-first seller workspace for Shopify, Wix, and Vinted. Listing from photos
 Shopify, Wix, or Vinted — a place the seller lists or fetches products.
 _Avoid_: Platform, integration, marketplace (as the general term), store (when you mean the channel type)
 
+**Publication**:
+Where this product is available inside a connected Shopify shop — Online Store, Point of Sale, Shop, and other sales apps on that shop. Not a Channel.
+_Avoid_: Channel, sales channel (as SnapSync language), available channels
+
 **Product**:
 The sellable thing the seller is listing. One product may have several photos. Listing copy and product facts belong to the product, not to a single photo.
 _Avoid_: Image (as the sellable thing), listing (as the thing being sold), snap, variant (as the sellable thing)

@@ -58,6 +58,7 @@ class TestPublicConfig:
 
 PROTECTED = [
     "/api/shopify/status",
+    "/api/shopify/publications",
     "/api/subscription/status",
 ]
 
@@ -150,8 +151,23 @@ class TestResponseContract:
             "shopDomain",
             "grantedScopes",
             "inventoryReady",
+            "publicationsReady",
             "gpsrIdentity",
         }
+        assert set(schemas["ShopifyPublicationsResponse"]["properties"]) == {
+            "connected",
+            "publicationsReady",
+            "productStatus",
+            "publications",
+        }
+        assert set(schemas["ShopifyPublicationOut"]["properties"]) == {
+            "id",
+            "name",
+            "published",
+        }
+        assert {"publicationIds", "productStatus"} <= set(
+            schemas["PushIdsBody"]["properties"]
+        )
         assert set(schemas["SubscriptionStatusResponse"]["properties"]) == {
             "subscribed",
             "status",
@@ -181,6 +197,7 @@ class TestResponseContract:
             "/api/auth/clerk-config",
             "/api/payments/config",
             "/api/shopify/status",
+            "/api/shopify/publications",
             "/api/shopify/disconnect",
             "/api/images",
             "/api/images/{image_id}",
@@ -230,6 +247,21 @@ class TestInventoryScopeCheck:
 
         granted = ["read_products", "write_products"]
         assert not all(scope in granted for scope in INVENTORY_SCOPES)
+
+
+class TestPublicationScopeCheck:
+    """`publicationsReady` is false until the shop granted publication scopes."""
+
+    def test_requires_every_scope(self) -> None:
+        from app.routers.connections import PUBLICATION_SCOPES
+
+        assert set(PUBLICATION_SCOPES) == {"read_publications", "write_publications"}
+
+    def test_partial_scopes_are_not_ready(self) -> None:
+        from app.routers.connections import PUBLICATION_SCOPES
+
+        granted = ["read_publications"]
+        assert not all(scope in granted for scope in PUBLICATION_SCOPES)
 
 
 class TestDisconnectContract:

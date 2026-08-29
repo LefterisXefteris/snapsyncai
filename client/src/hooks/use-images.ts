@@ -328,13 +328,17 @@ export function usePushToShopify() {
 
   return useMutation({
     onMutate: () => beginThinking(),
-    mutationFn: async (ids: number[]) => {
-      const res = await apiRequest("POST", api.images.pushToShopify.path, { ids });
+    mutationFn: async (
+      input: number[] | { ids: number[]; publicationIds?: string[]; productStatus?: string },
+    ) => {
+      const body = Array.isArray(input) ? { ids: input } : input;
+      const res = await apiRequest("POST", api.images.pushToShopify.path, body);
       return res.json();
     },
     onSuccess: (data) => {
       endThinking(data.failed === 0);
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.shopify.publications.path] });
       const errors = Array.isArray(data.results)
         ? data.results.map((result: { error?: string }) => result.error).filter(Boolean)
         : [];
@@ -377,6 +381,34 @@ export function useShopifyStatus() {
       if (!res.ok) throw new Error("Failed to check Shopify status");
       return res.json();
     },
+  });
+}
+
+export type ShopifyPublication = {
+  id: string;
+  name: string;
+  published: boolean;
+};
+
+export function useShopifyPublications(imageId?: number) {
+  const userId = useAppUserId();
+  return useQuery({
+    queryKey: [api.shopify.publications.path, userId, imageId],
+    queryFn: async () => {
+      const path =
+        imageId != null
+          ? `${api.shopify.publications.path}?imageId=${imageId}`
+          : api.shopify.publications.path;
+      const res = await fetch(apiUrl(path), { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load Shopify publications");
+      return res.json() as Promise<{
+        connected: boolean;
+        publicationsReady: boolean;
+        productStatus: string | null;
+        publications: ShopifyPublication[];
+      }>;
+    },
+    enabled: !!userId,
   });
 }
 

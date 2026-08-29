@@ -59,7 +59,8 @@ class Settings(BaseSettings):
     shopify_client_id: str | None = None
     shopify_client_secret: str | None = None
     shopify_scopes: str = (
-        "read_products,write_products,read_inventory,write_inventory,read_locations"
+        "read_products,write_products,read_inventory,write_inventory,read_locations,"
+        "read_publications,write_publications"
     )
     connection_encryption_key: str | None = None
 

@@ -33,7 +33,7 @@ from app.services.product_facts import (
     merge_product_facts,
     stored_from_facts,
 )
-from app.services.shopify import push_product_to_shopify
+from app.services.shopify import push_product_to_shopify, shopify_product_status
 from app.services.subscriptions import is_local_pro
 
 logger = logging.getLogger(__name__)
@@ -387,9 +387,27 @@ async def push_to_shopify(
                     full_map[img.id] = img
             full_primary = full_map.get(primary.id) or primary
             view_images = [full_map.get(view.id) or view for view in views]
-            result = await push_product_to_shopify(full_primary, connection, settings, view_images)
+            result = await push_product_to_shopify(
+                full_primary,
+                connection,
+                settings,
+                view_images,
+                publication_ids=body.publication_ids,
+                product_status=body.product_status,
+            )
             if result.get("shopify_product_id"):
                 from app.services.inventory.service import register_published_shopify_product
+
+                desired_ids = (
+                    body.publication_ids
+                    if body.publication_ids is not None
+                    else list(full_primary.shopify_publication_ids or [])
+                )
+                desired_status = shopify_product_status(
+                    body.product_status
+                    if body.product_status is not None
+                    else full_primary.shopify_product_status
+                )
 
                 await register_published_shopify_product(
                     session,
@@ -402,6 +420,8 @@ async def push_to_shopify(
                 updates = {
                     "shopify_product_id": result["shopify_product_id"],
                     "shopify_status": "synced",
+                    "shopify_product_status": desired_status,
+                    "shopify_publication_ids": desired_ids,
                 }
                 if primary.product_group_id:
                     await store.update_images_by_group_id(

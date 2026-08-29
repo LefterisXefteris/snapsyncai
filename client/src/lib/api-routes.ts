@@ -26,6 +26,7 @@ export const api = {
     oauthStart: { method: "GET" as const, path: "/api/shopify/oauth/start" as const },
     disconnect: { method: "POST" as const, path: "/api/shopify/disconnect" as const },
     gpsrIdentity: { method: "PUT" as const, path: "/api/shopify/gpsr-identity" as const },
+    publications: { method: "GET" as const, path: "/api/shopify/publications" as const },
   },
   website: {
     prototype: { method: "GET" as const, path: "/api/website/prototype" as const },

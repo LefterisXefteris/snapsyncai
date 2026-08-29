@@ -70,6 +70,6 @@ def test_image_update_schema_is_camel_case(monkeypatch) -> None:
     try:
         schemas = client.get("/openapi.json").json()["components"]["schemas"]
         props = set(schemas["ImageUpdate"]["properties"])
-        assert {"productType", "seoTitle", "productGroupId", "compareAtPrice"} <= props
+        assert {"productType", "seoTitle", "productGroupId", "compareAtPrice", "shopifyPublicationIds", "shopifyProductStatus"} <= props
     finally:
         get_settings.cache_clear()

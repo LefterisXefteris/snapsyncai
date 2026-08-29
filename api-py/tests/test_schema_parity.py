@@ -58,6 +58,8 @@ IMAGE_COLUMNS = {
     "collections",
     "shopify_product_id",
     "shopify_status",
+    "shopify_product_status",
+    "shopify_publication_ids",
     "payment_status",
     "product_context",
     "brand_tone",
@@ -105,6 +107,7 @@ class TestImageContract:
         columns = SQLModel.metadata.tables["images"].columns
         assert _pg_type(columns["tags"]) == "TEXT[]"
         assert _pg_type(columns["media_gallery"]) == "TEXT[]"
+        assert _pg_type(columns["shopify_publication_ids"]) == "TEXT[]"
         assert _pg_type(columns["aeo_faqs"]) == "JSONB"
         assert _pg_type(columns["variants"]) == "JSONB"
         assert _pg_type(columns["product_facts"]) == "JSONB"

@@ -81,11 +81,152 @@ def _price(value: Any) -> float:
         return 0.0
 
 
+def shopify_product_status(value: str | None) -> str:
+    if (value or "").strip().upper() == "ACTIVE":
+        return "ACTIVE"
+    return "DRAFT"
+
+
+def publication_changes(
+    desired: set[str], current: set[str]
+) -> tuple[list[str], list[str]]:
+    return sorted(desired - current), sorted(current - desired)
+
+
+def publication_label(node: dict[str, Any]) -> str:
+    catalog = node.get("catalog") if isinstance(node.get("catalog"), dict) else {}
+    title = catalog.get("title") if isinstance(catalog, dict) else None
+    name = node.get("name")
+    if isinstance(title, str) and title.strip():
+        return title
+    if isinstance(name, str) and name.strip():
+        return name
+    return "Publication"
+
+
+def _publication_nodes(data: dict[str, Any]) -> list[dict[str, Any]]:
+    publications = data.get("publications") or {}
+    nodes = publications.get("nodes")
+    if isinstance(nodes, list):
+        return [node for node in nodes if isinstance(node, dict) and node.get("id")]
+    return []
+
+
+async def list_shopify_publications(
+    connection: ShopifyConnection, settings: Settings
+) -> list[dict[str, str]]:
+    data = await shopify_graphql(
+        connection,
+        settings,
+        """
+        query SnapSyncPublications {
+          publications(first: 50) {
+            nodes {
+              id
+              name
+              catalog { title }
+            }
+          }
+        }
+        """,
+    )
+    return [
+        {"id": node["id"], "name": publication_label(node)}
+        for node in _publication_nodes(data)
+    ]
+
+
+async def product_publishing(
+    connection: ShopifyConnection, settings: Settings, product_id: str
+) -> tuple[str, set[str]]:
+    data = await shopify_graphql(
+        connection,
+        settings,
+        """
+        query SnapSyncProductPublishing($id: ID!) {
+          product(id: $id) {
+            status
+            resourcePublicationsV2(first: 50) {
+              nodes {
+                isPublished
+                publication { id }
+              }
+            }
+          }
+        }
+        """,
+        {"id": product_id},
+    )
+    product = data.get("product") or {}
+    status = shopify_product_status(product.get("status"))
+    published: set[str] = set()
+    for node in (product.get("resourcePublicationsV2") or {}).get("nodes") or []:
+        if not isinstance(node, dict) or not node.get("isPublished"):
+            continue
+        publication = node.get("publication") or {}
+        publication_id = publication.get("id")
+        if isinstance(publication_id, str) and publication_id:
+            published.add(publication_id)
+    return status, published
+
+
+async def apply_shopify_publications(
+    connection: ShopifyConnection,
+    settings: Settings,
+    product_id: str,
+    desired_ids: list[str],
+) -> None:
+    _status, current = await product_publishing(connection, settings, product_id)
+    to_publish, to_unpublish = publication_changes(set(desired_ids), current)
+    if to_publish:
+        data = await shopify_graphql(
+            connection,
+            settings,
+            """
+            mutation SnapSyncPublish($id: ID!, $input: [PublicationInput!]!) {
+              publishablePublish(id: $id, input: $input) {
+                userErrors { field message }
+              }
+            }
+            """,
+            {
+                "id": product_id,
+                "input": [{"publicationId": publication_id} for publication_id in to_publish],
+            },
+        )
+        errors = (data.get("publishablePublish") or {}).get("userErrors") or []
+        if errors:
+            raise RuntimeError("; ".join(e.get("message") or "" for e in errors))
+    if to_unpublish:
+        data = await shopify_graphql(
+            connection,
+            settings,
+            """
+            mutation SnapSyncUnpublish($id: ID!, $input: [PublicationInput!]!) {
+              publishableUnpublish(id: $id, input: $input) {
+                userErrors { field message }
+              }
+            }
+            """,
+            {
+                "id": product_id,
+                "input": [{"publicationId": publication_id} for publication_id in to_unpublish],
+            },
+        )
+        errors = (data.get("publishableUnpublish") or {}).get("userErrors") or []
+        if errors:
+            raise RuntimeError("; ".join(e.get("message") or "" for e in errors))
+
+
+
 async def create_shopify_product(
     connection: ShopifyConnection,
     settings: Settings,
     image: Any,
     view_images: list[Any] | None = None,
+    *,
+    publication_ids: list[str] | None = None,
+    product_status: str | None = None,
 ) -> dict[str, Any]:
     image_variants = image.variants if isinstance(getattr(image, "variants", None), list) else []
     combinations: list[list[str]] = [[]]
@@ -103,12 +244,18 @@ async def create_shopify_product(
         raise RuntimeError("Shopify supports at most 2048 variants per product")
 
     base_sku = str(getattr(image, "sku", None) or f"SS-{image.id}")
-    product_set = {
+    product_set: dict[str, Any] = {}
+    existing_id = getattr(image, "shopify_product_id", None)
+    if isinstance(existing_id, str) and existing_id:
+        product_set["id"] = existing_id
+    product_set.update({
         "title": image.title or image.original_name or "Untitled product",
         "descriptionHtml": image.description or "",
         "productType": image.product_type or image.category or "Other",
         "tags": image.tags if isinstance(image.tags, list) else [],
-        "status": "DRAFT",
+        "status": shopify_product_status(
+            product_status if product_status is not None else getattr(image, "shopify_product_status", None)
+        ),
         "seo": {
             "title": image.seo_title or image.title or "",
             "description": image.seo_description or "",
@@ -153,7 +300,7 @@ async def create_shopify_product(
             }
             for variant_index, combination in enumerate(combinations)
         ],
-    }
+    })
 
     data = await shopify_graphql(
         connection,
@@ -210,6 +357,14 @@ async def create_shopify_product(
                 "Shopify product created but media attachment failed: %s",
                 "; ".join(e["message"] for e in media_errors),
             )
+    desired_ids = (
+        publication_ids
+        if publication_ids is not None
+        else list(getattr(image, "shopify_publication_ids", None) or [])
+    )
+    granted = connection.granted_scopes or []
+    if all(scope in granted for scope in ("read_publications", "write_publications")):
+        await apply_shopify_publications(connection, settings, product["id"], desired_ids)
     return product
 
 
@@ -218,9 +373,19 @@ async def push_product_to_shopify(
     connection: ShopifyConnection,
     settings: Settings,
     view_images: list[Any] | None = None,
+    *,
+    publication_ids: list[str] | None = None,
+    product_status: str | None = None,
 ) -> dict[str, Any]:
     try:
-        product = await create_shopify_product(connection, settings, image, view_images)
+        product = await create_shopify_product(
+            connection,
+            settings,
+            image,
+            view_images,
+            publication_ids=publication_ids,
+            product_status=product_status,
+        )
         return {
             "shopify_product_id": product["id"],
             "variants": product["variants"]["nodes"],

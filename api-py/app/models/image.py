@@ -75,6 +75,8 @@ class Image(SQLModel, table=True):
     # --- Channel publish state -------------------------------------------------
     shopify_product_id: str | None = Field(default=None, sa_column=txt())
     shopify_status: str | None = Field(default=None, sa_column=txt(server_default="pending"))
+    shopify_product_status: str | None = Field(default=None, sa_column=txt(server_default="DRAFT"))
+    shopify_publication_ids: list[str] | None = Field(default=None, sa_column=txt_array())
 
     # --- Generation context -----------------------------------------------------
     payment_status: str | None = Field(default=None, sa_column=txt(server_default="unpaid"))

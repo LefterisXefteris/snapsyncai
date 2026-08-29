@@ -49,6 +49,8 @@ class ImageOut(CamelModel):
     collections: list[str] | None = None
     shopify_product_id: str | None = None
     shopify_status: str | None = None
+    shopify_product_status: str | None = None
+    shopify_publication_ids: list[str] | None = None
     payment_status: str | None = None
     product_context: str | None = None
     brand_tone: str | None = None
@@ -111,6 +113,8 @@ class ImageUpdate(CamelModel):
     collections: list[str] | None = None
     payment_status: str | None = None
     product_group_id: str | None = None
+    shopify_product_status: str | None = None
+    shopify_publication_ids: list[str] | None = None
 
     @field_validator("price", "compare_at_price", "cost_per_item", mode="before")
     @classmethod
@@ -179,6 +183,8 @@ class DeletedResponse(CamelModel):
 
 class PushIdsBody(CamelModel):
     ids: list[int]
+    publication_ids: list[str] | None = None
+    product_status: str | None = None
 
 
 class PushResult(CamelModel):

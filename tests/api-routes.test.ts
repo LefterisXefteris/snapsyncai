@@ -34,6 +34,8 @@ test("Shopify connect paths stay on /api/shopify", () => {
   assert.equal(api.shopify.disconnect.path, "/api/shopify/disconnect");
   assert.equal(api.shopify.gpsrIdentity.path, "/api/shopify/gpsr-identity");
   assert.equal(api.shopify.gpsrIdentity.method, "PUT");
+  assert.equal(api.shopify.publications.path, "/api/shopify/publications");
+  assert.equal(api.shopify.publications.method, "GET");
   assert.equal(api.images.pushToShopify.path, "/api/images/push-to-shopify");
 });
 
