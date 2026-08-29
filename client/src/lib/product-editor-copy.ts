@@ -13,7 +13,19 @@ export const PRODUCT_EDITOR_WORK = [
 export const UNPAID_PREVIEW_TITLE = "This product is in preview mode.";
 export const UNPAID_PREVIEW_DETAIL =
   "Subscribe to unlock listing copy, pricing, and selling fields.";
+export const PRODUCT_EDITOR_ALT_TEXT_LABEL = "Alt text";
 
 export function productEditorShowsVariants(variantCount: number): boolean {
   return variantCount > 0;
 }
+
+export function listingCopyTagsAfterAdd(tags: string[], raw: string): string[] {
+  const next = raw.trim();
+  if (!next || tags.includes(next)) return tags;
+  return [...tags, next];
+}
+
+export function listingCopyTagsAfterRemove(tags: string[], index: number): string[] {
+  return tags.filter((_, i) => i !== index);
+}
+

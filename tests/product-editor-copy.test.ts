@@ -8,6 +8,8 @@ import {
   PRODUCT_EDITOR_WORK,
   UNPAID_PREVIEW_DETAIL,
   UNPAID_PREVIEW_TITLE,
+  listingCopyTagsAfterAdd,
+  listingCopyTagsAfterRemove,
   productEditorShowsVariants,
 } from "../client/src/lib/product-editor-copy.ts";
 
@@ -36,11 +38,31 @@ test("variants only belong on the editor when the product already has them", () 
   assert.equal(productEditorShowsVariants(2), true);
 });
 
+test("a seller can add and remove listing copy tags", () => {
+  assert.deepEqual(listingCopyTagsAfterAdd(["cotton"], "tee"), ["cotton", "tee"]);
+  assert.deepEqual(listingCopyTagsAfterAdd(["cotton"], "  "), ["cotton"]);
+  assert.deepEqual(listingCopyTagsAfterAdd(["cotton"], "cotton"), ["cotton"]);
+  assert.deepEqual(listingCopyTagsAfterRemove(["cotton", "tee"], 0), ["tee"]);
+});
+
 test("the product editor page uses the copy module", () => {
   assert.match(editorPage, /from ["']@\/lib\/product-editor-copy["']/);
   assert.match(editorPage, /PRODUCT_EDITOR_WORK/);
   assert.match(editorPage, /UNPAID_PREVIEW_DETAIL/);
   assert.match(editorPage, /productEditorShowsVariants/);
+});
+
+test("the product editor lets the seller edit tags and photo alt text", () => {
+  assert.match(editorPage, /listingCopyTagsAfterAdd/);
+  assert.match(editorPage, /listingCopyTagsAfterRemove/);
+  assert.match(editorPage, /PRODUCT_EDITOR_ALT_TEXT_LABEL/);
+});
+
+test("generate listing copy fills page title and meta description", () => {
+  assert.match(editorPage, /parsed\.seoTitle/);
+  assert.match(editorPage, /parsed\.seoDescription/);
+  assert.match(listingCopyPanel, /seoTitle/);
+  assert.match(listingCopyPanel, /seoDescription/);
 });
 
 test("the product editor has no Discard, Add options, AI Content Generator, or Status card", () => {

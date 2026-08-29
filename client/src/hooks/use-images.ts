@@ -549,8 +549,18 @@ export interface GeneratedContent {
   title: string;
   description: string;
   seoKeywords: string[];
+  seoTitle?: string;
+  seoDescription?: string;
   aeoFaqs: { q: string; a: string }[];
 }
+
+export type RegenerableListingCopyField =
+  | "title"
+  | "description"
+  | "seoKeywords"
+  | "seoTitle"
+  | "seoDescription"
+  | "aeoFaqs";
 
 export function useGenerateContent() {
   const { toast } = useToast();
@@ -627,7 +637,7 @@ export function useRegenerateField() {
 
   const regenerate = async (
     imageId: number,
-    field: "title" | "description" | "seoKeywords" | "aeoFaqs",
+    field: RegenerableListingCopyField,
     params: { category?: string; styleTone?: string; audience?: string },
     onChunk: (text: string) => void,
     onDone: (value: string | string[] | { q: string; a: string }[]) => void,

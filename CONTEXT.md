@@ -41,8 +41,12 @@ Stock on hand for products in the workspace. Distinct from listing copy and from
 _Avoid_: Stock, quantity (alone)
 
 **Listing copy**:
-The title, description, tags, SEO, and AEO text written for a product. It must not be generated until product facts are confirmed.
+The title, description, tags, SEO title, meta description, and AEO text written for a product. It must not be generated until product facts are confirmed.
 _Avoid_: AI content, content, listing (alone)
+
+**Selling**:
+Price, compare-at price, cost, SKU, and barcode on the product. Distinct from inventory and from listing copy.
+_Avoid_: Commerce, merchandising
 
 **Product facts**:
 Structured attributes of a product that listing copy is not allowed to invent. The seller must confirm them before listing copy is generated.
@@ -78,7 +82,7 @@ _Avoid_: Compliance, EU person, responsible person (alone)
 
 **Manufacturer**:
 The maker named on GPSR identity (or the importer, if that is who the seller is identifying). Name, postal address, email.
-_Avoid_: Brand, seller (as the maker)
+_Avoid_: Brand, seller (as the maker), vendor
 
 **EU responsible person**:
 The EU-established contact on GPSR identity when the manufacturer is not in the EU. Name, postal address, email.

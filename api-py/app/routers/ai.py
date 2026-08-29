@@ -53,6 +53,13 @@ MIN_IMAGE_COUNT = 1
 MAX_UPLOAD_FILES = 200
 MAX_FILE_BYTES = 10 * 1024 * 1024
 CONCURRENCY_LIMIT = 10
+PHOTO_FILE_MISSING = (
+    "This photo's file is missing. Re-upload it before generating listing copy."
+)
+PHOTO_STORAGE_NOT_CONFIGURED = (
+    "Photo storage is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY "
+    "for this environment."
+)
 
 FIELD_PROMPTS = {
     "title": "Generate a single product title. Output only the title text, no JSON, no quotes.",
@@ -62,6 +69,14 @@ FIELD_PROMPTS = {
     "seoKeywords": (
         'Generate SEO keywords as a JSON array of strings: ["keyword1", "keyword2", ...]. '
         "Output only the JSON array."
+    ),
+    "seoTitle": (
+        "Generate an SEO title. Max 70 characters, specific, with product name. "
+        "Output only the title text, no JSON, no quotes."
+    ),
+    "seoDescription": (
+        "Generate a meta description. Max 320 characters, specific to this product. "
+        "Output only the description text."
     ),
     "aeoFaqs": (
         'Generate FAQ pairs as a JSON array: [{"q": "...", "a": "..."}]. '
@@ -75,10 +90,14 @@ Output ONLY valid JSON with this exact structure (no markdown, no code fences):
   "title": "Product title — specific, benefit-led, max 80 chars",
   "description": "3-4 paragraph product description, engaging and conversion-optimised",
   "seoKeywords": ["keyword1", "keyword2", ...],
+  "seoTitle": "SEO title — specific, max 70 chars",
+  "seoDescription": "Meta description — specific, max 320 chars",
   "aeoFaqs": [{"q": "Question?", "a": "Answer."}, ...]
 }
 Rules:
 - seoKeywords: 8-12 specific keywords/phrases for Shopify search — brand, material, use case, style
+- seoTitle: SEO title for search results, max 70 characters
+- seoDescription: meta description for search results, max 320 characters
 - aeoFaqs: 4-6 FAQ pairs that answer common buyer questions about this type of product (price not included)
 - Use the category, style/tone, and target audience provided by the user"""
 
@@ -207,6 +226,8 @@ async def upload_images(
             )
         if len(files) > MAX_UPLOAD_FILES:
             return _message(400, "Maximum 200 images per upload.")
+        if not settings.supabase_url or not settings.supabase_anon_key:
+            return _message(503, PHOTO_STORAGE_NOT_CONFIGURED)
 
         loaded: list[tuple[UploadFile, bytes]] = []
         for upload in files:
@@ -392,7 +413,7 @@ async def generate_content(
         return refused
     buf = await store.load_image_bytes(image)
     if buf is None:
-        return _message(400, "Image not available for AI analysis")
+        return _message(400, PHOTO_FILE_MISSING)
     mime = image.mime_type or "image/jpeg"
     user_text = (
         f"Category: {body.category or image.category or 'General'}\n"
@@ -434,7 +455,7 @@ async def regenerate_field(
         return refused
     buf = await store.load_image_bytes(image)
     if buf is None:
-        return _message(400, "Image not available for AI analysis")
+        return _message(400, PHOTO_FILE_MISSING)
     system_prompt = FIELD_PROMPTS.get(body.field)
     if not system_prompt:
         return _message(400, f"Unknown field: {body.field}")

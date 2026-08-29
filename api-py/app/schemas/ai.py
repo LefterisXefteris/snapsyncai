@@ -12,7 +12,7 @@ class GenerateContentBody(CamelModel):
 
 
 class RegenerateFieldBody(CamelModel):
-    field: Literal["title", "description", "seoKeywords", "aeoFaqs"]
+    field: Literal["title", "description", "seoKeywords", "seoTitle", "seoDescription", "aeoFaqs"]
     category: str | None = None
     style_tone: str | None = None
     audience: str | None = None

@@ -21,6 +21,7 @@ import { ArrowLeft, Check, Lock, Loader2, ImageIcon, Plus, ImagePlus, Store, X, 
 import { AiContentPanel } from "@/components/ai-content-panel";
 import { GpsrIdentityFields } from "@/components/gpsr-identity-fields";
 import {
+  PRODUCT_EDITOR_ALT_TEXT_LABEL,
   PRODUCT_EDITOR_DETAILS_TITLE,
   PRODUCT_EDITOR_FACTS_TITLE,
   PRODUCT_EDITOR_LISTING_COPY_TITLE,
@@ -28,6 +29,8 @@ import {
   PRODUCT_EDITOR_WORK,
   UNPAID_PREVIEW_DETAIL,
   UNPAID_PREVIEW_TITLE,
+  listingCopyTagsAfterAdd,
+  listingCopyTagsAfterRemove,
   productEditorShowsVariants,
 } from "@/lib/product-editor-copy";
 
@@ -80,6 +83,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [altText, setAltText] = useState("");
   const [aeoSnippet, setAeoSnippet] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [aeoFaqs, setAeoFaqs] = useState<{ q: string; a: string }[]>([]);
 
   // New e-commerce fields
@@ -650,7 +654,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     >
                       <img
                         src={productImageSrc(displayImage, proxyImageIds.has(displayImage.id))}
-                        alt={image.altText || image.title || "Product Image"}
+                        alt={altText || image.title || "Product Image"}
                         className="w-full h-full object-contain"
                         onError={() => handleImageLoadError(displayImage.id)}
                       />
@@ -663,6 +667,17 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       )}
                     </div>
                 )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">{PRODUCT_EDITOR_ALT_TEXT_LABEL}</label>
+                  <Input
+                    value={altText}
+                    onChange={(e) => setAltText(e.target.value)}
+                    disabled={isUnpaid}
+                    placeholder="Describe the photo for search and accessibility"
+                    className="h-8 text-sm"
+                  />
+                </div>
 
                 {/* All product images grid — always visible */}
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -1014,6 +1029,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       setTitle(parsed.title);
                       setDescription(parsed.description);
                       if (parsed.seoKeywords) setTags(parsed.seoKeywords);
+                      if (parsed.seoTitle) setSeoTitle(parsed.seoTitle.slice(0, 70));
+                      if (parsed.seoDescription) setSeoDescription(parsed.seoDescription.slice(0, 320));
                       if (parsed.aeoFaqs) setAeoFaqs(parsed.aeoFaqs);
                     }}
                     onAcceptTitle={(v) => {
@@ -1039,6 +1056,26 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       acceptListingCopy.mutate(
                         { imageId: image.id, generated: { tags: v } },
                         { onSuccess: (product) => { if (product.tags) setTags(product.tags); } },
+                      );
+                    }}
+                    onAcceptSeoTitle={(v) => {
+                      const next = v.slice(0, 70);
+                      setSeoTitle(next);
+                      acceptListingCopy.mutate(
+                        { imageId: image.id, generated: { seoTitle: next } },
+                        { onSuccess: (product) => { if (product.seoTitle) setSeoTitle(product.seoTitle); } },
+                      );
+                    }}
+                    onAcceptSeoDescription={(v) => {
+                      const next = v.slice(0, 320);
+                      setSeoDescription(next);
+                      acceptListingCopy.mutate(
+                        { imageId: image.id, generated: { seoDescription: next } },
+                        {
+                          onSuccess: (product) => {
+                            if (product.seoDescription) setSeoDescription(product.seoDescription);
+                          },
+                        },
                       );
                     }}
                     onAcceptAeoFaqs={(v) => {
@@ -1125,16 +1162,38 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     className="resize-none text-sm"
                   />
                 </div>
-                {tags.length > 0 && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium">Tags</label>
-                    <div className="flex flex-wrap gap-1">
-                      {tags.map((t, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs h-5 px-1.5 font-normal">{t}</Badge>
-                      ))}
-                    </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Tags</label>
+                  <div className="flex flex-wrap gap-1">
+                    {tags.map((t, i) => (
+                      <Badge key={`${t}-${i}`} variant="secondary" className="text-xs h-5 px-1.5 font-normal gap-0.5">
+                        {t}
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-sm opacity-70 hover:opacity-100 disabled:pointer-events-none"
+                          disabled={isUnpaid}
+                          aria-label={`Remove ${t}`}
+                          onClick={() => setTags(listingCopyTagsAfterRemove(tags, i))}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
-                )}
+                  <Input
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    disabled={isUnpaid}
+                    placeholder="Add a tag"
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      setTags(listingCopyTagsAfterAdd(tags, tagDraft));
+                      setTagDraft("");
+                    }}
+                  />
+                </div>
               </CardContent>
             </Card>
 

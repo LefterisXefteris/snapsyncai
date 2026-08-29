@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, Check, RefreshCw } from "lucide-react";
-import { useGenerateContent, useRegenerateField, type GeneratedContent } from "@/hooks/use-images";
+import { useGenerateContent, useRegenerateField, type GeneratedContent, type RegenerableListingCopyField } from "@/hooks/use-images";
 
 const STYLE_TONES = [
   "Professional & trustworthy",
@@ -22,6 +22,8 @@ interface AiContentPanelProps {
   onAcceptTitle: (value: string) => void;
   onAcceptDescription: (value: string) => void;
   onAcceptTags: (value: string[]) => void;
+  onAcceptSeoTitle: (value: string) => void;
+  onAcceptSeoDescription: (value: string) => void;
   onAcceptAeoFaqs: (value: { q: string; a: string }[]) => void;
 }
 
@@ -33,6 +35,8 @@ export function AiContentPanel({
   onAcceptTitle,
   onAcceptDescription,
   onAcceptTags,
+  onAcceptSeoTitle,
+  onAcceptSeoDescription,
   onAcceptAeoFaqs,
 }: AiContentPanelProps) {
   const { generate } = useGenerateContent();
@@ -53,6 +57,8 @@ export function AiContentPanel({
   const [pendingTitle, setPendingTitle] = useState<string | null>(null);
   const [pendingDescription, setPendingDescription] = useState<string | null>(null);
   const [pendingTags, setPendingTags] = useState<string[] | null>(null);
+  const [pendingSeoTitle, setPendingSeoTitle] = useState<string | null>(null);
+  const [pendingSeoDescription, setPendingSeoDescription] = useState<string | null>(null);
   const [pendingFaqs, setPendingFaqs] = useState<{ q: string; a: string }[] | null>(null);
 
   const handleGenerate = async () => {
@@ -63,6 +69,8 @@ export function AiContentPanel({
     setPendingTitle(null);
     setPendingDescription(null);
     setPendingTags(null);
+    setPendingSeoTitle(null);
+    setPendingSeoDescription(null);
     setPendingFaqs(null);
 
     await generate(
@@ -79,7 +87,7 @@ export function AiContentPanel({
     );
   };
 
-  const handleRegenerateField = async (field: "title" | "description" | "seoKeywords" | "aeoFaqs") => {
+  const handleRegenerateField = async (field: RegenerableListingCopyField) => {
     if (!canGenerate) return;
     setRegeneratingField(field);
     await regenerate(
@@ -91,6 +99,8 @@ export function AiContentPanel({
         if (field === "title") setPendingTitle(value as string);
         else if (field === "description") setPendingDescription(value as string);
         else if (field === "seoKeywords") setPendingTags(value as string[]);
+        else if (field === "seoTitle") setPendingSeoTitle(value as string);
+        else if (field === "seoDescription") setPendingSeoDescription(value as string);
         else if (field === "aeoFaqs") setPendingFaqs(value as { q: string; a: string }[]);
         setRegeneratingField(null);
       },
@@ -102,12 +112,16 @@ export function AiContentPanel({
   const displayTitle = pendingTitle ?? generated?.title ?? null;
   const displayDescription = pendingDescription ?? generated?.description ?? null;
   const displayTags = pendingTags ?? generated?.seoKeywords ?? null;
+  const displaySeoTitle = pendingSeoTitle ?? generated?.seoTitle ?? null;
+  const displaySeoDescription = pendingSeoDescription ?? generated?.seoDescription ?? null;
   const displayFaqs = pendingFaqs ?? generated?.aeoFaqs ?? null;
 
   const hasAnyResult =
     displayTitle !== null ||
     displayDescription !== null ||
     displayTags !== null ||
+    displaySeoTitle !== null ||
+    displaySeoDescription !== null ||
     displayFaqs !== null;
 
   return (
@@ -242,6 +256,42 @@ export function AiContentPanel({
                       </Badge>
                     ))}
                   </div>
+                )}
+              />
+            )}
+
+            {/* Page title */}
+            {displaySeoTitle !== null && (
+              <FieldPreview
+                label="Page title"
+                value={displaySeoTitle}
+                isRegenerating={regeneratingField === "seoTitle"}
+                canRegenerate={canGenerate}
+                onAccept={() => {
+                  onAcceptSeoTitle(displaySeoTitle);
+                  setPendingSeoTitle(null);
+                  if (generated) setGenerated({ ...generated, seoTitle: displaySeoTitle });
+                }}
+                onRegenerate={() => handleRegenerateField("seoTitle")}
+                renderValue={(v) => <p className="text-xs text-foreground leading-relaxed">{v as string}</p>}
+              />
+            )}
+
+            {/* Meta description */}
+            {displaySeoDescription !== null && (
+              <FieldPreview
+                label="Meta description"
+                value={displaySeoDescription}
+                isRegenerating={regeneratingField === "seoDescription"}
+                canRegenerate={canGenerate}
+                onAccept={() => {
+                  onAcceptSeoDescription(displaySeoDescription);
+                  setPendingSeoDescription(null);
+                  if (generated) setGenerated({ ...generated, seoDescription: displaySeoDescription });
+                }}
+                onRegenerate={() => handleRegenerateField("seoDescription")}
+                renderValue={(v) => (
+                  <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">{v as string}</p>
                 )}
               />
             )}
