@@ -107,3 +107,11 @@ _Avoid_: Out of date, dirty
 **Shop GPSR identity**:
 The default GPSR identity for a connected Shopify shop. A product may override it. Changing it stales listing copy on products that use the shop default.
 _Avoid_: Account compliance, store settings (as the fact itself)
+
+**Website**:
+The seller's own storefront, built outside SnapSync from a website prototype. Not a Channel. Product words on it are a snapshot of listing copy and confirmed facts; checkout stays on the Channel.
+_Avoid_: store, shop (when you mean this), channel, theme
+
+**Website prototype**:
+The look and the products the seller picks in SnapSync before a website is built. Not a live storefront in SnapSync. Not listing copy. Voice is those products' listing copy, not a separate tone field.
+_Avoid_: theme, mock, preview (as the job)

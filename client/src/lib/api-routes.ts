@@ -27,6 +27,10 @@ export const api = {
     disconnect: { method: "POST" as const, path: "/api/shopify/disconnect" as const },
     gpsrIdentity: { method: "PUT" as const, path: "/api/shopify/gpsr-identity" as const },
   },
+  website: {
+    prototype: { method: "GET" as const, path: "/api/website/prototype" as const },
+    handoff: { method: "POST" as const, path: "/api/website/handoff" as const },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

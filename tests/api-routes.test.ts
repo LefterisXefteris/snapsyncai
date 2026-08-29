@@ -36,3 +36,10 @@ test("Shopify connect paths stay on /api/shopify", () => {
   assert.equal(api.shopify.gpsrIdentity.method, "PUT");
   assert.equal(api.images.pushToShopify.path, "/api/images/push-to-shopify");
 });
+
+test("website prototype and handoff live on /api/website", () => {
+  assert.equal(api.website.prototype.path, "/api/website/prototype");
+  assert.equal(api.website.prototype.method, "GET");
+  assert.equal(api.website.handoff.path, "/api/website/handoff");
+  assert.equal(api.website.handoff.method, "POST");
+});

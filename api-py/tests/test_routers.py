@@ -206,6 +206,8 @@ class TestResponseContract:
             "/api/subscription/unlock-images",
             "/api/images/push-to-shopify",
             "/api/stripe/webhook",
+            "/api/website/prototype",
+            "/api/website/handoff",
         } <= paths
 
 

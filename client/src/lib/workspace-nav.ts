@@ -3,6 +3,7 @@ export type WorkspaceNavId =
   | "new-listing"
   | "import"
   | "inventory"
+  | "website"
   | "bulk-seo"
   | "settings";
 
@@ -30,6 +31,12 @@ export const WORKSPACE_NAV: WorkspaceNavItem[] = [
     id: "inventory",
     label: "Inventory",
     path: "/inventory",
+    stub: false,
+  },
+  {
+    id: "website",
+    label: "Website",
+    path: "/website",
     stub: false,
   },
   {

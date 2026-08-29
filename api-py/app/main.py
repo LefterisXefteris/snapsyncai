@@ -29,6 +29,7 @@ from app.routers import (
     inventory,
     oauth,
     webhooks,
+    website,
 )
 from app.services import catalogue_cache
 
@@ -95,4 +96,5 @@ def create_app() -> FastAPI:
     app.include_router(billing.router)
     app.include_router(webhooks.router)
     app.include_router(inventory.router)
+    app.include_router(website.router)
     return app

@@ -624,6 +624,9 @@ def _listing_copy_present(listing_copy: Mapping[str, Any] | None) -> bool:
     return False
 
 
+listing_copy_present = _listing_copy_present
+
+
 def _price(value: Any) -> str | None:
     if value is None or value == "":
         return None

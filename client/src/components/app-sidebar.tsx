@@ -3,6 +3,7 @@ import {
   Boxes,
   Crown,
   Download,
+  Globe,
   ImagePlus,
   Package,
   Search,
@@ -39,6 +40,7 @@ const NAV_ICONS: Record<WorkspaceNavId, typeof Package> = {
   "new-listing": ImagePlus,
   import: Download,
   inventory: Boxes,
+  website: Globe,
   "bulk-seo": Search,
   settings: Settings,
 };

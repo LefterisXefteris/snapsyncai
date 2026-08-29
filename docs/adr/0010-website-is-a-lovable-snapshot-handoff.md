@@ -1,0 +1,3 @@
+# Website is a Lovable snapshot, not a Channel
+
+A **website** is the seller’s own storefront, built outside SnapSync. It is not a Channel. v1 is Shopify-only: the seller sharpens a **website prototype** (look plus products already pushed, with listing copy), we hand Lovable a snapshot of listing copy, confirmed facts, photos, shop domain, and Shopify ids — never Shopify credentials. They Install Lovable’s app on that shop; cart and checkout stay on Shopify. Words on the site are the snapshot (voice is that listing copy, not a tone field). We rejected a live SnapSync read, MCP, Replit, Wix/Vinted, passing Admin tokens, and a theme editor in SnapSync.

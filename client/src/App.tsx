@@ -19,6 +19,7 @@ const Products = lazy(() => import("@/pages/Products"));
 const NewListing = lazy(() => import("@/pages/NewListing"));
 const ImportPage = lazy(() => import("@/pages/Import"));
 const InventoryPage = lazy(() => import("@/pages/Inventory"));
+const WebsitePage = lazy(() => import("@/pages/Website"));
 const BulkSeoPage = lazy(() => import("@/pages/BulkSeo"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -72,6 +73,7 @@ function AuthenticatedRouter() {
       <Route path="/new" component={NewListing} />
       <Route path="/import" component={ImportPage} />
       <Route path="/inventory" component={InventoryPage} />
+      <Route path="/website" component={WebsitePage} />
       <Route path="/bulk-seo" component={BulkSeoPage} />
       <Route path="/settings" component={Settings} />
       <Route path="/product/:id" component={ProductDetails} />
