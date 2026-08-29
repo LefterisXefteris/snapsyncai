@@ -6,9 +6,13 @@
 
 **Blocked by:** 01 — Confirm marks listing copy stale
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Pushing a selection that includes stale listing copy warns, then still pushes
-- [ ] Selection with no stale listing copy has no new warning
-- [ ] Unpaid products are still refused as today; that check is not replaced by the stale warning
-- [ ] Publish is not blocked on stale listing copy
+- [x] Pushing a selection that includes stale listing copy warns, then still pushes
+- [x] Selection with no stale listing copy has no new warning
+- [x] Unpaid products are still refused as today; that check is not replaced by the stale warning
+- [x] Publish is not blocked on stale listing copy
+
+## Answer
+
+Channel push reads `listingCopyStale` from the catalogue selection. Unpaid still refuses first with the existing listing-copy-required toast. Paid selections with stale listing copy get a confirm warning, then still push. Paid selections with no stale mark push as before. HTTP push is unchanged: it still refuses unpaid and does not refuse stale.

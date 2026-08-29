@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import type { Image } from "@/lib/image";
+import { channelPushDecision } from "@/lib/channel-push";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceNavItem } from "@/lib/workspace-nav";
 
@@ -85,14 +86,21 @@ export default function Products() {
       toast({ title: "No Products Selected", description: "Select products to push to Shopify.", variant: "destructive" });
       return;
     }
-    const unpaidSelected = images?.filter((img: Image) => selectedIds.has(img.id) && img.paymentStatus !== "paid") || [];
-    if (unpaidSelected.length > 0) {
+    const selected = images?.filter((img: Image) => selectedIds.has(img.id)) ?? [];
+    const decision = channelPushDecision(selected);
+    if (decision.kind === "unpaid") {
       toast({
         title: "Listing copy required",
-        description: `${unpaidSelected.length} selected product(s) still need listing copy. Subscribe to SnapSync AI Pro.`,
+        description: `${decision.count} selected product(s) still need listing copy. Subscribe to SnapSync AI Pro.`,
         variant: "destructive",
       });
       return;
+    }
+    if (decision.kind === "stale-warning") {
+      const proceed = window.confirm(
+        `${decision.count} selected product(s) have listing copy that no longer matches the confirmed facts. Push anyway, or cancel and generate again.`,
+      );
+      if (!proceed) return;
     }
     pushToShopify.mutate(ids, {
       onSuccess: () => setSelectedIds(new Set()),
