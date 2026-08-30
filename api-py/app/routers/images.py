@@ -1,7 +1,9 @@
 """Image CRUD + grouping + Shopify push — port of `server/routes.ts`."""
 
 import logging
+from collections.abc import Sequence
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
@@ -18,6 +20,9 @@ from app.schemas.image import (
     ImageListOut,
     ImageOut,
     ImageUpdate,
+    ListingCopyRefreshAcceptBody,
+    ListingCopyRefreshOut,
+    ListingCopyRefreshRegenerateBody,
     OkResponse,
     OkUpdatedResponse,
     PushIdsBody,
@@ -27,6 +32,18 @@ from app.schemas.image import (
 )
 from app.services import catalogue_cache, connections
 from app.services import images as store
+from app.services.listing_copy_refresh import (
+    REFRESH_PROPOSAL_SYSTEM,
+    accept_listing_copy_refresh,
+    listing_copy_from_image,
+    parse_refresh_proposal,
+    refresh_blocked_reason,
+    rewrite_constraints,
+    search_demand_configured,
+    seed_search_demand,
+    start_listing_copy_refresh,
+)
+from app.services.openai_client import get_openai
 from app.services.product_facts import (
     accept_generated_listing_copy,
     confirm_facts,
@@ -63,6 +80,9 @@ def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False):
         shop_gpsr,
         list_item=list_item,
         force_paid=is_local_pro(settings),
+        demand_configured=search_demand_configured(
+            settings.search_demand_api_key, settings.search_demand_url
+        ),
     )
 
 
@@ -226,6 +246,173 @@ async def accept_generated_listing_copy_route(
     updated = await store.persist_product_facts(
         session, image, stored_from_facts(accepted.facts)
     )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return _image_out(updated, settings, shop_gpsr)
+
+
+def _refresh_conflict(reason: str) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"message": reason})
+
+
+async def fetch_search_demand(
+    seeds: Sequence[str], url: str | None, api_key: str | None
+) -> tuple[str, ...]:
+    if not url or not str(url).strip():
+        return ()
+    headers = {}
+    if api_key and str(api_key).strip():
+        headers["Authorization"] = f"Bearer {api_key.strip()}"
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.get(
+            url,
+            params={"q": " ".join(seeds)},
+            headers=headers,
+        )
+        response.raise_for_status()
+        data = response.json()
+    raw = data.get("queries") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        return ()
+    return tuple(str(item).strip() for item in raw if str(item).strip())
+
+
+async def propose_refresh_pack(constraints: str) -> dict | None:
+    response = await get_openai().chat.completions.create(
+        model="gpt-5.2",
+        max_completion_tokens=1500,
+        messages=[
+            {"role": "system", "content": REFRESH_PROPOSAL_SYSTEM},
+            {"role": "user", "content": constraints},
+        ],
+    )
+    text = ""
+    if response.choices:
+        text = response.choices[0].message.content or ""
+    return parse_refresh_proposal(text)
+
+
+async def _listing_copy_refresh_context(session, image, user_id: str, settings):
+    group = await store.get_image_group(session, image.id, user_id)
+    facts = merge_product_facts(
+        [img.product_facts for img in group] or [image.product_facts]
+    )
+    connection = await connections.get_shopify(session, user_id)
+    shop_gpsr = connection.gpsr_identity if connection is not None else None
+    return (
+        facts,
+        listing_copy_from_image(image),
+        search_demand_configured(
+            settings.search_demand_api_key, settings.search_demand_url
+        ),
+        shop_gpsr,
+    )
+
+
+async def _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr):
+    if started.error:
+        return _refresh_conflict(started.error)
+    pack = await propose_refresh_pack(
+        rewrite_constraints(facts, started.queries, listing_copy, shop_gpsr)
+    )
+    if pack is None:
+        return JSONResponse(
+            status_code=502,
+            content={"message": "Could not parse listing copy refresh."},
+        )
+    return ListingCopyRefreshOut(
+        tags=pack["tags"],
+        description=pack["description"],
+        seo_title=pack["seoTitle"],
+        seo_description=pack["seoDescription"],
+        queries=list(started.queries),
+    )
+
+
+@router.post("/api/images/{image_id}/listing-copy/refresh", response_model=ListingCopyRefreshOut)
+async def listing_copy_refresh_route(
+    image_id: int,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+):
+    image = await store.get_image(session, image_id)
+    if not _owned(image, user_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    facts, listing_copy, configured, shop_gpsr = await _listing_copy_refresh_context(
+        session, image, user_id, settings
+    )
+    blocked = refresh_blocked_reason(facts, listing_copy, configured)
+    if blocked:
+        return _refresh_conflict(blocked)
+    queries = await fetch_search_demand(
+        seed_search_demand(facts, listing_copy),
+        settings.search_demand_url,
+        settings.search_demand_api_key,
+    )
+    started = start_listing_copy_refresh(
+        facts,
+        listing_copy,
+        configured,
+        fetch=lambda _seeds: queries,
+        shop_gpsr=shop_gpsr,
+    )
+    return await _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr)
+
+
+@router.post(
+    "/api/images/{image_id}/listing-copy/refresh/regenerate",
+    response_model=ListingCopyRefreshOut,
+)
+async def listing_copy_refresh_regenerate_route(
+    image_id: int,
+    body: ListingCopyRefreshRegenerateBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+):
+    image = await store.get_image(session, image_id)
+    if not _owned(image, user_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    facts, listing_copy, configured, shop_gpsr = await _listing_copy_refresh_context(
+        session, image, user_id, settings
+    )
+    blocked = refresh_blocked_reason(facts, listing_copy, configured)
+    if blocked:
+        return _refresh_conflict(blocked)
+    started = start_listing_copy_refresh(
+        facts,
+        listing_copy,
+        configured,
+        fetch=lambda _seeds: (),
+        shop_gpsr=shop_gpsr,
+        queries=body.queries,
+    )
+    return await _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr)
+
+
+@router.post("/api/images/{image_id}/listing-copy/refresh/accept", response_model=ImageOut)
+async def listing_copy_refresh_accept_route(
+    image_id: int,
+    body: ListingCopyRefreshAcceptBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> ImageOut:
+    image = await store.get_image(session, image_id)
+    if not _owned(image, user_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    facts, _listing_copy, _configured, shop_gpsr = await _listing_copy_refresh_context(
+        session, image, user_id, settings
+    )
+    accepted = accept_listing_copy_refresh(
+        facts,
+        body.model_dump(),
+        shop_gpsr,
+    )
+    if accepted.error:
+        return _refresh_conflict(accepted.error)
+    updated = await store.update_image(session, image_id, accepted.listing_copy or {})
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
     return _image_out(updated, settings, shop_gpsr)

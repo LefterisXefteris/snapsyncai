@@ -33,6 +33,7 @@ from app.services.image_analysis import (
     quick_preview_multiple_images,
 )
 from app.services.image_buffers import set_image_buffer
+from app.services.listing_copy_refresh import search_demand_configured
 from app.services.openai_client import get_openai
 from app.services.product_facts import (
     PersistableVision,
@@ -108,7 +109,13 @@ def _message(status: int, message: str, **extra: Any) -> JSONResponse:
 
 
 def _image_out(image, settings) -> ImageOut:
-    return with_facts_outcomes(image, force_paid=is_local_pro(settings))
+    return with_facts_outcomes(
+        image,
+        force_paid=is_local_pro(settings),
+        demand_configured=search_demand_configured(
+            settings.search_demand_api_key, settings.search_demand_url
+        ),
+    )
 
 
 def _new_image_values(

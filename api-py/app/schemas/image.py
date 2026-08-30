@@ -61,6 +61,8 @@ class ImageOut(CamelModel):
     created_at: datetime | None = None
     listing_copy_stale: bool = False
     may_generate_listing_copy: bool = False
+    may_refresh_listing_copy: bool = False
+    refresh_blocked_reason: str | None = None
     description_blocks: str = ""
 
     @field_serializer("price", "compare_at_price", "cost_per_item")
@@ -77,13 +79,23 @@ class ImageListOut(ImageOut):
 
 
 def with_facts_outcomes(
-    image, shop_gpsr=None, *, list_item: bool = False, force_paid: bool = False
+    image, shop_gpsr=None, *, list_item: bool = False, force_paid: bool = False,
+    demand_configured: bool = False,
 ):
-    """Copy Product facts outcomes onto the HTTP payload. Do not re-encode the rules here."""
+    """Copy Product facts and listing-copy-refresh outcomes onto the HTTP payload."""
+    from app.services.listing_copy_refresh import (
+        listing_copy_from_image,
+        refresh_payload_outcomes,
+    )
     from app.services.product_facts import facts_from_stored, payload_outcomes
 
     facts = facts_from_stored(getattr(image, "product_facts", None))
-    outcomes = payload_outcomes(facts, shop_gpsr)
+    outcomes = {
+        **payload_outcomes(facts, shop_gpsr),
+        **refresh_payload_outcomes(
+            facts, listing_copy_from_image(image), demand_configured
+        ),
+    }
     if force_paid:
         outcomes = {**outcomes, "payment_status": "paid"}
     model = ImageListOut if list_item else ImageOut
@@ -132,6 +144,25 @@ class AcceptGeneratedListingCopyBody(CamelModel):
     seo_description: str | None = None
     aeo_faqs: list[dict[str, str]] | None = None
     aeo_snippet: str | None = None
+
+
+class ListingCopyRefreshOut(CamelModel):
+    tags: list[str]
+    description: str
+    seo_title: str
+    seo_description: str
+    queries: list[str]
+
+
+class ListingCopyRefreshAcceptBody(CamelModel):
+    tags: list[str]
+    description: str
+    seo_title: str
+    seo_description: str
+
+
+class ListingCopyRefreshRegenerateBody(CamelModel):
+    queries: list[str]
 
 
 class FibreRowIn(CamelModel):

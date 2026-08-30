@@ -1,5 +1,6 @@
 export const PRODUCT_EDITOR_FACTS_TITLE = "Product facts";
 export const PRODUCT_EDITOR_LISTING_COPY_TITLE = "Listing copy";
+export const PRODUCT_EDITOR_REFRESH_LABEL = "Refresh from search demand";
 export const PRODUCT_EDITOR_SELLING_TITLE = "Selling";
 export const PRODUCT_EDITOR_DETAILS_TITLE = "Details";
 export const PRODUCT_EDITOR_SHOPIFY_TITLE = "Shopify";

@@ -1,0 +1,3 @@
+# Listing copy refresh uses search demand, not competitors
+
+Sellers asked for an agent that checks trends and rewrites tags and description to stay ahead of competition. **Listing copy refresh** looks at **search demand** — a real query source, plus this shop’s performance when it exists — and proposes tags, description, SEO title, and meta. We rejected scraping competitor listings (that copies their claims and fibre lies), fashion-season media (that pressures invented facts), and letting the model guess queries (that is ordinary generate, not search demand). “Ahead” means ranking for queries this product should win given confirmed facts, not denser copy than a rival.

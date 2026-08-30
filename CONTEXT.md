@@ -37,8 +37,16 @@ The job of fetching products from a channel.
 _Avoid_: Sync, fetch, pull, scrape
 
 **Bulk SEO**:
-The job of changing listing copy for many products at once. Not the SEO fields on a single product.
+The job of changing listing copy for many products at once. Not the SEO fields on a single product. Not listing copy refresh.
 _Avoid_: SEO (alone)
+
+**Listing copy refresh**:
+The job of proposing new tags, description, SEO title, and meta description for one product after looking at search demand. The seller starts it and accepts; it is not the first generate, not Bulk SEO, and it does not run when listing copy is missing or stale.
+_Avoid_: Agentic SEO, SEO agent, trend rewrite, competitor SEO
+
+**Search demand**:
+Queries people type for this kind of product, from a query source — not the model’s guesses — and this shop’s performance when it exists. Not fashion-season media and not other sellers’ listings.
+_Avoid_: Trends (alone), competitor research, keyword research (as the job)
 
 **Inventory**:
 Stock on hand for products in the workspace. Distinct from listing copy and from Import.

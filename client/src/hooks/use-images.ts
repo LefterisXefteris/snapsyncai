@@ -520,6 +520,90 @@ export function useAcceptGeneratedListingCopy() {
   });
 }
 
+export type ListingCopyRefreshPack = {
+  tags: string[];
+  description: string;
+  seoTitle: string;
+  seoDescription: string;
+  queries: string[];
+};
+
+export function useListingCopyRefresh() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (imageId: number) => {
+      const res = await apiRequest(
+        "POST",
+        buildUrl(api.images.refreshListingCopy.path, { id: imageId }),
+      );
+      return res.json() as Promise<ListingCopyRefreshPack>;
+    },
+    onError: (error: { message?: string }) => {
+      toast({
+        title: "Could not refresh listing copy",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useRegenerateListingCopyRefresh() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ imageId, queries }: { imageId: number; queries: string[] }) => {
+      const res = await apiRequest(
+        "POST",
+        buildUrl(api.images.regenerateListingCopyRefresh.path, { id: imageId }),
+        { queries },
+      );
+      return res.json() as Promise<ListingCopyRefreshPack>;
+    },
+    onError: (error: { message?: string }) => {
+      toast({
+        title: "Could not refresh listing copy",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useAcceptListingCopyRefresh() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      imageId,
+      pack,
+    }: {
+      imageId: number;
+      pack: Omit<ListingCopyRefreshPack, "queries">;
+    }) => {
+      const res = await apiRequest(
+        "POST",
+        buildUrl(api.images.acceptListingCopyRefresh.path, { id: imageId }),
+        pack,
+      );
+      return res.json() as Promise<Image>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+    },
+    onError: (error: { message?: string }) => {
+      toast({
+        title: "Could not accept listing copy refresh",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 export function useConfirmProductFacts() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

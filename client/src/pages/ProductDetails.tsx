@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, type ListingCopyRefreshPack } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
@@ -25,6 +25,7 @@ import {
   PRODUCT_EDITOR_DETAILS_TITLE,
   PRODUCT_EDITOR_FACTS_TITLE,
   PRODUCT_EDITOR_LISTING_COPY_TITLE,
+  PRODUCT_EDITOR_REFRESH_LABEL,
   PRODUCT_EDITOR_SELLING_TITLE,
   PRODUCT_EDITOR_SHOPIFY_TITLE,
   PRODUCT_EDITOR_AVAILABLE_ON_LABEL,
@@ -77,6 +78,9 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const pushToShopifyMutation = usePushToShopify();
   const confirmFactsMutation = useConfirmProductFacts();
   const acceptListingCopy = useAcceptGeneratedListingCopy();
+  const startListingCopyRefresh = useListingCopyRefresh();
+  const regenerateListingCopyRefresh = useRegenerateListingCopyRefresh();
+  const acceptListingCopyRefresh = useAcceptListingCopyRefresh();
   const { data: shopifyStatus } = useShopifyStatus();
   const saveShopGpsr = useSaveShopGpsrIdentity();
 
@@ -92,6 +96,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [aeoFaqs, setAeoFaqs] = useState<{ q: string; a: string }[]>([]);
+  const [refreshPack, setRefreshPack] = useState<ListingCopyRefreshPack | null>(null);
 
   // New e-commerce fields
   const [compareAtPrice, setCompareAtPrice] = useState("");
@@ -226,6 +231,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const isUnpaid = image.paymentStatus !== "paid";
   const facts = productFacts(image);
   const canGenerate = image.mayGenerateListingCopy === true;
+  const canRefresh = image.mayRefreshListingCopy === true;
+  const refreshBlockedReason = image.refreshBlockedReason ?? null;
   const shopGpsr = (shopifyStatus?.gpsrIdentity ?? null) as GpsrIdentity | null;
   const shopConnected = Boolean(shopifyStatus?.connected);
   const shopHasGpsr = isCompleteGpsr(shopGpsr);
@@ -1112,6 +1119,104 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     }}
                   />
                 )}
+                <div className="space-y-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={!canRefresh || startListingCopyRefresh.isPending}
+                    onClick={() => {
+                      startListingCopyRefresh.mutate(image.id, {
+                        onSuccess: (pack) => setRefreshPack(pack),
+                      });
+                    }}
+                  >
+                    {startListingCopyRefresh.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : null}
+                    {PRODUCT_EDITOR_REFRESH_LABEL}
+                  </Button>
+                  {!canRefresh && refreshBlockedReason ? (
+                    <p className="text-xs text-muted-foreground">{refreshBlockedReason}</p>
+                  ) : null}
+                  {refreshPack ? (
+                    <div className="space-y-2 rounded-md border p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Aimed at: {refreshPack.queries.join(", ")}
+                      </p>
+                      <p className="text-sm font-medium">{refreshPack.seoTitle}</p>
+                      <p className="text-xs text-muted-foreground">{refreshPack.seoDescription}</p>
+                      <p className="text-xs whitespace-pre-wrap">{refreshPack.description}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {refreshPack.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs h-5 px-1.5 font-normal">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 text-xs"
+                          disabled={acceptListingCopyRefresh.isPending}
+                          onClick={() => {
+                            acceptListingCopyRefresh.mutate(
+                              {
+                                imageId: image.id,
+                                pack: {
+                                  tags: refreshPack.tags,
+                                  description: refreshPack.description,
+                                  seoTitle: refreshPack.seoTitle,
+                                  seoDescription: refreshPack.seoDescription,
+                                },
+                              },
+                              {
+                                onSuccess: (product) => {
+                                  if (product.tags) setTags(product.tags);
+                                  if (product.description) setDescription(product.description);
+                                  if (product.seoTitle) setSeoTitle(product.seoTitle);
+                                  if (product.seoDescription) setSeoDescription(product.seoDescription);
+                                  setRefreshPack(null);
+                                },
+                              },
+                            );
+                          }}
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                          disabled={regenerateListingCopyRefresh.isPending}
+                          onClick={() => {
+                            regenerateListingCopyRefresh.mutate(
+                              { imageId: image.id, queries: refreshPack.queries },
+                              { onSuccess: (pack) => setRefreshPack(pack) },
+                            );
+                          }}
+                        >
+                          {regenerateListingCopyRefresh.isPending ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : null}
+                          Regenerate
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs"
+                          onClick={() => setRefreshPack(null)}
+                        >
+                          Dismiss
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium">Title</label>
                   <Input

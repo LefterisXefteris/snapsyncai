@@ -26,6 +26,18 @@ test("buildUrl substitutes path params used by the SPA", () => {
     buildUrl(api.images.confirmProductFacts.path, { id: 7 }),
     "/api/images/7/product-facts/confirm",
   );
+  assert.equal(
+    buildUrl(api.images.refreshListingCopy.path, { id: 7 }),
+    "/api/images/7/listing-copy/refresh",
+  );
+  assert.equal(
+    buildUrl(api.images.regenerateListingCopyRefresh.path, { id: 7 }),
+    "/api/images/7/listing-copy/refresh/regenerate",
+  );
+  assert.equal(
+    buildUrl(api.images.acceptListingCopyRefresh.path, { id: 7 }),
+    "/api/images/7/listing-copy/refresh/accept",
+  );
 });
 
 test("Shopify connect paths stay on /api/shopify", () => {

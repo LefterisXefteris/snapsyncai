@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # --- AI -----------------------------------------------------------------
     ai_integrations_openai_api_key: str | None = None
     ai_integrations_openai_base_url: str | None = None
+    search_demand_api_key: str | None = None
+    search_demand_url: str | None = None
 
     # --- Shopify ------------------------------------------------------------
     shopify_api_key: str | None = None

@@ -44,5 +44,7 @@ export type Image = {
   createdAt?: string | null;
   listingCopyStale?: boolean;
   mayGenerateListingCopy?: boolean;
+  mayRefreshListingCopy?: boolean;
+  refreshBlockedReason?: string | null;
   descriptionBlocks?: string | null;
 };

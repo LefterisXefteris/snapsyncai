@@ -20,6 +20,18 @@ export const api = {
       method: "POST" as const,
       path: "/api/images/:id/listing-copy/accept" as const,
     },
+    refreshListingCopy: {
+      method: "POST" as const,
+      path: "/api/images/:id/listing-copy/refresh" as const,
+    },
+    regenerateListingCopyRefresh: {
+      method: "POST" as const,
+      path: "/api/images/:id/listing-copy/refresh/regenerate" as const,
+    },
+    acceptListingCopyRefresh: {
+      method: "POST" as const,
+      path: "/api/images/:id/listing-copy/refresh/accept" as const,
+    },
   },
   shopify: {
     status: { method: "GET" as const, path: "/api/shopify/status" as const },
