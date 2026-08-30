@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { extractAsDraft, addToDraft, separateAsDraft, confirmCount, setThumbnail } from "../client/src/lib/draft-products.ts";
+import { extractAsDraft, addToDraft, separateAsDraft, confirmCount, setThumbnail, packMultiPhotoFirst } from "../client/src/lib/draft-products.ts";
 
 function photo(id: string) {
   return { id };
@@ -51,8 +51,8 @@ test("Separate peels the selection into its own draft including a single photo",
   const next = separateAsDraft(drafts, ["c2"], "peeled");
 
   assert.deepEqual(shape(next), [
-    ["peeled", ["c2"]],
     ["coat", ["c1", "c3"]],
+    ["peeled", ["c2"]],
   ]);
 });
 
@@ -78,4 +78,37 @@ test("Set as thumbnail moves that photo to the front of its draft", () => {
   const drafts = [draft("coat", ["c1", "c2", "c3"])];
   const next = setThumbnail(drafts, "c3");
   assert.deepEqual(shape(next), [["coat", ["c3", "c1", "c2"]]]);
+});
+
+test("Multi-photo drafts pack to the leading side ahead of one-photo drafts", () => {
+  const drafts = [
+    draft("s1", ["p1"]),
+    draft("coat", ["c1", "c2"]),
+    draft("s2", ["p2"]),
+    draft("hat", ["h1", "h2", "h3"]),
+    draft("s3", ["p3"]),
+  ];
+
+  assert.deepEqual(shape(packMultiPhotoFirst(drafts)), [
+    ["coat", ["c1", "c2"]],
+    ["hat", ["h1", "h2", "h3"]],
+    ["s1", ["p1"]],
+    ["s2", ["p2"]],
+    ["s3", ["p3"]],
+  ]);
+});
+
+test("Add to a leftover one-photo draft packs that draft onto the multi-photo side", () => {
+  const drafts = [
+    draft("s1", ["p1"]),
+    draft("s2", ["p2"]),
+    draft("s3", ["p3"]),
+  ];
+
+  const next = addToDraft(drafts, ["p1"], "s3");
+
+  assert.deepEqual(shape(next), [
+    ["s3", ["p3", "p1"]],
+    ["s2", ["p2"]],
+  ]);
 });

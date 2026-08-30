@@ -55,5 +55,10 @@ export function useGroupSelection(itemIdsInOrder: string[]) {
     anchorRef.current = null;
   }, []);
 
-  return { selected, handleClick, clear, setSelected };
+  const selectIds = useCallback((ids: string[]) => {
+    setSelected(new Set(ids));
+    anchorRef.current = ids[ids.length - 1] ?? null;
+  }, []);
+
+  return { selected, handleClick, clear, setSelected, selectIds };
 }

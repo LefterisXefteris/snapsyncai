@@ -18,6 +18,7 @@ export function ListingLightTable({
   isUploading,
   onChoosePhotos,
   onSelectPhoto,
+  onSelectDraft,
   onGroup,
   onAddTo,
   onSeparate,
@@ -34,6 +35,7 @@ export function ListingLightTable({
   isUploading: boolean;
   onChoosePhotos: () => void;
   onSelectPhoto: (photoId: string, e: React.MouseEvent) => void;
+  onSelectDraft: (photoIds: string[]) => void;
   onGroup: () => void;
   onAddTo: (destId: string) => void;
   onSeparate: () => void;
@@ -70,52 +72,65 @@ export function ListingLightTable({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 pb-40">
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
-          {cells.map(({ draft, photo }) => {
-            const clustered = draft.items.length > 1;
+        <div className="flex flex-wrap items-start gap-3">
+          {drafts.map((draft) => {
             const failed = failedDraftIds.has(draft.id);
-            const isThumb = clustered && draft.items[0]?.id === photo.id;
-            return (
-              <div key={photo.id} className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => onSelectPhoto(photo.id, e)}
+            if (draft.items.length > 1) {
+              return (
+                <div
+                  key={draft.id}
+                  data-testid="multi-photo-draft"
                   className={cn(
-                    "w-full overflow-hidden rounded-2xl",
-                    selectedIds.has(photo.id) && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                    clustered && "outline outline-2 outline-white/30",
-                    failed && "outline outline-2 outline-destructive/70",
+                    "max-w-full rounded-2xl bg-white/5 p-1.5 outline outline-2 outline-white/40",
+                    failed && "outline-destructive/70",
                   )}
                 >
-                  <img
-                    src={photo.url}
-                    alt={photo.file.name}
-                    className="aspect-[3/4] w-full object-cover"
-                  />
-                </button>
-                {isThumb && (
-                  <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 py-0.5 text-[9px] uppercase tracking-wide text-white/90">
-                    Thumbnail
-                  </span>
-                )}
-                {failed && (
                   <button
                     type="button"
-                    className="absolute bottom-1 left-1 rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground"
-                    onClick={() => onRetry(draft.id)}
+                    data-testid="multi-photo-draft-count"
+                    className="mb-1 rounded px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white/80 hover:bg-white/10"
+                    onClick={() => onSelectDraft(draft.items.map((photo) => photo.id))}
                   >
-                    Retry
+                    {draft.items.length} photos
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="absolute -right-1 -top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] text-white/80 hover:bg-red-600"
-                  aria-label="Delete photo"
-                  onClick={() => onDeletePhoto(photo.id)}
-                >
-                  ×
-                </button>
-              </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {draft.items.map((photo, index) => (
+                      <PhotoCell
+                        key={photo.id}
+                        photo={photo}
+                        selected={selectedIds.has(photo.id)}
+                        showThumbnailBadge={index === 0}
+                        failed={false}
+                        onSelect={(e) => onSelectPhoto(photo.id, e)}
+                        onDelete={() => onDeletePhoto(photo.id)}
+                      />
+                    ))}
+                  </div>
+                  {failed && (
+                    <button
+                      type="button"
+                      className="mt-1 rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground"
+                      onClick={() => onRetry(draft.id)}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              );
+            }
+            const photo = draft.items[0];
+            if (!photo) return null;
+            return (
+              <PhotoCell
+                key={photo.id}
+                photo={photo}
+                selected={selectedIds.has(photo.id)}
+                showThumbnailBadge={false}
+                failed={failed}
+                onSelect={(e) => onSelectPhoto(photo.id, e)}
+                onDelete={() => onDeletePhoto(photo.id)}
+                onRetry={() => onRetry(draft.id)}
+              />
             );
           })}
         </div>
@@ -229,6 +244,66 @@ export function ListingLightTable({
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function PhotoCell({
+  photo,
+  selected,
+  showThumbnailBadge,
+  failed,
+  onSelect,
+  onDelete,
+  onRetry,
+}: {
+  photo: Group["items"][number];
+  selected: boolean;
+  showThumbnailBadge: boolean;
+  failed: boolean;
+  onSelect: (e: React.MouseEvent) => void;
+  onDelete: () => void;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="relative w-[4.75rem] sm:w-[5.5rem] lg:w-24">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "w-full overflow-hidden rounded-2xl",
+          selected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+          failed && "outline outline-2 outline-destructive/70",
+        )}
+      >
+        <img
+          src={photo.url}
+          alt={photo.file.name}
+          className="aspect-[3/4] w-full object-cover"
+        />
+      </button>
+      {showThumbnailBadge && (
+        <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 py-0.5 text-[9px] uppercase tracking-wide text-white/90">
+          Thumbnail
+        </span>
+      )}
+      {failed && onRetry && (
+        <button
+          type="button"
+          className="absolute bottom-1 left-1 rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground"
+          onClick={onRetry}
+        >
+          Retry
+        </button>
+      )}
+      <button
+        type="button"
+        className="absolute -right-1 -top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] text-white/80 hover:bg-red-600"
+        aria-label="Delete photo"
+        onClick={onDelete}
+      >
+        ×
+      </button>
     </div>
   );
 }

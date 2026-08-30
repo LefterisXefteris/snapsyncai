@@ -38,7 +38,7 @@ export function extractAsDraft<T extends DraftPhoto>(
   if (selectedIds.length < 2) return drafts;
   const { remaining, taken } = takeSelected(drafts, selectedIds);
   if (taken.length < 2) return drafts;
-  return [{ id: newDraftId, items: taken }, ...remaining];
+  return packMultiPhotoFirst([{ id: newDraftId, items: taken }, ...remaining]);
 }
 
 /** Move selected photos onto an existing draft. That draft keeps its id and remaining photos. Empty drafts disappear. */
@@ -61,7 +61,7 @@ export function addToDraft<T extends DraftPhoto>(
   const insertAt = drafts.findIndex(d => d.id === destId);
   const before = withoutDest.filter(d => drafts.findIndex(x => x.id === d.id) < insertAt);
   const after = withoutDest.filter(d => drafts.findIndex(x => x.id === d.id) > insertAt);
-  return [...before, nextDest, ...after];
+  return packMultiPhotoFirst([...before, nextDest, ...after]);
 }
 
 /** Selection becomes its own draft, including a single photo. Empty drafts disappear. */
@@ -73,7 +73,16 @@ export function separateAsDraft<T extends DraftPhoto>(
   if (selectedIds.length === 0) return drafts;
   const { remaining, taken } = takeSelected(drafts, selectedIds);
   if (taken.length === 0) return drafts;
-  return [{ id: newDraftId, items: taken }, ...remaining];
+  return packMultiPhotoFirst([{ id: newDraftId, items: taken }, ...remaining]);
+}
+
+/** 2+ photo drafts first, keeping relative order in each partition. */
+export function packMultiPhotoFirst<T extends DraftPhoto, D extends DraftProduct<T>>(
+  drafts: D[],
+): D[] {
+  const multi = drafts.filter(d => d.items.length > 1);
+  const singles = drafts.filter(d => d.items.length <= 1);
+  return [...multi, ...singles];
 }
 
 export function confirmCount(drafts: DraftProduct[]): number {

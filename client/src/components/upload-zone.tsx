@@ -11,6 +11,7 @@ import { ListingLightTable } from "@/components/listing-light-table";
 import {
   addToDraft,
   extractAsDraft,
+  packMultiPhotoFirst,
   separateAsDraft,
   setThumbnail,
 } from "@/lib/draft-products";
@@ -47,6 +48,7 @@ export function UploadZone({
     handleClick: handleThumbnailClick,
     clear: clearSelection,
     setSelected,
+    selectIds,
   } = useGroupSelection(orderedItemIds);
   const [failedGroupIds, setFailedGroupIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
@@ -66,7 +68,7 @@ export function UploadZone({
       const { groups: restored, urlsCreated } = await loadStaged();
       if (restored.length === 0) return;
       urlsCreated.forEach(u => urlsRef.current.push(u));
-      setGroups(restored);
+      setGroups(packMultiPhotoFirst(restored));
     }
     restore();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -172,8 +174,9 @@ export function UploadZone({
       const [group] = next.splice(idx, 1);
       const singles = group.items.map(item => ({ id: crypto.randomUUID(), items: [item], maxImages: Number.MAX_SAFE_INTEGER }));
       next.splice(idx, 0, ...singles);
-      saveGroups(next);
-      return next;
+      const packed = packMultiPhotoFirst(next);
+      saveGroups(packed);
+      return packed;
     });
   };
 
@@ -192,8 +195,10 @@ export function UploadZone({
   const removeItem = (itemId: string) => {
     deleteBlob(itemId); // fire-and-forget
     setGroups(prev => {
-      const next = prev.map(g => ({ ...g, items: g.items.filter(i => i.id !== itemId) }))
-        .filter(g => g.items.length > 0);
+      const next = packMultiPhotoFirst(
+        prev.map(g => ({ ...g, items: g.items.filter(i => i.id !== itemId) }))
+          .filter(g => g.items.length > 0),
+      );
       saveGroups(next); // fire-and-forget
       return next;
     });
@@ -449,6 +454,7 @@ export function UploadZone({
             isUploading={isUploading}
             onChoosePhotos={open}
             onSelectPhoto={handleThumbnailClick}
+            onSelectDraft={selectIds}
             onGroup={handleGroup}
             onAddTo={handleAddTo}
             onSeparate={handleSeparate}

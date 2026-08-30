@@ -21,8 +21,8 @@ A picture of a product. Several photos may belong to one product.
 _Avoid_: Image (when you mean the sellable thing), snap
 
 **Draft product**:
-A product on the New listing canvas that is not yet in the catalogue. Each photo starts as its own draft product.
-_Avoid_: Upload, staged image, group (as the sellable thing)
+A product on the New listing canvas that is not yet in the catalogue. Each photo starts as its own draft product. Several photos on one draft are still that draft, not a finished or categorised product.
+_Avoid_: Upload, staged image, group (as the sellable thing), categorised, assigned
 
 **Variant**:
 A channel-level option of a product, such as color. Grouping photos in New listing does not create variants.

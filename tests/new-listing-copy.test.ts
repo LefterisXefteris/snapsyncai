@@ -36,3 +36,13 @@ test("selected photos collect in a dock with Group Add to Separate and Create", 
   assert.match(lightTable, /Add to/);
   assert.match(lightTable, /\bSeparate\b/);
 });
+
+test("multi-photo drafts are one frame with a clickable photo count", () => {
+  assert.match(lightTable, /data-testid="multi-photo-draft"/);
+  assert.match(lightTable, /data-testid="multi-photo-draft-count"/);
+  assert.match(lightTable, /onSelectDraft/);
+});
+
+test("New listing packs multi-photo drafts on restore and after a photo is removed", () => {
+  assert.match(uploadZone, /packMultiPhotoFirst/);
+});
