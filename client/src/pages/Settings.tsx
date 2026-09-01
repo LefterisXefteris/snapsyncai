@@ -39,11 +39,15 @@ export default function Settings() {
   const [shopGpsrDraft, setShopGpsrDraft] = useState(emptyGpsrIdentity());
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [billingInterval, setBillingInterval] = useState<"weekly" | "annual">("weekly");
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
 
   const isSubscribed = subscriptionStatus?.subscribed === true;
-  const weeklyPrice = (paymentConfig?.subscriptionWeeklyPricePence ?? 400) / 100;
-  const annualPrice = (paymentConfig?.subscriptionAnnualPricePence ?? 17300) / 100;
+  const leftoverWeekly = subscriptionStatus?.entitlement === "leftover_weekly";
+  const monthlyPrice = (paymentConfig?.planMonthlyPricePence ?? 1900) / 100;
+  const annualPrice = (paymentConfig?.planAnnualPricePence ?? 19000) / 100;
+  const allowanceUsed = subscriptionStatus?.allowanceUsed ?? 0;
+  const allowanceIncluded = subscriptionStatus?.allowanceIncluded;
+  const overageThisMonth = subscriptionStatus?.overageThisMonth ?? 0;
 
   useEffect(() => {
     const identity = shopifyStatus?.gpsrIdentity as GpsrIdentity | undefined;
@@ -192,14 +196,29 @@ export default function Settings() {
             <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Billing</h2>
             <div className="glass-panel rounded-2xl p-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-medium">{isSubscribed ? "SnapSync AI Pro" : "Subscription"}</h3>
+                <h3 className="text-sm font-medium">Plan</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {isSubscribed
-                    ? "Pro is active for this account."
-                    : "Subscribe for full listing copy on new listings."}
+                  {leftoverWeekly
+                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. Switch to a Plan for 20/month and £1.50 extra uses.`
+                    : isSubscribed
+                    ? allowanceIncluded == null
+                      ? "Local workspace — Allowance is not billed."
+                      : `${allowanceUsed} of ${allowanceIncluded} Allowance uses this month${overageThisMonth ? ` · ${overageThisMonth} extra` : ""}.`
+                    : "Subscribe for listing copy generate, listing copy refresh, and website."}
                 </p>
               </div>
               {isSubscribed ? (
+                <div className="flex items-center gap-2">
+                  {leftoverWeekly ? (
+                    <Button
+                      data-testid="button-switch-plan"
+                      size="sm"
+                      onClick={() => setShowSubscribeDialog(true)}
+                    >
+                      <Crown className="w-3.5 h-3.5 mr-1.5" />
+                      Switch to Plan
+                    </Button>
+                  ) : null}
                 <Button
                   data-testid="button-cancel-subscription"
                   variant="outline"
@@ -209,6 +228,7 @@ export default function Settings() {
                   <XCircle className="w-3.5 h-3.5 mr-1.5" />
                   Cancel
                 </Button>
+                </div>
               ) : (
                 <Button
                   data-testid="button-subscribe"
@@ -243,20 +263,20 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Crown className="w-5 h-5" />
-              SnapSync AI Pro
+              Plan
             </DialogTitle>
             <DialogDescription>
-              Unlock AI-powered analysis for up to 30 products per week.
+              20 listing-copy writes and website handoffs each calendar month. Extra uses £{(paymentConfig?.overagePence ?? 150) / 100} each.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setBillingInterval("weekly")}
-                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${billingInterval === "weekly" ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                onClick={() => setBillingInterval("monthly")}
+                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${billingInterval === "monthly" ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}
               >
-                <span className="font-semibold">£{weeklyPrice}/wk</span>
-                <span className="text-xs mt-0.5">Weekly</span>
+                <span className="font-semibold">£{monthlyPrice}/mo</span>
+                <span className="text-xs mt-0.5">Monthly</span>
               </button>
               <button
                 onClick={() => setBillingInterval("annual")}
@@ -268,10 +288,10 @@ export default function Settings() {
             </div>
             <Separator />
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> 30 products per week</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Full AI descriptions, pricing &amp; variants</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> SEO &amp; AEO content</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Push to Shopify</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> 20 listing-copy writes per month</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Listing copy refresh and website</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Extra uses billed, not a hard stop</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Push listing copy you typed or generated</li>
             </ul>
           </div>
           <DialogFooter>
@@ -279,7 +299,7 @@ export default function Settings() {
             <Button onClick={() => { setShowSubscribeDialog(false); handleSubscribe(); }} disabled={createSubscriptionCheckout.isPending}>
               {createSubscriptionCheckout.isPending
                 ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Redirecting...</>
-                : <><CreditCard className="w-4 h-4 mr-2" />{billingInterval === "annual" ? `Subscribe £${annualPrice}/yr` : `Subscribe £${weeklyPrice}/wk`}</>
+                : <><CreditCard className="w-4 h-4 mr-2" />{billingInterval === "annual" ? `Subscribe £${annualPrice}/yr` : `Subscribe £${monthlyPrice}/mo`}</>
               }
             </Button>
           </DialogFooter>

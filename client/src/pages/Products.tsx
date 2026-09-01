@@ -88,10 +88,10 @@ export default function Products() {
     }
     const selected = images?.filter((img: Image) => selectedIds.has(img.id)) ?? [];
     const decision = channelPushDecision(selected);
-    if (decision.kind === "unpaid") {
+    if (decision.kind === "missing-copy") {
       toast({
         title: "Listing copy required",
-        description: `${decision.count} selected product(s) still need listing copy. Subscribe to SnapSync AI Pro.`,
+        description: `${decision.count} selected product(s) still need listing copy.`,
         variant: "destructive",
       });
       return;

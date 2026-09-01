@@ -3,31 +3,31 @@ import assert from "node:assert/strict";
 
 import { channelPushDecision } from "../client/src/lib/channel-push.ts";
 
-test("Channel push refuses unpaid products even when listing copy is also stale", () => {
+test("Channel push refuses products with no listing copy, even when they look paid", () => {
   assert.deepEqual(
     channelPushDecision([
-      { paymentStatus: "unpaid", listingCopyStale: true },
-      { paymentStatus: "paid", listingCopyStale: true },
+      { listingCopyPresent: false, listingCopyStale: true, paymentStatus: "paid" },
+      { listingCopyPresent: true, listingCopyStale: true, paymentStatus: "unpaid" },
     ]),
-    { kind: "unpaid", count: 1 },
+    { kind: "missing-copy", count: 1 },
   );
 });
 
 test("Channel push warns when listing copy is stale, then still allows the push", () => {
   assert.deepEqual(
     channelPushDecision([
-      { paymentStatus: "paid", listingCopyStale: true },
-      { paymentStatus: "paid", listingCopyStale: false },
+      { listingCopyPresent: true, listingCopyStale: true },
+      { listingCopyPresent: true, listingCopyStale: false },
     ]),
     { kind: "stale-warning", count: 1 },
   );
 });
 
-test("Channel push has no new warning when listing copy is not stale", () => {
+test("Channel push has no new warning when listing copy is present and not stale", () => {
   assert.deepEqual(
     channelPushDecision([
-      { paymentStatus: "paid" },
-      { paymentStatus: "paid", listingCopyStale: false },
+      { listingCopyPresent: true, paymentStatus: "unpaid" },
+      { listingCopyPresent: true, listingCopyStale: false },
     ]),
     { kind: "push" },
   );

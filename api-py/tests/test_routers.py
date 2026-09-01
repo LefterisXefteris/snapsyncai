@@ -42,9 +42,10 @@ class TestPublicConfig:
         """Values from server/routes.ts:302-304 — changing them changes what users pay."""
         assert client.get("/api/payments/config").json() == {
             "publishableKey": "pk_test_stripe",
-            "subscriptionWeeklyPricePence": 400,
-            "subscriptionAnnualPricePence": 17_300,
-            "weeklyProductLimit": 30,
+            "planMonthlyPricePence": 1900,
+            "planAnnualPricePence": 19_000,
+            "allowanceMonthly": 20,
+            "overagePence": 150,
         }
 
     def test_clerk_config_500s_when_unconfigured(self, client: TestClient, monkeypatch) -> None:
@@ -170,6 +171,10 @@ class TestResponseContract:
         )
         assert set(schemas["SubscriptionStatusResponse"]["properties"]) == {
             "subscribed",
+            "entitlement",
+            "allowanceUsed",
+            "allowanceIncluded",
+            "overageThisMonth",
             "status",
             "currentPeriodEnd",
             "stripeSubscriptionId",

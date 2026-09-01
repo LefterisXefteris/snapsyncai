@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, type ListingCopyRefreshPack } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, useSubscriptionStatus, type ListingCopyRefreshPack } from "@/hooks/use-images";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
@@ -35,6 +35,7 @@ import {
   PRODUCT_EDITOR_WORK,
   UNPAID_PREVIEW_DETAIL,
   UNPAID_PREVIEW_TITLE,
+  NEED_PLAN,
   listingCopyTagsAfterAdd,
   listingCopyTagsAfterRemove,
   productEditorShowsVariants,
@@ -82,6 +83,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const regenerateListingCopyRefresh = useRegenerateListingCopyRefresh();
   const acceptListingCopyRefresh = useAcceptListingCopyRefresh();
   const { data: shopifyStatus } = useShopifyStatus();
+  const { data: subscriptionStatus } = useSubscriptionStatus();
   const saveShopGpsr = useSaveShopGpsrIdentity();
 
   const [title, setTitle] = useState("");
@@ -228,9 +230,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     );
   }
 
-  const isUnpaid = image.paymentStatus !== "paid";
+  const missingCopy = image.listingCopyPresent !== true;
   const facts = productFacts(image);
-  const canGenerate = image.mayGenerateListingCopy === true;
+  const factsOk = image.mayGenerateListingCopy === true;
+  const planBlocked = subscriptionStatus?.subscribed !== true;
+  const canGenerate = factsOk && !planBlocked;
+  const generateBlockedReason = !factsOk
+    ? "Confirm product facts before generating listing copy."
+    : planBlocked
+      ? NEED_PLAN
+      : undefined;
   const canRefresh = image.mayRefreshListingCopy === true;
   const refreshBlockedReason = image.refreshBlockedReason ?? null;
   const shopGpsr = (shopifyStatus?.gpsrIdentity ?? null) as GpsrIdentity | null;
@@ -412,7 +421,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending || isUnpaid}>
+            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? (
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               ) : (
@@ -653,7 +662,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <div
                     className={`relative w-full aspect-[4/5] max-h-[28rem] bg-muted/40 rounded-xl overflow-hidden transition-all shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06),0_16px_40px_-16px_hsl(250_25%_2%/0.6)] ${thumbnailDragActive ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}
                       onDragOver={(e) => {
-                        if (isUnpaid) return;
                         e.preventDefault();
                         e.dataTransfer.dropEffect = "move";
                         setThumbnailDragActive(true);
@@ -665,7 +673,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         setDraggedImageId(null);
                         setDragOverImageId(null);
                         const droppedId = getDraggedImageId(e);
-                        if (!droppedId || isUnpaid) return;
+                        if (!droppedId) return;
                         moveImageToIndex(droppedId, 0);
                       }}
                     >
@@ -690,7 +698,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Input
                     value={altText}
                     onChange={(e) => setAltText(e.target.value)}
-                    disabled={isUnpaid}
                     placeholder="Describe the photo for search and accessibility"
                     className="h-8 text-sm"
                   />
@@ -701,7 +708,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   {productImages.map((img, index) => (
                     <div
                       key={img.id}
-                      draggable={!isUnpaid}
+                     
                       className={`relative group/thumb rounded-lg overflow-hidden border-2 aspect-square cursor-grab active:cursor-grabbing transition-all ${
                         displayImageId === img.id
                           ? "border-primary ring-2 ring-primary/30"
@@ -710,14 +717,13 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                           : "border-border hover:border-foreground/30"
                       }`}
                       onDragStart={(e) => {
-                        if (isUnpaid) return;
                         setDraggedImageId(img.id);
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("application/x-product-image-id", String(img.id));
                         e.dataTransfer.setData("text/plain", String(img.id));
                       }}
                       onDragOver={(e) => {
-                        if (isUnpaid || draggedImageId === img.id) return;
+                        if (draggedImageId === img.id) return;
                         e.preventDefault();
                         e.dataTransfer.dropEffect = "move";
                         setDragOverImageId(img.id);
@@ -730,7 +736,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         const droppedId = getDraggedImageId(e);
                         setDraggedImageId(null);
                         setDragOverImageId(null);
-                        if (!droppedId || droppedId === img.id || isUnpaid) return;
+                        if (!droppedId || droppedId === img.id) return;
                         moveImageToIndex(droppedId, index);
                       }}
                       onDragEnd={() => {
@@ -780,7 +786,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             </Card>
           </div>
           <div className="space-y-4 overflow-y-auto min-h-0">
-            {isUnpaid && (
+            {missingCopy && (
               <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center gap-2">
                 <Lock className="w-4 h-4 shrink-0" />
                 <div>
@@ -1037,11 +1043,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-4">
-                {!isUnpaid && (
                   <AiContentPanel
                     imageId={image.id}
                     defaultCategory={category}
                     canGenerate={canGenerate}
+                    blockedReason={generateBlockedReason}
                     onGenerated={(parsed) => {
                       setTitle(parsed.title);
                       setDescription(parsed.description);
@@ -1118,7 +1124,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       );
                     }}
                   />
-                )}
                 <div className="space-y-1.5">
                   <Button
                     type="button"
@@ -1222,7 +1227,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    disabled={isUnpaid}
                     placeholder="Short sleeve t-shirt"
                     className="h-8 text-sm"
                   />
@@ -1232,7 +1236,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    disabled={isUnpaid}
                     rows={6}
                     placeholder="Product description..."
                     className="resize-y text-sm"
@@ -1258,7 +1261,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Input
                     value={seoTitle}
                     onChange={(e) => setSeoTitle(e.target.value)}
-                    disabled={isUnpaid}
                     maxLength={70}
                     className="h-8 text-sm"
                   />
@@ -1271,7 +1273,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Textarea
                     value={seoDescription}
                     onChange={(e) => setSeoDescription(e.target.value)}
-                    disabled={isUnpaid}
                     rows={3}
                     maxLength={320}
                     className="resize-none text-sm"
@@ -1286,7 +1287,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         <button
                           type="button"
                           className="ml-0.5 rounded-sm opacity-70 hover:opacity-100 disabled:pointer-events-none"
-                          disabled={isUnpaid}
+                         
                           aria-label={`Remove ${t}`}
                           onClick={() => setTags(listingCopyTagsAfterRemove(tags, i))}
                         >
@@ -1298,7 +1299,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Input
                     value={tagDraft}
                     onChange={(e) => setTagDraft(e.target.value)}
-                    disabled={isUnpaid}
                     placeholder="Add a tag"
                     className="h-8 text-sm"
                     onKeyDown={(e) => {
@@ -1325,7 +1325,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <Input
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
-                        disabled={isUnpaid}
+                       
                         className="pl-6 h-8 text-sm"
                         placeholder="0.00"
                         type="number"
@@ -1338,7 +1338,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       type="number"
                       value={inventoryQuantity}
                       onChange={(e) => setInventoryQuantity(Number(e.target.value))}
-                      disabled={isUnpaid || !trackQuantity}
+                      disabled={!trackQuantity}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -1347,7 +1347,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     <Input
                       value={sku}
                       onChange={(e) => setSku(e.target.value)}
-                      disabled={isUnpaid}
+                     
                       placeholder="e.g. TSHIRT-RED-L"
                       className="h-8 text-sm"
                     />
@@ -1361,7 +1361,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <Input
                         value={compareAtPrice}
                         onChange={(e) => setCompareAtPrice(e.target.value)}
-                        disabled={isUnpaid}
+                       
                         className="pl-6 h-8 text-sm"
                         placeholder="0.00"
                         type="number"
@@ -1375,7 +1375,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <Input
                         value={costPerItem}
                         onChange={(e) => setCostPerItem(e.target.value)}
-                        disabled={isUnpaid}
+                       
                         className="pl-6 h-8 text-sm"
                         placeholder="0.00"
                         type="number"
@@ -1387,7 +1387,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     <Input
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
-                      disabled={isUnpaid}
+                     
                       placeholder="000000000000"
                       className="h-8 text-sm"
                     />
@@ -1398,7 +1398,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     id="trackQuantity"
                     checked={trackQuantity}
                     onCheckedChange={(checked) => setTrackQuantity(checked as boolean)}
-                    disabled={isUnpaid}
                     className="w-4 h-4"
                   />
                   <label
@@ -1450,7 +1449,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       <Select
                         value={shopifyListingStatus}
                         onValueChange={(value) => setShopifyListingStatus(shopifyProductStatus(value))}
-                        disabled={isUnpaid}
+                       
                       >
                         <SelectTrigger className="h-8 text-sm" data-testid="select-shopify-product-status">
                           <SelectValue />
@@ -1485,7 +1484,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                                     ),
                                   )
                                 }
-                                disabled={isUnpaid || shopifyPublications?.publicationsReady === false}
+                                disabled={shopifyPublications?.publicationsReady === false}
                                 className="w-4 h-4"
                               />
                               <label
@@ -1499,8 +1498,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         </div>
                       )}
                     </div>
-                    {!isUnpaid && (
-                      <Button
+                    <Button
                         variant="outline"
                         size="sm"
                         className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === "synced" ? "text-muted-foreground" : "bg-[#95bf46]/10 text-[#95bf46] hover:bg-[#95bf46]/20 shadow-[inset_0_0_0_1px_rgb(149_191_70/0.3),0_0_20px_-8px_rgb(149_191_70/0.4)]"}`}
@@ -1523,7 +1521,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         )}
                         {image.shopifyStatus === "synced" ? "Sync updates to Shopify" : "Push to Shopify"}
                       </Button>
-                    )}
                   </>
                 )}
               </CardContent>
@@ -1539,7 +1536,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Select
                     value={category}
                     onValueChange={setCategory}
-                    disabled={isUnpaid}
                   >
                     <SelectTrigger className="h-8 text-sm">
                       <SelectValue placeholder="Select category" />
@@ -1558,7 +1554,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   <Input
                     value={productType}
                     onChange={(e) => setProductType(e.target.value)}
-                    disabled={isUnpaid}
                     placeholder="e.g. T-Shirt"
                     className="h-8 text-sm"
                   />

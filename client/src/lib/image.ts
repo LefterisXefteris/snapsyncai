@@ -43,6 +43,7 @@ export type Image = {
   sessionId?: string | null;
   createdAt?: string | null;
   listingCopyStale?: boolean;
+  listingCopyPresent?: boolean;
   mayGenerateListingCopy?: boolean;
   mayRefreshListingCopy?: boolean;
   refreshBlockedReason?: string | null;

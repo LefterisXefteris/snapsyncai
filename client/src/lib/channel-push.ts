@@ -1,17 +1,17 @@
 export type ChannelPushProduct = {
-  paymentStatus?: string | null;
-  listingCopyStale?: boolean;
+  listingCopyPresent?: boolean | null;
+  listingCopyStale?: boolean | null;
 };
 
 export type ChannelPushDecision =
-  | { kind: "unpaid"; count: number }
+  | { kind: "missing-copy"; count: number }
   | { kind: "stale-warning"; count: number }
   | { kind: "push" };
 
 export function channelPushDecision(selected: ChannelPushProduct[]): ChannelPushDecision {
-  const unpaid = selected.filter((product) => product.paymentStatus !== "paid").length;
-  if (unpaid > 0) {
-    return { kind: "unpaid", count: unpaid };
+  const missing = selected.filter((product) => product.listingCopyPresent !== true).length;
+  if (missing > 0) {
+    return { kind: "missing-copy", count: missing };
   }
   const stale = selected.filter((product) => product.listingCopyStale).length;
   if (stale > 0) {

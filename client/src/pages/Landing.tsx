@@ -231,8 +231,8 @@ export default function Landing() {
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
     "offers": [
-      { "@type": "Offer", "price": "4.00", "priceCurrency": "GBP", "name": "Weekly subscription — up to 30 products/week", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "4.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "WEE" } },
-      { "@type": "Offer", "price": "173.00", "priceCurrency": "GBP", "name": "Annual subscription — up to 30 products/week", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "173.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "ANN" } },
+      { "@type": "Offer", "price": "19.00", "priceCurrency": "GBP", "name": "Plan — 20 listing-copy writes per month", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "19.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "MON" } },
+      { "@type": "Offer", "price": "190.00", "priceCurrency": "GBP", "name": "Annual Plan — 20 listing-copy writes per month", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "190.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "ANN" } },
     ],
     "featureList": [
       "New listing from photos",
@@ -402,11 +402,11 @@ export default function Landing() {
                 Simple, transparent pricing
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Weekly or annual. The four live jobs, on Shopify.
+                Monthly or annual. Catalogue and facts are free. Listing copy writes are the Plan.
               </p>
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary font-medium bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                Up to 30 products/week · Cancel anytime
+                20 listing-copy writes/month · Extra £1.50 · Cancel anytime
               </div>
             </div>
 
@@ -415,12 +415,12 @@ export default function Landing() {
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Crown className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-xl">Pro Weekly</CardTitle>
+                    <CardTitle className="text-xl">Plan monthly</CardTitle>
                   </div>
-                  <CardDescription>Up to 30 products/week, billed weekly</CardDescription>
+                  <CardDescription>20 listing-copy writes each calendar month</CardDescription>
                   <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£4</span>
-                    <span className="text-muted-foreground text-sm ml-2">/week</span>
+                    <span className="text-4xl font-display font-bold">£19</span>
+                    <span className="text-muted-foreground text-sm ml-2">/month</span>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
@@ -434,7 +434,7 @@ export default function Landing() {
                     ))}
                   </ul>
                   <Button variant="outline" className="w-full mt-auto rounded-xl border-border/60 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300" onClick={openLandingSignIn}>
-                    {LANDING_PRIMARY_CTA} — £4/wk
+                    {LANDING_PRIMARY_CTA} — £19/mo
                   </Button>
                 </CardContent>
               </Card>
@@ -446,18 +446,18 @@ export default function Landing() {
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2">
                       <Crown className="w-4 h-4 text-primary" />
-                      <CardTitle className="text-xl">Pro Annual</CardTitle>
+                      <CardTitle className="text-xl">Plan annual</CardTitle>
                     </div>
                     <Badge className="text-[10px] font-bold text-primary-foreground bg-primary border-0 shadow-[0_0_12px_rgba(16,185,129,0.4)]">
-                      Save £35 · Best Value
+                      Save £38 · Best Value
                     </Badge>
                   </div>
-                  <CardDescription>Up to 30 products/week, save over 2 months</CardDescription>
+                  <CardDescription>Same Allowance, two months free vs monthly</CardDescription>
                   <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£173</span>
+                    <span className="text-4xl font-display font-bold">£190</span>
                     <span className="text-muted-foreground text-sm ml-2">/year</span>
                   </div>
-                  <p className="text-xs text-primary mt-1 font-medium">= £3.33/wk · best per-week rate</p>
+                  <p className="text-xs text-primary mt-1 font-medium">= £15.83/mo · 20 writes each month</p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col relative z-10">
                   <Separator className="mb-5" />
@@ -470,7 +470,7 @@ export default function Landing() {
                     ))}
                   </ul>
                   <Button className="w-full mt-auto rounded-xl shadow-md shadow-primary/20" onClick={openLandingSignIn}>
-                    {LANDING_PRIMARY_CTA} — £173/yr
+                    {LANDING_PRIMARY_CTA} — £190/yr
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </CardContent>

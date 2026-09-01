@@ -40,9 +40,10 @@ export function usePaymentConfig() {
       if (!res.ok) throw new Error("Payment system not available");
       return res.json() as Promise<{
         publishableKey: string;
-        subscriptionWeeklyPricePence: number;
-        subscriptionAnnualPricePence: number;
-        weeklyProductLimit: number;
+        planMonthlyPricePence: number;
+        planAnnualPricePence: number;
+        allowanceMonthly: number;
+        overagePence: number;
       }>;
     },
   });
@@ -53,10 +54,28 @@ export function useSubscriptionStatus() {
   return useQuery({
     queryKey: ['/api/subscription/status', userId],
     queryFn: async () => {
-      if (DEV_BYPASS_AUTH) return { subscribed: true, status: "active" };
+      if (DEV_BYPASS_AUTH) {
+        return {
+          subscribed: true,
+          status: "active",
+          entitlement: "local_bypass",
+          allowanceUsed: 0,
+          allowanceIncluded: null,
+          overageThisMonth: 0,
+        };
+      }
       const res = await fetch(apiUrl('/api/subscription/status'), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to check subscription");
-      return res.json() as Promise<{ subscribed: boolean; status?: string; currentPeriodEnd?: string; stripeSubscriptionId?: string }>;
+      return res.json() as Promise<{
+        subscribed: boolean;
+        entitlement?: string;
+        allowanceUsed?: number;
+        allowanceIncluded?: number | null;
+        overageThisMonth?: number;
+        status?: string;
+        currentPeriodEnd?: string;
+        stripeSubscriptionId?: string;
+      }>;
     },
     enabled: !!userId,
   });
@@ -66,7 +85,7 @@ export function useCreateSubscriptionCheckout() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (billingInterval: 'weekly' | 'annual' = 'weekly') => {
+    mutationFn: async (billingInterval: 'monthly' | 'annual' = 'monthly') => {
       const res = await apiRequest("POST", "/api/subscription/create-checkout", { billingInterval });
       return res.json() as Promise<{ checkoutUrl: string; sessionId: string }>;
     },
@@ -103,7 +122,7 @@ export function useVerifySubscription() {
       if (data.alreadyActive) {
         toast({ title: "Already Subscribed", description: "Your subscription is already active." });
       } else {
-        toast({ title: "Subscribed!", description: "Welcome to SnapSync AI Pro! You can now unlock unlimited AI analysis." });
+        toast({ title: "Plan active", description: "You have 20 listing-copy writes this calendar month." });
       }
     },
     onError: (error) => {
@@ -169,12 +188,9 @@ export function useUploadImages() {
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       if (variables.hideToast) return;
 
-      const allPaid = data.every((img: any) => img.paymentStatus === 'paid');
       toast({
-        title: allPaid ? "Products Ready" : "Images Uploaded",
-        description: allPaid
-          ? `${data.length} products uploaded with full AI analysis. Ready to review and push to your stores.`
-          : `${data.length} images uploaded with AI preview. Subscribe to unlock full descriptions and pricing.`,
+        title: "Photos uploaded",
+        description: `${data.length} photos are in New listing. Confirm facts, then listing copy.`,
       });
     },
     onError: (error) => {

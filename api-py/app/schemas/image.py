@@ -60,6 +60,7 @@ class ImageOut(CamelModel):
     session_id: str | None = None
     created_at: datetime | None = None
     listing_copy_stale: bool = False
+    listing_copy_present: bool = False
     may_generate_listing_copy: bool = False
     may_refresh_listing_copy: bool = False
     refresh_blocked_reason: str | None = None
@@ -79,25 +80,22 @@ class ImageListOut(ImageOut):
 
 
 def with_facts_outcomes(
-    image, shop_gpsr=None, *, list_item: bool = False, force_paid: bool = False,
-    demand_configured: bool = False,
+    image, shop_gpsr=None, *, list_item: bool = False, demand_configured: bool = False,
 ):
     """Copy Product facts and listing-copy-refresh outcomes onto the HTTP payload."""
     from app.services.listing_copy_refresh import (
         listing_copy_from_image,
         refresh_payload_outcomes,
     )
-    from app.services.product_facts import facts_from_stored, payload_outcomes
+    from app.services.product_facts import facts_from_stored, listing_copy_present, payload_outcomes
 
     facts = facts_from_stored(getattr(image, "product_facts", None))
+    listing_copy = listing_copy_from_image(image)
     outcomes = {
         **payload_outcomes(facts, shop_gpsr),
-        **refresh_payload_outcomes(
-            facts, listing_copy_from_image(image), demand_configured
-        ),
+        **refresh_payload_outcomes(facts, listing_copy, demand_configured),
+        "listing_copy_present": listing_copy_present(listing_copy),
     }
-    if force_paid:
-        outcomes = {**outcomes, "payment_status": "paid"}
     model = ImageListOut if list_item else ImageOut
     return model.model_validate(image).model_copy(update=outcomes)
 

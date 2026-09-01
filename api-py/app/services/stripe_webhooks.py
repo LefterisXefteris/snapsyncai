@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.services import billing
+from app.services.plan import leftover_weekly_from_interval
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ async def handle_subscription_events(
                 stripe.api_key = settings.stripe_secret_key
                 sub = stripe.Subscription.retrieve(subscription_id)
                 period_end = billing.from_unix(getattr(sub, "current_period_end", None))
+                previous = await billing.get_subscription(session, user_id)
+                interval = billing.recurring_interval_of(sub) or metadata.get("planInterval")
                 await billing.upsert_subscription(
                     session,
                     user_id=user_id,
@@ -58,7 +61,20 @@ async def handle_subscription_events(
                     stripe_subscription_id=subscription_id,
                     status=sub.status,
                     current_period_end=period_end,
+                    billing_interval=interval,
                 )
+                if (
+                    previous
+                    and previous.stripe_subscription_id != subscription_id
+                    and leftover_weekly_from_interval(previous.billing_interval)
+                ):
+                    try:
+                        stripe.Subscription.delete(previous.stripe_subscription_id)
+                    except Exception:
+                        logger.warning(
+                            "Webhook: could not cancel leftover weekly %s",
+                            previous.stripe_subscription_id,
+                        )
                 logger.info(
                     "Webhook: Subscription %s saved for user %s with status %s",
                     subscription_id,
@@ -75,7 +91,13 @@ async def handle_subscription_events(
         if data.get("current_period_end"):
             period_end = billing.from_unix(data["current_period_end"])
         try:
-            await billing.update_subscription_status(session, subscription_id, status, period_end)
+            await billing.update_subscription_status(
+                session,
+                subscription_id,
+                status,
+                period_end,
+                billing_interval=billing.recurring_interval_of(data),
+            )
             logger.info("Webhook: Subscription %s updated to %s", subscription_id, status)
         except Exception:
             logger.exception("Webhook: Error updating subscription status")

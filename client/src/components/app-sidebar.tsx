@@ -122,7 +122,7 @@ export function AppSidebar() {
               data-testid="badge-pro"
             >
               <Crown className="w-2.5 h-2.5 mr-0.5" />
-              Pro
+              Plan
             </Badge>
           )}
         </div>

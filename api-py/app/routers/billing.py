@@ -5,9 +5,9 @@ Paths stay byte-stable with the Express handlers they replace.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
+from datetime import UTC, datetime
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
@@ -25,54 +25,56 @@ from app.schemas.billing import (
     SubscriptionStatusResponse,
     UnlockImagesBody,
     UnlockResponse,
-    UnlockResult,
     VerifyResponse,
 )
-from app.services import billing, image_analysis
-from app.services import images as image_store
-from app.services.billing import WEEKLY_PRODUCT_LIMIT
-from app.services.product_facts import (
-    apply_suggested,
-    facts_from_stored,
-    persistable_from_vision,
-    stored_from_facts,
+from app.services import billing
+from app.services.plan import (
+    entitlement_of,
+    leftover_weekly_from_interval,
+    may_start_checkout,
+    view,
+    workspace_origin,
 )
+from app.services.plan_ledger import list_spends
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["billing"])
 
-CONCURRENCY_LIMIT = 10
 
-
-def _app_url(request: Request) -> str:
-    protocol = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
-    host = (
-        request.headers.get("x-forwarded-host")
-        or request.headers.get("host")
-        or request.url.hostname
+async def _plan_status(
+    session, user_id: str, settings, sub
+) -> SubscriptionStatusResponse:
+    local = billing.is_local_pro(settings) or await billing.is_dev_free_user(user_id, settings)
+    active = sub is not None and billing.is_active_status(sub.status)
+    leftover = bool(
+        active and leftover_weekly_from_interval(sub.billing_interval if sub else None)
     )
-    return f"{protocol}://{host}"
+    entitlement = entitlement_of(
+        local_pro=local, has_active_plan=active, leftover_weekly=leftover
+    )
+    spends = await list_spends(session, user_id)
+    snapshot = view(entitlement, spends, datetime.now(UTC))
+    return SubscriptionStatusResponse(
+        subscribed=entitlement != "free",
+        entitlement=entitlement,
+        allowance_used=snapshot.used,
+        allowance_included=snapshot.included,
+        overage_this_month=snapshot.overage,
+        status=(
+            "active"
+            if entitlement == "local_bypass"
+            else (sub.status if sub else None)
+        ),
+        current_period_end=billing.period_end_iso(sub.current_period_end) if sub else None,
+        stripe_subscription_id=sub.stripe_subscription_id if sub else None,
+    )
 
 
 def _http_error(status_code: int, message: str, **extra) -> HTTPException:
     if extra:
         return HTTPException(status_code=status_code, detail={"message": message, **extra})
     return HTTPException(status_code=status_code, detail=message)
-
-
-async def _run_with_concurrency(items, limit, fn):
-    if not items:
-        return []
-    semaphore = asyncio.Semaphore(limit)
-    results: list = [None] * len(items)
-
-    async def worker(index, item):
-        async with semaphore:
-            results[index] = await fn(item)
-
-    await asyncio.gather(*(worker(i, item) for i, item in enumerate(items)))
-    return results
 
 
 @router.get(
@@ -84,46 +86,33 @@ async def subscription_status(
     user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> SubscriptionStatusResponse:
     try:
-        if billing.is_local_pro(settings) or await billing.is_dev_free_user(
-            user_id, settings
+        sub = None
+        if not (
+            billing.is_local_pro(settings) or await billing.is_dev_free_user(user_id, settings)
         ):
-            return SubscriptionStatusResponse(
-                subscribed=True,
-                status="active",
-                current_period_end=None,
-                stripe_subscription_id=None,
-            )
+            sub = await billing.get_subscription(session, user_id)
 
-        sub = await billing.get_subscription(session, user_id)
+            if sub is None:
+                try:
+                    email = await billing.clerk_primary_email(user_id, settings)
+                    if email:
+                        customer, active_sub = await billing.find_active_stripe_subscription(email)
+                        if customer and active_sub:
+                            sub = await billing.relink_stripe_subscription(
+                                session, user_id, customer, active_sub
+                            )
+                            logger.info(
+                                "Auto-recovered subscription %s for user %s via email %s",
+                                active_sub.id,
+                                user_id,
+                                email,
+                            )
+                except Exception as recover_err:
+                    logger.warning(
+                        "Auto-recover subscription failed (non-fatal): %s", recover_err
+                    )
 
-        if sub is None:
-            try:
-                email = await billing.clerk_primary_email(user_id, settings)
-                if email:
-                    customer, active_sub = await billing.find_active_stripe_subscription(email)
-                    if customer and active_sub:
-                        sub = await billing.relink_stripe_subscription(
-                            session, user_id, customer, active_sub
-                        )
-                        logger.info(
-                            "Auto-recovered subscription %s for user %s via email %s",
-                            active_sub.id,
-                            user_id,
-                            email,
-                        )
-            except Exception as recover_err:
-                logger.warning(
-                    "Auto-recover subscription failed (non-fatal): %s", recover_err
-                )
-
-        if sub:
-            return SubscriptionStatusResponse(
-                subscribed=billing.is_active_status(sub.status),
-                status=sub.status,
-                current_period_end=billing.period_end_iso(sub.current_period_end),
-                stripe_subscription_id=sub.stripe_subscription_id,
-            )
-        return SubscriptionStatusResponse(subscribed=False)
+        return await _plan_status(session, user_id, settings, sub)
     except HTTPException:
         raise
     except Exception:
@@ -175,6 +164,7 @@ async def recover_subscription(
             stripe_subscription_id=sub_id,
             status=full_sub.status,
             current_period_end=period_end,
+            billing_interval=billing.recurring_interval_of(full_sub),
         )
         logger.info("Recovered subscription %s for user %s", sub_id, user_id)
         return RecoverResponse(
@@ -234,6 +224,7 @@ async def recover_by_email(
                 stripe_subscription_id=active.id,
                 status=active.status,
                 current_period_end=billing.from_unix(getattr(active, "current_period_end", None)),
+                billing_interval=billing.recurring_interval_of(active),
             )
             logger.info(
                 "recover-by-email: linked sub %s to user %s via email %s",
@@ -263,7 +254,22 @@ async def create_checkout(
 ) -> CheckoutResponse | JSONResponse:
     try:
         existing = await billing.get_subscription(session, user_id)
-        if existing and billing.is_active_status(existing.status):
+        local = billing.is_local_pro(settings) or await billing.is_dev_free_user(
+            user_id, settings
+        )
+        leftover = bool(
+            existing
+            and billing.is_active_status(existing.status)
+            and leftover_weekly_from_interval(existing.billing_interval)
+        )
+        entitlement = entitlement_of(
+            local_pro=local,
+            has_active_plan=bool(existing and billing.is_active_status(existing.status)),
+            leftover_weekly=leftover,
+        )
+        if existing and billing.is_active_status(existing.status) and not may_start_checkout(
+            entitlement
+        ):
             raise _http_error(400, "You already have an active subscription")
 
         billing.configure_stripe()
@@ -281,6 +287,10 @@ async def create_checkout(
                         (s for s in subs.data if s.status in ("active", "trialing")), None
                     )
                     if active:
+                        interval = billing.recurring_interval_of(active)
+                        if leftover_weekly_from_interval(interval):
+                            existing_customer_id = customer.id
+                            continue
                         old = await billing.get_subscription_by_stripe_id(session, active.id)
                         if old and old.user_id != user_id:
                             logger.info(
@@ -298,6 +308,7 @@ async def create_checkout(
                             current_period_end=billing.from_unix(
                                 getattr(active, "current_period_end", None)
                             ),
+                            billing_interval=interval,
                         )
                         logger.info(
                             "create-checkout: recovered existing sub %s for user %s via email %s",
@@ -331,19 +342,22 @@ async def create_checkout(
             if billing_interval == "annual"
             else await billing.get_or_create_weekly_subscription_price_id()
         )
-        app_url = _app_url(request)
+        origin = workspace_origin(settings.app_base_url)
         idempotency_key = (
-            f"checkout-{user_id}-{billing_interval or 'weekly'}-{int(time.time() // 60)}"
+            f"checkout-{user_id}-{billing_interval or 'monthly'}-{int(time.time() // 60)}"
         )
         params: dict = {
             "payment_method_types": ["card"],
             "line_items": [{"price": price_id, "quantity": 1}],
             "mode": "subscription",
             "success_url": (
-                f"{app_url}/?subscription=success&checkout_session_id={{CHECKOUT_SESSION_ID}}"
+                f"{origin}/?subscription=success&checkout_session_id={{CHECKOUT_SESSION_ID}}"
             ),
-            "cancel_url": f"{app_url}/?subscription=cancelled",
-            "metadata": {"userId": user_id},
+            "cancel_url": f"{origin}/?subscription=cancelled",
+            "metadata": {
+                "userId": user_id,
+                "planInterval": "year" if billing_interval == "annual" else "month",
+            },
         }
         if existing_customer_id:
             params["customer"] = existing_customer_id
@@ -379,7 +393,12 @@ async def verify_subscription(
             raise _http_error(400, "Missing checkout session ID")
 
         existing = await billing.get_subscription(session, user_id)
-        if existing and billing.is_active_status(existing.status):
+        leftover = bool(
+            existing
+            and billing.is_active_status(existing.status)
+            and leftover_weekly_from_interval(existing.billing_interval)
+        )
+        if existing and billing.is_active_status(existing.status) and not leftover:
             return VerifyResponse(verified=True, already_active=True)
 
         billing.configure_stripe()
@@ -398,15 +417,16 @@ async def verify_subscription(
         customer_id = billing.stripe_id(checkout.customer)
         sub_status = "active"
         period_end = None
-        if not isinstance(subscription, str):
-            if getattr(subscription, "status", None):
-                sub_status = subscription.status
-            period_end = billing.from_unix(getattr(subscription, "current_period_end", None))
+        stripe_sub = None if isinstance(subscription, str) else subscription
+        if stripe_sub is not None:
+            if getattr(stripe_sub, "status", None):
+                sub_status = stripe_sub.status
+            period_end = billing.from_unix(getattr(stripe_sub, "current_period_end", None))
         else:
             try:
-                full_sub = stripe.Subscription.retrieve(subscription)
-                sub_status = full_sub.status
-                period_end = billing.from_unix(getattr(full_sub, "current_period_end", None))
+                stripe_sub = stripe.Subscription.retrieve(subscription)
+                sub_status = stripe_sub.status
+                period_end = billing.from_unix(getattr(stripe_sub, "current_period_end", None))
             except Exception:
                 logger.exception("Failed to retrieve subscription details")
 
@@ -421,6 +441,15 @@ async def verify_subscription(
         # (Express does) but cannot double-grant credits against this checkout.
         await billing.claim_paid_session(session, checkout_session_id)
 
+        checkout_meta = checkout.metadata or {}
+        interval = (
+            billing.recurring_interval_of(stripe_sub)
+            or checkout_meta.get("planInterval")
+            or "month"
+        )
+        old_weekly_id = (
+            existing.stripe_subscription_id if leftover and existing else None
+        )
         await billing.upsert_subscription(
             session,
             user_id=user_id,
@@ -428,7 +457,15 @@ async def verify_subscription(
             stripe_subscription_id=sub_id,
             status=sub_status,
             current_period_end=period_end,
+            billing_interval=interval,
         )
+        if old_weekly_id and old_weekly_id != sub_id:
+            try:
+                stripe.Subscription.delete(old_weekly_id)
+            except Exception:
+                logger.warning(
+                    "Could not cancel leftover weekly subscription %s", old_weekly_id
+                )
         return VerifyResponse(verified=True, subscribed=True)
     except HTTPException:
         raise
@@ -473,166 +510,7 @@ async def unlock_images(
     settings: SettingsDep,
     body: UnlockImagesBody | None = None,
 ) -> UnlockResponse | JSONResponse:
-    try:
-        image_ids = (body.image_ids if body else None) or []
-        if not image_ids:
-            raise _http_error(400, "No image IDs provided")
-
-        all_images = await image_store.get_images_by_ids(session, image_ids)
-        user_images = [img for img in all_images if img.session_id == user_id]
-        unpaid = [img for img in user_images if img.payment_status != "paid"]
-        if not unpaid:
-            return UnlockResponse(processed=0, message="All selected images are already unlocked.")
-
-        local_pro = billing.is_local_pro(settings)
-        dev_free = await billing.is_dev_free_user(user_id, settings)
-        sub = await billing.get_subscription(session, user_id)
-        is_subscribed = local_pro or dev_free or (
-            sub is not None and billing.is_active_status(sub.status)
-        )
-        if not is_subscribed:
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "message": "Subscription required",
-                    "detail": "Subscribe to SnapSync AI to unlock AI product analysis.",
-                },
-            )
-
-        weekly_count = await billing.get_weekly_product_count(session, user_id)
-        remaining = WEEKLY_PRODUCT_LIMIT - weekly_count
-        if local_pro:
-            remaining = len(unpaid)
-        if remaining <= 0:
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "message": "Weekly limit reached",
-                    "detail": (
-                        f"You've used all {WEEKLY_PRODUCT_LIMIT} products this week. "
-                        "Your limit resets every Monday at midnight UTC."
-                    ),
-                    "weeklyLimit": WEEKLY_PRODUCT_LIMIT,
-                    "used": weekly_count,
-                    "resetsAt": billing.next_monday_utc().isoformat() + "Z",
-                },
-            )
-
-        seen_groups: set[str] = set()
-        capped = []
-        for img in unpaid:
-            key = img.product_group_id or f"single_{img.id}"
-            if key not in seen_groups:
-                if len(seen_groups) >= remaining:
-                    break
-                seen_groups.add(key)
-            capped.append(img)
-        unpaid = capped
-        db_lock = asyncio.Lock()
-
-        async def process(image):
-            try:
-                logger.info(
-                    "[unlock-images] Processing image %s: mimeType=%s, "
-                    "hasImageData=%s, hasStorageUrl=%s",
-                    image.id,
-                    image.mime_type,
-                    bool(image.image_data),
-                    bool(image.storage_url),
-                )
-                buffer = await image_store.load_image_bytes(image)
-                logger.info(
-                    "[unlock-images] loadImageBuffer for image %s: %s",
-                    image.id,
-                    f"got buffer ({len(buffer)} bytes)" if buffer else "null",
-                )
-                if not buffer:
-                    async with db_lock:
-                        await image_store.update_image(
-                            session,
-                            image.id,
-                            {"payment_status": "paid"},
-                        )
-                    return UnlockResult(
-                        id=image.id,
-                        title=image.title,
-                        note=(
-                            "Unlocked with basic data (image buffer expired). "
-                            "Re-upload for full AI analysis."
-                        ),
-                    )
-
-                image_tone = image.brand_tone or "professional"
-                logger.info(
-                    "[unlock-images] Calling fullAnalyzeImage for image %s, tone=%s",
-                    image.id,
-                    image_tone,
-                )
-                analysis = None
-                try:
-                    analysis = await image_analysis.full_analyze_image(
-                        buffer,
-                        image.mime_type,
-                        image.original_name,
-                        image_tone,
-                        image.product_context or None,
-                    )
-                except Exception:
-                    logger.exception(
-                        "[unlock-images] fullAnalyzeImage THREW for image %s", image.id
-                    )
-                logger.info(
-                    "[unlock-images] fullAnalyzeImage result for image %s: %s",
-                    image.id,
-                    (
-                        f'description="{str(analysis.get("description", ""))[:50]}"'
-                        if analysis
-                        else "null (threw)"
-                    ),
-                )
-
-                if analysis and analysis.get("description") != "Failed to analyze image.":
-                    persistable = persistable_from_vision(analysis)
-                    facts = apply_suggested(
-                        facts_from_stored(image.product_facts),
-                        persistable.facts.suggested,
-                    )
-                    updates = persistable.as_image_updates()
-                    updates["product_facts"] = stored_from_facts(facts)
-                    updates["payment_status"] = "paid"
-                    async with db_lock:
-                        await image_store.update_image(session, image.id, updates)
-                        await image_store.persist_product_facts(
-                            session, image, stored_from_facts(facts)
-                        )
-                    return UnlockResult(id=image.id, title=image.title)
-
-                async with db_lock:
-                    await image_store.update_image(session, image.id, {"payment_status": "paid"})
-                return UnlockResult(
-                    id=image.id,
-                    title=image.title,
-                    error=(
-                        "AI analysis failed — your preview data is preserved. "
-                        "Please try unlocking again or edit manually."
-                    ),
-                )
-            except Exception:
-                logger.exception("[unlock-images] CAUGHT ERROR for image %s", image.id)
-                async with db_lock:
-                    await image_store.update_image(session, image.id, {"payment_status": "paid"})
-                return UnlockResult(
-                    id=image.id,
-                    error=(
-                        "Full analysis failed but product unlocked. "
-                        "You can edit details manually."
-                    ),
-                )
-
-        results = await _run_with_concurrency(unpaid, CONCURRENCY_LIMIT, process)
-        return UnlockResponse(processed=len(results), results=results)
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Verify and unlock error")
-        raise _http_error(500, "Failed to process payment and unlock analysis") from None
+    raise _http_error(
+        410,
+        "Listing copy is generated after confirmed facts, not unlocked.",
+    )

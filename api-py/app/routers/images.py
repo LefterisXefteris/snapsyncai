@@ -44,14 +44,16 @@ from app.services.listing_copy_refresh import (
     start_listing_copy_refresh,
 )
 from app.services.openai_client import get_openai
+from app.services.plan_charge import authorize_plan_job, settle_plan_job
 from app.services.product_facts import (
     accept_generated_listing_copy,
     confirm_facts,
+    generation_blocked_reason,
+    listing_copy_present,
     merge_product_facts,
     stored_from_facts,
 )
 from app.services.shopify import push_product_to_shopify, shopify_product_status
-from app.services.subscriptions import is_local_pro
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,6 @@ def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False):
         image,
         shop_gpsr,
         list_item=list_item,
-        force_paid=is_local_pro(settings),
         demand_configured=search_demand_configured(
             settings.search_demand_api_key, settings.search_demand_url
         ),
@@ -92,9 +93,6 @@ async def list_images(
 ) -> list[ImageListOut] | JSONResponse:
     cached = await catalogue_cache.get(user_id)
     if cached is not None:
-        if is_local_pro(settings):
-            for item in cached:
-                item["paymentStatus"] = "paid"
         return JSONResponse(content=cached)
     try:
         rows = await store.list_images(session, user_id)
@@ -233,16 +231,30 @@ async def accept_generated_listing_copy_route(
     )
     connection = await connections.get_shopify(session, user_id)
     shop_gpsr = connection.gpsr_identity if connection is not None else None
+    facts_blocked = generation_blocked_reason(current)
+    if facts_blocked:
+        raise HTTPException(status_code=409, detail=facts_blocked)
     accepted = accept_generated_listing_copy(
         current,
         body.model_dump(exclude_unset=True),
         shop_gpsr,
     )
+    blocked = await authorize_plan_job(session, settings, user_id, "generate_persist")
+    if blocked:
+        raise HTTPException(status_code=403, detail=blocked)
     if accepted.listing_copy:
         written = await store.update_image(session, image_id, accepted.listing_copy)
         if written is None:
             raise HTTPException(status_code=404, detail="Image not found")
         image = written
+        await settle_plan_job(
+            session,
+            settings,
+            user_id,
+            "generate_persist",
+            listing_copy_was_stale=current.listing_copy_stale,
+            product_id=image_id,
+        )
     updated = await store.persist_product_facts(
         session, image, stored_from_facts(accepted.facts)
     )
@@ -412,9 +424,15 @@ async def listing_copy_refresh_accept_route(
     )
     if accepted.error:
         return _refresh_conflict(accepted.error)
+    blocked = await authorize_plan_job(session, settings, user_id, "refresh_accept")
+    if blocked:
+        raise HTTPException(status_code=403, detail=blocked)
     updated = await store.update_image(session, image_id, accepted.listing_copy or {})
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
+    await settle_plan_job(
+        session, settings, user_id, "refresh_accept", product_id=image_id
+    )
     return _image_out(updated, settings, shop_gpsr)
 
 
@@ -529,16 +547,19 @@ async def push_to_shopify(
         if not images_to_push:
             raise HTTPException(status_code=400, detail="No images found for given IDs")
 
-        unpaid = [img for img in images_to_push if img.payment_status != "paid"]
-        if unpaid and not is_local_pro(settings):
+        missing_copy = [
+            img
+            for img in images_to_push
+            if not listing_copy_present(listing_copy_from_image(img))
+        ]
+        if missing_copy:
             return JSONResponse(
                 status_code=402,
                 content={
                     "message": (
-                        f"{len(unpaid)} product(s) have not been unlocked yet. "
-                        "Pay for full AI analysis before pushing to Shopify."
+                        f"{len(missing_copy)} product(s) still need listing copy."
                     ),
-                    "unpaidCount": len(unpaid),
+                    "missingCopyCount": len(missing_copy),
                 },
             )
 

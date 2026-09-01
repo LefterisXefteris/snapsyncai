@@ -80,16 +80,16 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
   };
 
   // ── Status ────────────────────────────────────────────────────────────────
-  const isUnpaid = image.paymentStatus !== "paid";
+  const missingCopy = image.listingCopyPresent !== true;
   const isSynced = image.shopifyStatus === "synced";
-  const statusColor = isUnpaid
+  const statusColor = missingCopy
     ? "text-amber-400 bg-amber-400/10 border-amber-400/20"
     : image.shopifyStatus === "synced"
       ? "text-green-400 bg-green-400/10 border-green-400/20"
       : image.shopifyStatus === "failed"
         ? "text-red-400 bg-red-400/10 border-red-400/20"
         : "text-amber-400 bg-amber-400/10 border-amber-400/20";
-  const statusLabel = isUnpaid ? "Preview"
+  const statusLabel = missingCopy ? "No copy"
     : image.shopifyStatus === "synced" ? "Synced"
     : image.shopifyStatus === "failed" ? "Failed"
     : "Pending";
@@ -159,7 +159,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             </Badge>
           )}
           <Badge variant="outline" className={`text-[10px] font-mono uppercase tracking-wide ${statusColor} ${analyzing ? "animate-breathe" : ""}`}>
-            {isUnpaid && <Lock className="w-2.5 h-2.5 mr-0.5" />}
+            {missingCopy && <Lock className="w-2.5 h-2.5 mr-0.5" />}
             {analyzing ? "Thinking" : statusLabel}
           </Badge>
         </div>
@@ -202,7 +202,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
               {image.title || image.originalName}
             </h3>
 
-            {image.category && !isUnpaid && (
+            {image.category && (
               <p className="text-[10px] text-muted-foreground truncate" title={image.category}>
                 {image.category}
               </p>
@@ -210,16 +210,15 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           </>
         )}
 
-        {isUnpaid && !analyzing && (
+        {missingCopy && !analyzing && (
           <div className="p-1.5 rounded-md bg-amber-500/5 text-[10px] text-amber-500 flex items-center gap-1 shadow-[inset_0_0_0_1px_hsl(38_92%_50%/0.2)]">
             <Lock className="w-2.5 h-2.5 shrink-0" />
-            Preview mode — subscribe to unlock
+            Confirm facts, then listing copy
           </div>
         )}
 
         {/* ── Price + currency ── */}
-        {!isUnpaid && (
-          <div className="no-nav flex items-center gap-1 mt-auto pt-1">
+        <div className="no-nav flex items-center gap-1 mt-auto pt-1">
             {/* currency selector */}
             <Select value={currency} onValueChange={handleCurrencyChange}>
               <SelectTrigger className="h-7 w-16 text-[11px] font-mono bg-transparent border-white/10 px-1.5 no-nav">
@@ -264,7 +263,6 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
               </button>
             )}
           </div>
-        )}
 
         {/* ── Footer: mono metadata for published cards + remove ── */}
         <div className="flex items-center justify-between pt-1 gap-2">

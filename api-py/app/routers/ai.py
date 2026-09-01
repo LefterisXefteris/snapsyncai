@@ -35,6 +35,7 @@ from app.services.image_analysis import (
 from app.services.image_buffers import set_image_buffer
 from app.services.listing_copy_refresh import search_demand_configured
 from app.services.openai_client import get_openai
+from app.services.plan_charge import authorize_plan_job
 from app.services.product_facts import (
     PersistableVision,
     generation_blocked_reason,
@@ -42,7 +43,7 @@ from app.services.product_facts import (
     merge_product_facts,
     persistable_from_vision,
 )
-from app.services.subscriptions import has_active_subscription, is_local_pro
+from app.services.subscriptions import has_active_subscription
 from app.services.supabase_storage import upload_file_to_storage
 from app.services.upload_langgraph import resolve_upload_processing_mode
 
@@ -111,7 +112,6 @@ def _message(status: int, message: str, **extra: Any) -> JSONResponse:
 def _image_out(image, settings) -> ImageOut:
     return with_facts_outcomes(
         image,
-        force_paid=is_local_pro(settings),
         demand_configured=search_demand_configured(
             settings.search_demand_api_key, settings.search_demand_url
         ),
@@ -290,7 +290,7 @@ async def upload_images(
                             user_id=user_id,
                             context=context,
                             tone=tone,
-                            payment_status="paid" if upload_mode == "groupedPaid" else "unpaid",
+                            payment_status="unpaid",
                             persistable=persistable,
                             group_id=group_id,
                             include_commerce=is_primary,
@@ -310,7 +310,7 @@ async def upload_images(
                             user_id=user_id,
                             context=context,
                             tone=tone,
-                            payment_status="paid" if paid else "unpaid",
+                            payment_status="unpaid",
                             group_id=group_id,
                         ),
                     )
@@ -337,7 +337,7 @@ async def upload_images(
                             user_id=user_id,
                             context=context,
                             tone=tone,
-                            payment_status="paid",
+                            payment_status="unpaid",
                             persistable=persistable,
                         ),
                     )
@@ -372,7 +372,7 @@ async def upload_images(
                         user_id=user_id,
                         context=context,
                         tone=tone,
-                        payment_status="paid" if upload_mode == "singlePaid" else "unpaid",
+                        payment_status="unpaid",
                     ),
                 )
                 fallback = await _persist_storage(session, fallback, buf, mime, name)
@@ -409,7 +409,11 @@ async def _stream_chat(messages: list, max_tokens: int) -> AsyncIterator[str]:
 
 @router.post("/api/images/{image_id}/generate-content")
 async def generate_content(
-    image_id: int, body: GenerateContentBody, user_id: CurrentUser, session: SessionDep
+    image_id: int,
+    body: GenerateContentBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
 ):
     image = await store.get_image(session, image_id)
     if not _owned(image, user_id):
@@ -418,6 +422,9 @@ async def generate_content(
     refused = _refuse_ungated_listing_copy(facts)
     if refused is not None:
         return refused
+    blocked = await authorize_plan_job(session, settings, user_id, "generate_persist")
+    if blocked:
+        return _message(403, blocked)
     buf = await store.load_image_bytes(image)
     if buf is None:
         return _message(400, PHOTO_FILE_MISSING)
@@ -451,7 +458,11 @@ async def generate_content(
 
 @router.post("/api/images/{image_id}/regenerate-field")
 async def regenerate_field(
-    image_id: int, body: RegenerateFieldBody, user_id: CurrentUser, session: SessionDep
+    image_id: int,
+    body: RegenerateFieldBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
 ):
     image = await store.get_image(session, image_id)
     if not _owned(image, user_id):
@@ -460,6 +471,9 @@ async def regenerate_field(
     refused = _refuse_ungated_listing_copy(facts)
     if refused is not None:
         return refused
+    blocked = await authorize_plan_job(session, settings, user_id, "generate_persist")
+    if blocked:
+        return _message(403, blocked)
     buf = await store.load_image_bytes(image)
     if buf is None:
         return _message(400, PHOTO_FILE_MISSING)

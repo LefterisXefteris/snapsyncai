@@ -80,6 +80,16 @@ test("copy does not sell unshipped jobs, fake proof, or the old generator story"
   }
 });
 
+test("pricing is Plan Allowance, not weekly £4 or a 30-product cap", () => {
+  const text = landingVisibleText().toLowerCase();
+  assert.match(text, /£19/);
+  assert.match(text, /£190/);
+  assert.match(text, /£1\.50/);
+  assert.equal(text.includes("£4"), false);
+  assert.equal(text.includes("30 product"), false);
+  assert.equal(text.includes("unlock"), false);
+});
+
 test("document meta describes SnapSync the workspace, on snapsyncai.co.uk", () => {
   assert.match(html, /<title>SnapSync — /);
   assert.doesNotMatch(html, /SnapSync AI/);

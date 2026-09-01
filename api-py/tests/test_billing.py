@@ -15,7 +15,7 @@ from app.services.billing import (
     is_local_pro,
     next_monday_utc,
 )
-from app.services.subscriptions import ACTIVE_STATUSES, has_active_subscription
+from app.services.subscriptions import ACTIVE_STATUSES
 
 
 def test_active_statuses_match_express() -> None:
@@ -90,7 +90,25 @@ def test_local_pro_never_runs_in_production() -> None:
     assert is_local_pro(_settings(environment="production", dev_bypass_auth=True)) is False
 
 
+def test_recurring_interval_reads_the_stripe_item() -> None:
+    from types import SimpleNamespace
+
+    from app.services.billing import recurring_interval_of
+
+    week = SimpleNamespace(
+        items=SimpleNamespace(
+            data=[SimpleNamespace(price=SimpleNamespace(recurring=SimpleNamespace(interval="week")))]
+        )
+    )
+    assert recurring_interval_of(week) == "week"
+    month = {"items": {"data": [{"price": {"recurring": {"interval": "month"}}}]}}
+    assert recurring_interval_of(month) == "month"
+    assert recurring_interval_of(None) is None
+
+
 @pytest.mark.asyncio
 async def test_local_pro_counts_as_subscribed_without_stripe() -> None:
+    from app.services.subscriptions import has_active_subscription
+
     settings = _settings(environment="development", dev_bypass_auth=True)
     assert await has_active_subscription(None, "dev_local_user", settings) is True

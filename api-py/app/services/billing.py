@@ -24,10 +24,13 @@ from app.auth.clerk import _client
 from app.config import Settings, get_settings
 from app.models import Image, ShopifyConnection
 from app.models.billing import PaidSession, Subscription
-from app.routers.config import (
-    SUBSCRIPTION_ANNUAL_PRICE_PENCE,
-    SUBSCRIPTION_WEEKLY_PRICE_PENCE,
-    WEEKLY_PRODUCT_LIMIT,
+from app.services.plan import (
+    LEFTOVER_WEEKLY_INCLUDED as WEEKLY_PRODUCT_LIMIT,
+)
+from app.services.plan import (
+    OVERAGE_PENCE,
+    PLAN_ANNUAL_PENCE,
+    PLAN_MONTHLY_PENCE,
 )
 from app.services.subscriptions import (
     ACTIVE_STATUSES,
@@ -122,6 +125,7 @@ async def upsert_subscription(
     stripe_subscription_id: str,
     status: str,
     current_period_end: datetime | None,
+    billing_interval: str | None = None,
 ) -> Subscription:
     values = {
         "user_id": user_id,
@@ -130,6 +134,8 @@ async def upsert_subscription(
         "status": status,
         "current_period_end": current_period_end,
     }
+    if billing_interval is not None:
+        values["billing_interval"] = billing_interval
     existing = await get_subscription(session, user_id)
     if existing:
         await session.execute(
@@ -160,10 +166,13 @@ async def update_subscription_status(
     stripe_subscription_id: str,
     status: str,
     current_period_end: datetime | None = None,
+    billing_interval: str | None = None,
 ) -> None:
     updates: dict = {"status": status}
     if current_period_end is not None:
         updates["current_period_end"] = current_period_end
+    if billing_interval is not None:
+        updates["billing_interval"] = billing_interval
     await session.execute(
         update(Subscription)
         .where(Subscription.stripe_subscription_id == stripe_subscription_id)
@@ -294,13 +303,14 @@ async def get_weekly_product_count(session: AsyncSession, user_id: str) -> int:
 
 
 async def get_or_create_weekly_subscription_price_id() -> str:
+    """Plan monthly price. Name kept so checkout callers stay stable."""
     global _cached_weekly_price_id
     if _cached_weekly_price_id:
         return _cached_weekly_price_id
     configure_stripe()
     products = stripe.Product.list(active=True, limit=100)
     existing = next(
-        (p for p in products.data if (p.metadata or {}).get("type") == "weekly_subscription"),
+        (p for p in products.data if (p.metadata or {}).get("type") == "plan_subscription"),
         None,
     )
     if existing:
@@ -309,9 +319,9 @@ async def get_or_create_weekly_subscription_price_id() -> str:
             (
                 p
                 for p in prices.data
-                if p.unit_amount == SUBSCRIPTION_WEEKLY_PRICE_PENCE
+                if p.unit_amount == PLAN_MONTHLY_PENCE
                 and p.type == "recurring"
-                and getattr(p.recurring, "interval", None) == "week"
+                and getattr(p.recurring, "interval", None) == "month"
             ),
             None,
         )
@@ -321,17 +331,17 @@ async def get_or_create_weekly_subscription_price_id() -> str:
         product_id = existing.id
     else:
         product = stripe.Product.create(
-            name="SnapSync AI",
-            description="Up to 30 AI-powered product listings per week",
-            metadata={"type": "weekly_subscription"},
+            name="SnapSync Plan",
+            description="20 listing-copy writes and website handoffs per calendar month",
+            metadata={"type": "plan_subscription"},
         )
         product_id = product.id
 
     price = stripe.Price.create(
         product=product_id,
-        unit_amount=SUBSCRIPTION_WEEKLY_PRICE_PENCE,
+        unit_amount=PLAN_MONTHLY_PENCE,
         currency="gbp",
-        recurring={"interval": "week"},
+        recurring={"interval": "month"},
     )
     _cached_weekly_price_id = price.id
     return price.id
@@ -344,7 +354,7 @@ async def get_or_create_annual_subscription_price_id() -> str:
     configure_stripe()
     products = stripe.Product.list(active=True, limit=100)
     existing = next(
-        (p for p in products.data if (p.metadata or {}).get("type") == "weekly_subscription"),
+        (p for p in products.data if (p.metadata or {}).get("type") == "plan_subscription"),
         None,
     )
     if existing:
@@ -353,7 +363,7 @@ async def get_or_create_annual_subscription_price_id() -> str:
             (
                 p
                 for p in prices.data
-                if p.unit_amount == SUBSCRIPTION_ANNUAL_PRICE_PENCE
+                if p.unit_amount == PLAN_ANNUAL_PENCE
                 and p.type == "recurring"
                 and getattr(p.recurring, "interval", None) == "year"
             ),
@@ -365,15 +375,15 @@ async def get_or_create_annual_subscription_price_id() -> str:
         product_id = existing.id
     else:
         product = stripe.Product.create(
-            name="SnapSync AI",
-            description="Up to 30 AI-powered product listings per week",
-            metadata={"type": "weekly_subscription"},
+            name="SnapSync Plan",
+            description="20 listing-copy writes and website handoffs per calendar month",
+            metadata={"type": "plan_subscription"},
         )
         product_id = product.id
 
     price = stripe.Price.create(
         product=product_id,
-        unit_amount=SUBSCRIPTION_ANNUAL_PRICE_PENCE,
+        unit_amount=PLAN_ANNUAL_PENCE,
         currency="gbp",
         recurring={"interval": "year"},
     )
@@ -407,6 +417,46 @@ async def relink_stripe_subscription(
         stripe_subscription_id=active_sub.id,
         status=active_sub.status,
         current_period_end=from_unix(getattr(active_sub, "current_period_end", None)),
+        billing_interval=recurring_interval_of(active_sub),
+    )
+
+
+def recurring_interval_of(stripe_sub) -> str | None:
+    if stripe_sub is None:
+        return None
+    if isinstance(stripe_sub, dict):
+        items = stripe_sub.get("items")
+    else:
+        items = getattr(stripe_sub, "items", None)
+    if isinstance(items, dict):
+        data = items.get("data")
+    else:
+        data = getattr(items, "data", None) if items is not None else None
+    if not data:
+        return None
+    first = data[0]
+    if isinstance(first, dict):
+        price = first.get("price")
+    else:
+        price = getattr(first, "price", None)
+    if isinstance(price, dict):
+        recurring = price.get("recurring")
+    else:
+        recurring = getattr(price, "recurring", None) if price is not None else None
+    if isinstance(recurring, dict):
+        interval = recurring.get("interval")
+    else:
+        interval = getattr(recurring, "interval", None) if recurring is not None else None
+    return str(interval) if interval else None
+
+
+def report_overage(customer_id: str) -> None:
+    configure_stripe()
+    stripe.InvoiceItem.create(
+        customer=customer_id,
+        amount=OVERAGE_PENCE,
+        currency="gbp",
+        description="Allowance overage",
     )
 
 
@@ -436,7 +486,9 @@ __all__ = [
     "migrate_session",
     "next_monday_utc",
     "period_end_iso",
+    "recurring_interval_of",
     "relink_stripe_subscription",
+    "report_overage",
     "stripe_id",
     "update_subscription_status",
     "upsert_subscription",

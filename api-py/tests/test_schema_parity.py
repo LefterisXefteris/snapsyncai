@@ -16,6 +16,7 @@ EXPECTED_TABLES = {
     "paid_sessions",
     "subscriptions",
     "user_credits",
+    "allowance_spends",
     "inventory_settings",
     "inventory_items",
     "inventory_channel_links",

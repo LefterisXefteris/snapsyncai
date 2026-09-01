@@ -17,6 +17,10 @@ class UnlockImagesBody(CamelModel):
 
 class SubscriptionStatusResponse(CamelModel):
     subscribed: bool
+    entitlement: str | None = None
+    allowance_used: int | None = None
+    allowance_included: int | None = None
+    overage_this_month: int | None = None
     status: str | None = None
     current_period_end: str | None = None
     stripe_subscription_id: str | None = None

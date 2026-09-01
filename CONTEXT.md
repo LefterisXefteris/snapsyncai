@@ -5,8 +5,8 @@ Textile-first seller workspace for Shopify, Wix, and Vinted. Listing from photos
 ## Language
 
 **Channel**:
-Shopify, Wix, or Vinted — a place the seller lists or fetches products.
-_Avoid_: Platform, integration, marketplace (as the general term), store (when you mean the channel type)
+Shopify, Wix, or Vinted — a place the seller lists or fetches products. Each Channel keeps its own connect and publish fields; they are not one interchangeable slot.
+_Avoid_: Platform, plugin, integration, marketplace (as the general term), store (when you mean the channel type)
 
 **Publication**:
 Where this product is available inside a connected Shopify shop — Online Store, Point of Sale, Shop, and other sales apps on that shop. Not a Channel.
@@ -127,3 +127,11 @@ _Avoid_: store, shop (when you mean this), channel, theme
 **Website prototype**:
 The look and the products the seller picks in SnapSync before a website is built. Not a live storefront in SnapSync. Not listing copy. Voice is those products' listing copy, not a separate tone field.
 _Avoid_: theme, mock, preview (as the job)
+
+**Plan**:
+Paid access to the workspace for one seller and one Shopify shop. Monthly and annual are how they pay; annual is cheaper for the same Plan, not a bigger Allowance. It includes an Allowance. Without a Plan the seller still has the workspace — catalogue, Inventory, New listing, Import, confirmed facts, and push of listing copy they typed — but not listing-copy generate, listing copy refresh, Bulk SEO, or website.
+_Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock
+
+**Allowance**:
+The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product in the run. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write or website lands — a failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check.
+_Avoid_: credits, weekly product limit, unlock, compliance check, top-up, yearly bank

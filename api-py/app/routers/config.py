@@ -10,12 +10,14 @@ from fastapi import APIRouter, HTTPException, status
 from app.config import SettingsDep
 from app.schemas.base import CamelModel
 
-router = APIRouter(tags=["config"])
+from app.services.plan import (
+    OVERAGE_PENCE,
+    PLAN_ANNUAL_PENCE,
+    PLAN_INCLUDED,
+    PLAN_MONTHLY_PENCE,
+)
 
-# server/routes.ts:302-304
-SUBSCRIPTION_WEEKLY_PRICE_PENCE = 400  # £4.00/week
-SUBSCRIPTION_ANNUAL_PRICE_PENCE = 17_300  # £173.00/year (2 months free vs 52 x £4)
-WEEKLY_PRODUCT_LIMIT = 30
+router = APIRouter(tags=["config"])
 
 
 class ClerkConfigResponse(CamelModel):
@@ -24,9 +26,10 @@ class ClerkConfigResponse(CamelModel):
 
 class PaymentsConfigResponse(CamelModel):
     publishable_key: str
-    subscription_weekly_price_pence: int
-    subscription_annual_price_pence: int
-    weekly_product_limit: int
+    plan_monthly_price_pence: int
+    plan_annual_price_pence: int
+    allowance_monthly: int
+    overage_pence: int
 
 
 @router.get("/api/auth/clerk-config", response_model=ClerkConfigResponse)
@@ -48,7 +51,8 @@ async def payments_config(settings: SettingsDep) -> PaymentsConfigResponse:
         )
     return PaymentsConfigResponse(
         publishable_key=settings.stripe_publishable_key,
-        subscription_weekly_price_pence=SUBSCRIPTION_WEEKLY_PRICE_PENCE,
-        subscription_annual_price_pence=SUBSCRIPTION_ANNUAL_PRICE_PENCE,
-        weekly_product_limit=WEEKLY_PRODUCT_LIMIT,
+        plan_monthly_price_pence=PLAN_MONTHLY_PENCE,
+        plan_annual_price_pence=PLAN_ANNUAL_PENCE,
+        allowance_monthly=PLAN_INCLUDED,
+        overage_pence=OVERAGE_PENCE,
     )

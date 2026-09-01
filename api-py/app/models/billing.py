@@ -12,7 +12,7 @@ from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
-from app.models.base import integer, timestamp, txt
+from app.models.base import boolean, integer, timestamp, txt
 
 
 class PaidSession(SQLModel, table=True):
@@ -37,6 +37,7 @@ class Subscription(SQLModel, table=True):
     stripe_subscription_id: str = Field(sa_column=txt(nullable=False))
     status: str = Field(sa_column=txt(nullable=False, server_default="active"))
     current_period_end: datetime | None = Field(default=None, sa_column=timestamp())
+    billing_interval: str | None = Field(default=None, sa_column=txt())
     created_at: datetime | None = Field(default=None, sa_column=timestamp(now=True))
 
 
@@ -48,3 +49,15 @@ class UserCredits(SQLModel, table=True):
     balance: int = Field(sa_column=integer(nullable=False, default=0))
     lifetime_credits: int = Field(sa_column=integer(nullable=False, default=0))
     updated_at: datetime | None = Field(default=None, sa_column=timestamp(now=True))
+
+
+class AllowanceSpend(SQLModel, table=True):
+    __tablename__ = "allowance_spends"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: str = Field(sa_column=txt(nullable=False, index=True))
+    kind: str = Field(sa_column=txt(nullable=False))
+    product_id: int | None = Field(default=None, sa_column=integer())
+    as_overage: bool = Field(sa_column=boolean(nullable=False, default=False))
+    overage_reported: bool = Field(sa_column=boolean(nullable=False, default=True))
+    created_at: datetime | None = Field(default=None, sa_column=timestamp(now=True))

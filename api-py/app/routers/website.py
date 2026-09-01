@@ -3,10 +3,12 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.auth.clerk import CurrentUser
+from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.services import connections
 from app.services import images as store
+from app.services.plan_charge import authorize_plan_job, settle_plan_job
 from app.services.website_handoff import (
     HandoffError,
     build_handoff,
@@ -64,7 +66,7 @@ async def website_prototype(
 
 @router.post("/api/website/handoff", response_model=WebsiteHandoffResponse)
 async def website_handoff(
-    body: WebsiteHandoffBody, user_id: CurrentUser, session: SessionDep
+    body: WebsiteHandoffBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> WebsiteHandoffResponse:
     connection = await connections.get_shopify(session, user_id)
     if connection is None:
@@ -75,6 +77,9 @@ async def website_handoff(
     eligible = eligible_products(photos_from_images(images))
     wanted = set(body.product_ids)
     selected = [product for product in eligible if product.id in wanted]
+    blocked = await authorize_plan_job(session, settings, user_id, "website_handoff")
+    if blocked:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocked)
     try:
         result = build_handoff(
             shop_domain=connection.shop_domain,
@@ -84,6 +89,7 @@ async def website_handoff(
         )
     except HandoffError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await settle_plan_job(session, settings, user_id, "website_handoff")
     return WebsiteHandoffResponse(
         lovable_url=result.lovable_url, product_count=result.product_count
     )

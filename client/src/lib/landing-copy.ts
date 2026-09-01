@@ -4,7 +4,7 @@ export const LANDING_DOCUMENT_TITLE =
   "SnapSync — seller workspace for textile listings on Shopify";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is a seller workspace for textile listings on Shopify. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Push to Shopify. Inventory Autopilot included. Subscribe from £4/week.";
+  "SnapSync is a seller workspace for textile listings on Shopify. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Push to Shopify. Inventory Autopilot included. Plan from £19/month.";
 
 export const LANDING_EYEBROW = "Shopify · textiles";
 
@@ -16,12 +16,12 @@ export const LANDING_SUBHEAD =
 export const LANDING_NON_TEXTILE =
   "Not a textile? You still confirm facts. The fibre pack is only for textile products.";
 
-export const LANDING_MICRO = "No card required · up to 200 photos · 30 products/week";
+export const LANDING_MICRO = "No card required · catalogue, facts, and typed listing copy free";
 
 export const LANDING_PRIMARY_CTA = "Start free";
 export const LANDING_SECONDARY_CTA = "How it works";
 
-export const LANDING_FINE_PRINT = "Subscribe from £4/week · £173/year · Cancel anytime";
+export const LANDING_FINE_PRINT = "Plan from £19/month · £190/year · Extra uses £1.50 · Cancel anytime";
 
 export const JOBS = [
   {
@@ -70,23 +70,23 @@ export const STEPS = [
 ] as const;
 
 export const WEEKLY_BULLETS = [
-  "Up to 30 products per week",
+  "20 listing-copy writes per calendar month",
   "New listing from photos (up to 200)",
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
   "Inventory Autopilot",
-  "Cancel anytime",
+  "Extra uses £1.50 — not a hard stop",
 ] as const;
 
 export const ANNUAL_BULLETS = [
-  "Up to 30 products per week",
+  "20 listing-copy writes per calendar month",
   "New listing from photos (up to 200)",
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
   "Inventory Autopilot",
-  "Best per-week rate",
+  "Two months free vs paying monthly",
 ] as const;
 
 export const FAQ_DATA = [
@@ -101,9 +101,9 @@ export const FAQ_DATA = [
       "Listing copy must not invent product facts a photo cannot establish. You confirm fibre composition, care instructions, and GPSR identity — or skip the blocks you do not have. Only then is listing copy generated.",
   },
   {
-    question: "How does the 30-product weekly limit work?",
+    question: "How does the Plan Allowance work?",
     answer:
-      "Each week (Monday to Sunday UTC) you can unlock full listing copy for up to 30 products. Several photos of one product count as one product. The count resets every Monday at midnight UTC.",
+      "Each calendar month a Plan includes 20 listing-copy writes (first generate or listing copy refresh) and website handoffs. Extra uses are £1.50 on the invoice. Unused uses expire at month end. Confirming facts does not spend. No card is required to use the workspace.",
   },
   {
     question: "How do I create a product from photos?",
@@ -118,7 +118,7 @@ export const FAQ_DATA = [
   {
     question: "How much does SnapSync cost?",
     answer:
-      "No card to start. Subscribe for £4/week or £173/year for up to 30 products per week — listing copy, SEO, AEO, push to Shopify, and Inventory Autopilot. Cancel anytime.",
+      "No card to start. A Plan is £19/month or £190/year for 20 listing-copy writes each calendar month — listing copy, listing copy refresh, website, push to Shopify, and Inventory Autopilot. Extra uses £1.50. Cancel anytime.",
   },
   {
     question: "Can I edit listing copy before I push to Shopify?",

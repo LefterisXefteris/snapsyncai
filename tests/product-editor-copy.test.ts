@@ -30,9 +30,11 @@ test("work column is product facts, then listing copy, then selling, then detail
   );
 });
 
-test("unpaid preview unlocks listing copy and selling, not variants", () => {
-  assert.match(UNPAID_PREVIEW_TITLE, /preview/i);
+test("missing listing copy points at facts or typing, not unlock", () => {
+  assert.match(UNPAID_PREVIEW_TITLE, /listing copy/i);
   assert.match(UNPAID_PREVIEW_DETAIL, /listing copy/i);
+  assert.doesNotMatch(UNPAID_PREVIEW_TITLE, /unlock/i);
+  assert.doesNotMatch(UNPAID_PREVIEW_DETAIL, /unlock/i);
   assert.doesNotMatch(UNPAID_PREVIEW_DETAIL, /variant/i);
 });
 

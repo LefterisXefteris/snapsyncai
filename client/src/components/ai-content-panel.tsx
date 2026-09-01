@@ -18,6 +18,7 @@ interface AiContentPanelProps {
   imageId: number;
   defaultCategory?: string;
   canGenerate: boolean;
+  blockedReason?: string;
   onGenerated: (parsed: GeneratedContent) => void;
   onAcceptTitle: (value: string) => void;
   onAcceptDescription: (value: string) => void;
@@ -31,6 +32,7 @@ export function AiContentPanel({
   imageId,
   defaultCategory,
   canGenerate,
+  blockedReason,
   onGenerated,
   onAcceptTitle,
   onAcceptDescription,
@@ -170,7 +172,7 @@ export function AiContentPanel({
 
         {!canGenerate && (
           <p className="text-xs text-muted-foreground">
-            Confirm product facts before generating listing copy.
+            {blockedReason ?? "Confirm product facts before generating listing copy."}
           </p>
         )}
 

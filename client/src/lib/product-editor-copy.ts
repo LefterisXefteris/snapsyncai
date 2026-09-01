@@ -18,9 +18,11 @@ export const PRODUCT_EDITOR_WORK = [
   { title: PRODUCT_EDITOR_DETAILS_TITLE },
 ] as const;
 
-export const UNPAID_PREVIEW_TITLE = "This product is in preview mode.";
+export const UNPAID_PREVIEW_TITLE = "This product has no listing copy yet.";
 export const UNPAID_PREVIEW_DETAIL =
-  "Subscribe to unlock listing copy, pricing, and selling fields.";
+  "Confirm product facts, then generate listing copy — or type it yourself and push.";
+export const NEED_PLAN =
+  "Subscribe to a Plan to generate listing copy, refresh from search demand, or build a website.";
 export const PRODUCT_EDITOR_ALT_TEXT_LABEL = "Alt text";
 
 export function productEditorShowsVariants(variantCount: number): boolean {
