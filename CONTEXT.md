@@ -37,8 +37,8 @@ The job of fetching products from a channel.
 _Avoid_: Sync, fetch, pull, scrape
 
 **Bulk SEO**:
-The job of changing listing copy for many products at once. Not the SEO fields on a single product. Not listing copy refresh.
-_Avoid_: SEO (alone)
+The job of running listing copy refresh for many seller-picked products at once. The seller starts it and accepts per product; it is not a schedule, not a second rewrite engine, and accept does not Push to a Channel.
+_Avoid_: SEO (alone), Agentic SEO, SEO agent
 
 **Listing copy refresh**:
 The job of proposing new tags, description, SEO title, and meta description for one product after looking at search demand. The seller starts it and accepts; it is not the first generate, not Bulk SEO, and it does not run when listing copy is missing or stale.
@@ -133,5 +133,5 @@ Paid access to the workspace for one seller and one Shopify shop. Monthly and an
 _Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock
 
 **Allowance**:
-The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product in the run. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write or website lands — a failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check.
+The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write or website lands — a failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check.
 _Avoid_: credits, weekly product limit, unlock, compliance check, top-up, yearly bank

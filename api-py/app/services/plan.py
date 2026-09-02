@@ -18,7 +18,7 @@ OVERAGE_PENCE = 150
 
 NEED_PLAN = (
     "Subscribe to a Plan to generate listing copy, refresh from search demand, "
-    "or build a website."
+    "run Bulk SEO, or build a website."
 )
 WEEKLY_LIMIT = (
     "You've used all 30 listing-copy writes this week. "

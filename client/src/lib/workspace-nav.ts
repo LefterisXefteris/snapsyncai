@@ -43,8 +43,7 @@ export const WORKSPACE_NAV: WorkspaceNavItem[] = [
     id: "bulk-seo",
     label: "Bulk SEO",
     path: "/bulk-seo",
-    stub: true,
-    emptyState: "Changing listing copy for many products at once is not available yet.",
+    stub: false,
   },
   { id: "settings", label: "Settings", path: "/settings", stub: false },
 ];

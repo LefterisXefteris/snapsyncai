@@ -32,6 +32,11 @@ async def _context(session: AsyncSession | None, settings: Settings, user_id: st
     return entitlement, spends, sub
 
 
+async def current_entitlement(session: AsyncSession, settings: Settings, user_id: str):
+    entitlement, _spends, _sub = await _context(session, settings, user_id)
+    return entitlement
+
+
 async def authorize_plan_job(
     session: AsyncSession, settings: Settings, user_id: str, job: JobKind
 ) -> str | None:

@@ -44,6 +44,12 @@ export const api = {
     prototype: { method: "GET" as const, path: "/api/website/prototype" as const },
     handoff: { method: "POST" as const, path: "/api/website/handoff" as const },
   },
+  bulkSeo: {
+    catalogue: { method: "GET" as const, path: "/api/bulk-seo" as const },
+    start: { method: "POST" as const, path: "/api/bulk-seo/start" as const },
+    regenerate: { method: "POST" as const, path: "/api/bulk-seo/regenerate" as const },
+    accept: { method: "POST" as const, path: "/api/bulk-seo/accept" as const },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

@@ -57,3 +57,14 @@ test("website prototype and handoff live on /api/website", () => {
   assert.equal(api.website.handoff.path, "/api/website/handoff");
   assert.equal(api.website.handoff.method, "POST");
 });
+
+test("Bulk SEO catalogue lives on /api/bulk-seo", () => {
+  assert.equal(api.bulkSeo.catalogue.path, "/api/bulk-seo");
+  assert.equal(api.bulkSeo.catalogue.method, "GET");
+  assert.equal(api.bulkSeo.start.path, "/api/bulk-seo/start");
+  assert.equal(api.bulkSeo.start.method, "POST");
+  assert.equal(api.bulkSeo.regenerate.path, "/api/bulk-seo/regenerate");
+  assert.equal(api.bulkSeo.regenerate.method, "POST");
+  assert.equal(api.bulkSeo.accept.path, "/api/bulk-seo/accept");
+  assert.equal(api.bulkSeo.accept.method, "POST");
+});

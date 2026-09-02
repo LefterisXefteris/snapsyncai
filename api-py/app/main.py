@@ -22,6 +22,7 @@ from app.db import dispose_engine, get_engine
 from app.routers import (
     ai,
     billing,
+    bulk_seo,
     config,
     connections,
     health,
@@ -97,4 +98,5 @@ def create_app() -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(inventory.router)
     app.include_router(website.router)
+    app.include_router(bulk_seo.router)
     return app

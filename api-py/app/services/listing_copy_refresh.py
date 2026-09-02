@@ -19,7 +19,7 @@ _COPY_MISSING = "Generate listing copy before refreshing from search demand."
 _COPY_STALE = (
     "Regenerate listing copy from confirmed facts before refreshing from search demand."
 )
-_DEMAND_UNCONFIGURED = "Search demand is not configured."
+DEMAND_UNCONFIGURED = "Search demand is not configured."
 _EMPTY_DEMAND = "No search demand for this product."
 
 
@@ -42,7 +42,7 @@ def refresh_blocked_reason(
     if facts.listing_copy_stale:
         return _COPY_STALE
     if not demand_configured:
-        return _DEMAND_UNCONFIGURED
+        return DEMAND_UNCONFIGURED
     return None
 
 
