@@ -15,7 +15,7 @@ test("Products is the home path", () => {
   assert.equal(workspaceNavItem("products").stub, false);
 });
 
-test("nav order is catalogue, then entry jobs, then stubs, then Settings", () => {
+test("nav order is catalogue, then entry jobs, then Settings", () => {
   assert.deepEqual(
     WORKSPACE_NAV.map((item) => item.label),
     ["Products", "New listing", "Import", "Inventory", "Website", "Bulk SEO", "Settings"],
@@ -28,8 +28,8 @@ test("New listing is a photo-entry destination, not a stub", () => {
   assert.equal(item.stub, false);
 });
 
-test("Import is a stub; Inventory, Website, and Bulk SEO are live", () => {
-  assert.equal(workspaceNavItem("import").stub, true);
+test("Import, Inventory, Website, and Bulk SEO are live", () => {
+  assert.equal(workspaceNavItem("import").stub, false);
   assert.equal(workspaceNavItem("inventory").stub, false);
   assert.equal(workspaceNavItem("website").stub, false);
   assert.equal(workspaceNavItem("website").path, "/website");
@@ -63,6 +63,7 @@ test("an unknown path activates nothing", () => {
   assert.equal(activeWorkspaceNavId("/not-a-page"), null);
 });
 
-test("stub copy names the job and does not pretend the backend exists", () => {
-  assert.equal(workspaceStubCopy("import").body, "Importing products from a channel is not available yet.");
+test("Import is not a stub", () => {
+  assert.equal(workspaceNavItem("import").stub, false);
+  assert.equal(workspaceStubCopy("import").body, "");
 });

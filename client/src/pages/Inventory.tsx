@@ -223,7 +223,7 @@ function InventoryOnboarding(props: {
         </div>
         <h1 className="font-display text-3xl md:text-4xl font-bold">Stop overselling before it starts</h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Import your Shopify catalog, reserve a safety buffer, and let SnapSync keep every tracked variant protected.
+          Load Shopify stock, reserve a safety buffer, and let SnapSync keep every tracked variant protected.
         </p>
       </div>
 
@@ -266,11 +266,11 @@ function InventoryOnboarding(props: {
             </div>
             <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground flex gap-2">
               <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
-              SnapSync first runs a read-only catalog import. You will preview the impact before any Shopify quantities change.
+              SnapSync first reads the Shopify catalogue for stock. You will preview the impact before any Shopify quantities change.
             </div>
             <Button className="w-full" onClick={start} disabled={!locationId || setup.isPending}>
               {setup.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Warehouse className="w-4 h-4 mr-2" />}
-              Import Shopify catalog
+              Set up Shopify stock
             </Button>
           </CardContent>
         </Card>
@@ -279,7 +279,7 @@ function InventoryOnboarding(props: {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               {status === "preview_ready" ? <Check className="w-5 h-5 text-emerald-400" /> : <Loader2 className="w-5 h-5 text-primary animate-spin" />}
-              {status === "preview_ready" ? "Catalog preview ready" : status === "failed" ? "Import failed" : "Importing your catalog"}
+              {status === "preview_ready" ? "Catalog preview ready" : status === "failed" ? "Stock setup failed" : "Loading Shopify stock"}
             </CardTitle>
             <CardDescription>
               {status === "preview_ready"

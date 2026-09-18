@@ -23,6 +23,7 @@ from app.routers import (
     ai,
     billing,
     bulk_seo,
+    catalogue_import,
     config,
     connections,
     health,
@@ -99,4 +100,5 @@ def create_app() -> FastAPI:
     app.include_router(inventory.router)
     app.include_router(website.router)
     app.include_router(bulk_seo.router)
+    app.include_router(catalogue_import.router)
     return app

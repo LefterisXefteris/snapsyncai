@@ -68,3 +68,10 @@ test("Bulk SEO catalogue lives on /api/bulk-seo", () => {
   assert.equal(api.bulkSeo.accept.path, "/api/bulk-seo/accept");
   assert.equal(api.bulkSeo.accept.method, "POST");
 });
+
+test("Import lives on /api/import", () => {
+  assert.equal(api.import.status.path, "/api/import");
+  assert.equal(api.import.status.method, "GET");
+  assert.equal(api.import.start.path, "/api/import/start");
+  assert.equal(api.import.start.method, "POST");
+});

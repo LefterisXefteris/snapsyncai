@@ -24,8 +24,7 @@ export const WORKSPACE_NAV: WorkspaceNavItem[] = [
     id: "import",
     label: "Import",
     path: "/import",
-    stub: true,
-    emptyState: "Importing products from a channel is not available yet.",
+    stub: false,
   },
   {
     id: "inventory",
