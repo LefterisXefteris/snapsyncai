@@ -1,3 +1,5 @@
+**Status:** done
+
 ## Problem Statement
 
 The product still has two backends. FastAPI already implements the product API, but production `/api` still runs on Express (Vercel), and the usual local `dev` command still boots Express with Vite inside it. That leaves a TypeScript server in the path after the API has already been ported, and it blocks a clean FastAPI-only backend.

@@ -25,7 +25,7 @@ A product on the New listing canvas that is not yet in the catalogue. Each photo
 _Avoid_: Upload, staged image, group (as the sellable thing), categorised, assigned
 
 **Variant**:
-A channel-level option of a product, such as color. Grouping photos in New listing does not create variants.
+A channel-level option of a product, such as color or size, with its own selling when the Channel has more than one. Grouping photos in New listing does not create variants. Distinct from Inventory (stock on that option).
 _Avoid_: Group, listing (as a color/size option)
 
 **New listing**:
@@ -33,8 +33,8 @@ The job of creating a product from photos.
 _Avoid_: Upload, upload product, add product
 
 **Import**:
-The job of fetching products from a channel.
-_Avoid_: Sync, fetch, pull, scrape
+The job of fetching products from a channel into the catalogue that are not already there. The seller starts it; it is not a schedule. Match is the Channel product id. Not Inventory pulling stock, and not Push.
+_Avoid_: Sync, fetch, pull, scrape, Inventory Autopilot setup, two-way merge
 
 **Bulk SEO**:
 The job of running listing copy refresh for many seller-picked products at once. The seller starts it and accepts per product; it is not a schedule, not a second rewrite engine, and accept does not Push to a Channel.
@@ -57,8 +57,8 @@ The title, description, tags, SEO title, meta description, and AEO text written 
 _Avoid_: AI content, content, listing (alone)
 
 **Selling**:
-Price, compare-at price, cost, SKU, and barcode on the product. Distinct from inventory and from listing copy.
-_Avoid_: Commerce, merchandising
+Price, compare-at price, cost, SKU, and barcode on the product, or on a variant when the product has more than one. Distinct from Inventory and from listing copy.
+_Avoid_: Commerce, merchandising, quantity, stock
 
 **Product facts**:
 Structured attributes of a product that listing copy is not allowed to invent. The seller must confirm them before listing copy is generated.

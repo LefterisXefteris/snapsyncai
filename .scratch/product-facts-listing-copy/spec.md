@@ -1,4 +1,4 @@
-**Status:** ready-for-agent
+**Status:** done
 
 # Product facts before listing copy
 

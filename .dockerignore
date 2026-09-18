@@ -1,0 +1,13 @@
+.git
+.cursor
+.scratch
+.agents
+.claude
+.planning
+.vscode
+node_modules
+dist
+api-py/.venv
+api-py/tests
+api-py/.env
+api-py/.env.local

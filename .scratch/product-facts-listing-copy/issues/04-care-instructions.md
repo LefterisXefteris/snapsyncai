@@ -6,11 +6,15 @@
 
 **Blocked by:** 02 — Textile fibre composition in the listing
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Textile Product Details: care is either a complete five-family set or an explicit skip
-- [ ] Picks are from the v1 lists (washing, bleaching, drying, ironing, professional textile care) and render as English text, not symbols
-- [ ] Empty care cannot be confirmed — fill all five or skip
-- [ ] Generated description includes the care block after composition when not skipped; skip omits it
-- [ ] Care is not shown for a confirmed non-textile product
-- [ ] Tests hit the product-facts module: skip omits the care block; partial care cannot confirm; rendered text matches the picks and contains no pictograms
+- [x] Textile Product Details: care is either a complete five-family set or an explicit skip
+- [x] Picks are from the v1 lists (washing, bleaching, drying, ironing, professional textile care) and render as English text, not symbols
+- [x] Empty care cannot be confirmed — fill all five or skip
+- [x] Generated description includes the care block after composition when not skipped; skip omits it
+- [x] Care is not shown for a confirmed non-textile product
+- [x] Tests hit the product-facts module: skip omits the care block; partial care cannot confirm; rendered text matches the picks and contains no pictograms
+
+## Comments
+
+Closed to match git (`eaaee41` and later Product facts module work). Not a fresh implement.

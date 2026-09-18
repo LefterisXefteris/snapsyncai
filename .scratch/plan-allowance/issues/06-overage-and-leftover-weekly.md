@@ -6,7 +6,7 @@
 
 **Blocked by:** 03 — Checkout is a Plan, return to the workspace; 04 — Generate and listing copy refresh spend; 05 — Website handoff spends
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 21st successful Plan job is allowed and marked overage
 - [x] Overage is reported through the Stripe adapter; tests fake the adapter

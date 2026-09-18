@@ -6,7 +6,7 @@
 
 **Blocked by:** 02 — Plan module, status, and Settings meter
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Free: Generate and refresh accept refused with the Plan reason; facts-blocked generate still facts, not Plan
 - [x] Persist from Generate spends unless listing copy was stale

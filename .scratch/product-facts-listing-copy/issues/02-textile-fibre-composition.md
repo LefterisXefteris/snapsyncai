@@ -6,13 +6,17 @@
 
 **Blocked by:** 01 — Gate listing copy on confirmed facts (non-textile path)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Confirming a textile without composition does not open the gate
-- [ ] Composition is structured rows: common EU fibre names plus Other; integer percentages must sum to 100
-- [ ] Suggested fibre names pre-fill rows with blank percentages; vision must not fill percentages
-- [ ] Incomplete rows (name without %, or % that do not sum to 100) cannot be confirmed
-- [ ] After composition is confirmed, Generate writes listing copy whose description includes the English composition block
-- [ ] Tags and AEO use confirmed fibre names, not suggested-only names
-- [ ] Composition and care UI stay hidden when the product is confirmed not a textile
-- [ ] Tests hit the product-facts module: missing composition blocks generate; 80% cotton alone cannot confirm; description HTML contains the confirmed composition and not a skipped/absent GPSR block
+- [x] Confirming a textile without composition does not open the gate
+- [x] Composition is structured rows: common EU fibre names plus Other; integer percentages must sum to 100
+- [x] Suggested fibre names pre-fill rows with blank percentages; vision must not fill percentages
+- [x] Incomplete rows (name without %, or % that do not sum to 100) cannot be confirmed
+- [x] After composition is confirmed, Generate writes listing copy whose description includes the English composition block
+- [x] Tags and AEO use confirmed fibre names, not suggested-only names
+- [x] Composition and care UI stay hidden when the product is confirmed not a textile
+- [x] Tests hit the product-facts module: missing composition blocks generate; 80% cotton alone cannot confirm; description HTML contains the confirmed composition and not a skipped/absent GPSR block
+
+## Comments
+
+Closed to match git (`58a2325` and later Product facts module work). Not a fresh implement.

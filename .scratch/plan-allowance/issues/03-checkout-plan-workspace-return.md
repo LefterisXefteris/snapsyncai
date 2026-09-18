@@ -6,7 +6,7 @@
 
 **Blocked by:** 02 — Plan module, status, and Settings meter
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] create-checkout uses Plan monthly/annual prices (£19 / £190), not weekly £4
 - [x] success and cancel URLs use the workspace origin (APP_BASE_URL), not the API host

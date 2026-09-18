@@ -21,8 +21,13 @@ curl -s http://localhost:5001/api/health
 
 ## 1. Deploy
 
-Create a Railway service with **root directory `api-py`**. It builds from
-`Dockerfile` (`railway.toml`).
+Repo-root `railway.toml` + `Dockerfile` build FastAPI from `api-py/` with the
+default (repository root) service directory. Builder must be **Dockerfile**.
+Leave Root Directory empty when using those root files.
+
+Alternatively: Root Directory `api-py`, Dockerfile path `Dockerfile`
+(`api-py/railway.toml`). Do not combine Root Directory `api-py` with path
+`api-py/Dockerfile` — that looks for `api-py/api-py/Dockerfile`.
 
 Set these on the service (same production values the product already uses):
 

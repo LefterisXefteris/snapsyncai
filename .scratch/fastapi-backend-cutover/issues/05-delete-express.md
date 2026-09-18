@@ -1,20 +1,20 @@
-## Parent
+# 05 — Delete Express
 
-lisai-app-3p3
+**Parent:** `.scratch/fastapi-backend-cutover/spec.md`
 
-## What to build
+**What to build:** Express is gone. The TypeScript server, Vercel API handler, Fly config, Express-only tests, and `shared/` are removed. The SPA owns its `Image` type and path helpers. Vercel serves only the SPA. Local and production backends are FastAPI only.
 
-Express is gone. The TypeScript server, Vercel API handler, Fly config, Express-only tests, and `shared/` are removed. The SPA owns its `Image` type and path helpers. Vercel serves only the SPA. Local and production backends are FastAPI only.
+**Blocked by:** 01 — Local FastAPI only; 04 — Production SPA uses API
 
-## Acceptance criteria
+**Status:** done
 
-- [ ] No Express process or Vercel `/api` serverless handler remains
-- [ ] SPA types and path helpers live in the client; `shared/` is gone
-- [ ] Fly is not referenced as a deploy target
-- [ ] Replit Stripe-sync and Replit image/batch helpers are gone
-- [ ] Local `dev` still runs Vite + FastAPI
-- [ ] Production `/api` is Railway only (Vercel no longer handles `/api`)
+- [x] No Express process or Vercel `/api` serverless handler remains
+- [x] SPA types and path helpers live in the client; `shared/` is gone
+- [x] Fly is not referenced as a deploy target
+- [x] Replit Stripe-sync and Replit image/batch helpers are gone
+- [x] Local `dev` still runs Vite + FastAPI
+- [x] Production `/api` is Railway only (Vercel no longer handles `/api`)
 
-## Blocked by
+## Comments
 
-Ticket 1 (local FastAPI-only) and ticket 4 (production SPA uses `api.`).
+Closed to match git (`26108a6`, `0e2443d`).

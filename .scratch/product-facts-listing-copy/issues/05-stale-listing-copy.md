@@ -6,11 +6,15 @@
 
 **Blocked by:** 02 — Textile fibre composition in the listing; 03 — Shop GPSR identity on the listing
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Editing confirmed facts after Generate marks listing copy stale (composition, care, GPSR, or textile flag)
-- [ ] A banner tells the seller to regenerate; existing listing copy is not cleared
-- [ ] Publish still succeeds while copy is stale
-- [ ] Regenerating produces new listing copy from the updated facts and clears stale
-- [ ] Confirming facts for the first time (no prior Generate) is not stale
-- [ ] Tests hit the product-facts module: facts changed after generation → stale; regenerate with new facts → not stale; never-generated is not stale
+- [x] Editing confirmed facts after Generate marks listing copy stale (composition, care, GPSR, or textile flag)
+- [x] A banner tells the seller to regenerate; existing listing copy is not cleared
+- [x] Publish still succeeds while copy is stale
+- [x] Regenerating produces new listing copy from the updated facts and clears stale
+- [x] Confirming facts for the first time (no prior Generate) is not stale
+- [x] Tests hit the product-facts module: facts changed after generation → stale; regenerate with new facts → not stale; never-generated is not stale
+
+## Comments
+
+Closed to match git (`681fc2b` and the later one-product-facts-module tickets). Not a fresh implement.

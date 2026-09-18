@@ -1,5 +1,5 @@
-# Railway service root: this directory (`api-py`).
-# Dashboard/DNS for api.snapsyncai.co.uk is ticket lisai-app-3p3.3.
+# Use this file only when the Railway service Root Directory is `api-py`.
+# For a repo-root service (the default), use the railway.toml at the repo root.
 
 [build]
 builder = "DOCKERFILE"

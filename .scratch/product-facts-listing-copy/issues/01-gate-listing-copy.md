@@ -6,13 +6,17 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Upload does not persist title, description, tags, SEO, or AEO (unpaid preview included — no title teaser)
-- [ ] Upload may persist classification, price, color/size variants, and suggested facts (textile yes/no, fibre names with blank %)
-- [ ] Product Details lets the seller confirm “not a textile”; Generate and regenerate stay off until that confirmation
-- [ ] After confirmation, Generate runs and must not invent fibre composition or GPSR identity
-- [ ] Facts belong to the product (shared across grouped photos; a standalone photo is its own product)
-- [ ] Unlock / paid full analysis does not write listing copy
-- [ ] Grandfathered listing copy still publishes; Generate on that product stays gated until facts are confirmed
-- [ ] Tests hit the product-facts module: unconfirmed cannot generate; non-textile confirm opens the gate; vision output with listing copy is persisted without those fields
+- [x] Upload does not persist title, description, tags, SEO, or AEO (unpaid preview included — no title teaser)
+- [x] Upload may persist classification, price, color/size variants, and suggested facts (textile yes/no, fibre names with blank %)
+- [x] Product Details lets the seller confirm “not a textile”; Generate and regenerate stay off until that confirmation
+- [x] After confirmation, Generate runs and must not invent fibre composition or GPSR identity
+- [x] Facts belong to the product (shared across grouped photos; a standalone photo is its own product)
+- [x] Unlock / paid full analysis does not write listing copy
+- [x] Grandfathered listing copy still publishes; Generate on that product stays gated until facts are confirmed
+- [x] Tests hit the product-facts module: unconfirmed cannot generate; non-textile confirm opens the gate; vision output with listing copy is persisted without those fields
+
+## Comments
+
+Closed to match git (`2ef06d8` and later Product facts module work). Not a fresh implement.

@@ -6,7 +6,7 @@
 
 **Blocked by:** 02 — Plan module, status, and Settings meter
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Free seller cannot hand off; reason is Plan
 - [x] Successful handoff records one spend

@@ -9,7 +9,7 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-STORAGE_BUCKET = "product-images"
+DEFAULT_STORAGE_BUCKET = "product-images"
 
 
 @lru_cache
@@ -33,8 +33,10 @@ def upload_image_to_storage(
 
     path = f"{image_id}/{int(time.time() * 1000)}.{ext}"
     try:
+        settings = get_settings()
+        bucket = settings.supabase_storage_bucket or DEFAULT_STORAGE_BUCKET
         supabase = _client()
-        error = supabase.storage.from_(STORAGE_BUCKET).upload(
+        error = supabase.storage.from_(bucket).upload(
             path,
             file_buffer,
             {"content-type": mime_type, "upsert": "false"},
@@ -42,7 +44,7 @@ def upload_image_to_storage(
         if getattr(error, "error", None):
             logger.error("Supabase Storage upload error: %s", error.error)
             return None
-        data = supabase.storage.from_(STORAGE_BUCKET).get_public_url(path)
+        data = supabase.storage.from_(bucket).get_public_url(path)
         if isinstance(data, dict):
             return data.get("publicUrl") or data.get("public_url")
         return str(data)

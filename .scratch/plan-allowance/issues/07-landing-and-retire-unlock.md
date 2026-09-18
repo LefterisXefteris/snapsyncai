@@ -6,7 +6,7 @@
 
 **Blocked by:** 02 — Plan module, status, and Settings meter; 04 — Generate and listing copy refresh spend
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Landing FAQ and prices match the Plan, not weekly £4 and 30/week
 - [x] Catalogue cards and editor copy do not say subscribe to unlock analysis

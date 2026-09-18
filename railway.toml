@@ -1,0 +1,13 @@
+# FastAPI on Railway. Build context is the repository root (default).
+# Do not also set Root Directory to `api-py` when using this file — that
+# resolves dockerfilePath to api-py/Dockerfile inside api-py/.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

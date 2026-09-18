@@ -6,7 +6,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Catalogue push refuses products with no listing copy and names that gap
 - [x] Products with typed or generated listing copy can push regardless of unpaid unlock

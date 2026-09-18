@@ -6,7 +6,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Plan module: free cannot run Plan jobs; Plan has 20 included uses per UTC calendar month; unused do not carry over; 21st is overage and still allowed; leftover weekly is 30 per UTC week then a hard stop; local bypass is unlimited and unbilled
 - [x] Spend ledger exists; module views it through an in-memory sequence in tests
