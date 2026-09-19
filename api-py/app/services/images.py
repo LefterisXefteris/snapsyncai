@@ -97,14 +97,25 @@ async def list_images(session: AsyncSession, session_id: str) -> list[Image]:
     return [Image(**row._mapping) for row in result]
 
 
-async def get_image(session: AsyncSession, image_id: int) -> Image | None:
-    return await session.get(Image, image_id)
+async def get_image(
+    session: AsyncSession, image_id: int, session_id: str
+) -> Image | None:
+    _require_session(session_id)
+    result = await session.execute(
+        select(Image).where(Image.id == image_id, Image.session_id == session_id)
+    )
+    return result.scalar_one_or_none()
 
 
-async def get_images_by_ids(session: AsyncSession, ids: list[int]) -> list[Image]:
+async def get_images_by_ids(
+    session: AsyncSession, ids: list[int], session_id: str
+) -> list[Image]:
+    _require_session(session_id)
     if not ids:
         return []
-    result = await session.execute(select(Image).where(Image.id.in_(ids)))
+    result = await session.execute(
+        select(Image).where(Image.id.in_(ids), Image.session_id == session_id)
+    )
     return list(result.scalars().all())
 
 
@@ -159,10 +170,14 @@ async def persist_product_facts(
             session, image.product_group_id, {"product_facts": facts_record}
         )
         await session.flush()
-        return await get_image(session, image.id) if image.id is not None else image
-    if image.id is None:
+        if image.id is None or not image.session_id:
+            return image
+        return await get_image(session, image.id, image.session_id)
+    if image.id is None or not image.session_id:
         return image
-    return await update_image(session, image.id, {"product_facts": facts_record})
+    return await update_image(
+        session, image.id, {"product_facts": facts_record}, image.session_id
+    )
 
 
 def listing_copy_from_images(images: Sequence[Image]) -> dict:
@@ -184,24 +199,36 @@ def listing_copy_from_images(images: Sequence[Image]) -> dict:
     }
 
 
-async def update_image(session: AsyncSession, image_id: int, updates: dict) -> Image | None:
+async def update_image(
+    session: AsyncSession, image_id: int, updates: dict, session_id: str
+) -> Image | None:
+    _require_session(session_id)
     payload = dict(updates)
     for key in ("price", "compare_at_price", "cost_per_item"):
         if key in payload and isinstance(payload[key], str):
             payload[key] = _as_decimal(payload[key])
     if not payload:
-        return await get_image(session, image_id)
-    await session.execute(update(Image).where(Image.id == image_id).values(**payload))
+        return await get_image(session, image_id, session_id)
+    await session.execute(
+        update(Image)
+        .where(Image.id == image_id, Image.session_id == session_id)
+        .values(**payload)
+    )
     await session.flush()
-    updated = await get_image(session, image_id)
+    updated = await get_image(session, image_id, session_id)
     if updated is not None:
         await catalogue_cache.invalidate(updated.session_id)
     return updated
 
 
-async def delete_image(session: AsyncSession, image_id: int) -> None:
-    image = await get_image(session, image_id)
-    await session.execute(delete(Image).where(Image.id == image_id))
+async def delete_image(
+    session: AsyncSession, image_id: int, session_id: str
+) -> None:
+    _require_session(session_id)
+    image = await get_image(session, image_id, session_id)
+    await session.execute(
+        delete(Image).where(Image.id == image_id, Image.session_id == session_id)
+    )
     if image is not None:
         await catalogue_cache.invalidate(image.session_id)
 
@@ -237,6 +264,18 @@ async def load_image_bytes(image: Image) -> bytes | None:
     if image.image_data:
         return base64.b64decode(image.image_data)
     if image.storage_url:
+        from app.config import get_settings
+        from app.services.supabase_storage import (
+            download_storage_bytes_async,
+            is_snapsync_storage_url,
+        )
+
+        settings = get_settings()
+        if is_snapsync_storage_url(image.storage_url, settings):
+            data = await download_storage_bytes_async(image.storage_url, settings)
+            if data and image.id is not None:
+                set_image_buffer(image.id, data)
+            return data
         try:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.get(image.storage_url)

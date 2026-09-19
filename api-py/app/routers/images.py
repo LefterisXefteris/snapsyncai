@@ -120,10 +120,10 @@ async def get_group(
 
 @router.post("/api/images/{image_id}/unlink-from-group", response_model=OkResponse)
 async def unlink_from_group(image_id: int, user_id: CurrentUser, session: SessionDep) -> OkResponse:
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
-    await store.update_image(session, image_id, {"product_group_id": None})
+    await store.update_image(session, image_id, {"product_group_id": None}, user_id)
     return OkResponse()
 
 
@@ -135,18 +135,23 @@ async def assign_group_batch(
         raise HTTPException(status_code=400, detail="imageIds array and productGroupId required")
     updated = 0
     for image_id in body.image_ids:
-        image = await store.get_image(session, image_id)
+        image = await store.get_image(session, image_id, user_id)
         if _owned(image, user_id):
-            await store.update_image(session, image_id, {"product_group_id": body.product_group_id})
-            updated += 1
-    if body.primary_image_id:
-        primary = await store.get_image(session, body.primary_image_id)
-        if _owned(primary, user_id) and not primary.product_group_id:
             await store.update_image(
-                session, body.primary_image_id, {"product_group_id": body.product_group_id}
+                session, image_id, {"product_group_id": body.product_group_id}, user_id
             )
             updated += 1
-    synced = await store.get_image(session, body.image_ids[0])
+    if body.primary_image_id:
+        primary = await store.get_image(session, body.primary_image_id, user_id)
+        if _owned(primary, user_id) and not primary.product_group_id:
+            await store.update_image(
+                session,
+                body.primary_image_id,
+                {"product_group_id": body.product_group_id},
+                user_id,
+            )
+            updated += 1
+    synced = await store.get_image(session, body.image_ids[0], user_id)
     if _owned(synced, user_id):
         await _sync_product_facts(session, user_id, synced)
     return OkUpdatedResponse(updated=updated)
@@ -158,17 +163,22 @@ async def assign_group(
 ) -> OkResponse:
     if not body.product_group_id:
         raise HTTPException(status_code=400, detail="productGroupId required")
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
-    await store.update_image(session, image_id, {"product_group_id": body.product_group_id})
+    await store.update_image(
+        session, image_id, {"product_group_id": body.product_group_id}, user_id
+    )
     if body.primary_image_id and body.primary_image_id != image_id:
-        primary = await store.get_image(session, body.primary_image_id)
+        primary = await store.get_image(session, body.primary_image_id, user_id)
         if _owned(primary, user_id) and not primary.product_group_id:
             await store.update_image(
-                session, body.primary_image_id, {"product_group_id": body.product_group_id}
+                session,
+                body.primary_image_id,
+                {"product_group_id": body.product_group_id},
+                user_id,
             )
-    refreshed = await store.get_image(session, image_id)
+    refreshed = await store.get_image(session, image_id, user_id)
     if _owned(refreshed, user_id):
         await _sync_product_facts(session, user_id, refreshed)
     return OkResponse()
@@ -182,7 +192,7 @@ async def confirm_product_facts(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
     group = await store.get_image_group(session, image_id, user_id)
@@ -222,7 +232,7 @@ async def accept_generated_listing_copy_route(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
     group = await store.get_image_group(session, image_id, user_id)
@@ -243,7 +253,9 @@ async def accept_generated_listing_copy_route(
     if blocked:
         raise HTTPException(status_code=403, detail=blocked)
     if accepted.listing_copy:
-        written = await store.update_image(session, image_id, accepted.listing_copy)
+        written = await store.update_image(
+            session, image_id, accepted.listing_copy, user_id
+        )
         if written is None:
             raise HTTPException(status_code=404, detail="Image not found")
         image = written
@@ -348,7 +360,7 @@ async def listing_copy_refresh_route(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
     facts, listing_copy, configured, shop_gpsr = await _listing_copy_refresh_context(
@@ -383,7 +395,7 @@ async def listing_copy_refresh_regenerate_route(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
     facts, listing_copy, configured, shop_gpsr = await _listing_copy_refresh_context(
@@ -411,7 +423,7 @@ async def listing_copy_refresh_accept_route(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
     facts, _listing_copy, _configured, shop_gpsr = await _listing_copy_refresh_context(
@@ -427,7 +439,9 @@ async def listing_copy_refresh_accept_route(
     blocked = await authorize_plan_job(session, settings, user_id, "refresh_accept")
     if blocked:
         raise HTTPException(status_code=403, detail=blocked)
-    updated = await store.update_image(session, image_id, accepted.listing_copy or {})
+    updated = await store.update_image(
+        session, image_id, accepted.listing_copy or {}, user_id
+    )
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
     await settle_plan_job(
@@ -441,12 +455,19 @@ async def image_file(
     image_id: int,
     user_id: CurrentUser,
     session: SessionDep,
+    settings: SettingsDep,
     proxy: str | None = Query(default=None),
 ):
-    image = await store.get_image(session, image_id)
+    from app.services.supabase_storage import is_snapsync_storage_url
+
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
-    if image.storage_url and proxy != "1":
+    if (
+        image.storage_url
+        and proxy != "1"
+        and not is_snapsync_storage_url(image.storage_url, settings)
+    ):
         return RedirectResponse(image.storage_url, status_code=302)
     buffer = await store.load_image_bytes(image)
     if buffer is None:
@@ -456,7 +477,7 @@ async def image_file(
         media_type=image.mime_type,
         headers={
             "Content-Length": str(len(buffer)),
-            "Cache-Control": "public, max-age=604800, immutable",
+            "Cache-Control": "private, max-age=3600",
         },
     )
 
@@ -469,12 +490,12 @@ async def update_image(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
     payload = body.model_dump(exclude_unset=True)
     try:
-        updated = await store.update_image(session, image_id, payload)
+        updated = await store.update_image(session, image_id, payload, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid update data") from exc
     if updated is None:
@@ -486,10 +507,10 @@ async def update_image(
 
 @router.delete("/api/images/{image_id}", status_code=204)
 async def delete_image(image_id: int, user_id: CurrentUser, session: SessionDep) -> Response:
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         raise HTTPException(status_code=404, detail="Image not found")
-    await store.delete_image(session, image_id)
+    await store.delete_image(session, image_id, user_id)
     return Response(status_code=204)
 
 
@@ -542,7 +563,7 @@ async def push_to_shopify(
                 status_code=400, detail="Shopify not connected. Please connect your store first."
             )
 
-        selected = await store.get_images_by_ids(session, body.ids)
+        selected = await store.get_images_by_ids(session, body.ids, user_id)
         images_to_push = [img for img in selected if img.session_id == user_id]
         if not images_to_push:
             raise HTTPException(status_code=400, detail="No images found for given IDs")
@@ -591,7 +612,7 @@ async def push_to_shopify(
             needed = [primary.id, *[view.id for view in views]]
             missing = [image_id for image_id in needed if image_id not in full_map]
             if missing:
-                for img in await store.get_images_by_ids(session, missing):
+                for img in await store.get_images_by_ids(session, missing, user_id):
                     full_map[img.id] = img
             full_primary = full_map.get(primary.id) or primary
             view_images = [full_map.get(view.id) or view for view in views]
@@ -636,13 +657,15 @@ async def push_to_shopify(
                         session, primary.product_group_id, updates
                     )
                 else:
-                    await store.update_image(session, primary.id, updates)
+                    await store.update_image(session, primary.id, updates, user_id)
                 success += 1
                 results.append(
                     PushResult(id=primary.id, shopify_product_id=result["shopify_product_id"])
                 )
             else:
-                await store.update_image(session, primary.id, {"shopify_status": "failed"})
+                await store.update_image(
+                    session, primary.id, {"shopify_status": "failed"}, user_id
+                )
                 failed += 1
                 results.append(PushResult(id=primary.id, error=result.get("error")))
         return PushResponse(success=success, failed=failed, results=results)

@@ -19,6 +19,7 @@ from app.services.listing_copy_refresh import (
 )
 from app.services.plan import Entitlement, Spend, decide
 from app.services.product_facts import ProductFacts, facts_from_stored, listing_copy_present
+from app.services.supabase_storage import channel_photo_url
 
 
 @dataclass(frozen=True)
@@ -78,7 +79,7 @@ def photos_from_images(images: Sequence[Any]) -> list[BulkSeoPhoto]:
                 title=getattr(image, "title", None),
                 listing_copy=listing_copy,
                 facts=facts_from_stored(getattr(image, "product_facts", None)),
-                photo_url=getattr(image, "storage_url", None),
+                photo_url=channel_photo_url(getattr(image, "storage_url", None)),
             )
         )
     return photos

@@ -43,6 +43,7 @@ APP_BASE_URL=https://www.snapsyncai.co.uk
 CORS_ALLOW_ORIGINS=https://www.snapsyncai.co.uk,https://snapsyncai.co.uk
 SENTRY_DSN
 SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
 SUPABASE_ANON_KEY
 AI_INTEGRATIONS_OPENAI_API_KEY
 SHOPIFY_API_KEY
@@ -90,6 +91,13 @@ GET https://www.snapsyncai.co.uk/api/shopify/status   (no cookie)
 
 401 is what `queryClient.ts` is written for. The SPA should treat it as signed
 out instead of choking on HTML from a redirect.
+
+`SUPABASE_SERVICE_ROLE_KEY` is required for photo upload, private download, and
+Push signed URLs. Flip the live `product-images` bucket private with:
+
+```bash
+bash scripts/lock-supabase-photo-bucket.sh
+```
 
 ## 3. Cut over the SPA
 

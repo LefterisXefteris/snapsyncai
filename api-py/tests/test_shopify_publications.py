@@ -382,7 +382,7 @@ def test_publications_endpoint_ticks_the_product_live_set(monkeypatch) -> None:
     async def ready_connection(_session, _user_id):
         return _connection()
 
-    async def fake_get(_session, image_id: int):
+    async def fake_get(_session, image_id: int, _session_id: str = ""):
         if image_id != 14:
             return None
         return Image(

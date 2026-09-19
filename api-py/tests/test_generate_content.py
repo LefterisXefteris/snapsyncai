@@ -50,7 +50,7 @@ def _confirmed_photo() -> Image:
 def test_generate_content_tells_the_seller_to_reupload_a_missing_photo(monkeypatch) -> None:
     photo = _confirmed_photo()
 
-    async def fake_get(_session, image_id: int):
+    async def fake_get(_session, image_id: int, _session_id: str = ""):
         return photo if image_id == photo.id else None
 
     async def fake_group(_session, image_id: int, _user_id: str):
@@ -78,7 +78,7 @@ def test_generate_content_tells_the_seller_to_reupload_a_missing_photo(monkeypat
 
 def test_upload_refuses_when_photo_storage_is_not_configured(monkeypatch) -> None:
     monkeypatch.delenv("SUPABASE_URL", raising=False)
-    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     client = _client(monkeypatch)
     try:
         response = client.post(
@@ -88,7 +88,7 @@ def test_upload_refuses_when_photo_storage_is_not_configured(monkeypatch) -> Non
         assert response.status_code == 503
         assert response.json() == {
             "message": (
-                "Photo storage is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY "
+                "Photo storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY "
                 "for this environment."
             )
         }

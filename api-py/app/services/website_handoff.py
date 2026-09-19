@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from app.services.product_facts import facts_from_stored, listing_copy_present, stored_from_facts
+from app.services.supabase_storage import channel_photo_url
 
 LOVABLE_BUILD_ORIGIN = "https://lovable.dev/"
 PROMPT_CHAR_LIMIT = 50_000
@@ -98,8 +99,9 @@ def _product_from_group(photos: Sequence[WebsitePhoto]) -> WebsiteProduct | None
         return None
     urls: list[str] = []
     for photo in ranked:
-        if photo.storage_url and photo.storage_url not in urls:
-            urls.append(photo.storage_url)
+        url = channel_photo_url(photo.storage_url)
+        if url and url not in urls:
+            urls.append(url)
     facts_source = next((p.product_facts for p in ranked if p.product_facts), None)
     confirmed = stored_from_facts(facts_from_stored(facts_source)).get("confirmed")
     tags = listing["tags"] if isinstance(listing["tags"], list) else []

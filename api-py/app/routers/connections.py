@@ -132,7 +132,7 @@ async def shopify_publications(
     published: set[str] = set()
     product_status = None
     if image_id is not None:
-        image = await store.get_image(session, image_id)
+        image = await store.get_image(session, image_id, user_id)
         if image is not None and image.session_id == user_id and image.shopify_product_id:
             try:
                 product_status, published = await product_publishing(

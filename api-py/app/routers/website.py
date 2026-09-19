@@ -1,5 +1,7 @@
 """Website prototype listing and Lovable handoff."""
 
+from dataclasses import replace
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.auth.clerk import CurrentUser
@@ -9,8 +11,10 @@ from app.schemas.base import CamelModel
 from app.services import connections
 from app.services import images as store
 from app.services.plan_charge import authorize_plan_job, settle_plan_job
+from app.services.shopify import list_shopify_product_image_urls
 from app.services.website_handoff import (
     HandoffError,
+    WebsiteProduct,
     build_handoff,
     eligible_products,
     photos_from_images,
@@ -42,13 +46,32 @@ class WebsiteHandoffResponse(CamelModel):
     product_count: int
 
 
+async def _with_channel_photos(
+    connection, settings, products: list[WebsiteProduct]
+) -> list[WebsiteProduct]:
+    if connection is None:
+        return products
+    filled: list[WebsiteProduct] = []
+    for product in products:
+        try:
+            urls = await list_shopify_product_image_urls(
+                connection, settings, product.shopify_product_id
+            )
+        except Exception:
+            urls = ()
+        filled.append(replace(product, photo_urls=urls) if urls else product)
+    return filled
+
+
 @router.get("/api/website/prototype", response_model=WebsitePrototypeResponse)
 async def website_prototype(
-    user_id: CurrentUser, session: SessionDep
+    user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> WebsitePrototypeResponse:
     connection = await connections.get_shopify(session, user_id)
     images = await store.list_images(session, user_id)
-    products = eligible_products(photos_from_images(images))
+    products = await _with_channel_photos(
+        connection, settings, eligible_products(photos_from_images(images))
+    )
     return WebsitePrototypeResponse(
         shop_connected=connection is not None,
         shop_domain=connection.shop_domain if connection is not None else None,
@@ -74,7 +97,9 @@ async def website_handoff(
             status_code=status.HTTP_409_CONFLICT, detail="Shopify is not connected"
         )
     images = await store.list_images(session, user_id)
-    eligible = eligible_products(photos_from_images(images))
+    eligible = await _with_channel_photos(
+        connection, settings, eligible_products(photos_from_images(images))
+    )
     wanted = set(body.product_ids)
     selected = [product for product in eligible if product.id in wanted]
     blocked = await authorize_plan_job(session, settings, user_id, "website_handoff")

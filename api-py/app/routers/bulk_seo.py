@@ -231,7 +231,7 @@ async def bulk_seo_accept(
     if result.error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.error)
     if "copy" in stash:
-        updated = await store.update_image(session, stash["id"], stash["copy"])
+        updated = await store.update_image(session, stash["id"], stash["copy"], user_id)
         if updated is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if result.spent:

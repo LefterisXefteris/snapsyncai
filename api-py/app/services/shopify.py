@@ -11,6 +11,7 @@ import httpx
 from app.config import Settings
 from app.models import ShopifyConnection
 from app.services.crypto import decrypt_shopify_token
+from app.services.supabase_storage import media_original_source
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,40 @@ async def shopify_graphql(
             return data
 
     raise RuntimeError("Shopify GraphQL request exhausted retries")
+
+
+async def list_shopify_product_image_urls(
+    connection: ShopifyConnection,
+    settings: Settings,
+    product_id: str,
+) -> tuple[str, ...]:
+    data = await shopify_graphql(
+        connection,
+        settings,
+        """
+        query SnapSyncProductMedia($id: ID!) {
+          product(id: $id) {
+            media(first: 50) {
+              nodes {
+                ... on MediaImage {
+                  image { url }
+                }
+              }
+            }
+          }
+        }
+        """,
+        {"id": product_id},
+    )
+    product = data.get("product") or {}
+    nodes = ((product.get("media") or {}).get("nodes")) or []
+    urls: list[str] = []
+    for node in nodes:
+        image = node.get("image") if isinstance(node, dict) else None
+        url = image.get("url") if isinstance(image, dict) else None
+        if isinstance(url, str) and url.startswith("https://") and url not in urls:
+            urls.append(url)
+    return tuple(urls)
 
 
 def _price(value: Any) -> float:
@@ -328,16 +363,17 @@ async def create_shopify_product(
         )
 
     media_sources = [image, *(view_images or [])]
-    media = [
-        {
-            "originalSource": item.storage_url,
-            "alt": item.alt_text or item.title or item.original_name or "",
-            "mediaContentType": "IMAGE",
-        }
-        for item in media_sources
-        if isinstance(getattr(item, "storage_url", None), str)
-        and item.storage_url.startswith("https://")
-    ]
+    media = []
+    for item in media_sources:
+        source = media_original_source(getattr(item, "storage_url", None), settings)
+        if source:
+            media.append(
+                {
+                    "originalSource": source,
+                    "alt": item.alt_text or item.title or item.original_name or "",
+                    "mediaContentType": "IMAGE",
+                }
+            )
     if media:
         media_data = await shopify_graphql(
             connection,

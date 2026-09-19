@@ -53,12 +53,23 @@ def test_only_pushed_products_with_listing_copy_are_eligible() -> None:
 
 
 def test_grouped_photos_are_one_product() -> None:
-    front = _photo(id=10, product_group_id="g1", storage_url="https://cdn.example/front.jpg")
-    back = _photo(id=11, product_group_id="g1", title=None, description=None, storage_url="https://cdn.example/back.jpg")
+    front = _photo(id=10, product_group_id="g1", storage_url="https://cdn.shopify.com/s/files/1/front.jpg")
+    back = _photo(id=11, product_group_id="g1", title=None, description=None, storage_url="https://cdn.shopify.com/s/files/1/back.jpg")
     products = eligible_products([front, back])
     assert len(products) == 1
     assert products[0].id == 10
-    assert products[0].photo_urls == ("https://cdn.example/front.jpg", "https://cdn.example/back.jpg")
+    assert products[0].photo_urls == (
+        "https://cdn.shopify.com/s/files/1/front.jpg",
+        "https://cdn.shopify.com/s/files/1/back.jpg",
+    )
+
+
+def test_website_snapshot_drops_snapsync_storage_urls() -> None:
+    photo = _photo(
+        storage_url="https://abc.supabase.co/storage/v1/object/public/product-images/1/x.jpg"
+    )
+    products = eligible_products([photo])
+    assert products[0].photo_urls == ()
 
 
 def test_snapshot_is_listing_copy_facts_photos_and_shopify_id() -> None:

@@ -420,7 +420,7 @@ def test_refresh_http_refuses_unconfirmed_facts(monkeypatch) -> None:
         title="Cotton tee",
     )
 
-    async def fake_get(_session, image_id: int):
+    async def fake_get(_session, image_id: int, _session_id: str = ""):
         return photo if image_id == photo.id else None
 
     async def fake_group(_session, image_id: int, _user_id: str):
@@ -463,7 +463,7 @@ def test_refresh_http_returns_a_pack_from_demand(monkeypatch) -> None:
         product_facts=stored_from_facts(_confirmed_facts()),
     )
 
-    async def fake_get(_session, image_id: int):
+    async def fake_get(_session, image_id: int, _session_id: str = ""):
         return photo if image_id == photo.id else None
 
     async def fake_group(_session, image_id: int, _user_id: str):

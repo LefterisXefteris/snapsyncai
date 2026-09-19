@@ -10,6 +10,7 @@ import {
   useBulkSeoStart,
   type BulkSeoPackItem,
 } from "@/hooks/use-bulk-seo";
+import { apiUrl } from "@/lib/api-origin";
 import {
   BULK_SEO_EMPTY,
   bulkSeoEligibleIds,
@@ -146,15 +147,11 @@ export default function BulkSeoPage() {
                           onCheckedChange={(value) => toggle(row.id, value === true)}
                           aria-label={row.title ?? `Product ${row.id}`}
                         />
-                        {row.photoUrl ? (
-                          <img
-                            src={row.photoUrl}
-                            alt=""
-                            className="h-10 w-10 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="h-10 w-10 rounded bg-muted" />
-                        )}
+                        <img
+                          src={apiUrl(`/api/images/${row.id}/file`)}
+                          alt=""
+                          className="h-10 w-10 rounded object-cover"
+                        />
                         <div className="min-w-0 flex-1">
                           <span className="text-sm truncate block">
                             {row.title ?? `Product ${row.id}`}

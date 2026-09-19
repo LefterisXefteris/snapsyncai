@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # --- Storage ------------------------------------------------------------
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
+    supabase_service_role_key: str | None = None
     supabase_storage_bucket: str = "product-images"
 
     # --- Billing ------------------------------------------------------------

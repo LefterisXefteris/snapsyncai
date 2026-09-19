@@ -59,7 +59,7 @@ PHOTO_FILE_MISSING = (
     "This photo's file is missing. Re-upload it before generating listing copy."
 )
 PHOTO_STORAGE_NOT_CONFIGURED = (
-    "Photo storage is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY "
+    "Photo storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY "
     "for this environment."
 )
 
@@ -207,7 +207,9 @@ async def _persist_storage(session, image, buf: bytes, mime: str, original_name:
     set_image_buffer(image.id, buf)
     storage_url = await upload_file_to_storage(buf, mime, image.id, original_name)
     if storage_url:
-        updated = await store.update_image(session, image.id, {"storage_url": storage_url})
+        updated = await store.update_image(
+            session, image.id, {"storage_url": storage_url}, image.session_id or ""
+        )
         return updated or image
     return image
 
@@ -233,7 +235,7 @@ async def upload_images(
             )
         if len(files) > MAX_UPLOAD_FILES:
             return _message(400, "Maximum 200 images per upload.")
-        if not settings.supabase_url or not settings.supabase_anon_key:
+        if not settings.supabase_url or not settings.supabase_service_role_key:
             return _message(503, PHOTO_STORAGE_NOT_CONFIGURED)
 
         loaded: list[tuple[UploadFile, bytes]] = []
@@ -415,7 +417,7 @@ async def generate_content(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         return _message(404, "Image not found")
     facts = await _facts_for_product(session, image, user_id)
@@ -464,7 +466,7 @@ async def regenerate_field(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id)
+    image = await store.get_image(session, image_id, user_id)
     if not _owned(image, user_id):
         return _message(404, "Image not found")
     facts = await _facts_for_product(session, image, user_id)

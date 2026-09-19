@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import field_serializer, field_validator
+from pydantic import Field, field_serializer, field_validator
 
 from app.schemas.base import CamelModel
 from app.schemas.gpsr import GpsrIdentityIn
@@ -15,6 +15,8 @@ LIST_EXCLUDE = frozenset(
         "ai_data",
         "aeo_faqs",
         "description_blocks",
+        "storage_url",
+        "session_id",
     }
 )
 
@@ -25,7 +27,7 @@ class ImageOut(CamelModel):
     mime_type: str
     size: int
     image_data: str | None = None
-    storage_url: str | None = None
+    storage_url: str | None = Field(default=None, exclude=True)
     title: str | None = None
     description: str | None = None
     price: Decimal | str | None = None
@@ -57,7 +59,7 @@ class ImageOut(CamelModel):
     ai_data: Any | None = None
     product_facts: Any | None = None
     product_group_id: str | None = None
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, exclude=True)
     created_at: datetime | None = None
     listing_copy_stale: bool = False
     listing_copy_present: bool = False

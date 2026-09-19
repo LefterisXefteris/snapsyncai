@@ -5,7 +5,7 @@ Seam: `app.services.bulk_seo`.
 
 from datetime import UTC, datetime
 
-from app.services.bulk_seo import BulkSeoPhoto, accept_item, picker, regenerate_item, start_pack
+from app.services.bulk_seo import BulkSeoPhoto, accept_item, photos_from_images, picker, regenerate_item, start_pack
 from app.services.product_facts import (
     confirm_facts,
     facts_from_stored,
@@ -34,6 +34,25 @@ def _photo(**overrides) -> BulkSeoPhoto:
     )
     values.update(overrides)
     return BulkSeoPhoto(**values)
+
+
+def test_photos_from_images_omit_snapsync_storage_urls() -> None:
+    from types import SimpleNamespace
+
+    image = SimpleNamespace(
+        id=8,
+        product_group_id=None,
+        title="Tee",
+        description="Soft tee",
+        tags=("tee",),
+        seo_title="Tee",
+        seo_description="Soft tee",
+        aeo_snippet=None,
+        aeo_faqs=None,
+        storage_url="https://abc.supabase.co/storage/v1/object/public/product-images/8/x.jpg",
+        product_facts=None,
+    )
+    assert photos_from_images([image])[0].photo_url is None
 
 
 def test_blocked_row_keeps_the_refresh_reason() -> None:
