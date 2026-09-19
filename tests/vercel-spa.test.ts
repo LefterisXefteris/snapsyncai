@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,4 +31,13 @@ test("production start script is not the Express bundle", () => {
   assert.ok(!(pkg.scripts?.start ?? "").includes("dist/index.cjs"));
   assert.equal(pkg.dependencies?.express, undefined);
   assert.equal(pkg.dependencies?.["stripe-replit-sync"], undefined);
+});
+
+test("Vercel install uses npm because the repo lockfile is package-lock.json", () => {
+  const vercel = JSON.parse(readFileSync(join(root, "vercel.json"), "utf8")) as {
+    installCommand?: string;
+  };
+  assert.match(vercel.installCommand ?? "", /^npm ci\b/);
+  assert.equal(existsSync(join(root, "package-lock.json")), true);
+  assert.equal(existsSync(join(root, "pnpm-lock.yaml")), false);
 });

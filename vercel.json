@@ -1,5 +1,5 @@
 {
-    "installCommand": "pnpm install --no-frozen-lockfile",
+    "installCommand": "npm ci",
     "buildCommand": "npm run build",
     "outputDirectory": "dist/public",
     "rewrites": [
