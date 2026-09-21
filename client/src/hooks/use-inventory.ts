@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { apiUrl } from "@/lib/api-origin";
+import { apiFetch } from "@/lib/api-fetch";
 
 export type InventoryLocation = { id: string; name: string; isActive: boolean };
 
@@ -57,7 +57,7 @@ export type InventoryNotificationDto = {
 };
 
 async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(apiUrl(url), { credentials: "include" });
+  const response = await apiFetch(url);
   if (!response.ok) {
     const body = await response.json().catch(() => ({ message: response.statusText }));
     throw new Error(body.message || "Inventory request failed");

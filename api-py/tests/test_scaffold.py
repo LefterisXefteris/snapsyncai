@@ -50,6 +50,45 @@ def test_missing_database_url_fails_at_startup(monkeypatch) -> None:
         Settings(_env_file=None)  # type: ignore[call-arg]
 
 
+def test_https_project_url_is_not_a_database_url() -> None:
+    with pytest.raises(ValidationError, match="postgresql"):
+        Settings(
+            _env_file=None,
+            database_url="https://soghjlnltozwvsmeqjox.supabase.co",
+        )
+
+
+def test_development_rejects_cloud_supabase_postgres() -> None:
+    with pytest.raises(ValidationError, match="local"):
+        Settings(
+            _env_file=None,
+            environment="development",
+            database_url=(
+                "postgresql://postgres.abc:secret@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+            ),
+        )
+
+
+def test_production_accepts_cloud_supabase_postgres() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="production",
+        database_url=(
+            "postgresql://postgres.abc:secret@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+        ),
+    )
+    assert "pooler.supabase.com" in settings.database_url
+
+
+def test_development_accepts_local_cli_postgres() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="development",
+        database_url="postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    )
+    assert settings.database_url.endswith("/postgres")
+
+
 class TestSupabasePoolerUrl:
     """`server/db.ts` hand-parses DATABASE_URL to survive these two cases."""
 

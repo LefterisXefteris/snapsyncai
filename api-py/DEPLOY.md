@@ -9,8 +9,9 @@ at `https://api.snapsyncai.co.uk`. Fly is not a deploy target.
 
 ## Local
 
-`npm run dev` starts Postgres, Redis, FastAPI (`:8000`), and Vite (`:5001`). Every
-`/api` request from the SPA is proxied to FastAPI. Express is not started.
+`npm run dev` starts the local Supabase CLI stack (Postgres + Storage), Redis,
+FastAPI (`:8000`), and Vite (`:5001`). Every `/api` request from the SPA is
+proxied to FastAPI. Express is not started.
 The catalogue cache is on when `REDIS_URL` is set (dev.sh defaults it to local
 Redis). Unset or empty `REDIS_URL` keeps `GET /api/images` on Postgres only.
 
@@ -29,7 +30,12 @@ Alternatively: Root Directory `api-py`, Dockerfile path `Dockerfile`
 (`api-py/railway.toml`). Do not combine Root Directory `api-py` with path
 `api-py/Dockerfile` — that looks for `api-py/api-py/Dockerfile`.
 
-Set these on the service (same production values the product already uses):
+Set these on the service (same production values the product already uses).
+Walk through the paste with:
+
+```bash
+bash .scratch/fastapi-backend-cutover/railway-env-wizard.sh
+```
 
 ```text
 DATABASE_URL
@@ -52,7 +58,9 @@ CONNECTION_ENCRYPTION_KEY
 ENVIRONMENT=production
 ```
 
-`DATABASE_URL` must be the **same database the product already uses**.
+`DATABASE_URL` must be the **existing production Supabase Session pooler**
+(`:5432`), not localhost, not a Project URL (`https://….supabase.co`), and not
+Railway Postgres. FastAPI refuses to boot without it.
 
 `REDIS_URL` is optional. Add Railway's Redis plugin and paste its URL to cache
 the Products catalogue (`GET /api/images`). Unset or a down Redis fails open to

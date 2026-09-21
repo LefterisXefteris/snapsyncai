@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 #
-# Start the local stack: Postgres, Redis, FastAPI, and Vite.
+# Start the local stack: Supabase CLI (Postgres + Storage), Redis, FastAPI, and Vite.
 #
-#   postgres   docker, host port 5433
+#   postgres   supabase start, host port 54322
+#   storage    supabase start, API http://127.0.0.1:54321
 #   redis      docker, host port 6379
 #   api        FastAPI                                    http://localhost:8000
 #   web        Vite SPA; every /api request proxied to FastAPI
 #                                                         http://localhost:5001
 #
-# Express is not started. Production /api is FastAPI on Railway.
+# Express is not started. Production /api is FastAPI on Railway. Production
+# Postgres is the cloud Supabase project — never this local stack.
 #
-# Ctrl-C stops the servers. Postgres is left running (it holds your data); stop it
-# with `docker compose down`.
+# Ctrl-C stops the servers. Supabase is left running (it holds your data); stop
+# it with `npx supabase stop`. Redis: `docker compose down`.
 #
 # Deliberately no `concurrently` dependency — plain background jobs and a trap.
 
@@ -45,10 +47,30 @@ set +a
 
 [ -n "${DATABASE_URL:-}" ] || fatal "DATABASE_URL is unset in .env.local"
 
+case "$DATABASE_URL" in
+  http://*|https://*)
+    fatal "DATABASE_URL is a Project URL, not Postgres.
+       Use the local CLI URI from .env.example (postgresql://…@127.0.0.1:54322/postgres).
+       Production DATABASE_URL belongs on Railway only."
+    ;;
+esac
+case "$DATABASE_URL" in
+  *pooler.supabase.com*|*.supabase.co*)
+    fatal "DATABASE_URL points at a cloud Supabase project.
+       Local must use supabase start (127.0.0.1:54322). Production URLs belong on Railway."
+    ;;
+esac
+case "$DATABASE_URL" in
+  *:5433/*|*:5433)
+    fatal "DATABASE_URL still points at Compose Postgres (:5433).
+       Copy DATABASE_URL and SUPABASE_* from .env.example, then re-run."
+    ;;
+esac
+
 command -v uv >/dev/null || fatal "uv not found — https://docs.astral.sh/uv/"
 [ -d node_modules ] || { info "installing node dependencies"; npm install; }
 
-# ── Postgres ────────────────────────────────────────────────────────────────
+# ── Postgres + Storage (supabase start) + Redis ─────────────────────────────
 
 SKIP_DB="${SKIP_DB:-0}"
 if [ "$SKIP_DB" != "1" ]; then
@@ -58,27 +80,15 @@ if [ "$SKIP_DB" != "1" ]; then
        only /api/* routes will 500)."
   fi
 
-  info "starting postgres"
-  docker compose up -d postgres >/dev/null
+  info "starting supabase (local Postgres + Storage)"
+  npx --yes supabase start
+
   redis_started=0
   if docker compose up -d redis >/dev/null; then
     redis_started=1
   else
     warn "redis did not start — catalogue cache off until it does"
   fi
-
-  printf '%s' "${DIM}waiting for postgres${OFF}"
-  for _ in $(seq 1 30); do
-    if docker compose exec -T postgres pg_isready -U snapsync -d snapsync >/dev/null 2>&1; then
-      printf '\r%s\r' "                          "
-      info "postgres ready on 5433"
-      break
-    fi
-    printf '.'; sleep 1
-  done
-
-  docker compose exec -T postgres pg_isready -U snapsync -d snapsync >/dev/null 2>&1 \
-    || fatal "postgres did not become ready in 30s — check: docker compose logs postgres"
 
   if [ "$redis_started" = "1" ]; then
     printf '%s' "${DIM}waiting for redis${OFF}"
@@ -122,7 +132,7 @@ cleanup() {
   pkill -f "vite --config" 2>/dev/null || true
   pkill -f "uvicorn app.main:create_app" 2>/dev/null || true
   wait 2>/dev/null || true
-  printf '%s(postgres left running — `docker compose down` to stop it)%s\n' "$DIM" "$OFF"
+  printf '%s(supabase left running — `npx supabase stop` to stop it)%s\n' "$DIM" "$OFF"
 }
 trap cleanup INT TERM EXIT
 

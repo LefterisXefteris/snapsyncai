@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
-import { apiUrl } from "@/lib/api-origin";
+import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { BulkSeoCatalogueRow } from "@/lib/bulk-seo";
@@ -46,7 +46,7 @@ export function useBulkSeoCatalogue() {
   return useQuery({
     queryKey: [api.bulkSeo.catalogue.path, userId],
     queryFn: async () => {
-      const res = await fetch(apiUrl(api.bulkSeo.catalogue.path), { credentials: "include" });
+      const res = await apiFetch(api.bulkSeo.catalogue.path);
       if (!res.ok) throw new Error("Failed to load Bulk SEO");
       return res.json() as Promise<BulkSeoCatalogue>;
     },

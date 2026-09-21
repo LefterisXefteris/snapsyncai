@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Annotated, Literal
 
 from fastapi import Depends
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -78,6 +78,25 @@ class Settings(BaseSettings):
     # Comma-separated or JSON list. Empty means CORS middleware is not mounted
     # (same-origin Vite proxy / current production Express).
     cors_allow_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def database_url_matches_environment(self) -> "Settings":
+        url = self.database_url.strip()
+        lowered = url.lower()
+        if lowered.startswith("http://") or lowered.startswith("https://"):
+            raise ValueError(
+                "DATABASE_URL must be a postgresql:// URI, not a Project URL "
+                "(https://….supabase.co)."
+            )
+        if not lowered.startswith("postgres"):
+            raise ValueError("DATABASE_URL must start with postgresql://")
+        cloud = "pooler.supabase.com" in lowered or ".supabase.co" in lowered
+        if self.environment == "development" and cloud:
+            raise ValueError(
+                "development DATABASE_URL must be the local supabase start Postgres "
+                "(127.0.0.1:54322), not a cloud project. Production URLs belong on Railway."
+            )
+        return self
 
     @field_validator("cors_allow_origins", mode="before")
     @classmethod

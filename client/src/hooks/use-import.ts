@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
-import { apiUrl } from "@/lib/api-origin";
+import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,7 +35,7 @@ export function useImportStatus() {
   return useQuery({
     queryKey: [api.import.status.path, userId],
     queryFn: async () => {
-      const res = await fetch(apiUrl(api.import.status.path), { credentials: "include" });
+      const res = await apiFetch(api.import.status.path);
       if (!res.ok) throw new Error("Failed to load Import");
       return res.json() as Promise<ImportStatus>;
     },

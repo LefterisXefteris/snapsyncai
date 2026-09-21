@@ -6,9 +6,12 @@
 npm run dev
 ```
 
-Starts Postgres (Docker), FastAPI on `:8000`, and Vite on `:5001`. Every `/api`
+Starts the local Supabase CLI stack (Postgres + Storage), FastAPI on `:8000`,
+and Vite on `:5001`. Every `/api`
 request from the SPA is proxied to FastAPI. Express is gone; production `/api`
-is FastAPI on Railway (`https://api.snapsyncai.co.uk`).
+is FastAPI on Railway (`https://api.snapsyncai.co.uk`). Production Postgres is
+the cloud Supabase project, set as `DATABASE_URL` on Railway, never in
+`.env.local`.
 
 ```bash
 curl -s http://localhost:5001/api/health

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
 import { api, buildUrl } from "@/lib/api-routes";
 import { apiUrl } from "@/lib/api-origin";
+import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 
 const CURRENCIES = [
@@ -66,9 +67,8 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
     const cleaned = draftPrice.replace(/[^0-9.]/g, "");
     if (cleaned === String(image.price)) { setEditingPrice(false); return; }
     try {
-      await fetch(apiUrl(buildUrl(api.images.update.path, { id: image.id })), {
+      await apiFetch(buildUrl(api.images.update.path, { id: image.id }), {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ price: cleaned || null }),
       });

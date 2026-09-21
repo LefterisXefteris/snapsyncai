@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@/lib/api-routes";
 import { apiRequest } from "@/lib/queryClient";
 import { apiUrl } from "@/lib/api-origin";
+import { apiFetch } from "@/lib/api-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
@@ -23,7 +24,7 @@ export function useImages() {
     // Scoped by userId so different users never share the same cache entry
     queryKey: [api.images.list.path, userId],
     queryFn: async () => {
-      const res = await fetch(apiUrl(api.images.list.path), { credentials: "include" });
+      const res = await apiFetch(api.images.list.path);
       if (!res.ok) throw new Error("Failed to fetch images");
       return res.json();
     },
@@ -36,7 +37,7 @@ export function usePaymentConfig() {
   return useQuery({
     queryKey: ['/api/payments/config'],
     queryFn: async () => {
-      const res = await fetch(apiUrl('/api/payments/config'), { credentials: "include" });
+      const res = await apiFetch('/api/payments/config');
       if (!res.ok) throw new Error("Payment system not available");
       return res.json() as Promise<{
         publishableKey: string;
@@ -64,7 +65,7 @@ export function useSubscriptionStatus() {
           overageThisMonth: 0,
         };
       }
-      const res = await fetch(apiUrl('/api/subscription/status'), { credentials: "include" });
+      const res = await apiFetch('/api/subscription/status');
       if (!res.ok) throw new Error("Failed to check subscription");
       return res.json() as Promise<{
         subscribed: boolean;
@@ -170,10 +171,9 @@ export function useUploadImages() {
       if (brandTone) formData.append("brandTone", brandTone);
       if (groupAsOne) formData.append("groupAsOne", "true");
 
-      const res = await fetch(apiUrl(api.images.upload.path), {
+      const res = await apiFetch(api.images.upload.path, {
         method: api.images.upload.method,
         body: formData,
-        credentials: "include",
       });
 
       if (!res.ok) {
@@ -268,7 +268,7 @@ export function useProductGroup(imageId: number | undefined) {
   return useQuery({
     queryKey: ['/api/images/group', imageId],
     queryFn: async () => {
-      const res = await fetch(apiUrl(`/api/images/${imageId}/group`), { credentials: "include" });
+      const res = await apiFetch(`/api/images/${imageId}/group`);
       if (!res.ok) throw new Error("Failed to fetch product group");
       return res.json();
     },
@@ -393,7 +393,7 @@ export function useShopifyStatus() {
   return useQuery({
     queryKey: [api.shopify.status.path],
     queryFn: async () => {
-      const res = await fetch(apiUrl(api.shopify.status.path), { credentials: "include" });
+      const res = await apiFetch(api.shopify.status.path);
       if (!res.ok) throw new Error("Failed to check Shopify status");
       return res.json();
     },
@@ -415,7 +415,7 @@ export function useShopifyPublications(imageId?: number) {
         imageId != null
           ? `${api.shopify.publications.path}?imageId=${imageId}`
           : api.shopify.publications.path;
-      const res = await fetch(apiUrl(path), { credentials: "include" });
+      const res = await apiFetch(path);
       if (!res.ok) throw new Error("Failed to load Shopify publications");
       return res.json() as Promise<{
         connected: boolean;
@@ -709,10 +709,9 @@ export function useGenerateContent() {
     let accumulated = "";
     beginThinking();
     try {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(params),
       });
       if (!res.ok || !res.body) {
@@ -779,10 +778,9 @@ export function useRegenerateField() {
     let accumulated = "";
     beginThinking();
     try {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ field, ...params }),
       });
       if (!res.ok || !res.body) {

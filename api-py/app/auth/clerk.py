@@ -1,10 +1,9 @@
 """Clerk authentication — the Python port of `server/routes.ts:43-72`.
 
-The SPA sends the Clerk `__session` **cookie**, not a bearer token; there is no
-`getToken()` call anywhere in `client/src`. Because the Vercel rewrite keeps the API
-same-origin, that cookie reaches this service unchanged, and `authenticate_request`
-reads it straight off the `Cookie` header. Bearer tokens also work, so a future switch
-needs no change here.
+The SPA sends the Clerk session as a Bearer token (`apiFetch` → `Authorization`)
+plus the `__session` cookie. Bearer is required after cutover: `www` and `api.`
+are different hosts, so a host-only cookie on `www` never reaches FastAPI.
+`authenticate_request` already accepts both.
 
 The resolved Clerk user id doubles as the row-level tenancy key — `images.session_id`
 and `inventory_*.user_id`. Getting this wrong leaks data across accounts, so

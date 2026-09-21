@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
-import { apiUrl } from "@/lib/api-origin";
+import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,7 +32,7 @@ export function useWebsitePrototype() {
   return useQuery({
     queryKey: [api.website.prototype.path, userId],
     queryFn: async () => {
-      const res = await fetch(apiUrl(api.website.prototype.path), { credentials: "include" });
+      const res = await apiFetch(api.website.prototype.path);
       if (!res.ok) throw new Error("Failed to load website prototype");
       return res.json() as Promise<WebsitePrototype>;
     },
