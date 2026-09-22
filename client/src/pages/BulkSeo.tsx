@@ -10,7 +10,7 @@ import {
   useBulkSeoStart,
   type BulkSeoPackItem,
 } from "@/hooks/use-bulk-seo";
-import { apiUrl } from "@/lib/api-origin";
+import { AuthenticatedImg } from "@/components/authenticated-img";
 import {
   BULK_SEO_EMPTY,
   bulkSeoEligibleIds,
@@ -147,8 +147,8 @@ export default function BulkSeoPage() {
                           onCheckedChange={(value) => toggle(row.id, value === true)}
                           aria-label={row.title ?? `Product ${row.id}`}
                         />
-                        <img
-                          src={apiUrl(`/api/images/${row.id}/file`)}
+                        <AuthenticatedImg
+                          path={`/api/images/${row.id}/file`}
                           alt=""
                           className="h-10 w-10 rounded object-cover"
                         />

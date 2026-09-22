@@ -6,7 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@/lib/api-routes";
-import { apiUrl } from "@/lib/api-origin";
+import { AuthenticatedImg } from "@/components/authenticated-img";
 import { productFacts, draftComposition, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, emptyCare, isCompleteCare, CARE_FAMILIES, CARE_PICKS, type FibreRowDraft, type GpsrChoice, type GpsrIdentity, type CareChoice, type CareInstructions } from "@/lib/product-facts";
 import type { Image } from "@/lib/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -62,12 +62,12 @@ function orderProductImages(images: Image[], mediaGallery: string[]) {
   });
 }
 
-function productImageSrc(image: Pick<Image, "id" | "size" | "createdAt">, proxy = false, cacheKey?: number) {
+function productImagePath(image: Pick<Image, "id" | "size" | "createdAt">, proxy = false, cacheKey?: number) {
   const params = new URLSearchParams();
   if (image.size) params.set("sz", String(image.size));
   params.set("t", String(cacheKey ?? new Date(image.createdAt || Date.now()).getTime()));
   if (proxy) params.set("proxy", "1");
-  return apiUrl(`/api/images/${image.id}/file?${params.toString()}`);
+  return `/api/images/${image.id}/file?${params.toString()}`;
 }
 
 export default function ProductDetails({ params }: { params: { id: string } }) {
@@ -528,8 +528,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                                     onClick={() => togglePickerSelect(img.id)}
                                     className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all select-none ${isSel ? "border-primary ring-2 ring-primary/40 scale-[0.97]" : "border-border hover:border-primary/50 hover:scale-[0.98]"}`}
                                   >
-                                    <img
-                                      src={productImageSrc(img, proxyImageIds.has(img.id))}
+                                    <AuthenticatedImg
+                                      path={productImagePath(img, proxyImageIds.has(img.id))}
                                       alt={img.originalName || "Image"}
                                       className="w-full h-full object-cover"
                                       loading="lazy"
@@ -677,8 +677,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         moveImageToIndex(droppedId, 0);
                       }}
                     >
-                      <img
-                        src={productImageSrc(displayImage, proxyImageIds.has(displayImage.id))}
+                      <AuthenticatedImg
+                        path={productImagePath(displayImage, proxyImageIds.has(displayImage.id))}
                         alt={altText || image.title || "Product Image"}
                         className="w-full h-full object-contain"
                         onError={() => handleImageLoadError(displayImage.id)}
@@ -746,8 +746,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       }}
                       onClick={() => { setSelectedImageId(img.id); }}
                     >
-                      <img
-                        src={productImageSrc(img, proxyImageIds.has(img.id))}
+                      <AuthenticatedImg
+                        path={productImagePath(img, proxyImageIds.has(img.id))}
                         alt={img.originalName || "Product view"}
                         className="w-full h-full object-cover"
                         loading="lazy"

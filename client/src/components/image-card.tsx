@@ -11,8 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
 import { api, buildUrl } from "@/lib/api-routes";
-import { apiUrl } from "@/lib/api-origin";
 import { apiFetch } from "@/lib/api-fetch";
+import { AuthenticatedImg } from "@/components/authenticated-img";
 import { cn } from "@/lib/utils";
 
 const CURRENCIES = [
@@ -120,13 +120,14 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
       {/* ── Main image ── */}
       <div className="relative bg-muted/40 flex items-center justify-center overflow-hidden" style={{ height: hasViews ? "120px" : "176px" }}>
         {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
-        <img
-          src={apiUrl(`/api/images/${image.id}/file?sz=${image.size}&t=${new Date(image.createdAt || Date.now()).getTime()}`)}
+        <AuthenticatedImg
+          path={`/api/images/${image.id}/file?sz=${image.size}&t=${new Date(image.createdAt || Date.now()).getTime()}`}
           alt={image.altText || image.title || image.originalName}
           className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
           decoding="async"
           onLoad={() => setImgLoaded(true)}
+          onUnavailable={() => setImgLoaded(true)}
           onError={(e) => { e.currentTarget.style.display = "none"; setImgLoaded(true); }}
           data-testid={`img-product-${image.id}`}
         />
@@ -170,8 +171,8 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         <div className="flex gap-1 px-2 py-1.5 bg-muted/30">
           {views.slice(0, 5).map((v) => (
             <div key={v.id} className="relative w-9 h-9 shrink-0 rounded-md overflow-hidden bg-muted/50">
-              <img
-                src={apiUrl(`/api/images/${v.id}/file?sz=${v.size}`)}
+              <AuthenticatedImg
+                path={`/api/images/${v.id}/file?sz=${v.size}`}
                 alt=""
                 className="w-full h-full object-cover"
                 loading="lazy"
