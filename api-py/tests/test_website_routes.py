@@ -51,6 +51,6 @@ def test_website_schemas_are_camel_case(monkeypatch) -> None:
         handoff = set(schemas["WebsiteHandoffResponse"]["properties"])
         assert handoff == {"lovableUrl", "productCount"}
         body = set(schemas["WebsiteHandoffBody"]["properties"])
-        assert body == {"productIds", "look"}
+        assert body == {"productIds", "look", "confirmOverflow"}
     finally:
         get_settings.cache_clear()

@@ -144,6 +144,7 @@ class AcceptGeneratedListingCopyBody(CamelModel):
     seo_description: str | None = None
     aeo_faqs: list[dict[str, str]] | None = None
     aeo_snippet: str | None = None
+    confirm_overflow: bool = False
 
 
 class ListingCopyRefreshOut(CamelModel):
@@ -159,6 +160,7 @@ class ListingCopyRefreshAcceptBody(CamelModel):
     description: str
     seo_title: str
     seo_description: str
+    confirm_overflow: bool = False
 
 
 class ListingCopyRefreshRegenerateBody(CamelModel):

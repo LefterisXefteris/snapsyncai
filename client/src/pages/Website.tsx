@@ -7,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useWebsiteHandoff, useWebsitePrototype } from "@/hooks/use-website";
+import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
+import { overflowNoticeText } from "@/lib/overflow-copy";
 import { workspaceNavItem } from "@/lib/workspace-nav";
 import { WEBSITE_EMPTY, WEBSITE_LOOK_HINT, WEBSITE_NEEDS_SHOPIFY } from "@/lib/website-copy";
 
 export default function WebsitePage() {
   const prototype = useWebsitePrototype();
   const handoff = useWebsiteHandoff();
+  const overflow = useOverflowConfirm();
   const settings = workspaceNavItem("settings");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [look, setLook] = useState("");
@@ -32,14 +35,24 @@ export default function WebsitePage() {
   };
 
   const build = () => {
-    handoff.mutate(
-      { productIds: Array.from(selectedIds), look },
-      {
-        onSuccess: (result) => {
-          window.open(result.lovableUrl, "_blank", "noopener,noreferrer");
+    const send = (confirmOverflow: boolean) => {
+      handoff.mutate(
+        { productIds: Array.from(selectedIds), look, confirmOverflow },
+        {
+          onSuccess: (result) => {
+            window.open(result.lovableUrl, "_blank", "noopener,noreferrer");
+          },
+          onError: (error) => {
+            if (confirmOverflow) return;
+            overflow.retryIfConfirmRequired(
+              error instanceof Error ? error.message : "",
+              send,
+            );
+          },
         },
-      },
-    );
+      );
+    };
+    overflow.run(send);
   };
 
   return (
@@ -61,6 +74,11 @@ export default function WebsitePage() {
             Build website
           </Button>
         </div>
+        {overflow.overflowNotice ? (
+          <p className="text-xs text-muted-foreground mt-2" data-testid="text-overflow-notice">
+            {overflowNoticeText(overflow.overagePence)}
+          </p>
+        ) : null}
       </div>
 
       <ScrollArea className="flex-1">
@@ -141,6 +159,7 @@ export default function WebsitePage() {
           )}
         </div>
       </ScrollArea>
+      {overflow.dialog}
     </div>
   );
 }

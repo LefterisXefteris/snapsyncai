@@ -1,9 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
 import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { isOverflowConfirmError } from "@/lib/overflow-copy";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
@@ -41,13 +42,18 @@ export function useWebsitePrototype() {
 }
 
 export function useWebsiteHandoff() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (body: { productIds: number[]; look: string }) => {
+    mutationFn: async (body: { productIds: number[]; look: string; confirmOverflow?: boolean }) => {
       const res = await apiRequest(api.website.handoff.method, api.website.handoff.path, body);
       return res.json() as Promise<{ lovableUrl: string; productCount: number }>;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+    },
     onError: (error) => {
+      if (isOverflowConfirmError(error instanceof Error ? error.message : "")) return;
       toast({
         title: "Could not hand off to Lovable",
         description: error instanceof Error ? error.message : "Website handoff failed",

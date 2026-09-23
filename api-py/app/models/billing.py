@@ -38,6 +38,7 @@ class Subscription(SQLModel, table=True):
     status: str = Field(sa_column=txt(nullable=False, server_default="active"))
     current_period_end: datetime | None = Field(default=None, sa_column=timestamp())
     billing_interval: str | None = Field(default=None, sa_column=txt())
+    overflow_confirmed_month: str | None = Field(default=None, sa_column=txt())
     created_at: datetime | None = Field(default=None, sa_column=timestamp(now=True))
 
 

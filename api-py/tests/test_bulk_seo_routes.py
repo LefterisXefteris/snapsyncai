@@ -74,6 +74,6 @@ def test_bulk_seo_schema_is_camel_case(monkeypatch) -> None:
         regen = set(schemas["BulkSeoRegenerateBody"]["properties"])
         assert regen == {"productId", "queries"}
         accept = set(schemas["BulkSeoAcceptBody"]["properties"])
-        assert accept == {"productId", "tags", "description", "seoTitle", "seoDescription"}
+        assert accept == {"productId", "tags", "description", "seoTitle", "seoDescription", "confirmOverflow"}
     finally:
         get_settings.cache_clear()

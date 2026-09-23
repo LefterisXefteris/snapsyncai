@@ -246,10 +246,18 @@ async def accept_generated_listing_copy_route(
         raise HTTPException(status_code=409, detail=facts_blocked)
     accepted = accept_generated_listing_copy(
         current,
-        body.model_dump(exclude_unset=True),
+        body.model_dump(exclude_unset=True, exclude={"confirm_overflow"}),
         shop_gpsr,
     )
-    blocked = await authorize_plan_job(session, settings, user_id, "generate_persist")
+    blocked = await authorize_plan_job(
+        session,
+        settings,
+        user_id,
+        "generate_persist",
+        listing_copy_was_stale=current.listing_copy_stale,
+        confirm_overflow=body.confirm_overflow,
+        completing=True,
+    )
     if blocked:
         raise HTTPException(status_code=403, detail=blocked)
     if accepted.listing_copy:
@@ -265,6 +273,7 @@ async def accept_generated_listing_copy_route(
             user_id,
             "generate_persist",
             listing_copy_was_stale=current.listing_copy_stale,
+            confirm_overflow=body.confirm_overflow,
             product_id=image_id,
         )
     updated = await store.persist_product_facts(
@@ -436,7 +445,14 @@ async def listing_copy_refresh_accept_route(
     )
     if accepted.error:
         return _refresh_conflict(accepted.error)
-    blocked = await authorize_plan_job(session, settings, user_id, "refresh_accept")
+    blocked = await authorize_plan_job(
+        session,
+        settings,
+        user_id,
+        "refresh_accept",
+        confirm_overflow=body.confirm_overflow,
+        completing=True,
+    )
     if blocked:
         raise HTTPException(status_code=403, detail=blocked)
     updated = await store.update_image(
@@ -445,7 +461,12 @@ async def listing_copy_refresh_accept_route(
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
     await settle_plan_job(
-        session, settings, user_id, "refresh_accept", product_id=image_id
+        session,
+        settings,
+        user_id,
+        "refresh_accept",
+        confirm_overflow=body.confirm_overflow,
+        product_id=image_id,
     )
     return _image_out(updated, settings, shop_gpsr)
 

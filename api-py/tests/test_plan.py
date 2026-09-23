@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from app.services.plan import (
     LEFTOVER_WEEKLY_INCLUDED,
+    NEED_OVERFLOW_CONFIRM,
     NEED_PLAN,
     PLAN_INCLUDED,
     WEEKLY_LIMIT,
@@ -44,6 +45,7 @@ def test_uncompleted_generate_does_not_spend() -> None:
     decision = decide("plan", (), JAN, "generate_persist", completed=False)
     assert decision.allowed is True
     assert decision.records_spend is False
+    assert decision.overflow_confirm_required is False
 
 
 def test_refresh_accept_spends() -> None:
@@ -52,12 +54,64 @@ def test_refresh_accept_spends() -> None:
     assert decision.records_spend is True
 
 
-def test_twenty_first_plan_use_is_overage_and_still_allowed() -> None:
+def test_twenty_first_plan_use_needs_overflow_confirm() -> None:
     spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
     decision = decide("plan", spends, JAN, "generate_persist")
+    assert decision.allowed is False
+    assert decision.blocked_reason == NEED_OVERFLOW_CONFIRM
+    assert decision.records_spend is False
+    assert decision.overflow_notice is True
+    assert decision.overflow_confirm_required is True
+
+
+def test_twenty_first_plan_use_with_confirm_is_overage() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
+    decision = decide("plan", spends, JAN, "generate_persist", confirm_overflow=True)
     assert decision.allowed is True
     assert decision.as_overage is True
     assert decision.records_spend is True
+    assert decision.overflow_notice is True
+
+
+def test_stream_at_overflow_does_not_block() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
+    decision = decide("plan", spends, JAN, "generate_persist", completed=False)
+    assert decision.allowed is True
+    assert decision.records_spend is False
+    assert decision.overflow_notice is True
+    assert decision.overflow_confirm_required is True
+
+
+def test_stale_generate_at_overflow_does_not_confirm_or_spend() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
+    decision = decide(
+        "plan", spends, JAN, "generate_persist", listing_copy_was_stale=True
+    )
+    assert decision.allowed is True
+    assert decision.records_spend is False
+    assert decision.overflow_notice is False
+    assert decision.overflow_confirm_required is False
+
+
+def test_later_overflow_this_month_is_silent_after_ack() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(21))
+    decision = decide(
+        "plan", spends, JAN, "generate_persist", overflow_confirmed_month="2026-01"
+    )
+    assert decision.allowed is True
+    assert decision.as_overage is True
+    assert decision.overflow_notice is True
+    assert decision.overflow_confirm_required is False
+
+
+def test_next_month_needs_overflow_confirm_again() -> None:
+    february = tuple(Spend(at=FEB, kind="generate_persist") for _ in range(20))
+    decision = decide(
+        "plan", february, FEB, "generate_persist", overflow_confirmed_month="2026-01"
+    )
+    assert decision.allowed is False
+    assert decision.blocked_reason == NEED_OVERFLOW_CONFIRM
+    assert decision.overflow_confirm_required is True
 
 
 def test_unused_included_does_not_carry_into_the_next_month() -> None:
@@ -111,7 +165,8 @@ def test_website_handoff_counts_in_the_same_twenty() -> None:
     assert decision.records_spend is True
     assert decision.as_overage is False
     after = (*spends, Spend(at=JAN, kind="website_handoff"))
-    assert decide("plan", after, JAN, "website_handoff").as_overage is True
+    assert decide("plan", after, JAN, "website_handoff").blocked_reason == NEED_OVERFLOW_CONFIRM
+    assert decide("plan", after, JAN, "website_handoff", confirm_overflow=True).as_overage is True
 
 
 def test_entitlement_prefers_local_bypass_then_plan_then_free() -> None:
@@ -156,7 +211,7 @@ def test_overage_report_failure_still_keeps_the_recorded_spend() -> None:
         raise RuntimeError("stripe down")
 
     spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide("plan", spends, JAN, "generate_persist")
+    decision = decide("plan", spends, JAN, "generate_persist", confirm_overflow=True)
     reported = persist_spend_then_report(
         records_spend=decision.records_spend,
         as_overage=decision.as_overage,

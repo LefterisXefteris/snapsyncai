@@ -21,6 +21,8 @@ class SubscriptionStatusResponse(CamelModel):
     allowance_used: int | None = None
     allowance_included: int | None = None
     overage_this_month: int | None = None
+    overflow_notice: bool = False
+    overflow_confirm_required: bool = False
     status: str | None = None
     current_period_end: str | None = None
     stripe_subscription_id: str | None = None

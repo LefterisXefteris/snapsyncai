@@ -135,3 +135,7 @@ _Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlo
 **Allowance**:
 The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write or website lands — a failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check.
 _Avoid_: credits, weekly product limit, unlock, compliance check, top-up, yearly bank
+
+**Overflow**:
+A £0.70 charge on the Plan invoice for one Allowance use after the included 20 in the UTC calendar month. Not a pack, not a prepaid balance, not a purchase of a write. Leftover weekly has none.
+_Avoid_: top-up, credit, extra pack, overage (as seller-facing language)

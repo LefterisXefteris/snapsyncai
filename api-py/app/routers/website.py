@@ -39,6 +39,7 @@ class WebsitePrototypeResponse(CamelModel):
 class WebsiteHandoffBody(CamelModel):
     product_ids: list[int]
     look: str = ""
+    confirm_overflow: bool = False
 
 
 class WebsiteHandoffResponse(CamelModel):
@@ -102,7 +103,14 @@ async def website_handoff(
     )
     wanted = set(body.product_ids)
     selected = [product for product in eligible if product.id in wanted]
-    blocked = await authorize_plan_job(session, settings, user_id, "website_handoff")
+    blocked = await authorize_plan_job(
+        session,
+        settings,
+        user_id,
+        "website_handoff",
+        confirm_overflow=body.confirm_overflow,
+        completing=True,
+    )
     if blocked:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocked)
     try:
@@ -114,7 +122,9 @@ async def website_handoff(
         )
     except HandoffError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    await settle_plan_job(session, settings, user_id, "website_handoff")
+    await settle_plan_job(
+        session, settings, user_id, "website_handoff", confirm_overflow=body.confirm_overflow
+    )
     return WebsiteHandoffResponse(
         lovable_url=result.lovable_url, product_count=result.product_count
     )

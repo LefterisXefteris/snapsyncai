@@ -251,11 +251,20 @@ def accept_item(
     persist: Callable[[int, Mapping[str, Any]], None],
     record_spend: Callable[[], None],
     shop_gpsr: Mapping[str, Any] | None = None,
+    confirm_overflow: bool = False,
+    overflow_confirmed_month: str | None = None,
 ) -> AcceptResult:
     accepted = accept_listing_copy_refresh(photo.facts, proposal, shop_gpsr)
     if accepted.error or accepted.listing_copy is None:
         return AcceptResult(error=accepted.error)
-    decision = decide(entitlement, spends, now, "bulk_seo_persist")
+    decision = decide(
+        entitlement,
+        spends,
+        now,
+        "bulk_seo_persist",
+        confirm_overflow=confirm_overflow,
+        overflow_confirmed_month=overflow_confirmed_month,
+    )
     if not decision.allowed:
         return AcceptResult(error=decision.blocked_reason)
     persist(photo.id, accepted.listing_copy)

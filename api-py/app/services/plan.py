@@ -24,6 +24,7 @@ WEEKLY_LIMIT = (
     "You've used all 30 listing-copy writes this week. "
     "Your leftover weekly Plan resets every Monday at midnight UTC."
 )
+NEED_OVERFLOW_CONFIRM = "overflow_confirm_required"
 
 _SPENDING_JOBS = frozenset(
     {"generate_persist", "refresh_accept", "website_handoff", "bulk_seo_persist"}
@@ -50,6 +51,8 @@ class SpendDecision:
     blocked_reason: str | None
     records_spend: bool
     as_overage: bool
+    overflow_notice: bool = False
+    overflow_confirm_required: bool = False
 
 
 def _aware(value: datetime) -> datetime:
@@ -61,6 +64,11 @@ def _aware(value: datetime) -> datetime:
 def month_start_utc(now: datetime) -> datetime:
     now = _aware(now).astimezone(UTC)
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def month_key_utc(now: datetime) -> str:
+    now = _aware(now).astimezone(UTC)
+    return f"{now.year:04d}-{now.month:02d}"
 
 
 def week_start_utc(now: datetime) -> datetime:
@@ -106,6 +114,8 @@ def decide(
     *,
     listing_copy_was_stale: bool = False,
     completed: bool = True,
+    overflow_confirmed_month: str | None = None,
+    confirm_overflow: bool = False,
 ) -> SpendDecision:
     if entitlement == "free":
         return SpendDecision(
@@ -138,14 +148,29 @@ def decide(
             as_overage=False,
         )
 
-    records = completed and not listing_copy_was_stale and job in _SPENDING_JOBS
+    would_spend = not listing_copy_was_stale and job in _SPENDING_JOBS
     snapshot = view(entitlement, spends, now)
-    as_overage = records and snapshot.used >= PLAN_INCLUDED
+    overflow_notice = would_spend and snapshot.used >= PLAN_INCLUDED
+    overflow_confirm_required = overflow_notice and overflow_confirmed_month != month_key_utc(
+        now
+    )
+    if completed and overflow_confirm_required and not confirm_overflow:
+        return SpendDecision(
+            allowed=False,
+            blocked_reason=NEED_OVERFLOW_CONFIRM,
+            records_spend=False,
+            as_overage=False,
+            overflow_notice=True,
+            overflow_confirm_required=True,
+        )
+    records = completed and would_spend
     return SpendDecision(
         allowed=True,
         blocked_reason=None,
         records_spend=records,
-        as_overage=as_overage,
+        as_overage=records and overflow_notice,
+        overflow_notice=overflow_notice,
+        overflow_confirm_required=overflow_confirm_required,
     )
 
 

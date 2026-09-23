@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, useSubscriptionStatus, type ListingCopyRefreshPack } from "@/hooks/use-images";
+import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
+import { overflowNoticeText, showGenerateOverflowNotice } from "@/lib/overflow-copy";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
@@ -84,6 +86,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const acceptListingCopyRefresh = useAcceptListingCopyRefresh();
   const { data: shopifyStatus } = useShopifyStatus();
   const { data: subscriptionStatus } = useSubscriptionStatus();
+  const overflow = useOverflowConfirm();
   const saveShopGpsr = useSaveShopGpsrIdentity();
 
   const [title, setTitle] = useState("");
@@ -242,6 +245,56 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
       : undefined;
   const canRefresh = image.mayRefreshListingCopy === true;
   const refreshBlockedReason = image.refreshBlockedReason ?? null;
+  const generateOverflowNotice = showGenerateOverflowNotice(
+    overflow.overflowNotice,
+    image.listingCopyStale,
+  )
+    ? overflowNoticeText(overflow.overagePence)
+    : null;
+  const refreshOverflowNotice = canRefresh && overflow.overflowNotice
+    ? overflowNoticeText(overflow.overagePence)
+    : null;
+
+  const acceptGenerated = (
+    generated: Parameters<typeof acceptListingCopy.mutate>[0]["generated"],
+    onSuccess?: (product: Image) => void,
+  ) => {
+    const send = (confirmOverflow: boolean) => {
+      acceptListingCopy.mutate(
+        { imageId: image.id, generated, confirmOverflow },
+        {
+          onSuccess,
+          onError: (error) => {
+            if (confirmOverflow) return;
+            overflow.retryIfConfirmRequired(error.message, send);
+          },
+        },
+      );
+    };
+    overflow.run(send);
+  };
+
+  const acceptRefresh = (pack: Omit<ListingCopyRefreshPack, "queries">) => {
+    const send = (confirmOverflow: boolean) => {
+      acceptListingCopyRefresh.mutate(
+        { imageId: image.id, pack, confirmOverflow },
+        {
+          onSuccess: (product) => {
+            if (product.tags) setTags(product.tags);
+            if (product.description) setDescription(product.description);
+            if (product.seoTitle) setSeoTitle(product.seoTitle);
+            if (product.seoDescription) setSeoDescription(product.seoDescription);
+            setRefreshPack(null);
+          },
+          onError: (error: { message?: string }) => {
+            if (confirmOverflow) return;
+            overflow.retryIfConfirmRequired(error.message ?? "", send);
+          },
+        },
+      );
+    };
+    overflow.run(send);
+  };
   const shopGpsr = (shopifyStatus?.gpsrIdentity ?? null) as GpsrIdentity | null;
   const shopConnected = Boolean(shopifyStatus?.connected);
   const shopHasGpsr = isCompleteGpsr(shopGpsr);
@@ -1048,6 +1101,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     defaultCategory={category}
                     canGenerate={canGenerate}
                     blockedReason={generateBlockedReason}
+                    overflowNotice={generateOverflowNotice}
                     onGenerated={(parsed) => {
                       setTitle(parsed.title);
                       setDescription(parsed.description);
@@ -1058,68 +1112,48 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     }}
                     onAcceptTitle={(v) => {
                       setTitle(v);
-                      acceptListingCopy.mutate(
-                        { imageId: image.id, generated: { title: v } },
-                        { onSuccess: (product) => { if (product.title) setTitle(product.title); } },
-                      );
+                      acceptGenerated({ title: v }, (product) => {
+                        if (product.title) setTitle(product.title);
+                      });
                     }}
                     onAcceptDescription={(v) => {
                       setDescription(v);
-                      acceptListingCopy.mutate(
-                        { imageId: image.id, generated: { description: v } },
-                        {
-                          onSuccess: (product) => {
-                            if (product.description) setDescription(product.description);
-                          },
-                        },
-                      );
+                      acceptGenerated({ description: v }, (product) => {
+                        if (product.description) setDescription(product.description);
+                      });
                     }}
                     onAcceptTags={(v) => {
                       setTags(v);
-                      acceptListingCopy.mutate(
-                        { imageId: image.id, generated: { tags: v } },
-                        { onSuccess: (product) => { if (product.tags) setTags(product.tags); } },
-                      );
+                      acceptGenerated({ tags: v }, (product) => {
+                        if (product.tags) setTags(product.tags);
+                      });
                     }}
                     onAcceptSeoTitle={(v) => {
                       const next = v.slice(0, 70);
                       setSeoTitle(next);
-                      acceptListingCopy.mutate(
-                        { imageId: image.id, generated: { seoTitle: next } },
-                        { onSuccess: (product) => { if (product.seoTitle) setSeoTitle(product.seoTitle); } },
-                      );
+                      acceptGenerated({ seoTitle: next }, (product) => {
+                        if (product.seoTitle) setSeoTitle(product.seoTitle);
+                      });
                     }}
                     onAcceptSeoDescription={(v) => {
                       const next = v.slice(0, 320);
                       setSeoDescription(next);
-                      acceptListingCopy.mutate(
-                        { imageId: image.id, generated: { seoDescription: next } },
-                        {
-                          onSuccess: (product) => {
-                            if (product.seoDescription) setSeoDescription(product.seoDescription);
-                          },
-                        },
-                      );
+                      acceptGenerated({ seoDescription: next }, (product) => {
+                        if (product.seoDescription) setSeoDescription(product.seoDescription);
+                      });
                     }}
                     onAcceptAeoFaqs={(v) => {
                       setAeoFaqs(v);
-                      acceptListingCopy.mutate(
-                        {
-                          imageId: image.id,
-                          generated: {
-                            aeoFaqs: v.map((f) => ({ question: f.q, answer: f.a })),
-                          },
-                        },
-                        {
-                          onSuccess: (product) => {
-                            if (!Array.isArray(product.aeoFaqs)) return;
-                            setAeoFaqs(
-                              (product.aeoFaqs as { q?: string; a?: string; question?: string; answer?: string }[]).map((f) => ({
-                                q: f.q ?? f.question ?? "",
-                                a: f.a ?? f.answer ?? "",
-                              })),
-                            );
-                          },
+                      acceptGenerated(
+                        { aeoFaqs: v.map((f) => ({ question: f.q, answer: f.a })) },
+                        (product) => {
+                          if (!Array.isArray(product.aeoFaqs)) return;
+                          setAeoFaqs(
+                            (product.aeoFaqs as { q?: string; a?: string; question?: string; answer?: string }[]).map((f) => ({
+                              q: f.q ?? f.question ?? "",
+                              a: f.a ?? f.answer ?? "",
+                            })),
+                          );
                         },
                       );
                     }}
@@ -1145,6 +1179,11 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                   {!canRefresh && refreshBlockedReason ? (
                     <p className="text-xs text-muted-foreground">{refreshBlockedReason}</p>
                   ) : null}
+                  {refreshOverflowNotice ? (
+                    <p className="text-xs text-muted-foreground" data-testid="text-overflow-notice-refresh">
+                      {refreshOverflowNotice}
+                    </p>
+                  ) : null}
                   {refreshPack ? (
                     <div className="space-y-2 rounded-md border p-3">
                       <p className="text-xs text-muted-foreground">
@@ -1167,26 +1206,12 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                           className="h-8 text-xs"
                           disabled={acceptListingCopyRefresh.isPending}
                           onClick={() => {
-                            acceptListingCopyRefresh.mutate(
-                              {
-                                imageId: image.id,
-                                pack: {
-                                  tags: refreshPack.tags,
-                                  description: refreshPack.description,
-                                  seoTitle: refreshPack.seoTitle,
-                                  seoDescription: refreshPack.seoDescription,
-                                },
-                              },
-                              {
-                                onSuccess: (product) => {
-                                  if (product.tags) setTags(product.tags);
-                                  if (product.description) setDescription(product.description);
-                                  if (product.seoTitle) setSeoTitle(product.seoTitle);
-                                  if (product.seoDescription) setSeoDescription(product.seoDescription);
-                                  setRefreshPack(null);
-                                },
-                              },
-                            );
+                            acceptRefresh({
+                              tags: refreshPack.tags,
+                              description: refreshPack.description,
+                              seoTitle: refreshPack.seoTitle,
+                              seoDescription: refreshPack.seoDescription,
+                            });
                           }}
                         >
                           Accept
@@ -1586,6 +1611,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+      {overflow.dialog}
     </div>
   );
 }

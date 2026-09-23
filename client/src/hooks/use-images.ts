@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
+import { isOverflowConfirmError } from "@/lib/overflow-copy";
 import type { Image } from "@/lib/image";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
@@ -63,6 +64,8 @@ export function useSubscriptionStatus() {
           allowanceUsed: 0,
           allowanceIncluded: null,
           overageThisMonth: 0,
+          overflowNotice: false,
+          overflowConfirmRequired: false,
         };
       }
       const res = await apiFetch('/api/subscription/status');
@@ -73,6 +76,8 @@ export function useSubscriptionStatus() {
         allowanceUsed?: number;
         allowanceIncluded?: number | null;
         overageThisMonth?: number;
+        overflowNotice?: boolean;
+        overflowConfirmRequired?: boolean;
         status?: string;
         currentPeriodEnd?: string;
         stripeSubscriptionId?: string;
@@ -511,22 +516,26 @@ export function useAcceptGeneratedListingCopy() {
     mutationFn: async ({
       imageId,
       generated,
+      confirmOverflow,
     }: {
       imageId: number;
       generated: GeneratedListingCopy;
+      confirmOverflow?: boolean;
     }) => {
       const res = await apiRequest(
         "POST",
         buildUrl(api.images.acceptListingCopy.path, { id: imageId }),
-        generated,
+        { ...generated, confirmOverflow: confirmOverflow === true },
       );
       return res.json() as Promise<Image>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
     },
     onError: (error) => {
+      if (isOverflowConfirmError(error.message)) return;
       toast({
         title: "Could not accept listing copy",
         description: error.message,
@@ -595,22 +604,26 @@ export function useAcceptListingCopyRefresh() {
     mutationFn: async ({
       imageId,
       pack,
+      confirmOverflow,
     }: {
       imageId: number;
       pack: Omit<ListingCopyRefreshPack, "queries">;
+      confirmOverflow?: boolean;
     }) => {
       const res = await apiRequest(
         "POST",
         buildUrl(api.images.acceptListingCopyRefresh.path, { id: imageId }),
-        pack,
+        { ...pack, confirmOverflow: confirmOverflow === true },
       );
       return res.json() as Promise<Image>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
     },
     onError: (error: { message?: string }) => {
+      if (isOverflowConfirmError(error.message ?? "")) return;
       toast({
         title: "Could not accept listing copy refresh",
         description: error.message,

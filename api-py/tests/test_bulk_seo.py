@@ -408,3 +408,44 @@ def test_local_bypass_accept_persists_and_does_not_record_spend() -> None:
     assert result.error is None
     assert persisted == [1]
     assert spent == []
+
+
+def test_twenty_first_accept_needs_overflow_confirm() -> None:
+    from app.services.plan import NEED_OVERFLOW_CONFIRM, Spend
+
+    persisted: list = []
+    spent: list = []
+    spends = tuple(Spend(at=JAN, kind="bulk_seo_persist") for _ in range(20))
+    result = accept_item(
+        _photo(),
+        _PACK,
+        entitlement="plan",
+        spends=spends,
+        now=JAN,
+        persist=lambda *_args: persisted.append(1),
+        record_spend=lambda: spent.append("bulk_seo_persist"),
+    )
+    assert result.error == NEED_OVERFLOW_CONFIRM
+    assert persisted == []
+    assert spent == []
+
+
+def test_twenty_first_accept_with_confirm_spends() -> None:
+    from app.services.plan import Spend
+
+    persisted: list = []
+    spent: list = []
+    spends = tuple(Spend(at=JAN, kind="bulk_seo_persist") for _ in range(20))
+    result = accept_item(
+        _photo(),
+        _PACK,
+        entitlement="plan",
+        spends=spends,
+        now=JAN,
+        persist=lambda pid, copy: persisted.append(pid),
+        record_spend=lambda: spent.append("bulk_seo_persist"),
+        confirm_overflow=True,
+    )
+    assert result.error is None
+    assert persisted == [1]
+    assert spent == ["bulk_seo_persist"]

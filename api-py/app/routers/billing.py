@@ -35,7 +35,7 @@ from app.services.plan import (
     view,
     workspace_origin,
 )
-from app.services.plan_ledger import list_spends
+from app.services.plan_charge import overflow_view
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +55,17 @@ async def _plan_status(
     )
     spends = await list_spends(session, user_id)
     snapshot = view(entitlement, spends, datetime.now(UTC))
+    overflow_notice, overflow_confirm_required = await overflow_view(
+        session, settings, user_id
+    )
     return SubscriptionStatusResponse(
         subscribed=entitlement != "free",
         entitlement=entitlement,
         allowance_used=snapshot.used,
         allowance_included=snapshot.included,
         overage_this_month=snapshot.overage,
+        overflow_notice=overflow_notice,
+        overflow_confirm_required=overflow_confirm_required,
         status=(
             "active"
             if entitlement == "local_bypass"

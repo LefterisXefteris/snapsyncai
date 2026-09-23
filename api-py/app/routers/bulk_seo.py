@@ -20,8 +20,8 @@ from app.services.bulk_seo import (
     start_pack,
 )
 from app.services.listing_copy_refresh import search_demand_configured
-from app.services.plan import NEED_PLAN, WEEKLY_LIMIT
-from app.services.plan_charge import current_entitlement, settle_plan_job
+from app.services.plan import NEED_OVERFLOW_CONFIRM, NEED_PLAN, WEEKLY_LIMIT
+from app.services.plan_charge import current_entitlement, overflow_ack_month, settle_plan_job
 from app.services.plan_ledger import list_spends
 
 router = APIRouter(tags=["bulk-seo"])
@@ -56,6 +56,7 @@ class BulkSeoAcceptBody(CamelModel):
     description: str
     seo_title: str
     seo_description: str
+    confirm_overflow: bool = False
 
 
 class BulkSeoProposal(CamelModel):
@@ -205,6 +206,7 @@ async def bulk_seo_accept(
     shop_gpsr = connection.gpsr_identity if connection is not None else None
     entitlement = await current_entitlement(session, settings, user_id)
     spends = await list_spends(session, user_id)
+    ack_month = await overflow_ack_month(session, settings, user_id)
     stash: dict = {}
 
     def persist(product_id: int, listing_copy):
@@ -225,8 +227,10 @@ async def bulk_seo_accept(
         persist=persist,
         record_spend=lambda: None,
         shop_gpsr=shop_gpsr if isinstance(shop_gpsr, dict) else None,
+        confirm_overflow=body.confirm_overflow,
+        overflow_confirmed_month=ack_month,
     )
-    if result.error in (NEED_PLAN, WEEKLY_LIMIT):
+    if result.error in (NEED_PLAN, WEEKLY_LIMIT, NEED_OVERFLOW_CONFIRM):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=result.error)
     if result.error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.error)
@@ -236,6 +240,11 @@ async def bulk_seo_accept(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if result.spent:
         await settle_plan_job(
-            session, settings, user_id, "bulk_seo_persist", product_id=photo.id
+            session,
+            settings,
+            user_id,
+            "bulk_seo_persist",
+            confirm_overflow=body.confirm_overflow,
+            product_id=photo.id,
         )
     return {"ok": True}

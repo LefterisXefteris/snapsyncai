@@ -1,9 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
 import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { isOverflowConfirmError } from "@/lib/overflow-copy";
 import type { BulkSeoCatalogueRow } from "@/lib/bulk-seo";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
@@ -91,6 +92,7 @@ export function useBulkSeoRegenerate() {
 }
 
 export function useBulkSeoAccept() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (body: {
@@ -99,11 +101,16 @@ export function useBulkSeoAccept() {
       description: string;
       seoTitle: string;
       seoDescription: string;
+      confirmOverflow?: boolean;
     }) => {
       const res = await apiRequest(api.bulkSeo.accept.method, api.bulkSeo.accept.path, body);
       return res.json() as Promise<{ ok: boolean }>;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+    },
     onError: (error) => {
+      if (isOverflowConfirmError(error instanceof Error ? error.message : "")) return;
       toast({
         title: "Could not accept",
         description: error instanceof Error ? error.message : "Bulk SEO accept failed",

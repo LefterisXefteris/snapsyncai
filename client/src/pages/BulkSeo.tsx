@@ -17,12 +17,15 @@ import {
   bulkSeoEligibleTickCount,
   bulkSeoStartEnabled,
 } from "@/lib/bulk-seo";
+import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
+import { overflowNoticeText } from "@/lib/overflow-copy";
 
 export default function BulkSeoPage() {
   const catalogue = useBulkSeoCatalogue();
   const start = useBulkSeoStart();
   const regenerate = useBulkSeoRegenerate();
   const accept = useBulkSeoAccept();
+  const overflow = useOverflowConfirm();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [items, setItems] = useState<Record<number, BulkSeoPackItem>>({});
   const [packUseCount, setPackUseCount] = useState(0);
@@ -121,6 +124,11 @@ export default function BulkSeoPage() {
                 </div>
               ) : (
                 <>
+                  {overflow.overflowNotice ? (
+                    <p className="text-xs text-muted-foreground" data-testid="text-overflow-notice">
+                      {overflowNoticeText(overflow.overagePence)}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     Accepting these proposals would spend {proposedUseCount}{" "}
                     {proposedUseCount === 1 ? "use" : "uses"}
@@ -186,31 +194,38 @@ export default function BulkSeoPage() {
                               onClick={() => {
                                 const proposal = item.proposal;
                                 if (!proposal) return;
-                                accept.mutate(
-                                  {
-                                    productId: row.id,
-                                    tags: proposal.tags,
-                                    description: proposal.description,
-                                    seoTitle: proposal.seoTitle,
-                                    seoDescription: proposal.seoDescription,
-                                  },
-                                  {
-                                    onSuccess: () => {
-                                      setItems((prev) => {
-                                        const next = { ...prev };
-                                        delete next[row.id];
-                                        return next;
-                                      });
-                                      setPackUseCount((count) => Math.max(0, count - 1));
+                                const send = (confirmOverflow: boolean) => {
+                                  accept.mutate(
+                                    {
+                                      productId: row.id,
+                                      tags: proposal.tags,
+                                      description: proposal.description,
+                                      seoTitle: proposal.seoTitle,
+                                      seoDescription: proposal.seoDescription,
+                                      confirmOverflow,
                                     },
-                                    onError: (error) => {
-                                      const message = error instanceof Error ? error.message : "";
-                                      if (message.startsWith("403:")) {
-                                        setAcceptBlockedReason(message.replace(/^403:\s*/, ""));
-                                      }
+                                    {
+                                      onSuccess: () => {
+                                        setItems((prev) => {
+                                          const next = { ...prev };
+                                          delete next[row.id];
+                                          return next;
+                                        });
+                                        setPackUseCount((count) => Math.max(0, count - 1));
+                                      },
+                                      onError: (error) => {
+                                        const message = error instanceof Error ? error.message : "";
+                                        if (!confirmOverflow && overflow.retryIfConfirmRequired(message, send)) {
+                                          return;
+                                        }
+                                        if (message.startsWith("403:")) {
+                                          setAcceptBlockedReason(message.replace(/^403:\s*/, ""));
+                                        }
+                                      },
                                     },
-                                  },
-                                );
+                                  );
+                                };
+                                overflow.run(send);
                               }}
                             >
                               Accept
@@ -260,6 +275,7 @@ export default function BulkSeoPage() {
           )}
         </div>
       </ScrollArea>
+      {overflow.dialog}
     </div>
   );
 }

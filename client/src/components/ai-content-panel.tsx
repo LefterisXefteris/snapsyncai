@@ -19,6 +19,7 @@ interface AiContentPanelProps {
   defaultCategory?: string;
   canGenerate: boolean;
   blockedReason?: string;
+  overflowNotice?: string | null;
   onGenerated: (parsed: GeneratedContent) => void;
   onAcceptTitle: (value: string) => void;
   onAcceptDescription: (value: string) => void;
@@ -33,6 +34,7 @@ export function AiContentPanel({
   defaultCategory,
   canGenerate,
   blockedReason,
+  overflowNotice,
   onGenerated,
   onAcceptTitle,
   onAcceptDescription,
@@ -175,6 +177,11 @@ export function AiContentPanel({
             {blockedReason ?? "Confirm product facts before generating listing copy."}
           </p>
         )}
+        {canGenerate && overflowNotice ? (
+          <p className="text-xs text-muted-foreground" data-testid="text-overflow-notice">
+            {overflowNotice}
+          </p>
+        ) : null}
 
         {/* Generate button */}
         <Button

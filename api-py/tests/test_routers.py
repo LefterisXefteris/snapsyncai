@@ -175,6 +175,8 @@ class TestResponseContract:
             "allowanceUsed",
             "allowanceIncluded",
             "overageThisMonth",
+            "overflowNotice",
+            "overflowConfirmRequired",
             "status",
             "currentPeriodEnd",
             "stripeSubscriptionId",
