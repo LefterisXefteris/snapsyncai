@@ -199,7 +199,7 @@ export default function Settings() {
                 <h3 className="text-sm font-medium">Plan</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {leftoverWeekly
-                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. Switch to a Plan for 20/month and £1.50 extra uses.`
+                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. Switch to a Plan for 20/month and £0.70 extra uses.`
                     : isSubscribed
                     ? allowanceIncluded == null
                       ? "Local workspace — Allowance is not billed."
@@ -266,7 +266,7 @@ export default function Settings() {
               Plan
             </DialogTitle>
             <DialogDescription>
-              20 listing-copy writes and website handoffs each calendar month. Extra uses £{(paymentConfig?.overagePence ?? 150) / 100} each.
+              20 listing-copy writes and website handoffs each calendar month. Extra uses £{((paymentConfig?.overagePence ?? 70) / 100).toFixed(2)} each.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

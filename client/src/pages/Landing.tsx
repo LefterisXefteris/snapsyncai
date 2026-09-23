@@ -406,7 +406,7 @@ export default function Landing() {
               </p>
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary font-medium bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                20 listing-copy writes/month · Extra £1.50 · Cancel anytime
+                20 listing-copy writes/month · Extra £0.70 · Cancel anytime
               </div>
             </div>
 

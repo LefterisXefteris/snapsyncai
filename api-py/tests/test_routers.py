@@ -45,7 +45,7 @@ class TestPublicConfig:
             "planMonthlyPricePence": 1900,
             "planAnnualPricePence": 19_000,
             "allowanceMonthly": 20,
-            "overagePence": 150,
+            "overagePence": 70,
         }
 
     def test_clerk_config_500s_when_unconfigured(self, client: TestClient, monkeypatch) -> None:

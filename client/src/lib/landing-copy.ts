@@ -21,7 +21,7 @@ export const LANDING_MICRO = "No card required · catalogue, facts, and typed li
 export const LANDING_PRIMARY_CTA = "Start free";
 export const LANDING_SECONDARY_CTA = "How it works";
 
-export const LANDING_FINE_PRINT = "Plan from £19/month · £190/year · Extra uses £1.50 · Cancel anytime";
+export const LANDING_FINE_PRINT = "Plan from £19/month · £190/year · Extra uses £0.70 · Cancel anytime";
 
 export const JOBS = [
   {
@@ -76,7 +76,7 @@ export const WEEKLY_BULLETS = [
   "SEO and AEO in the listing copy",
   "Push to Shopify",
   "Inventory Autopilot",
-  "Extra uses £1.50 — not a hard stop",
+  "Extra uses £0.70 — not a hard stop",
 ] as const;
 
 export const ANNUAL_BULLETS = [
@@ -103,7 +103,7 @@ export const FAQ_DATA = [
   {
     question: "How does the Plan Allowance work?",
     answer:
-      "Each calendar month a Plan includes 20 listing-copy writes (first generate or listing copy refresh) and website handoffs. Extra uses are £1.50 on the invoice. Unused uses expire at month end. Confirming facts does not spend. No card is required to use the workspace.",
+      "Each calendar month a Plan includes 20 listing-copy writes (first generate or listing copy refresh) and website handoffs. Extra uses are £0.70 on the invoice. Unused uses expire at month end. Confirming facts does not spend. No card is required to use the workspace.",
   },
   {
     question: "How do I create a product from photos?",
@@ -118,7 +118,7 @@ export const FAQ_DATA = [
   {
     question: "How much does SnapSync cost?",
     answer:
-      "No card to start. A Plan is £19/month or £190/year for 20 listing-copy writes each calendar month — listing copy, listing copy refresh, website, push to Shopify, and Inventory Autopilot. Extra uses £1.50. Cancel anytime.",
+      "No card to start. A Plan is £19/month or £190/year for 20 listing-copy writes each calendar month — listing copy, listing copy refresh, website, push to Shopify, and Inventory Autopilot. Extra uses £0.70. Cancel anytime.",
   },
   {
     question: "Can I edit listing copy before I push to Shopify?",

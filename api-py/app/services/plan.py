@@ -14,7 +14,7 @@ PLAN_INCLUDED = 20
 LEFTOVER_WEEKLY_INCLUDED = 30
 PLAN_MONTHLY_PENCE = 1900
 PLAN_ANNUAL_PENCE = 19_000
-OVERAGE_PENCE = 150
+OVERAGE_PENCE = 70
 
 NEED_PLAN = (
     "Subscribe to a Plan to generate listing copy, refresh from search demand, "
