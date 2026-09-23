@@ -235,6 +235,46 @@ class TestResponseContract:
         } <= paths
 
 
+class TestPlanStatus:
+    """Settings treats any status failure as free (`subscribed !== true` → Subscribe)."""
+
+    @pytest.mark.asyncio
+    async def test_active_monthly_plan_is_subscribed(self, monkeypatch) -> None:
+        from types import SimpleNamespace
+
+        from app.routers import billing as routes
+
+        async def no_spends(_session, _user_id):
+            return []
+
+        async def no_overflow(_session, _settings, _user_id):
+            return False, False
+
+        monkeypatch.setattr(routes, "list_spends", no_spends)
+        monkeypatch.setattr(routes, "overflow_view", no_overflow)
+        monkeypatch.setattr(routes.billing, "is_local_pro", lambda _s: False)
+
+        async def not_dev(_uid, _s):
+            return False
+
+        monkeypatch.setattr(routes.billing, "is_dev_free_user", not_dev)
+
+        sub = SimpleNamespace(
+            status="active",
+            billing_interval="month",
+            current_period_end=None,
+            stripe_subscription_id="sub_test",
+        )
+        result = await routes._plan_status(None, "user_test", SimpleNamespace(), sub)
+        assert result.subscribed is True
+        assert result.entitlement == "plan"
+        assert result.allowance_used == 0
+        assert result.allowance_included == 20
+        payload = result.model_dump(by_alias=True, exclude_none=True)
+        assert payload["subscribed"] is True
+        assert payload["entitlement"] == "plan"
+
+
 class TestInventoryScopeCheck:
     """`inventoryReady` reflects whether Shopify granted listing inventory scopes."""
 
