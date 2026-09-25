@@ -10,6 +10,10 @@ const lightTable = readFileSync(
   path.join(root, "client/src/components/listing-light-table.tsx"),
   "utf8",
 );
+const stagedImages = readFileSync(
+  path.join(root, "client/src/hooks/use-staged-images.ts"),
+  "utf8",
+);
 
 test("New listing copy does not tell the seller to drag to regroup", () => {
   assert.doesNotMatch(uploadZone, /Drag to regroup/);
@@ -45,4 +49,14 @@ test("multi-photo drafts are one frame with a clickable photo count", () => {
 
 test("New listing packs multi-photo drafts on restore and after a photo is removed", () => {
   assert.match(uploadZone, /packMultiPhotoFirst/);
+});
+
+test("New listing shows the smaller picture and Create sends the original photo", () => {
+  assert.match(uploadZone, /smallerPicture\(file\)/);
+  assert.match(uploadZone, /createObjectURL\(display\)/);
+  assert.doesNotMatch(uploadZone, /createObjectURL\(file\)/);
+  assert.doesNotMatch(uploadZone, /createObjectURL\(f\)/);
+  assert.match(uploadZone, /files: group\.items\.map\(it => it\.file\)/);
+  assert.match(stagedImages, /createObjectURL\(photo\.display\)/);
+  assert.doesNotMatch(lightTable, /backdrop-blur/);
 });
