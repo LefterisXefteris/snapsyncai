@@ -12,4 +12,4 @@ Run typechecking regularly, single test files regularly, and the full test suite
 
 Once done, use /code-review to review the work.
 
-Commit your work to the current branch.
+Before push to main, or before telling the user production has it, follow `.agents/skills/live-path/SKILL.md`. Commit to the current branch is allowed before that; shipped is not.

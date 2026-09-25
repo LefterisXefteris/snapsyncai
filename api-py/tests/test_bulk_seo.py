@@ -110,6 +110,15 @@ def test_unconfigured_search_demand_blocks_start() -> None:
     assert view.start_blocked_reason == "Search demand is not configured."
 
 
+def test_dataforseo_without_login_blocks_bulk_seo_start() -> None:
+    from app.services.listing_copy_refresh import search_demand_configured
+    from app.services.search_demand import DATAFORSEO_LIVE_URL
+
+    configured = search_demand_configured("password", DATAFORSEO_LIVE_URL)
+    view = picker([_photo()], demand_configured=configured, entitlement="plan")
+    assert view.start_blocked_reason == "Search demand is not configured."
+
+
 def test_proposed_use_count_is_eligible_ticks_not_blocked_rows() -> None:
     ready = _photo(id=1)
     blocked = _photo(id=2, facts=facts_from_stored(None), title="Draft")

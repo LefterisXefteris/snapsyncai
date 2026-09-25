@@ -113,7 +113,9 @@ def _image_out(image, settings) -> ImageOut:
     return with_facts_outcomes(
         image,
         demand_configured=search_demand_configured(
-            settings.search_demand_api_key, settings.search_demand_url
+            settings.search_demand_api_key,
+            settings.search_demand_url,
+            settings.search_demand_login,
         ),
     )
 

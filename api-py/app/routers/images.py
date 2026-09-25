@@ -82,7 +82,9 @@ def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False):
         shop_gpsr,
         list_item=list_item,
         demand_configured=search_demand_configured(
-            settings.search_demand_api_key, settings.search_demand_url
+            settings.search_demand_api_key,
+            settings.search_demand_url,
+            settings.search_demand_login,
         ),
     )
 
@@ -289,8 +291,16 @@ def _refresh_conflict(reason: str) -> JSONResponse:
 
 
 async def fetch_search_demand(
-    seeds: Sequence[str], url: str | None, api_key: str | None
+    seeds: Sequence[str],
+    url: str | None,
+    api_key: str | None,
+    *,
+    login: str | None = None,
 ) -> tuple[str, ...]:
+    from app.services.search_demand import fetch_dataforseo, is_dataforseo_url
+
+    if is_dataforseo_url(url):
+        return await fetch_dataforseo(seeds, str(url), login, api_key)
     if not url or not str(url).strip():
         return ()
     headers = {}
@@ -336,7 +346,9 @@ async def _listing_copy_refresh_context(session, image, user_id: str, settings):
         facts,
         listing_copy_from_image(image),
         search_demand_configured(
-            settings.search_demand_api_key, settings.search_demand_url
+            settings.search_demand_api_key,
+            settings.search_demand_url,
+            settings.search_demand_login,
         ),
         shop_gpsr,
     )
@@ -382,6 +394,7 @@ async def listing_copy_refresh_route(
         seed_search_demand(facts, listing_copy),
         settings.search_demand_url,
         settings.search_demand_api_key,
+        login=settings.search_demand_login,
     )
     started = start_listing_copy_refresh(
         facts,

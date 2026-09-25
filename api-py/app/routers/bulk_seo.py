@@ -80,7 +80,11 @@ class BulkSeoPackResponse(CamelModel):
 
 
 def _demand_configured(settings) -> bool:
-    return search_demand_configured(settings.search_demand_api_key, settings.search_demand_url)
+    return search_demand_configured(
+        settings.search_demand_api_key,
+        settings.search_demand_url,
+        settings.search_demand_login,
+    )
 
 
 def _pack_item_out(item: PackItem) -> BulkSeoPackItem:
@@ -137,7 +141,10 @@ async def bulk_seo_start(
 
     async def fetch(_product_id: int, seeds):
         return await fetch_search_demand(
-            seeds, settings.search_demand_url, settings.search_demand_api_key
+            seeds,
+            settings.search_demand_url,
+            settings.search_demand_api_key,
+            login=settings.search_demand_login,
         )
 
     async def propose(_product_id: int, **kwargs):

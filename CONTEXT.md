@@ -12,6 +12,10 @@ _Avoid_: Platform, plugin, integration, marketplace (as the general term), store
 Where this product is available inside a connected Shopify shop — Online Store, Point of Sale, Shop, and other sales apps on that shop. Not a Channel.
 _Avoid_: Channel, sales channel (as SnapSync language), available channels
 
+**Go live**:
+The seller’s choice, on the product page, to put this product on the Online Store as Active, once listing copy exists and the price is greater than zero. It is a Push with that status and that publication. Other publications already chosen stay chosen. On a single tracked variant it also sets that variant’s available stock, including zero.
+_Avoid_: production, publish, make live, push production
+
 **Product**:
 The sellable thing the seller is listing. One product may have several photos. Listing copy and product facts belong to the product, not to a single photo.
 _Avoid_: Image (as the sellable thing), listing (as the thing being sold), snap, variant (as the sellable thing)

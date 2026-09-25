@@ -70,8 +70,16 @@ def listing_copy_from_image(image: Any) -> dict[str, Any]:
     }
 
 
-def search_demand_configured(api_key: str | None, url: str | None = None) -> bool:
-    return bool(api_key and str(api_key).strip() and url and str(url).strip())
+def search_demand_configured(
+    api_key: str | None, url: str | None = None, login: str | None = None
+) -> bool:
+    from app.services.search_demand import is_dataforseo_url
+
+    if not url or not str(url).strip():
+        return False
+    if is_dataforseo_url(url):
+        return bool(login and str(login).strip() and api_key and str(api_key).strip())
+    return bool(api_key and str(api_key).strip())
 
 
 def seed_search_demand(

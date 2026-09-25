@@ -2,6 +2,8 @@
 
 Engineering work in this repo follows **Matt Pocock's skills** (`.agents/skills/`). Issues live as markdown under `.scratch/`. See `docs/agents/issue-tracker.md`.
 
+**Live path:** before push to `main` or saying production has it, prove the seller-visible path. See `.agents/skills/live-path/SKILL.md`.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
