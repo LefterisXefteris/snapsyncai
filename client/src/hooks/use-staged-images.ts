@@ -1,4 +1,5 @@
 import { openDB, DBSchema } from 'idb';
+import { photoFromRecord, smallerPicture } from '@/lib/staged-photo';
 
 // ─── Shared types (imported by 05-02, 05-03) ───────────────────────────────
 
@@ -19,6 +20,7 @@ export interface Group {
 export interface BlobRecord {
   id: string;        // matches FileItem.id
   blob: Blob;        // actual binary — stored via structured clone, never JSON
+  displayBlob?: Blob; // smaller on-screen picture; absent on rolls staged before it existed
   filename: string;
   mimeType: string;
   savedAt: number;   // Date.now() — used for 24h expiry check
@@ -34,7 +36,7 @@ export interface GroupRecord {
 
 export interface StagedImagesHook {
   loadStaged: () => Promise<{ groups: Group[]; urlsCreated: string[] }>;
-  saveBlob: (id: string, file: File) => Promise<void>;
+  saveBlob: (id: string, file: File, displayBlob: Blob | null) => Promise<void>;
   deleteBlob: (id: string) => Promise<void>;
   saveGroups: (groups: Group[]) => Promise<void>;
   clearAll: () => Promise<void>;
@@ -72,6 +74,22 @@ function getDB() {
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
 const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+async function backfillSmallerPictures(records: BlobRecord[]): Promise<void> {
+  for (const record of records) {
+    const smaller = await smallerPicture(record.blob);
+    if (!smaller) continue;
+    try {
+      const db = await getDB();
+      const current = await db.get('blobs', record.id);
+      if (!current) continue;
+      await db.put('blobs', { ...current, displayBlob: smaller });
+    } catch (err) {
+      console.warn('[use-staged-images] IDB unavailable:', err);
+      return;
+    }
+  }
+}
 
 export function useStagedImages(): StagedImagesHook {
   async function loadStaged(): Promise<{ groups: Group[]; urlsCreated: string[] }> {
@@ -122,12 +140,10 @@ export function useStagedImages(): StagedImagesHook {
         for (const itemId of storedGroup.itemIds) {
           const blobRecord = blobMap.get(itemId);
           if (!blobRecord) continue; // blob may have been deleted
-          const file = new File([blobRecord.blob], blobRecord.filename, {
-            type: blobRecord.mimeType,
-          });
-          const url = URL.createObjectURL(file);
+          const photo = photoFromRecord(blobRecord);
+          const url = URL.createObjectURL(photo.display);
           urlsCreated.push(url);
-          items.push({ id: itemId, file, url });
+          items.push({ id: itemId, file: photo.file, url });
         }
         if (items.length > 0) {
           reconstructedGroups.push({
@@ -138,6 +154,9 @@ export function useStagedImages(): StagedImagesHook {
         }
       }
 
+      const missingDisplay = freshBlobs.filter((blob) => !blob.displayBlob);
+      if (missingDisplay.length > 0) void backfillSmallerPictures(missingDisplay);
+
       return { groups: reconstructedGroups, urlsCreated };
     } catch (err) {
       console.warn('[use-staged-images] IDB unavailable:', err);
@@ -145,12 +164,13 @@ export function useStagedImages(): StagedImagesHook {
     }
   }
 
-  async function saveBlob(id: string, file: File): Promise<void> {
+  async function saveBlob(id: string, file: File, displayBlob: Blob | null): Promise<void> {
     try {
       const db = await getDB();
       await db.put('blobs', {
         id,
         blob: file, // File extends Blob — structured clone handles it
+        ...(displayBlob ? { displayBlob } : {}),
         filename: file.name,
         mimeType: file.type,
         savedAt: Date.now(),

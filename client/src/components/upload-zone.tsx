@@ -3,6 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { UploadCloud, Loader2, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isImageLikeFile } from "@/lib/image-file-utils";
+import { photoFromRecord, smallerPicture } from "@/lib/staged-photo";
 import { useUploadImages } from "@/hooks/use-images";
 import { useToast } from "@/hooks/use-toast";
 import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
@@ -99,35 +100,56 @@ export function UploadZone({
   }, [orderedItemIds, clearSelection, setSelected]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newItems: FileItem[] = acceptedFiles.map(f => {
-      const url = URL.createObjectURL(f);
-      urlsRef.current.push(url);
-      return { id: crypto.randomUUID(), file: f, url };
-    });
-
-    setGroups(prev => {
-      const existingCount = prev.reduce((n, g) => n + g.items.length, 0);
-      if (existingCount + newItems.length > 200) {
-        toast({ title: "Too many images", description: "Max 200 per upload.", variant: "destructive" });
-        return prev;
+    void (async () => {
+      const prepared: { item: FileItem; displayBlob: Blob | null }[] = [];
+      for (let i = 0; i < acceptedFiles.length; i += 4) {
+        const chunk = acceptedFiles.slice(i, i + 4);
+        const part = await Promise.all(chunk.map(async (file) => {
+          const smaller = await smallerPicture(file);
+          const { display } = photoFromRecord({
+            blob: file,
+            displayBlob: smaller ?? undefined,
+            filename: file.name,
+            mimeType: file.type,
+          });
+          const url = URL.createObjectURL(display);
+          urlsRef.current.push(url);
+          return {
+            item: { id: crypto.randomUUID(), file, url },
+            displayBlob: smaller,
+          };
+        }));
+        prepared.push(...part);
       }
-      // Each dropped file becomes its own one-item group, appended to the end.
-      // No rechunking of existing groups — manual-first UX (GROUP-05/06/08).
-      const newGroups: GroupWithLabel[] = newItems.map(item => ({
-        id: crypto.randomUUID(),
-        items: [item],
-        maxImages: Number.MAX_SAFE_INTEGER, // vestigial; kept for IDB back-compat
-      }));
-      const next = [...prev, ...newGroups];
-      // Persist new blobs and updated groups (fire-and-forget)
-      Promise.all(newItems.map(item => saveBlob(item.id, item.file)))
-        .then(() => saveGroups(next))
-        .catch(err => console.warn('[upload-zone] IDB save failed:', err));
-      return next;
-    });
 
-    // Signal parent that user actively dropped files (not IDB restore)
-    onFreshDrop?.();
+      setGroups(prev => {
+        const existingCount = prev.reduce((n, g) => n + g.items.length, 0);
+        if (existingCount + prepared.length > 200) {
+          const rejected = new Set(prepared.map(({ item }) => item.url));
+          prepared.forEach(({ item }) => URL.revokeObjectURL(item.url));
+          urlsRef.current = urlsRef.current.filter((url) => !rejected.has(url));
+          toast({ title: "Too many images", description: "Max 200 per upload.", variant: "destructive" });
+          return prev;
+        }
+        const newItems = prepared.map(({ item }) => item);
+        // Each dropped file becomes its own one-item group, appended to the end.
+        // No rechunking of existing groups — manual-first UX (GROUP-05/06/08).
+        const newGroups: GroupWithLabel[] = newItems.map(item => ({
+          id: crypto.randomUUID(),
+          items: [item],
+          maxImages: Number.MAX_SAFE_INTEGER, // vestigial; kept for IDB back-compat
+        }));
+        const next = [...prev, ...newGroups];
+        // Persist new blobs and updated groups (fire-and-forget)
+        Promise.all(prepared.map(({ item, displayBlob }) => saveBlob(item.id, item.file, displayBlob)))
+          .then(() => saveGroups(next))
+          .catch(err => console.warn('[upload-zone] IDB save failed:', err));
+        return next;
+      });
+
+      // Signal parent that user actively dropped files (not IDB restore)
+      onFreshDrop?.();
+    })();
   }, [toast, saveBlob, saveGroups, onFreshDrop]);
 
   const handleDropRejected = useCallback(() => {

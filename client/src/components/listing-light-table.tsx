@@ -137,7 +137,7 @@ export function ListingLightTable({
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-        <div className="pointer-events-auto w-full max-w-3xl rounded-2xl bg-card/95 p-3 shadow-2xl backdrop-blur">
+        <div className="pointer-events-auto w-full max-w-3xl rounded-2xl bg-card p-3 shadow-2xl">
           <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
               {selectedIds.size === 0
