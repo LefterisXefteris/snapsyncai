@@ -1,17 +1,17 @@
 export const LANDING_BRAND = "SnapSync";
 
 export const LANDING_DOCUMENT_TITLE =
-  "SnapSync — seller workspace for textile listings on Shopify";
+  "SnapSync — your e-commerce agent for textile listings";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is a seller workspace for textile listings on Shopify. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Push to Shopify. Inventory Autopilot included. Plan from £19/month.";
+  "SnapSync is your e-commerce agent for textile listings. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Import, inventory, Bulk SEO, and a website. Push to Shopify. Plan from £19/month.";
 
-export const LANDING_EYEBROW = "Shopify · textiles";
+export const LANDING_EYEBROW = "Textile listings · Shopify";
 
-export const LANDING_H1 = "The Shopify workspace for textile sellers";
+export const LANDING_H1 = "Your e-commerce agent for textile listings";
 
 export const LANDING_SUBHEAD =
-  "New listing from photos. Confirm fibre composition, care instructions, and GPSR identity. Then listing copy. Push to Shopify.";
+  "It groups photos into products, waits until you confirm the facts, then writes listing copy and pushes to Shopify.";
 
 export const LANDING_NON_TEXTILE =
   "Not a textile? You still confirm facts. The fibre pack is only for textile products.";
@@ -27,22 +27,42 @@ export const JOBS = [
   {
     title: "New listing",
     description:
-      "Drag in up to 200 photos and group them into products. New listing is the photo job, not the whole workspace.",
+      "Drag in up to 200 photos and group them into products. New listing is the photo job, not the whole agent.",
   },
   {
     title: "Product facts, then listing copy",
     description:
-      "A photo may suggest fibre names. You confirm fibre composition, care instructions, and GPSR identity. Listing copy — including SEO and AEO — is not generated until those facts are confirmed.",
+      "A photo may suggest fibre names. You confirm fibre composition, care instructions, and GPSR identity. Listing copy — including SEO and AEO — is not written until those facts are confirmed.",
   },
   {
     title: "Products",
     description:
-      "The catalogue you live in. Review, edit, and push to Shopify when the listing is ready.",
+      "The catalogue you live in. Review and edit every field, then push to Shopify when the listing is ready.",
   },
   {
-    title: "Inventory Autopilot",
+    title: "Import",
     description:
-      "Import the Shopify catalogue you already sell, set a safety buffer, and keep tracked variants from overselling. A parallel job, not a listing step.",
+      "Bring in Shopify products that are not already in the catalogue. You start it. It does not pull stock and it does not push.",
+  },
+  {
+    title: "Inventory",
+    description:
+      "Load Shopify stock, hold a safety buffer, and keep tracked variants from overselling. A parallel job, not a listing step.",
+  },
+  {
+    title: "Bulk SEO",
+    description:
+      "Refresh tags, description, SEO title, and meta description for the products you pick, using search demand. You accept each one. Accept does not push to Shopify.",
+  },
+  {
+    title: "Website",
+    description:
+      "Pick the products and the look. The storefront is built from their listing copy. Checkout stays on Shopify.",
+  },
+  {
+    title: "Settings",
+    description:
+      "Connect your Shopify shop, save the shop GPSR identity, and see your Plan. Catalogue, facts, and listing copy you type stay free.",
   },
 ] as const;
 
@@ -75,7 +95,7 @@ export const WEEKLY_BULLETS = [
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
-  "Inventory Autopilot",
+  "Import, inventory, Bulk SEO, and a website",
   "Extra uses £0.70 — not a hard stop",
 ] as const;
 
@@ -85,7 +105,7 @@ export const ANNUAL_BULLETS = [
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
-  "Inventory Autopilot",
+  "Import, inventory, Bulk SEO, and a website",
   "Two months free vs paying monthly",
 ] as const;
 
@@ -93,17 +113,17 @@ export const FAQ_DATA = [
   {
     question: "What is SnapSync?",
     answer:
-      "SnapSync is a seller workspace for textile listings on Shopify. New listing from photos is one job inside it. You also get a product catalogue, confirmed product facts before listing copy, and Inventory Autopilot.",
+      "SnapSync is your e-commerce agent for textile listings. New listing from photos is one job. You also get a product catalogue, Import from Shopify, confirmed product facts before listing copy, inventory, Bulk SEO, and a website.",
   },
   {
     question: "Why do I confirm facts before listing copy?",
     answer:
-      "Listing copy must not invent product facts a photo cannot establish. You confirm fibre composition, care instructions, and GPSR identity — or skip the blocks you do not have. Only then is listing copy generated.",
+      "Listing copy must not invent product facts a photo cannot establish. You confirm fibre composition, care instructions, and GPSR identity — or skip the blocks you do not have. Only then is listing copy written.",
   },
   {
     question: "How does the Plan Allowance work?",
     answer:
-      "Each calendar month a Plan includes 20 listing-copy writes (first generate or listing copy refresh) and website handoffs. Extra uses are £0.70 on the invoice. Unused uses expire at month end. Confirming facts does not spend. No card is required to use the workspace.",
+      "Each calendar month a Plan includes 20 listing-copy writes (first generate or listing copy refresh) and website handoffs. Extra uses are £0.70 on the invoice. Unused uses expire at month end. Confirming facts does not spend. No card is required to start.",
   },
   {
     question: "How do I create a product from photos?",
@@ -111,14 +131,14 @@ export const FAQ_DATA = [
       "Open New listing and drag in up to 200 photos. Group them into products. Confirm facts, generate listing copy, then push to Shopify. No card is required to start.",
   },
   {
-    question: "Which channels does SnapSync publish to?",
+    question: "Which shops does SnapSync publish to?",
     answer:
       "Shopify. Connect your shop in Settings, then push products from the catalogue.",
   },
   {
     question: "How much does SnapSync cost?",
     answer:
-      "No card to start. A Plan is £19/month or £190/year for 20 listing-copy writes each calendar month — listing copy, listing copy refresh, website, push to Shopify, and Inventory Autopilot. Extra uses £0.70. Cancel anytime.",
+      "No card to start. A Plan is £19/month or £190/year for 20 listing-copy writes each calendar month — listing copy, listing copy refresh, Bulk SEO, a website, push to Shopify, and inventory. Extra uses £0.70. Cancel anytime.",
   },
   {
     question: "Can I edit listing copy before I push to Shopify?",
@@ -141,7 +161,7 @@ export const DEMO = {
 } as const;
 
 export const FOOTER_BLURB =
-  "Seller workspace for textile listings on Shopify. New listing from photos is one job inside it.";
+  "Your e-commerce agent for textile listings. New listing from photos is one job.";
 
 export function landingVisibleText(): string {
   return [

@@ -24,10 +24,12 @@ test("the wordmark is SnapSync, not SnapSync AI", () => {
   assert.equal(new RegExp("SnapSync AI", "i").test(landingVisibleText()), false);
 });
 
-test("the hero names a textile seller workspace, then facts before listing copy", () => {
-  assert.match(LANDING_H1, /workspace/i);
+test("the hero names your e-commerce agent for textile listings, then facts before listing copy", () => {
+  assert.match(LANDING_H1, /e-commerce agent/i);
   assert.match(LANDING_H1, /textile/i);
+  assert.doesNotMatch(LANDING_H1, /workspace/i);
   const text = landingVisibleText().toLowerCase();
+  assert.equal(text.includes("workspace"), false);
   for (const phrase of [
     "fibre composition",
     "care instructions",
@@ -39,10 +41,19 @@ test("the hero names a textile seller workspace, then facts before listing copy"
   }
 });
 
-test("jobs are the four live ones, listing-first", () => {
+test("jobs are the live ones, listing-first", () => {
   assert.deepEqual(
     JOBS.map((job) => job.title),
-    ["New listing", "Product facts, then listing copy", "Products", "Inventory Autopilot"],
+    [
+      "New listing",
+      "Product facts, then listing copy",
+      "Products",
+      "Import",
+      "Inventory",
+      "Bulk SEO",
+      "Website",
+      "Settings",
+    ],
   );
 });
 
@@ -90,7 +101,7 @@ test("pricing is Plan Allowance, not weekly £4 or a 30-product cap", () => {
   assert.equal(text.includes("unlock"), false);
 });
 
-test("document meta describes SnapSync the workspace, on snapsyncai.co.uk", () => {
+test("document meta describes SnapSync the e-commerce agent, on snapsyncai.co.uk", () => {
   assert.match(html, /<title>SnapSync — /);
   assert.doesNotMatch(html, /SnapSync AI/);
   assert.doesNotMatch(html, /listing generator/i);
