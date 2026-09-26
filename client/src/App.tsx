@@ -8,7 +8,6 @@ import { dark } from "@clerk/themes";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AmbientProvider } from "@/components/ambient/AmbientProvider";
-import { AuroraBackground } from "@/components/ambient/AuroraBackground";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { lazy, Suspense, useEffect, useRef } from "react";
@@ -32,7 +31,6 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 const VITE_CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
-// Ink/aurora Clerk theme — matches the ambient design tokens in index.css
 const clerkAppearance = {
   baseTheme: dark,
   variables: {
@@ -41,12 +39,11 @@ const clerkAppearance = {
     colorInputBackground: "hsl(0 0% 13%)",
     colorText: "hsl(0 0% 95%)",
     colorTextSecondary: "hsl(0 0% 63%)",
-    borderRadius: "1rem",
+    borderRadius: "0.5rem",
     fontFamily: "'Instrument Sans', sans-serif",
   },
   elements: {
-    card: "shadow-2xl backdrop-blur-2xl",
-    formButtonPrimary: "shadow-[0_0_24px_-6px_hsl(45_70%_50%/0.5)]",
+    card: "border border-[hsl(0_0%_15%)] shadow-none",
   },
 };
 
@@ -122,7 +119,7 @@ function AuthenticatedLayout() {
   useIdlePreload();
 
   return (
-    <SidebarProvider className="min-h-svh">
+    <SidebarProvider className="min-h-svh" defaultOpen={false}>
       <AppSidebar />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden bg-transparent">
         <header className="flex h-12 items-center gap-2 px-2 md:hidden shrink-0">
@@ -225,7 +222,6 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AmbientProvider>
           <TooltipProvider>
-            <AuroraBackground />
             {DEV_BYPASS_AUTH && !VITE_CLERK_KEY ? (
               <Switch>
                 <Route path="/page" component={AuthScreen} />

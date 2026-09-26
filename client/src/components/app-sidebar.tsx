@@ -26,6 +26,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
   WORKSPACE_NAV,
@@ -55,15 +56,20 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="px-3 py-3">
-        <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center">
-          <img src={snapsyncaiLogo} alt="SnapSync AI" className="w-7 h-7 rounded-md shrink-0" />
-          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+      <SidebarHeader className="p-2">
+        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <img
+            src={snapsyncaiLogo}
+            alt="SnapSync AI"
+            className="w-7 h-7 rounded-md shrink-0 group-data-[collapsible=icon]:hidden"
+          />
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <div className="font-display text-sm font-bold tracking-tight truncate">SnapSync AI</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="text-xs text-muted-foreground">
               workspace
             </div>
           </div>
+          <SidebarTrigger />
         </div>
       </SidebarHeader>
       <SidebarContent>

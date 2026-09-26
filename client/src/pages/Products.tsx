@@ -153,7 +153,7 @@ export default function Products() {
 
   return (
     <div className="h-full w-full flex flex-col bg-transparent text-foreground overflow-hidden">
-      <div className="p-3 bg-background/60 backdrop-blur-xl z-10 sticky top-0 shadow-[inset_0_-1px_0_0_hsl(var(--foreground)/0.05)]">
+      <div className="p-3 bg-background border-b border-border z-10 sticky top-0">
         <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 no-scrollbar flex-nowrap">
           <div className="flex items-center gap-2">
             <h1 className="font-display text-sm font-semibold">Products</h1>
@@ -221,7 +221,7 @@ export default function Products() {
             <div className="space-y-6 pb-20">
               {Object.entries(groupedImages).sort(([a], [b]) => a.localeCompare(b)).map(([category, entries]) => (
                 <div key={category} className="space-y-3">
-                  <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground sticky top-0 py-1.5 bg-background/70 backdrop-blur-md z-10">
+                  <h3 className="text-xs font-medium text-muted-foreground sticky top-0 py-1.5 bg-background z-10">
                     {category} <span className="opacity-50">· {entries.length}</span>
                   </h3>
                   <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
@@ -241,7 +241,7 @@ export default function Products() {
             </div>
           ) : (
             <div className="h-[50vh] flex flex-col items-center justify-center text-center animate-settle">
-              <div className="w-16 h-16 rounded-full portal-ring bg-primary/5 flex items-center justify-center mx-auto mb-5">
+              <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center mx-auto mb-5">
                 <BrainCircuit className="w-7 h-7 text-primary/60" />
               </div>
               <h3 className="font-display text-lg font-semibold">A quiet workspace</h3>

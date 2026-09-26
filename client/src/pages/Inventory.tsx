@@ -147,7 +147,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
   return (
     <div className="min-h-screen bg-transparent text-foreground pb-28">
-      <header className="h-16 px-5 md:px-8 flex items-center justify-between border-b border-border/50 bg-background/50 backdrop-blur-xl sticky top-0 z-30">
+      <header className="h-16 px-5 md:px-8 flex items-center justify-between border-b border-border bg-background sticky top-0 z-30">
         <button onClick={() => navigate("/")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronRight className="w-4 h-4 rotate-180" />
           Workspace
@@ -318,7 +318,7 @@ function InventoryOnboarding(props: {
 function PreviewStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border bg-card/50 p-3">
-      <div className="font-mono text-xl font-semibold">{value}</div>
+      <div className="text-xl font-semibold tabular-nums">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
@@ -464,7 +464,7 @@ function MetricCard({ icon: Icon, label, value, tone }: { icon: typeof Boxes; la
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <Icon className={`w-4 h-4 ${tone === "danger" ? "text-destructive" : tone === "warning" ? "text-amber-400" : "text-primary"}`} />
-          <span className="font-mono text-2xl font-semibold">{value}</span>
+          <span className="text-2xl font-semibold tabular-nums">{value}</span>
         </div>
         <p className="text-xs text-muted-foreground mt-2">{label}</p>
       </CardContent>
@@ -508,19 +508,19 @@ function InventoryRow(props: {
     <TableRow>
       <TableCell className="pl-6 min-w-[240px]">
         <div className="font-medium text-sm">{props.item.title}</div>
-        <div className="text-xs text-muted-foreground font-mono">
-          {props.item.sku || "No SKU"}{props.item.variantTitle ? ` · ${props.item.variantTitle}` : ""}
+        <div className="text-xs text-muted-foreground">
+          {props.item.sku ? <span className="font-mono">{props.item.sku}</span> : "No SKU"}{props.item.variantTitle ? ` · ${props.item.variantTitle}` : ""}
           {props.item.kind === "bundle" && <Badge variant="outline" className="ml-2 h-4 text-[9px]">Bundle</Badge>}
         </div>
       </TableCell>
-      <TableCell><button onClick={props.onAdjust} disabled={props.readOnly} className="font-mono font-semibold hover:text-primary disabled:hover:text-inherit">{props.item.ledgerQuantity}</button></TableCell>
+      <TableCell><button onClick={props.onAdjust} disabled={props.readOnly} className="tabular-nums font-semibold hover:text-primary disabled:hover:text-inherit">{props.item.ledgerQuantity}</button></TableCell>
       <TableCell>
-        <Input type="number" min={0} value={buffer} onChange={(event) => setBuffer(Math.max(0, Number(event.target.value)))} className="w-20 h-8 font-mono" disabled={props.readOnly || props.item.kind === "bundle"} />
+        <Input type="number" min={0} value={buffer} onChange={(event) => setBuffer(Math.max(0, Number(event.target.value)))} className="w-20 h-8 tabular-nums" disabled={props.readOnly || props.item.kind === "bundle"} />
       </TableCell>
       <TableCell>
-        <Input type="number" min={0} value={threshold} onChange={(event) => setThreshold(Math.max(0, Number(event.target.value)))} className="w-20 h-8 font-mono" disabled={props.readOnly || props.item.kind === "bundle"} />
+        <Input type="number" min={0} value={threshold} onChange={(event) => setThreshold(Math.max(0, Number(event.target.value)))} className="w-20 h-8 tabular-nums" disabled={props.readOnly || props.item.kind === "bundle"} />
       </TableCell>
-      <TableCell><span className="font-mono">{props.item.sellableQuantity}</span></TableCell>
+      <TableCell><span className="tabular-nums">{props.item.sellableQuantity}</span></TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={statusVariant as any} className="capitalize">{props.item.state.replace("_", " ")}</Badge>
@@ -578,7 +578,7 @@ function LedgerDialog({ item, onOpenChange }: { item: InventoryItemDto | null; o
             {(ledger.data || []).map((entry) => (
               <div key={entry.id} className="rounded-lg border p-3 flex items-start justify-between gap-4">
                 <div><p className="text-sm font-medium">{entry.reason}</p><p className="text-xs text-muted-foreground">{entry.source} · {new Date(entry.createdAt).toLocaleString()}</p></div>
-                <div className="text-right font-mono"><div className={entry.delta >= 0 ? "text-emerald-400" : "text-destructive"}>{entry.delta >= 0 ? "+" : ""}{entry.delta}</div><div className="text-xs text-muted-foreground">after {entry.quantityAfter}</div></div>
+                <div className="text-right tabular-nums"><div className={entry.delta >= 0 ? "text-emerald-400" : "text-destructive"}>{entry.delta >= 0 ? "+" : ""}{entry.delta}</div><div className="text-xs text-muted-foreground">after {entry.quantityAfter}</div></div>
               </div>
             ))}
             {!ledger.isLoading && ledger.data?.length === 0 && <p className="text-sm text-muted-foreground text-center py-12">No adjustments yet.</p>}
@@ -676,9 +676,9 @@ function BundlesDialog({ open, onOpenChange, items, readOnly }: { open: boolean;
               <h3 className="text-sm font-semibold">Active recipes</h3>
               {(bundles.data || []).map((bundle: any) => (
                 <div key={bundle.id} className="rounded-lg border p-3">
-                  <div className="flex justify-between gap-2"><div><p className="text-sm font-medium">{bundle.title}</p><p className="text-xs font-mono text-muted-foreground">{bundle.sku || "No SKU"}</p></div><Button size="icon" variant="ghost" className="text-destructive" onClick={() => remove(bundle.id)} disabled={readOnly}><Trash2 className="w-4 h-4" /></Button></div>
+                  <div className="flex justify-between gap-2"><div><p className="text-sm font-medium">{bundle.title}</p><p className="text-xs text-muted-foreground">{bundle.sku ? <span className="font-mono">{bundle.sku}</span> : "No SKU"}</p></div><Button size="icon" variant="ghost" className="text-destructive" onClick={() => remove(bundle.id)} disabled={readOnly}><Trash2 className="w-4 h-4" /></Button></div>
                   <div className="mt-2 text-xs text-muted-foreground">{bundle.components.map((component: any) => `${component.units}× ${component.title}`).join(" · ")}</div>
-                  <div className="mt-2 text-xs font-mono text-primary">Computed availability: {bundle.computedAvailability}</div>
+                  <div className="mt-2 text-xs tabular-nums text-primary">Computed availability: {bundle.computedAvailability}</div>
                 </div>
               ))}
               {!bundles.isLoading && bundles.data?.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No bundle recipes yet.</p>}

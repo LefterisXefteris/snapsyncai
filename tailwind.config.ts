@@ -6,9 +6,12 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: "0.5rem",
+        md: "0.5rem",
+        sm: "0.375rem",
+        xl: "0.5rem",
+        "2xl": "0.5rem",
+        "3xl": "0.5rem",
       },
       colors: {
         // Flat / base colors (regular buttons)
@@ -81,11 +84,6 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
-        aurora: {
-          "1": "hsl(var(--aurora-1) / <alpha-value>)",
-          "2": "hsl(var(--aurora-2) / <alpha-value>)",
-          "3": "hsl(var(--aurora-3) / <alpha-value>)",
-        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
@@ -103,20 +101,10 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        shimmer: {
-          "0%": { backgroundPosition: "120% 0" },
-          "100%": { backgroundPosition: "-80% 0" },
-        },
-        breathe: {
-          "0%, 100%": { opacity: "0.6" },
-          "50%": { opacity: "1" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        shimmer: "shimmer 1.6s linear infinite",
-        breathe: "breathe 3.2s ease-in-out infinite",
       },
     },
   },

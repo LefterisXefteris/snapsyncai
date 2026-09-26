@@ -90,9 +90,9 @@ export default function Settings() {
       <ScrollArea className="flex-1">
         <div className="px-6 pb-16 max-w-xl space-y-10">
           <section className="space-y-4">
-            <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Channels</h2>
+            <h2 className="text-xs text-muted-foreground">Channels</h2>
 
-            <div className="glass-panel rounded-2xl p-4 space-y-4">
+            <div className="glass-panel rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-medium">Shopify</h3>
@@ -150,20 +150,20 @@ export default function Settings() {
               )}
             </div>
 
-            <div className="glass-panel rounded-2xl p-4">
+            <div className="glass-panel rounded-lg p-4">
               <h3 className="text-sm font-medium">Wix</h3>
               <p className="text-xs text-muted-foreground mt-1">Wix is not connected yet.</p>
             </div>
 
-            <div className="glass-panel rounded-2xl p-4">
+            <div className="glass-panel rounded-lg p-4">
               <h3 className="text-sm font-medium">Vinted</h3>
               <p className="text-xs text-muted-foreground mt-1">Vinted is not connected yet.</p>
             </div>
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Shop GPSR identity</h2>
-            <div className="glass-panel rounded-2xl p-4 space-y-3">
+            <h2 className="text-xs text-muted-foreground">Shop GPSR identity</h2>
+            <div className="glass-panel rounded-lg p-4 space-y-3">
               <p className="text-xs text-muted-foreground">
                 Saved once for this Shopify shop. Products can use it as the default, override it, or skip.
               </p>
@@ -193,8 +193,8 @@ export default function Settings() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Billing</h2>
-            <div className="glass-panel rounded-2xl p-4 flex items-center justify-between gap-3">
+            <h2 className="text-xs text-muted-foreground">Billing</h2>
+            <div className="glass-panel rounded-lg p-4 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-medium">Plan</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -243,8 +243,8 @@ export default function Settings() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Account</h2>
-            <div className="glass-panel rounded-2xl p-4 flex items-center gap-3">
+            <h2 className="text-xs text-muted-foreground">Account</h2>
+            <div className="glass-panel rounded-lg p-4 flex items-center gap-3">
               {DEV_BYPASS_AUTH ? (
                 <div className="w-8 h-8 rounded-full bg-muted" title="Local dev user" />
               ) : (

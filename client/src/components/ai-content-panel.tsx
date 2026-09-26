@@ -131,7 +131,7 @@ export function AiContentPanel({
   return (
     <div className="space-y-3">
       {isGenerating && (
-        <p className="font-mono text-xs uppercase tracking-widest text-aurora-2 animate-breathe">
+        <p className="text-xs text-muted-foreground">
           streaming
         </p>
       )}
@@ -199,9 +199,9 @@ export function AiContentPanel({
 
         {/* Streaming raw indicator — the model writing in real time */}
         {isGenerating && streamText && (
-          <div className="text-[10px] text-muted-foreground font-mono bg-muted/40 p-2 rounded-lg max-h-16 overflow-hidden shadow-[inset_0_0_0_1px_hsl(var(--aurora-2)/0.2)]">
+          <div className="text-[10px] text-muted-foreground bg-muted/40 border border-border p-2 rounded-lg max-h-16 overflow-hidden">
             {streamText.slice(-200)}
-            <span className="inline-block w-1.5 h-3 bg-aurora-2 animate-pulse ml-0.5 align-text-bottom" />
+            <span className="inline-block w-1.5 h-3 bg-foreground animate-pulse ml-0.5 align-text-bottom" />
           </div>
         )}
 
@@ -358,7 +358,7 @@ function FieldPreview<T>({
   return (
     <div className="rounded-xl p-3 space-y-2 bg-background/60 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06)]">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">{label}</span>
+        <span className="text-[10px] font-semibold text-muted-foreground">{label}</span>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -387,8 +387,8 @@ function FieldPreview<T>({
       </div>
       {isRegenerating ? (
         <div className="space-y-1.5">
-          <div className="h-3 w-full rounded animate-shimmer" />
-          <div className="h-3 w-2/3 rounded animate-shimmer" />
+          <div className="h-3 w-full rounded bg-muted" />
+          <div className="h-3 w-2/3 rounded bg-muted" />
         </div>
       ) : (
         <div className="max-h-32 overflow-y-auto">{renderValue(value)}</div>

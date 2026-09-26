@@ -57,10 +57,10 @@ export function ListingLightTable({
   const selectedPhotoId = selectedIds.size === 1 ? [...selectedIds][0] : null;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-black/40">
+    <div className="relative flex h-full min-h-0 flex-col bg-background">
       <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-2">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary/80">New listing</p>
+          <p className="text-xs text-primary/80">New listing</p>
           <h1 className="mt-1 font-display text-lg font-semibold">Create products from photos</h1>
           <p className="mt-1 text-xs text-muted-foreground">
             Select photos — they collect in the dock. Group angles of one product, then create.
@@ -137,7 +137,7 @@ export function ListingLightTable({
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-        <div className="pointer-events-auto w-full max-w-3xl rounded-2xl bg-card p-3 shadow-2xl">
+        <div className="pointer-events-auto w-full max-w-3xl rounded-lg border border-border bg-card p-3">
           <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
               {selectedIds.size === 0

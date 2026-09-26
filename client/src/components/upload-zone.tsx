@@ -401,7 +401,7 @@ export function UploadZone({
       <div className="mx-auto w-full max-w-3xl space-y-4 p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary/80">New listing</p>
+          <p className="text-xs text-primary/80">New listing</p>
           <h2 className="mt-1 font-display text-lg font-semibold tracking-tight text-foreground">
             Create products from photos
           </h2>
@@ -421,30 +421,16 @@ export function UploadZone({
         disabled={isUploading}
         aria-label="Choose product photos"
         className={cn(
-          "relative group w-full overflow-hidden border text-left transition-all duration-300 disabled:cursor-wait disabled:opacity-60 min-h-[220px] rounded-2xl p-5 sm:p-6",
+          "relative group w-full overflow-hidden border text-left transition-colors disabled:cursor-wait disabled:opacity-60 min-h-[220px] rounded-lg p-5 sm:p-6",
           isDragActive
-            ? "border-primary bg-primary/10 shadow-[0_0_36px_-12px_hsl(var(--primary)/0.55)]"
-            : "border-dashed border-foreground/15 bg-card/35 hover:border-primary/45 hover:bg-card/55"
+            ? "border-primary bg-primary/10"
+            : "border-dashed border-border bg-card hover:border-primary/45"
         )}
       >
-        <div
-          aria-hidden
-          className={cn(
-            "absolute inset-0 pointer-events-none transition-opacity duration-500",
-            isDragActive ? "opacity-100" : "opacity-40 group-hover:opacity-70",
-          )}
-          style={{
-            background:
-              "radial-gradient(circle at 100% 120%, hsl(var(--aurora-1) / 0.18), transparent 55%), radial-gradient(circle at 0% 0%, hsl(var(--aurora-2) / 0.12), transparent 48%)",
-          }}
-        />
         <div className={cn(
           "relative z-10 flex min-h-[168px] flex-col items-center justify-center text-center"
         )}>
-          <div className={cn(
-            "flex shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-105 h-12 w-12",
-            isDragActive && "scale-110"
-          )}>
+          <div className="flex shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary h-12 w-12">
             {isDragActive
               ? <UploadCloud className="h-5 w-5" />
               : <ImagePlus className="h-5 w-5" />}
@@ -456,10 +442,10 @@ export function UploadZone({
           <p className="mt-1.5 max-w-[250px] text-xs leading-relaxed text-muted-foreground">
             Each photo starts as its own draft product. Group several photos of one product, then create.
           </p>
-          <span className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[0_8px_24px_-10px_hsl(var(--primary)/0.8)]">
+          <span className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
             Choose photos
           </span>
-          <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/65">
+          <p className="mt-3 text-[9px] text-muted-foreground/65">
             PNG · JPG · WEBP · HEIC · up to 200
           </p>
         </div>

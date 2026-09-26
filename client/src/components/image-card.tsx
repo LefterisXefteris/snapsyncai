@@ -40,7 +40,7 @@ interface ImageCardProps {
   index: number;
   selected?: boolean;
   highlighted?: boolean;
-  /** True while AI analysis is running for this card — shows the scan-line + shimmer treatment */
+  /** True while analysis is running for this card. */
   analyzing?: boolean;
   onSelect?: (id: number, selected: boolean) => void;
 }
@@ -107,9 +107,9 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 28, delay: Math.min(index * 0.04, 0.4) }}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl glass-card cursor-pointer cv-auto",
+        "group relative flex flex-col overflow-hidden rounded-lg glass-card cursor-pointer cv-auto",
         selected && "glow-selected",
-        highlighted && !selected && "animate-bloom ring-2 ring-primary/50",
+        highlighted && !selected && "ring-2 ring-primary/50",
       )}
       data-testid={`card-product-${image.id}`}
       onClick={(e) => {
@@ -133,8 +133,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         />
         {imgLoaded && <ImageIcon className="w-8 h-8 text-foreground/10" />}
 
-        {/* AI thinking scan-line */}
-        {analyzing && <div className="scan-line" />}
+        {analyzing && <div className="absolute inset-0 bg-background/40" />}
 
         <div className="absolute top-2.5 left-2.5">
           <Checkbox
@@ -155,11 +154,11 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             </Badge>
           )}
           {hasViews && (
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-white/20 text-white/70 bg-black/40 font-mono">
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-white/20 text-white/70 bg-black/40 tabular-nums">
               {allImages.length} views
             </Badge>
           )}
-          <Badge variant="outline" className={`text-[10px] font-mono uppercase tracking-wide ${statusColor} ${analyzing ? "animate-breathe" : ""}`}>
+          <Badge variant="outline" className={`text-[10px] ${statusColor}`}>
             {missingCopy && <Lock className="w-2.5 h-2.5 mr-0.5" />}
             {analyzing ? "Thinking" : statusLabel}
           </Badge>
@@ -183,7 +182,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           ))}
           {views.length > 5 && (
             <div className="w-9 h-9 shrink-0 rounded-md bg-foreground/5 flex items-center justify-center">
-              <span className="text-[9px] font-mono text-muted-foreground">+{views.length - 5}</span>
+              <span className="text-[9px] tabular-nums text-muted-foreground">+{views.length - 5}</span>
             </div>
           )}
         </div>
@@ -194,8 +193,8 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         {analyzing ? (
           // Streaming-style skeleton while the AI writes the listing
           <div className="space-y-1.5 py-0.5">
-            <div className="h-3.5 w-4/5 rounded animate-shimmer" />
-            <div className="h-2.5 w-3/5 rounded animate-shimmer" />
+            <div className="h-3.5 w-4/5 rounded bg-muted" />
+            <div className="h-2.5 w-3/5 rounded bg-muted" />
           </div>
         ) : (
           <>
@@ -222,12 +221,12 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         <div className="no-nav flex items-center gap-1 mt-auto pt-1">
             {/* currency selector */}
             <Select value={currency} onValueChange={handleCurrencyChange}>
-              <SelectTrigger className="h-7 w-16 text-[11px] font-mono bg-transparent border-white/10 px-1.5 no-nav">
+              <SelectTrigger className="h-7 w-16 text-[11px] bg-transparent border-border px-1.5 no-nav">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {CURRENCIES.map(c => (
-                  <SelectItem key={c.code} value={c.code} className="text-xs font-mono">
+                  <SelectItem key={c.code} value={c.code} className="text-xs">
                     {c.symbol} {c.code}
                   </SelectItem>
                 ))}
@@ -237,10 +236,10 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
             {/* price input */}
             {editingPrice ? (
               <div className="flex items-center gap-1 flex-1">
-                <span className="text-xs font-mono text-muted-foreground">{getSymbol(currency)}</span>
+                <span className="text-xs tabular-nums text-muted-foreground">{getSymbol(currency)}</span>
                 <input
                   autoFocus
-                  className="flex-1 min-w-0 h-7 bg-foreground/5 rounded-md px-1.5 text-xs font-mono text-foreground focus:outline-none shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.4)] focus:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.8),0_0_12px_-2px_hsl(var(--primary)/0.4)]"
+                  className="flex-1 min-w-0 h-7 bg-background rounded-md border border-border px-1.5 text-xs tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
                   value={draftPrice}
                   onChange={e => setDraftPrice(e.target.value)}
                   onBlur={savePrice}
@@ -254,7 +253,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
                 onClick={() => { setDraftPrice(image.price ? String(image.price) : ""); setEditingPrice(true); }}
                 title="Click to edit price"
               >
-                <span className="font-medium font-mono">
+                <span className="font-medium tabular-nums">
                   {savedFlash
                     ? <span className="text-green-400 flex items-center gap-0.5"><Check className="w-3 h-3" /> Saved</span>
                     : <>{getSymbol(currency)}{image.price ? Number(image.price).toFixed(2) : <span className="text-muted-foreground italic font-body">Add price</span>}</>
@@ -268,7 +267,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
         {/* ── Footer: mono metadata for published cards + remove ── */}
         <div className="flex items-center justify-between pt-1 gap-2">
           {isSynced ? (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70 truncate">
+            <span className="text-[9px] text-muted-foreground/70 truncate">
               {syncedPlatforms.join(" · ")}
               {image.createdAt && (
                 <> · {new Date(image.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>

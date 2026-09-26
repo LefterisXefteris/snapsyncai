@@ -32,6 +32,12 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+function readSidebarCookie(): boolean | null {
+  if (typeof document === "undefined") return null
+  const match = document.cookie.match(/(?:^|; )sidebar_state=(true|false)(?:;|$)/)
+  return match ? match[1] === "true" : null
+}
+
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
   open: boolean
@@ -71,7 +77,7 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  const [_open, _setOpen] = React.useState(() => readSidebarCookie() ?? defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -164,6 +170,10 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const [hovering, setHovering] = React.useState(false)
+  const iconCollapsed = collapsible === "icon" && state === "collapsed"
+  const overlay = iconCollapsed && hovering
+  const visualCollapsible = state === "collapsed" && !overlay ? collapsible : ""
 
   if (collapsible === "none") {
     return (
@@ -209,27 +219,34 @@ function Sidebar({
     <div
       className="group peer text-sidebar-foreground hidden md:block"
       data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
+      data-collapsible={visualCollapsible}
+      data-collapse-mode={collapsible}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      onMouseEnter={() => {
+        if (collapsible === "icon" && state === "collapsed") setHovering(true)
+      }}
+      onMouseLeave={() => setHovering(false)}
     >
-      {/* This is what handles the sidebar gap on desktop */}
+      {/* Gap follows the pinned state. Hover widens the panel over the page
+          without pushing the canvas. */}
       <div
         data-slot="sidebar-gap"
         className={cn(
           "relative w-[var(--sidebar-width)] bg-transparent transition-[width] duration-200 ease-linear",
-          "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
+          "group-data-[collapse-mode=offcanvas]:group-data-[state=collapsed]:w-0",
           variant === "floating" || variant === "inset"
-            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+var(--spacing-4))]"
-            : "group-data-[collapsible=icon]:w-[var(--sidebar-width-icon)]"
+            ? "group-data-[collapse-mode=icon]:group-data-[state=collapsed]:w-[calc(var(--sidebar-width-icon)+var(--spacing-4))]"
+            : "group-data-[collapse-mode=icon]:group-data-[state=collapsed]:w-[var(--sidebar-width-icon)]"
         )}
       />
       <div
         data-slot="sidebar-container"
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-[var(--sidebar-width)] transition-[left,right,width] duration-200 ease-linear md:flex",
+          overlay && "z-40 shadow-xl",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",

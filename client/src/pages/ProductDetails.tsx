@@ -219,7 +219,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   if (isLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-transparent">
-        <span className="w-3 h-3 rounded-full bg-primary animate-pulse-glow shadow-[0_0_24px_6px_hsl(var(--primary)/0.35)]" />
+        <Loader2 className="w-5 h-5 animate-spin text-primary" />
       </div>
     );
   }
@@ -456,8 +456,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   return (
     <div className="h-screen bg-transparent flex flex-col overflow-hidden">
-      {/* Glowing action bar */}
-      <div className="sticky top-0 z-30 bg-background/60 backdrop-blur-xl hairline-b">
+      {/* Action bar */}
+      <div className="sticky top-0 z-30 bg-background border-b border-border">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
@@ -467,8 +467,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               {title || "Unnamed Product"}
             </h1>
             {image.shopifyStatus === "synced" && (
-              <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[10px] h-5 px-1.5 font-mono uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-breathe mr-1" />
+              <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[10px] h-5 px-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1" />
                 Synced
               </Badge>
             )}
@@ -579,7 +579,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                                   <div
                                     key={img.id}
                                     onClick={() => togglePickerSelect(img.id)}
-                                    className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all select-none ${isSel ? "border-primary ring-2 ring-primary/40 scale-[0.97]" : "border-border hover:border-primary/50 hover:scale-[0.98]"}`}
+                                    className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-colors select-none ${isSel ? "border-primary" : "border-border hover:border-primary/50"}`}
                                   >
                                     <AuthenticatedImg
                                       path={productImagePath(img, proxyImageIds.has(img.id))}
@@ -713,7 +713,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 {/* Selected image large preview */}
                 {displayImageId && (
                   <div
-                    className={`relative w-full aspect-[4/5] max-h-[28rem] bg-muted/40 rounded-xl overflow-hidden transition-all shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.06),0_16px_40px_-16px_hsl(250_25%_2%/0.6)] ${thumbnailDragActive ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}
+                    className={`relative w-full aspect-[4/5] max-h-[28rem] bg-muted/40 rounded-lg overflow-hidden border border-border ${thumbnailDragActive ? "ring-2 ring-primary bg-primary/5" : ""}`}
                       onDragOver={(e) => {
                         e.preventDefault();
                         e.dataTransfer.dropEffect = "move";
@@ -737,7 +737,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         onError={() => handleImageLoadError(displayImage.id)}
                       />
                       {thumbnailDragActive && (
-                        <div className="absolute inset-0 z-20 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+                        <div className="absolute inset-0 z-20 bg-background/80 flex items-center justify-center">
                           <div className="rounded-md border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary shadow-sm">
                             Drop to make thumbnail
                           </div>
@@ -994,7 +994,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         <Plus className="w-3.5 h-3.5 mr-1" />
                         Add fibre
                       </Button>
-                      <p className="text-[11px] text-muted-foreground font-mono">
+                      <p className="text-[11px] text-muted-foreground tabular-nums">
                         {compositionRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0)} / 100
                       </p>
                     </div>
@@ -1351,7 +1351,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                        
-                        className="pl-6 h-8 text-sm"
+                        className="pl-6 h-8 text-sm tabular-nums"
                         placeholder="0.00"
                         type="number"
                       />
@@ -1364,7 +1364,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       value={inventoryQuantity}
                       onChange={(e) => setInventoryQuantity(Number(e.target.value))}
                       disabled={!trackQuantity}
-                      className="h-8 text-sm"
+                      className="h-8 text-sm tabular-nums"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1374,7 +1374,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       onChange={(e) => setSku(e.target.value)}
                      
                       placeholder="e.g. TSHIRT-RED-L"
-                      className="h-8 text-sm"
+                      className="h-8 text-sm font-mono"
                     />
                   </div>
                 </div>
@@ -1387,7 +1387,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         value={compareAtPrice}
                         onChange={(e) => setCompareAtPrice(e.target.value)}
                        
-                        className="pl-6 h-8 text-sm"
+                        className="pl-6 h-8 text-sm tabular-nums"
                         placeholder="0.00"
                         type="number"
                       />
@@ -1401,7 +1401,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         value={costPerItem}
                         onChange={(e) => setCostPerItem(e.target.value)}
                        
-                        className="pl-6 h-8 text-sm"
+                        className="pl-6 h-8 text-sm tabular-nums"
                         placeholder="0.00"
                         type="number"
                       />
@@ -1414,7 +1414,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       onChange={(e) => setBarcode(e.target.value)}
                      
                       placeholder="000000000000"
-                      className="h-8 text-sm"
+                      className="h-8 text-sm font-mono"
                     />
                   </div>
                 </div>
@@ -1526,7 +1526,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                     <Button
                         variant="outline"
                         size="sm"
-                        className={`h-8 text-[11px] px-2.5 ${image.shopifyStatus === "synced" ? "text-muted-foreground" : "bg-[#95bf46]/10 text-[#95bf46] hover:bg-[#95bf46]/20 shadow-[inset_0_0_0_1px_rgb(149_191_70/0.3),0_0_20px_-8px_rgb(149_191_70/0.4)]"}`}
+                        className="h-8 text-[11px] px-2.5"
                         onClick={() =>
                           pushToShopifyMutation.mutate({
                             ids: [image.id],
