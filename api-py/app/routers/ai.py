@@ -9,6 +9,7 @@ import asyncio
 import base64
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -34,6 +35,13 @@ from app.services.image_analysis import (
 )
 from app.services.image_buffers import set_image_buffer
 from app.services.listing_copy_refresh import search_demand_configured
+from app.services.listing_copy_trace import (
+    JOB_GENERATE,
+    JOB_REGENERATE,
+    ListingCopyCall,
+    listing_copy_trace_store,
+    record_listing_copy_call,
+)
 from app.services.openai_client import get_openai
 from app.services.plan_charge import authorize_plan_job
 from app.services.product_facts import (
@@ -393,22 +401,74 @@ def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 
-async def _stream_chat(messages: list, max_tokens: int) -> AsyncIterator[str]:
+async def _stream_chat(
+    messages: list,
+    max_tokens: int,
+    trace: dict | None = None,
+) -> AsyncIterator[str]:
+    started = time.perf_counter()
+    chunks: list[str] = []
+    error: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
     try:
         stream = await get_openai().chat.completions.create(
             model="gpt-5.2",
             stream=True,
+            stream_options={"include_usage": True},
             max_completion_tokens=max_tokens,
             messages=messages,
         )
         async for chunk in stream:
+            usage = getattr(chunk, "usage", None)
+            if usage is not None:
+                input_tokens = getattr(usage, "prompt_tokens", None)
+                output_tokens = getattr(usage, "completion_tokens", None)
             content = chunk.choices[0].delta.content or "" if chunk.choices else ""
             if content:
+                chunks.append(content)
                 yield _sse({"content": content})
-        yield _sse({"done": True})
     except Exception:
         logger.exception("SSE generation error")
-        yield _sse({"error": "Generation failed"})
+        error = "Generation failed"
+    recorded = None
+    if trace is not None:
+        recorded = record_listing_copy_call(
+            trace["store"],
+            ListingCopyCall(
+                job=trace["job"],
+                messages=messages,
+                completion="".join(chunks),
+                error=error,
+                model="gpt-5.2",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                product_id=trace["product_id"],
+                group_id=trace.get("group_id"),
+                field=trace.get("field"),
+            ),
+        )
+    if error:
+        payload: dict[str, Any] = {"error": error}
+        if recorded is not None:
+            payload["traceId"] = recorded.id
+        yield _sse(payload)
+        return
+    done: dict[str, Any] = {"done": True}
+    if recorded is not None:
+        done["traceId"] = recorded.id
+    yield _sse(done)
+
+
+def _listing_copy_trace(settings, image, job: str, field: str | None = None) -> dict:
+    return {
+        "store": listing_copy_trace_store(settings),
+        "job": job,
+        "product_id": image.id,
+        "group_id": image.product_group_id,
+        "field": field,
+    }
 
 
 @router.post("/api/images/{image_id}/generate-content")
@@ -454,7 +514,7 @@ async def generate_content(
         },
     ]
     return StreamingResponse(
-        _stream_chat(messages, 1500),
+        _stream_chat(messages, 1500, _listing_copy_trace(settings, image, JOB_GENERATE)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
@@ -506,7 +566,11 @@ async def regenerate_field(
         },
     ]
     return StreamingResponse(
-        _stream_chat(messages, 1000),
+        _stream_chat(
+            messages,
+            1000,
+            _listing_copy_trace(settings, image, JOB_REGENERATE, body.field),
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )

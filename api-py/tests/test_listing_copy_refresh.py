@@ -472,7 +472,7 @@ def test_refresh_http_returns_a_pack_from_demand(monkeypatch) -> None:
     async def fake_fetch(_seeds, _url, _key, *, login=None):
         return ("cotton t-shirt",)
 
-    async def fake_propose(_constraints):
+    async def fake_propose(_constraints, **_kwargs):
         return {
             "tags": ["cotton", "tee"],
             "description": "<p>A cotton tee.</p>",

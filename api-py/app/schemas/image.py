@@ -145,6 +145,7 @@ class AcceptGeneratedListingCopyBody(CamelModel):
     aeo_faqs: list[dict[str, str]] | None = None
     aeo_snippet: str | None = None
     confirm_overflow: bool = False
+    trace_id: str | None = None
 
 
 class ListingCopyRefreshOut(CamelModel):
@@ -153,6 +154,7 @@ class ListingCopyRefreshOut(CamelModel):
     seo_title: str
     seo_description: str
     queries: list[str]
+    trace_id: str | None = None
 
 
 class ListingCopyRefreshAcceptBody(CamelModel):
@@ -161,10 +163,15 @@ class ListingCopyRefreshAcceptBody(CamelModel):
     seo_title: str
     seo_description: str
     confirm_overflow: bool = False
+    trace_id: str | None = None
 
 
 class ListingCopyRefreshRegenerateBody(CamelModel):
     queries: list[str]
+
+
+class ListingCopyRefreshDismissBody(CamelModel):
+    trace_id: str | None = None
 
 
 class FibreRowIn(CamelModel):

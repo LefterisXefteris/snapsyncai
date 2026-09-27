@@ -1,5 +1,6 @@
 """Bulk SEO catalogue picker and pack start."""
 
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
@@ -20,6 +21,11 @@ from app.services.bulk_seo import (
     start_pack,
 )
 from app.services.listing_copy_refresh import search_demand_configured
+from app.services.listing_copy_trace import (
+    JOB_BULK,
+    listing_copy_trace_store,
+    mark_bulk_accept,
+)
 from app.services.plan import NEED_OVERFLOW_CONFIRM, NEED_PLAN, WEEKLY_LIMIT
 from app.services.plan_charge import current_entitlement, overflow_ack_month, settle_plan_job
 from app.services.plan_ledger import list_spends
@@ -48,6 +54,7 @@ class BulkSeoStartBody(CamelModel):
 class BulkSeoRegenerateBody(CamelModel):
     product_id: int
     queries: list[str]
+    pack_id: str | None = None
 
 
 class BulkSeoAcceptBody(CamelModel):
@@ -57,6 +64,8 @@ class BulkSeoAcceptBody(CamelModel):
     seo_title: str
     seo_description: str
     confirm_overflow: bool = False
+    trace_id: str | None = None
+    pack_id: str | None = None
 
 
 class BulkSeoProposal(CamelModel):
@@ -64,6 +73,7 @@ class BulkSeoProposal(CamelModel):
     description: str
     seo_title: str
     seo_description: str
+    trace_id: str | None = None
 
 
 class BulkSeoPackItem(CamelModel):
@@ -77,6 +87,7 @@ class BulkSeoPackResponse(CamelModel):
     error: str | None = None
     items: list[BulkSeoPackItem]
     proposed_use_count: int = 0
+    pack_id: str | None = None
 
 
 def _demand_configured(settings) -> bool:
@@ -139,6 +150,10 @@ async def bulk_seo_start(
     shop_gpsr = connection.gpsr_identity if connection is not None else None
     configured = _demand_configured(settings)
 
+    pack_id = uuid.uuid4().hex
+    photos = photos_from_images(images)
+    by_id = {photo.id: photo for photo in photos}
+
     async def fetch(_product_id: int, seeds):
         return await fetch_search_demand(
             seeds,
@@ -147,11 +162,15 @@ async def bulk_seo_start(
             login=settings.search_demand_login,
         )
 
-    async def propose(_product_id: int, **kwargs):
-        return await propose_refresh_pack(kwargs["constraints"])
+    async def propose(product_id: int, **kwargs):
+        photo = by_id.get(product_id)
+        return await propose_refresh_pack(
+            kwargs["constraints"],
+            trace=_bulk_trace(settings, product_id, photo, pack_id),
+        )
 
     pack = await start_pack(
-        photos_from_images(images),
+        photos,
         body.product_ids,
         demand_configured=configured,
         entitlement=entitlement,
@@ -164,6 +183,7 @@ async def bulk_seo_start(
     return BulkSeoPackResponse(
         items=[_pack_item_out(item) for item in pack.items],
         proposed_use_count=pack.proposed_use_count,
+        pack_id=pack_id,
     )
 
 
@@ -184,7 +204,10 @@ async def bulk_seo_regenerate(
     configured = _demand_configured(settings)
 
     async def propose(**kwargs):
-        return await propose_refresh_pack(kwargs["constraints"])
+        return await propose_refresh_pack(
+            kwargs["constraints"],
+            trace=_bulk_trace(settings, photo.id, photo, body.pack_id),
+        )
 
     item = await regenerate_item(
         photo,
@@ -254,4 +277,21 @@ async def bulk_seo_accept(
             confirm_overflow=body.confirm_overflow,
             product_id=photo.id,
         )
+    if "copy" in stash:
+        mark_bulk_accept(
+            listing_copy_trace_store(settings),
+            product_id=photo.id,
+            pack_id=body.pack_id or "",
+            trace_id=body.trace_id,
+        )
     return {"ok": True}
+
+
+def _bulk_trace(settings, product_id: int, photo, pack_id: str | None) -> dict:
+    return {
+        "store": listing_copy_trace_store(settings),
+        "job": JOB_BULK,
+        "product_id": product_id,
+        "group_id": getattr(photo, "product_group_id", None) if photo is not None else None,
+        "pack_id": pack_id,
+    }

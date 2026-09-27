@@ -28,6 +28,7 @@ export default function BulkSeoPage() {
   const overflow = useOverflowConfirm();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [items, setItems] = useState<Record<number, BulkSeoPackItem>>({});
+  const [packId, setPackId] = useState<string | null>(null);
   const [packUseCount, setPackUseCount] = useState(0);
   const [acceptBlockedReason, setAcceptBlockedReason] = useState<string | null>(null);
 
@@ -57,6 +58,7 @@ export default function BulkSeoPage() {
         const next: Record<number, BulkSeoPackItem> = {};
         for (const item of pack.items) next[item.id] = item;
         setItems(next);
+        setPackId(pack.packId ?? null);
         setPackUseCount(pack.proposedUseCount);
         setAcceptBlockedReason(null);
       },
@@ -203,6 +205,8 @@ export default function BulkSeoPage() {
                                       seoTitle: proposal.seoTitle,
                                       seoDescription: proposal.seoDescription,
                                       confirmOverflow,
+                                      traceId: proposal.traceId,
+                                      packId,
                                     },
                                     {
                                       onSuccess: () => {
@@ -237,7 +241,7 @@ export default function BulkSeoPage() {
                               disabled={regenerate.isPending}
                               onClick={() =>
                                 regenerate.mutate(
-                                  { productId: row.id, queries: item.queries },
+                                  { productId: row.id, queries: item.queries, packId },
                                   {
                                     onSuccess: (next) =>
                                       setItems((prev) => ({ ...prev, [row.id]: next })),

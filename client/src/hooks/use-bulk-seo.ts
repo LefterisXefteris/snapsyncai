@@ -27,6 +27,7 @@ export type BulkSeoProposal = {
   description: string;
   seoTitle: string;
   seoDescription: string;
+  traceId?: string | null;
 };
 
 export type BulkSeoPackItem = {
@@ -40,6 +41,7 @@ export type BulkSeoPack = {
   error: string | null;
   items: BulkSeoPackItem[];
   proposedUseCount: number;
+  packId?: string | null;
 };
 
 export function useBulkSeoCatalogue() {
@@ -77,7 +79,7 @@ export function useBulkSeoStart() {
 export function useBulkSeoRegenerate() {
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (body: { productId: number; queries: string[] }) => {
+    mutationFn: async (body: { productId: number; queries: string[]; packId?: string | null }) => {
       const res = await apiRequest(api.bulkSeo.regenerate.method, api.bulkSeo.regenerate.path, body);
       return res.json() as Promise<BulkSeoPackItem>;
     },
@@ -102,6 +104,8 @@ export function useBulkSeoAccept() {
       seoTitle: string;
       seoDescription: string;
       confirmOverflow?: boolean;
+      traceId?: string | null;
+      packId?: string | null;
     }) => {
       const res = await apiRequest(api.bulkSeo.accept.method, api.bulkSeo.accept.path, body);
       return res.json() as Promise<{ ok: boolean }>;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, useSubscriptionStatus, type ListingCopyRefreshPack } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useDismissListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, useSubscriptionStatus, type ListingCopyRefreshPack } from "@/hooks/use-images";
 import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
 import { overflowNoticeText, showGenerateOverflowNotice } from "@/lib/overflow-copy";
 import { apiRequest } from "@/lib/queryClient";
@@ -84,6 +84,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const startListingCopyRefresh = useListingCopyRefresh();
   const regenerateListingCopyRefresh = useRegenerateListingCopyRefresh();
   const acceptListingCopyRefresh = useAcceptListingCopyRefresh();
+  const dismissListingCopyRefresh = useDismissListingCopyRefresh();
   const { data: shopifyStatus } = useShopifyStatus();
   const { data: subscriptionStatus } = useSubscriptionStatus();
   const overflow = useOverflowConfirm();
@@ -1110,42 +1111,42 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       if (parsed.seoDescription) setSeoDescription(parsed.seoDescription.slice(0, 320));
                       if (parsed.aeoFaqs) setAeoFaqs(parsed.aeoFaqs);
                     }}
-                    onAcceptTitle={(v) => {
+                    onAcceptTitle={(v, traceId) => {
                       setTitle(v);
-                      acceptGenerated({ title: v }, (product) => {
+                      acceptGenerated({ title: v, traceId }, (product) => {
                         if (product.title) setTitle(product.title);
                       });
                     }}
-                    onAcceptDescription={(v) => {
+                    onAcceptDescription={(v, traceId) => {
                       setDescription(v);
-                      acceptGenerated({ description: v }, (product) => {
+                      acceptGenerated({ description: v, traceId }, (product) => {
                         if (product.description) setDescription(product.description);
                       });
                     }}
-                    onAcceptTags={(v) => {
+                    onAcceptTags={(v, traceId) => {
                       setTags(v);
-                      acceptGenerated({ tags: v }, (product) => {
+                      acceptGenerated({ tags: v, traceId }, (product) => {
                         if (product.tags) setTags(product.tags);
                       });
                     }}
-                    onAcceptSeoTitle={(v) => {
+                    onAcceptSeoTitle={(v, traceId) => {
                       const next = v.slice(0, 70);
                       setSeoTitle(next);
-                      acceptGenerated({ seoTitle: next }, (product) => {
+                      acceptGenerated({ seoTitle: next, traceId }, (product) => {
                         if (product.seoTitle) setSeoTitle(product.seoTitle);
                       });
                     }}
-                    onAcceptSeoDescription={(v) => {
+                    onAcceptSeoDescription={(v, traceId) => {
                       const next = v.slice(0, 320);
                       setSeoDescription(next);
-                      acceptGenerated({ seoDescription: next }, (product) => {
+                      acceptGenerated({ seoDescription: next, traceId }, (product) => {
                         if (product.seoDescription) setSeoDescription(product.seoDescription);
                       });
                     }}
-                    onAcceptAeoFaqs={(v) => {
+                    onAcceptAeoFaqs={(v, traceId) => {
                       setAeoFaqs(v);
                       acceptGenerated(
-                        { aeoFaqs: v.map((f) => ({ question: f.q, answer: f.a })) },
+                        { aeoFaqs: v.map((f) => ({ question: f.q, answer: f.a })), traceId },
                         (product) => {
                           if (!Array.isArray(product.aeoFaqs)) return;
                           setAeoFaqs(
@@ -1239,7 +1240,13 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                           size="sm"
                           variant="ghost"
                           className="h-8 text-xs"
-                          onClick={() => setRefreshPack(null)}
+                          onClick={() => {
+                            dismissListingCopyRefresh.mutate({
+                              imageId: image.id,
+                              traceId: refreshPack.traceId,
+                            });
+                            setRefreshPack(null);
+                          }}
                         >
                           Dismiss
                         </Button>

@@ -1,0 +1,5 @@
+# Listing-copy model calls are traced on self-hosted Langfuse
+
+Production listing-copy model calls are traced on a self-hosted Langfuse deployed on Railway as its own service, not inside the API service. Local and production are separate Langfuse projects. The API only sends traces to that host. Prompts stay in the repo. A trace is one model call: the text prompt, the completion, the model, latency, and token counts. The product photo is not stored. Sellers never see Langfuse. If Langfuse is down, the seller still gets the listing copy, the trace or mark is dropped, and the API logs the export failure. ADR 0016 still holds: tracing is not part of the Bulk SEO job and must not block it.
+
+**Considered:** Langfuse Cloud (rejected because the prompt carries fibre composition and GPSR name, address, and email); a separate EU VM (rejected in favour of a Railway deploy of Langfuse); tracing only on a laptop (rejected because the API cannot reach it); making a failed export fail the listing (rejected because a trace store must not stop a listing).

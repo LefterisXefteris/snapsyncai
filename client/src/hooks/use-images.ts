@@ -506,6 +506,7 @@ export type GeneratedListingCopy = {
   seoDescription?: string;
   aeoFaqs?: { q: string; a: string }[] | { question: string; answer: string }[];
   aeoSnippet?: string;
+  traceId?: string;
 };
 
 export function useAcceptGeneratedListingCopy() {
@@ -551,6 +552,7 @@ export type ListingCopyRefreshPack = {
   seoTitle: string;
   seoDescription: string;
   queries: string[];
+  traceId?: string | null;
 };
 
 export function useListingCopyRefresh() {
@@ -592,6 +594,18 @@ export function useRegenerateListingCopyRefresh() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+}
+
+export function useDismissListingCopyRefresh() {
+  return useMutation({
+    mutationFn: async ({ imageId, traceId }: { imageId: number; traceId?: string | null }) => {
+      await apiRequest(
+        "POST",
+        buildUrl(api.images.dismissListingCopyRefresh.path, { id: imageId }),
+        { traceId },
+      );
     },
   });
 }
@@ -715,7 +729,7 @@ export function useGenerateContent() {
     imageId: number,
     params: { category: string; styleTone: string; audience: string },
     onChunk: (text: string) => void,
-    onDone: (parsed: GeneratedContent) => void,
+    onDone: (parsed: GeneratedContent, traceId?: string) => void,
     onError?: (msg: string) => void
   ): Promise<void> => {
     const url = apiUrl(buildUrl(api.images.generateContent.path, { id: imageId }));
@@ -746,11 +760,11 @@ export function useGenerateContent() {
             // Parse the full accumulated JSON
             try {
               const parsed: GeneratedContent = JSON.parse(accumulated);
-              onDone(parsed);
+              onDone(parsed, json.traceId);
             } catch {
               // Fallback: try to extract JSON object from accumulated text
               const match = accumulated.match(/\{[\s\S]*\}/);
-              if (match) onDone(JSON.parse(match[0]));
+              if (match) onDone(JSON.parse(match[0]), json.traceId);
               else throw new Error("Could not parse generated content");
             }
             endThinking(true);
@@ -784,7 +798,7 @@ export function useRegenerateField() {
     field: RegenerableListingCopyField,
     params: { category?: string; styleTone?: string; audience?: string },
     onChunk: (text: string) => void,
-    onDone: (value: string | string[] | { q: string; a: string }[]) => void,
+    onDone: (value: string | string[] | { q: string; a: string }[], traceId?: string) => void,
     onError?: (msg: string) => void
   ): Promise<void> => {
     const url = apiUrl(buildUrl(api.images.regenerateField.path, { id: imageId }));
@@ -815,12 +829,12 @@ export function useRegenerateField() {
             if (field === "seoKeywords" || field === "aeoFaqs") {
               try {
                 const match = accumulated.match(/\[[\s\S]*\]/);
-                onDone(JSON.parse(match ? match[0] : accumulated));
+                onDone(JSON.parse(match ? match[0] : accumulated), json.traceId);
               } catch {
-                onDone(accumulated);
+                onDone(accumulated, json.traceId);
               }
             } else {
-              onDone(accumulated.trim());
+              onDone(accumulated.trim(), json.traceId);
             }
             endThinking(true);
             return;

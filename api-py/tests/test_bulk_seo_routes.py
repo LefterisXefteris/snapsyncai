@@ -66,14 +66,23 @@ def test_bulk_seo_schema_is_camel_case(monkeypatch) -> None:
         start_body = set(schemas["BulkSeoStartBody"]["properties"])
         assert start_body == {"productIds"}
         pack = set(schemas["BulkSeoPackResponse"]["properties"])
-        assert pack == {"error", "items", "proposedUseCount"}
+        assert pack == {"error", "items", "proposedUseCount", "packId"}
         item = set(schemas["BulkSeoPackItem"]["properties"])
         assert item == {"id", "error", "proposal", "queries"}
         proposal = set(schemas["BulkSeoProposal"]["properties"])
-        assert proposal == {"tags", "description", "seoTitle", "seoDescription"}
+        assert proposal == {"tags", "description", "seoTitle", "seoDescription", "traceId"}
         regen = set(schemas["BulkSeoRegenerateBody"]["properties"])
-        assert regen == {"productId", "queries"}
+        assert regen == {"productId", "queries", "packId"}
         accept = set(schemas["BulkSeoAcceptBody"]["properties"])
-        assert accept == {"productId", "tags", "description", "seoTitle", "seoDescription", "confirmOverflow"}
+        assert accept == {
+            "productId",
+            "tags",
+            "description",
+            "seoTitle",
+            "seoDescription",
+            "confirmOverflow",
+            "traceId",
+            "packId",
+        }
     finally:
         get_settings.cache_clear()

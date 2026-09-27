@@ -1,6 +1,7 @@
 """Image CRUD + grouping + Shopify push — port of `server/routes.ts`."""
 
 import logging
+import time
 from collections.abc import Sequence
 
 import httpx
@@ -21,6 +22,7 @@ from app.schemas.image import (
     ImageOut,
     ImageUpdate,
     ListingCopyRefreshAcceptBody,
+    ListingCopyRefreshDismissBody,
     ListingCopyRefreshOut,
     ListingCopyRefreshRegenerateBody,
     OkResponse,
@@ -42,6 +44,14 @@ from app.services.listing_copy_refresh import (
     search_demand_configured,
     seed_search_demand,
     start_listing_copy_refresh,
+)
+from app.services.listing_copy_trace import (
+    JOB_REFRESH,
+    ListingCopyCall,
+    listing_copy_trace_store,
+    mark_generated_field,
+    mark_refresh,
+    record_listing_copy_call,
 )
 from app.services.openai_client import get_openai
 from app.services.plan_charge import authorize_plan_job, settle_plan_job
@@ -248,7 +258,7 @@ async def accept_generated_listing_copy_route(
         raise HTTPException(status_code=409, detail=facts_blocked)
     accepted = accept_generated_listing_copy(
         current,
-        body.model_dump(exclude_unset=True, exclude={"confirm_overflow"}),
+        body.model_dump(exclude_unset=True, exclude={"confirm_overflow", "trace_id"}),
         shop_gpsr,
     )
     blocked = await authorize_plan_job(
@@ -283,7 +293,40 @@ async def accept_generated_listing_copy_route(
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="Image not found")
+    _mark_generated_fields(settings, image_id, body)
     return _image_out(updated, settings, shop_gpsr)
+
+
+def _mark_generated_fields(settings, image_id: int, body: AcceptGeneratedListingCopyBody) -> None:
+    data = body.model_dump(exclude_unset=True)
+    fields = (
+        ("title", "title"),
+        ("description", "description"),
+        ("tags", "tags"),
+        ("seo_title", "seoTitle"),
+        ("seo_description", "seoDescription"),
+        ("aeo_faqs", "aeoFaqs"),
+    )
+    trace_store = listing_copy_trace_store(settings)
+    for key, field_name in fields:
+        if key not in data or data[key] is None:
+            continue
+        mark_generated_field(
+            trace_store,
+            product_id=image_id,
+            field=field_name,
+            accepted=data[key],
+            trace_id=body.trace_id,
+        )
+
+
+def _refresh_trace(settings, image) -> dict:
+    return {
+        "store": listing_copy_trace_store(settings),
+        "job": JOB_REFRESH,
+        "product_id": image.id,
+        "group_id": image.product_group_id,
+    }
 
 
 def _refresh_conflict(reason: str) -> JSONResponse:
@@ -320,19 +363,72 @@ async def fetch_search_demand(
     return tuple(str(item).strip() for item in raw if str(item).strip())
 
 
-async def propose_refresh_pack(constraints: str) -> dict | None:
-    response = await get_openai().chat.completions.create(
-        model="gpt-5.2",
-        max_completion_tokens=1500,
-        messages=[
-            {"role": "system", "content": REFRESH_PROPOSAL_SYSTEM},
-            {"role": "user", "content": constraints},
-        ],
-    )
+async def propose_refresh_pack(constraints: str, *, trace: dict | None = None) -> dict | None:
+    started = time.perf_counter()
     text = ""
-    if response.choices:
-        text = response.choices[0].message.content or ""
-    return parse_refresh_proposal(text)
+    error: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    try:
+        response = await get_openai().chat.completions.create(
+            model="gpt-5.2",
+            max_completion_tokens=1500,
+            messages=[
+                {"role": "system", "content": REFRESH_PROPOSAL_SYSTEM},
+                {"role": "user", "content": constraints},
+            ],
+        )
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            input_tokens = getattr(usage, "prompt_tokens", None)
+            output_tokens = getattr(usage, "completion_tokens", None)
+        if response.choices:
+            text = response.choices[0].message.content or ""
+        parsed = parse_refresh_proposal(text)
+        if parsed is None:
+            error = "Could not parse listing copy refresh."
+    except Exception:
+        logger.exception("listing copy refresh generation failed")
+        _record_refresh_trace(trace, constraints, text, "Generation failed", started, None, None)
+        raise
+    recorded = _record_refresh_trace(
+        trace, constraints, text, error, started, input_tokens, output_tokens
+    )
+    if parsed is not None and recorded is not None:
+        return {**parsed, "traceId": recorded.id}
+    return parsed
+
+
+def _record_refresh_trace(
+    trace: dict | None,
+    constraints: str,
+    text: str,
+    error: str | None,
+    started: float,
+    input_tokens: int | None,
+    output_tokens: int | None,
+):
+    if trace is None:
+        return None
+    return record_listing_copy_call(
+        trace["store"],
+        ListingCopyCall(
+            job=trace["job"],
+            messages=[
+                {"role": "system", "content": REFRESH_PROPOSAL_SYSTEM},
+                {"role": "user", "content": constraints},
+            ],
+            completion=text,
+            error=error,
+            model="gpt-5.2",
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            product_id=trace["product_id"],
+            group_id=trace.get("group_id"),
+            pack_id=trace.get("pack_id"),
+        ),
+    )
 
 
 async def _listing_copy_refresh_context(session, image, user_id: str, settings):
@@ -354,11 +450,12 @@ async def _listing_copy_refresh_context(session, image, user_id: str, settings):
     )
 
 
-async def _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr):
+async def _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr, trace=None):
     if started.error:
         return _refresh_conflict(started.error)
     pack = await propose_refresh_pack(
-        rewrite_constraints(facts, started.queries, listing_copy, shop_gpsr)
+        rewrite_constraints(facts, started.queries, listing_copy, shop_gpsr),
+        trace=trace,
     )
     if pack is None:
         return JSONResponse(
@@ -371,10 +468,15 @@ async def _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr):
         seo_title=pack["seoTitle"],
         seo_description=pack["seoDescription"],
         queries=list(started.queries),
+        trace_id=pack.get("traceId"),
     )
 
 
-@router.post("/api/images/{image_id}/listing-copy/refresh", response_model=ListingCopyRefreshOut)
+@router.post(
+    "/api/images/{image_id}/listing-copy/refresh",
+    response_model=ListingCopyRefreshOut,
+    response_model_exclude_none=True,
+)
 async def listing_copy_refresh_route(
     image_id: int,
     user_id: CurrentUser,
@@ -403,12 +505,15 @@ async def listing_copy_refresh_route(
         fetch=lambda _seeds: queries,
         shop_gpsr=shop_gpsr,
     )
-    return await _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr)
+    return await _listing_copy_refresh_pack(
+        facts, listing_copy, started, shop_gpsr, _refresh_trace(settings, image)
+    )
 
 
 @router.post(
     "/api/images/{image_id}/listing-copy/refresh/regenerate",
     response_model=ListingCopyRefreshOut,
+    response_model_exclude_none=True,
 )
 async def listing_copy_refresh_regenerate_route(
     image_id: int,
@@ -434,7 +539,9 @@ async def listing_copy_refresh_regenerate_route(
         shop_gpsr=shop_gpsr,
         queries=body.queries,
     )
-    return await _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr)
+    return await _listing_copy_refresh_pack(
+        facts, listing_copy, started, shop_gpsr, _refresh_trace(settings, image)
+    )
 
 
 @router.post("/api/images/{image_id}/listing-copy/refresh/accept", response_model=ImageOut)
@@ -481,7 +588,33 @@ async def listing_copy_refresh_accept_route(
         confirm_overflow=body.confirm_overflow,
         product_id=image_id,
     )
+    mark_refresh(
+        listing_copy_trace_store(settings),
+        product_id=image_id,
+        outcome="accepted",
+        trace_id=body.trace_id,
+    )
     return _image_out(updated, settings, shop_gpsr)
+
+
+@router.post("/api/images/{image_id}/listing-copy/refresh/dismiss", response_model=OkResponse)
+async def listing_copy_refresh_dismiss_route(
+    image_id: int,
+    body: ListingCopyRefreshDismissBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> OkResponse:
+    image = await store.get_image(session, image_id, user_id)
+    if not _owned(image, user_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    mark_refresh(
+        listing_copy_trace_store(settings),
+        product_id=image_id,
+        outcome="dismissed",
+        trace_id=body.trace_id,
+    )
+    return OkResponse(ok=True)
 
 
 @router.get("/api/images/{image_id}/file")

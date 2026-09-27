@@ -32,6 +32,10 @@ export const api = {
       method: "POST" as const,
       path: "/api/images/:id/listing-copy/refresh/accept" as const,
     },
+    dismissListingCopyRefresh: {
+      method: "POST" as const,
+      path: "/api/images/:id/listing-copy/refresh/dismiss" as const,
+    },
   },
   shopify: {
     status: { method: "GET" as const, path: "/api/shopify/status" as const },

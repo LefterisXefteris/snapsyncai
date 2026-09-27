@@ -21,12 +21,12 @@ interface AiContentPanelProps {
   blockedReason?: string;
   overflowNotice?: string | null;
   onGenerated: (parsed: GeneratedContent) => void;
-  onAcceptTitle: (value: string) => void;
-  onAcceptDescription: (value: string) => void;
-  onAcceptTags: (value: string[]) => void;
-  onAcceptSeoTitle: (value: string) => void;
-  onAcceptSeoDescription: (value: string) => void;
-  onAcceptAeoFaqs: (value: { q: string; a: string }[]) => void;
+  onAcceptTitle: (value: string, traceId?: string) => void;
+  onAcceptDescription: (value: string, traceId?: string) => void;
+  onAcceptTags: (value: string[], traceId?: string) => void;
+  onAcceptSeoTitle: (value: string, traceId?: string) => void;
+  onAcceptSeoDescription: (value: string, traceId?: string) => void;
+  onAcceptAeoFaqs: (value: { q: string; a: string }[], traceId?: string) => void;
 }
 
 export function AiContentPanel({
@@ -64,6 +64,10 @@ export function AiContentPanel({
   const [pendingSeoTitle, setPendingSeoTitle] = useState<string | null>(null);
   const [pendingSeoDescription, setPendingSeoDescription] = useState<string | null>(null);
   const [pendingFaqs, setPendingFaqs] = useState<{ q: string; a: string }[] | null>(null);
+  const [generateTraceId, setGenerateTraceId] = useState<string | null>(null);
+  const [fieldTraceIds, setFieldTraceIds] = useState<
+    Partial<Record<RegenerableListingCopyField, string>>
+  >({});
 
   const handleGenerate = async () => {
     if (!canGenerate) return;
@@ -76,13 +80,17 @@ export function AiContentPanel({
     setPendingSeoTitle(null);
     setPendingSeoDescription(null);
     setPendingFaqs(null);
+    setGenerateTraceId(null);
+    setFieldTraceIds({});
 
     await generate(
       imageId,
       { category, styleTone, audience },
       (text) => setStreamText(text),
-      (parsed) => {
+      (parsed, traceId) => {
         setGenerated(parsed);
+        setGenerateTraceId(traceId ?? null);
+        setFieldTraceIds({});
         setIsGenerating(false);
         setStreamText("");
         onGenerated(parsed);
@@ -99,7 +107,8 @@ export function AiContentPanel({
       field,
       { category, styleTone, audience },
       () => {}, // no mid-stream UI update for single field
-      (value) => {
+      (value, traceId) => {
+        if (traceId) setFieldTraceIds((prev) => ({ ...prev, [field]: traceId }));
         if (field === "title") setPendingTitle(value as string);
         else if (field === "description") setPendingDescription(value as string);
         else if (field === "seoKeywords") setPendingTags(value as string[]);
@@ -119,6 +128,8 @@ export function AiContentPanel({
   const displaySeoTitle = pendingSeoTitle ?? generated?.seoTitle ?? null;
   const displaySeoDescription = pendingSeoDescription ?? generated?.seoDescription ?? null;
   const displayFaqs = pendingFaqs ?? generated?.aeoFaqs ?? null;
+  const traceFor = (field: RegenerableListingCopyField) =>
+    fieldTraceIds[field] ?? generateTraceId ?? undefined;
 
   const hasAnyResult =
     displayTitle !== null ||
@@ -216,7 +227,7 @@ export function AiContentPanel({
                 isRegenerating={regeneratingField === "title"}
                 canRegenerate={canGenerate}
                 onAccept={() => {
-                  onAcceptTitle(displayTitle);
+                  onAcceptTitle(displayTitle, traceFor("title"));
                   setPendingTitle(null);
                   if (generated) setGenerated({ ...generated, title: displayTitle });
                 }}
@@ -233,7 +244,7 @@ export function AiContentPanel({
                 isRegenerating={regeneratingField === "description"}
                 canRegenerate={canGenerate}
                 onAccept={() => {
-                  onAcceptDescription(displayDescription);
+                  onAcceptDescription(displayDescription, traceFor("description"));
                   setPendingDescription(null);
                   if (generated) setGenerated({ ...generated, description: displayDescription });
                 }}
@@ -252,7 +263,7 @@ export function AiContentPanel({
                 isRegenerating={regeneratingField === "seoKeywords"}
                 canRegenerate={canGenerate}
                 onAccept={() => {
-                  onAcceptTags(displayTags);
+                  onAcceptTags(displayTags, traceFor("seoKeywords"));
                   setPendingTags(null);
                   if (generated) setGenerated({ ...generated, seoKeywords: displayTags });
                 }}
@@ -277,7 +288,7 @@ export function AiContentPanel({
                 isRegenerating={regeneratingField === "seoTitle"}
                 canRegenerate={canGenerate}
                 onAccept={() => {
-                  onAcceptSeoTitle(displaySeoTitle);
+                  onAcceptSeoTitle(displaySeoTitle, traceFor("seoTitle"));
                   setPendingSeoTitle(null);
                   if (generated) setGenerated({ ...generated, seoTitle: displaySeoTitle });
                 }}
@@ -294,7 +305,7 @@ export function AiContentPanel({
                 isRegenerating={regeneratingField === "seoDescription"}
                 canRegenerate={canGenerate}
                 onAccept={() => {
-                  onAcceptSeoDescription(displaySeoDescription);
+                  onAcceptSeoDescription(displaySeoDescription, traceFor("seoDescription"));
                   setPendingSeoDescription(null);
                   if (generated) setGenerated({ ...generated, seoDescription: displaySeoDescription });
                 }}
@@ -313,7 +324,7 @@ export function AiContentPanel({
                 isRegenerating={regeneratingField === "aeoFaqs"}
                 canRegenerate={canGenerate}
                 onAccept={() => {
-                  onAcceptAeoFaqs(displayFaqs);
+                  onAcceptAeoFaqs(displayFaqs, traceFor("aeoFaqs"));
                   setPendingFaqs(null);
                   if (generated) setGenerated({ ...generated, aeoFaqs: displayFaqs });
                 }}
