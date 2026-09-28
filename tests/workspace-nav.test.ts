@@ -5,14 +5,11 @@ import {
   WORKSPACE_HOME_PATH,
   WORKSPACE_NAV,
   activeWorkspaceNavId,
-  workspaceArrivalPath,
   workspaceNavItem,
   workspaceStubCopy,
 } from "../client/src/lib/workspace-nav.ts";
 
-test("a shop lands on Products and a missing shop lands in the conversation", () => {
-  assert.equal(workspaceArrivalPath(true), "/");
-  assert.equal(workspaceArrivalPath(false), "/conversation");
+test("Conversation sits beside the catalogue", () => {
   assert.equal(workspaceNavItem("conversation").path, "/conversation");
   assert.equal(workspaceNavItem("conversation").stub, false);
 });

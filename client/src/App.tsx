@@ -12,7 +12,14 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { useShopifyStatus } from "@/hooks/use-images";
-import { workspaceArrivalPath, WORKSPACE_HOME_PATH } from "@/lib/workspace-nav";
+import { useToast } from "@/hooks/use-toast";
+import {
+  clearConnectFrom,
+  readWorkspaceChoice,
+  rememberWorkspaceChoice,
+  shopifyConnectNotice,
+  workspaceArrival,
+} from "@/lib/workspace-arrival";
 
 // Route-level code splitting: each page ships as its own chunk so the
 // initial bundle stays small and loads fast.
@@ -121,12 +128,38 @@ function useIdlePreload() {
 
 function ShopArrival() {
   const shopify = useShopifyStatus();
+  const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
+  const toldConnect = useRef<string | null>(null);
   useEffect(() => {
     if (!shopify.isSuccess) return;
-    const target = workspaceArrivalPath(shopify.data?.connected === true);
-    if (pathname === WORKSPACE_HOME_PATH && target !== pathname) setLocation(target);
-  }, [shopify.isSuccess, shopify.data, pathname, setLocation]);
+    const choice = readWorkspaceChoice();
+    const search = window.location.search;
+    const arrival = workspaceArrival({
+      shopConnected: shopify.data?.connected === true,
+      pathname,
+      search,
+      chosenPath: choice.chosenPath,
+      connectFrom: choice.connectFrom,
+    });
+    const destination = arrival.path.split("?")[0];
+    if (destination !== pathname) {
+      setLocation(arrival.path);
+      return;
+    }
+    rememberWorkspaceChoice(arrival.chosenPath);
+    if (arrival.clearConnectFrom) clearConnectFrom();
+    const notice = shopifyConnectNotice(search);
+    if (notice && toldConnect.current !== search) {
+      toldConnect.current = search;
+      toast(notice);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("shopify");
+      url.searchParams.delete("reason");
+      const next = `${url.pathname}${url.search}`;
+      window.history.replaceState({}, "", next);
+    }
+  }, [shopify.isSuccess, shopify.data, pathname, setLocation, toast]);
   return null;
 }
 

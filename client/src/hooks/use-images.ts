@@ -3,6 +3,7 @@ import { api, buildUrl } from "@/lib/api-routes";
 import { apiRequest } from "@/lib/queryClient";
 import { apiUrl } from "@/lib/api-origin";
 import { apiFetch } from "@/lib/api-fetch";
+import { rememberConnectFrom } from "@/lib/workspace-arrival";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
@@ -441,6 +442,7 @@ export function useShopifyConnect() {
 
   return useMutation({
     mutationFn: async ({ shopDomain }: { shopDomain: string }) => {
+      rememberConnectFrom(window.location.pathname);
       const params = new URLSearchParams({ shop: shopDomain });
       window.location.assign(`${apiUrl(api.shopify.oauthStart.path)}?${params.toString()}`);
     },

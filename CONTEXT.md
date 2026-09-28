@@ -8,6 +8,22 @@ Textile-first seller workspace for Shopify, Wix, and Vinted. Listing from photos
 Shopify, Wix, or Vinted — a place the seller lists or fetches products. Each Channel keeps its own connect and publish fields; they are not one interchangeable slot.
 _Avoid_: Platform, plugin, integration, marketplace (as the general term), store (when you mean the channel type)
 
+**Channel claim**:
+The seller taking ownership, on Shopify, of a shop opened for them because they had no Shopify Channel yet. They confirm a shop name and the email for their Shopify account before that shop is opened. Until that claim, it is not their Channel. Distinct from connecting a shop they already own.
+_Avoid_: store setup, create store, MCP
+
+**Conversation**:
+The one dialogue for a Shopify shop, kept on that shop, and a destination beside the catalogue. A seller with no Shopify Channel arrives there each time they open the workspace itself; a destination they open stays until they leave. Disconnecting, and a connect or Channel claim trip, are not leaving. A job it starts is the same job the catalogue page runs; confirming facts, accepting listing copy, going live, and the website handoff stay with the seller.
+_Avoid_: agent, Agentic SEO, SEO agent, copilot, home, thread
+
+**Silence**:
+A shop-level choice on that conversation. It can stop job offers, or stop the conversation offering or starting Bulk SEO, listing copy refresh, or a website prototype. The catalogue page for a silenced job stays. Inventory, a Channel claim, and connect cannot be silenced.
+_Avoid_: disable chat, hide page, mute
+
+**Job offer**:
+A proposal, in the conversation, of a job the seller did not ask for. It does not start the job, and declining it does not silence that job.
+_Avoid_: suggestion, agent nudge, autopilot
+
 **Publication**:
 Where this product is available inside a connected Shopify shop — Online Store, Point of Sale, Shop, and other sales apps on that shop. Not a Channel.
 _Avoid_: Channel, sales channel (as SnapSync language), available channels
@@ -137,7 +153,7 @@ Paid access to the workspace for one seller and one Shopify shop. Monthly and an
 _Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock
 
 **Allowance**:
-The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write or website lands — a failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check.
+The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write or website lands — a failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check. Talk in the conversation is not a use, and there is no separate cap on it.
 _Avoid_: credits, weekly product limit, unlock, compliance check, top-up, yearly bank
 
 **Overflow**:
