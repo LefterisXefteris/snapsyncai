@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/clerk-react";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
 import { isOverflowConfirmError } from "@/lib/overflow-copy";
+import { AVAILABLE_STOCK_NOT_SET } from "@/lib/product-editor-copy";
 import type { Image } from "@/lib/image";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
@@ -382,7 +383,9 @@ export function usePushToShopify() {
       } else {
         toast({
           title: "Shopify Sync Complete",
-          description: `${data.success} product(s) pushed successfully.`,
+          description: data.stockNotSet
+            ? `${data.success} product(s) pushed successfully. ${AVAILABLE_STOCK_NOT_SET}`
+            : `${data.success} product(s) pushed successfully.`,
         });
       }
     },

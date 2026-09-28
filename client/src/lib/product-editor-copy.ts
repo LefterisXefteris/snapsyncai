@@ -60,6 +60,7 @@ export const QUIETER_PUSH_LABEL = "Push";
 export const GO_LIVE_NEEDS_LISTING_COPY = "This product needs listing copy.";
 export const GO_LIVE_NEEDS_PRICE = "This product needs a price greater than zero.";
 export const GO_LIVE_NO_ONLINE_STORE = "This shop has no Online Store.";
+export const AVAILABLE_STOCK_NOT_SET = "Available stock was not set.";
 
 const ONLINE_STORE_LABEL = "Online Store";
 

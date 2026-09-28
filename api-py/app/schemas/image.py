@@ -237,3 +237,4 @@ class PushResponse(CamelModel):
     success: int
     failed: int
     results: list[PushResult]
+    stock_not_set: bool = False

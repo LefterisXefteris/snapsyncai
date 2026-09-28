@@ -169,6 +169,23 @@ async def get_connection_for_shop(
     ).scalar_one_or_none()
 
 
+async def inventory_location_for_user(session: AsyncSession | None, user_id: str) -> str | None:
+    """The Inventory location, when Inventory is on for this seller."""
+    if session is None:
+        return None
+    inventory_settings = (
+        await session.execute(
+            select(InventorySettings).where(
+                InventorySettings.user_id == user_id,
+                InventorySettings.enabled.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if inventory_settings is None:
+        return None
+    return inventory_settings.location_id
+
+
 async def list_inventory_locations(
     session: AsyncSession, settings: Settings, user_id: str
 ) -> list[dict[str, Any]]:
@@ -1000,6 +1017,8 @@ async def register_published_shopify_product(
     image: Any,
     product_id: str,
     variants: list[dict[str, Any]],
+    available_stock: int | None = None,
+    queue_sync: bool = True,
 ) -> None:
     if not feature_enabled(settings):
         return
@@ -1012,6 +1031,8 @@ async def register_published_shopify_product(
     ).scalar_one_or_none()
     if not inventory_settings:
         return
+    page_quantity = max(0, int(getattr(image, "inventory_quantity", 0) or 0))
+    quantity = page_quantity if available_stock is None else available_stock
     for index, variant in enumerate(variants):
         item = InventoryItem(
             user_id=user_id,
@@ -1020,7 +1041,7 @@ async def register_published_shopify_product(
             or "Untitled product",
             variant_title=f"Variant {index + 1}" if len(variants) > 1 else None,
             sku=variant.get("sku"),
-            ledger_quantity=max(0, int(getattr(image, "inventory_quantity", 0) or 0)),
+            ledger_quantity=quantity,
             tracking_enabled=bool((variant.get("inventoryItem") or {}).get("tracked", True)),
             state="active",
         )
@@ -1034,11 +1055,12 @@ async def register_published_shopify_product(
                 external_variant_id=variant["id"],
                 external_inventory_item_id=variant["inventoryItem"]["id"],
                 external_location_id=inventory_settings.location_id,
-                observed_quantity=0,
-                pushed_quantity=0,
+                observed_quantity=quantity if available_stock is not None else 0,
+                pushed_quantity=quantity if available_stock is not None else 0,
                 sync_state="pending",
                 external_status="DRAFT",
                 last_observed_at=_now(),
             )
         )
-        await enqueue_inventory_job(session, user_id, "sync_item", {"itemId": item.id})
+        if queue_sync:
+            await enqueue_inventory_job(session, user_id, "sync_item", {"itemId": item.id})

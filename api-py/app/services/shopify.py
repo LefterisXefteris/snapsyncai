@@ -421,6 +421,51 @@ async def create_shopify_product(
     return product
 
 
+async def set_storefront_available_stock(
+    connection: ShopifyConnection,
+    settings: Settings,
+    *,
+    inventory_item_id: str,
+    location_id: str,
+    quantity: int,
+) -> None:
+    """Set one variant's available stock to the page quantity. Skips compare-and-swap."""
+    data = await shopify_graphql(
+        connection,
+        settings,
+        """
+        mutation SetStorefrontAvailable(
+          $input: InventorySetQuantitiesInput!, $idempotencyKey: String!
+        ) {
+          inventorySetQuantities(input: $input) @idempotent(key: $idempotencyKey) {
+            userErrors { field message code }
+          }
+        }
+        """,
+        {
+            "idempotencyKey": f"storefront-{inventory_item_id}-{location_id}",
+            "input": {
+                "name": "available",
+                "reason": "correction",
+                "referenceDocumentUri": f"snapsync://go-live/{inventory_item_id}",
+                "quantities": [
+                    {
+                        "inventoryItemId": inventory_item_id,
+                        "locationId": location_id,
+                        "quantity": quantity,
+                        "changeFromQuantity": None,
+                    }
+                ],
+            },
+        },
+    )
+    errors = (data.get("inventorySetQuantities") or {}).get("userErrors") or []
+    if errors:
+        raise RuntimeError(
+            "; ".join(error.get("message") or "Stock was not set" for error in errors)
+        )
+
+
 async def push_product_to_shopify(
     image: Any,
     connection: ShopifyConnection,

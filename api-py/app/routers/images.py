@@ -67,7 +67,9 @@ from app.services.shopify import (
     list_shopify_publications,
     online_store_publication_id,
     price_greater_than_zero,
+    product_publishing,
     push_product_to_shopify,
+    set_storefront_available_stock,
     shopify_product_status,
 )
 
@@ -714,23 +716,28 @@ def _push_publication_ids(body: PushIdsBody, image) -> list[str]:
     return list(image.shopify_publication_ids or [])
 
 
-async def _storefront_price_refusal(body, images, connection, settings) -> JSONResponse | None:
-    """A write that leaves the product Active on the Online Store needs a price greater than zero."""
+def _page_quantity(image) -> int:
+    raw = getattr(image, "inventory_quantity", None)
+    try:
+        quantity = int(raw if raw is not None else 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, quantity)
+
+
+def _tracks_quantity(image) -> bool:
+    return getattr(image, "track_quantity", None) != "false"
+
+
+def _is_storefront_write(status: str, publication_ids: list[str], online_store: str | None) -> bool:
+    return status == "ACTIVE" and online_store is not None and online_store in publication_ids
+
+
+async def _storefront_price_refusal(body, images, listed) -> JSONResponse | None:
+    """A storefront write needs a price greater than zero."""
     active = [image for image in images if _push_status(body, image) == "ACTIVE"]
     if not active:
         return None
-    try:
-        listed = await list_shopify_publications(connection, settings)
-    except Exception:
-        logger.exception("Shopify publications lookup failed before push")
-        return JSONResponse(
-            status_code=400,
-            content={
-                "message": (
-                    "Reconnect Shopify in Settings to choose where this product is available."
-                )
-            },
-        )
     online_store = online_store_publication_id(listed)
     if online_store is None:
         return None
@@ -743,6 +750,77 @@ async def _storefront_price_refusal(body, images, connection, settings) -> JSONR
     if not missing_price:
         return None
     return JSONResponse(status_code=400, content={"message": STOREFRONT_PRICE_REQUIRED})
+
+
+async def _previously_on_online_store(
+    image, connection, settings, online_store: str
+) -> bool | None:
+    """Whether Shopify already has this product Active on the Online Store.
+
+    None means the read failed, so stock must not be written over an unknown quantity.
+    """
+    product_id = getattr(image, "shopify_product_id", None)
+    if not isinstance(product_id, str) or not product_id:
+        return False
+    try:
+        status, published = await product_publishing(connection, settings, product_id)
+    except Exception:
+        logger.exception("Shopify publishing lookup failed before setting available stock")
+        return None
+    return shopify_product_status(status) == "ACTIVE" and online_store in published
+
+
+async def _stock_location(session, settings, connection, user_id: str) -> str | None:
+    from app.services.inventory.service import inventory_location_for_user
+    from app.services.inventory.shopify_ops import get_shopify_locations
+
+    chosen = await inventory_location_for_user(session, user_id)
+    if chosen:
+        return chosen
+    locations = await get_shopify_locations(connection, settings)
+    if not locations:
+        return None
+    location_id = locations[0].get("id")
+    return location_id if isinstance(location_id, str) and location_id else None
+
+
+async def _landing_available_stock(
+    session, settings, connection, user_id, image, variants: list
+) -> tuple[bool, int | None]:
+    """Set available stock on a first storefront landing.
+
+    Returns whether stock was not set, and the quantity written when it was.
+    """
+    if not _tracks_quantity(image):
+        return False, None
+    if len(variants) != 1:
+        return True, None
+    inventory_item = variants[0].get("inventoryItem") if isinstance(variants[0], dict) else None
+    inventory_item_id = (
+        (inventory_item or {}).get("id") if isinstance(inventory_item, dict) else None
+    )
+    if not isinstance(inventory_item_id, str) or not inventory_item_id:
+        return True, None
+    try:
+        location_id = await _stock_location(session, settings, connection, user_id)
+    except Exception:
+        logger.exception("Could not choose a location for available stock")
+        return True, None
+    if not location_id:
+        return True, None
+    quantity = _page_quantity(image)
+    try:
+        await set_storefront_available_stock(
+            connection,
+            settings,
+            inventory_item_id=inventory_item_id,
+            location_id=location_id,
+            quantity=quantity,
+        )
+    except Exception:
+        logger.exception("Available stock was not set")
+        return True, None
+    return False, quantity
 
 
 def _sort_group_by_media_gallery(group: list) -> None:
@@ -802,11 +880,25 @@ async def push_to_shopify(
                 },
             )
 
-        price_refusal = await _storefront_price_refusal(
-            body, images_to_push, connection, settings
-        )
-        if price_refusal is not None:
-            return price_refusal
+        listed = None
+        if any(_push_status(body, image) == "ACTIVE" for image in images_to_push):
+            try:
+                listed = await list_shopify_publications(connection, settings)
+            except Exception:
+                logger.exception("Shopify publications lookup failed before push")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "message": (
+                            "Reconnect Shopify in Settings to choose "
+                            "where this product is available."
+                        ),
+                    },
+                )
+            price_refusal = await _storefront_price_refusal(body, images_to_push, listed)
+            if price_refusal is not None:
+                return price_refusal
+        online_store = online_store_publication_id(listed or [])
 
         all_user_images = await store.list_images(session, user_id)
         group_map: dict[str, list] = {}
@@ -831,6 +923,7 @@ async def push_to_shopify(
         full_map = {img.id: img for img in selected}
         success = 0
         failed = 0
+        stock_not_set = False
         results: list[PushResult] = []
         for primary, views in products:
             needed = [primary.id, *[view.id for view in views]]
@@ -840,6 +933,17 @@ async def push_to_shopify(
                     full_map[img.id] = img
             full_primary = full_map.get(primary.id) or primary
             view_images = [full_map.get(view.id) or view for view in views]
+            desired_ids = _push_publication_ids(body, full_primary)
+            desired_status = _push_status(body, full_primary)
+            # Read Shopify before the write. Afterwards the product is already on the store.
+            previous = None
+            landing = bool(
+                online_store and _is_storefront_write(desired_status, desired_ids, online_store)
+            )
+            if landing and online_store:
+                previous = await _previously_on_online_store(
+                    full_primary, connection, settings, online_store
+                )
             result = await push_product_to_shopify(
                 full_primary,
                 connection,
@@ -851,8 +955,20 @@ async def push_to_shopify(
             if result.get("shopify_product_id"):
                 from app.services.inventory.service import register_published_shopify_product
 
-                desired_ids = _push_publication_ids(body, full_primary)
-                desired_status = _push_status(body, full_primary)
+                written: int | None = None
+                if landing:
+                    if previous is None:
+                        stock_not_set = True
+                    elif previous is False:
+                        missed, written = await _landing_available_stock(
+                            session,
+                            settings,
+                            connection,
+                            user_id,
+                            full_primary,
+                            result.get("variants") or [],
+                        )
+                        stock_not_set = stock_not_set or missed
 
                 await register_published_shopify_product(
                     session,
@@ -861,6 +977,8 @@ async def push_to_shopify(
                     image=full_primary,
                     product_id=result["shopify_product_id"],
                     variants=result.get("variants") or [],
+                    available_stock=written,
+                    queue_sync=False,
                 )
                 updates = {
                     "shopify_product_id": result["shopify_product_id"],
@@ -884,7 +1002,9 @@ async def push_to_shopify(
                 )
                 failed += 1
                 results.append(PushResult(id=primary.id, error=result.get("error")))
-        return PushResponse(success=success, failed=failed, results=results)
+        return PushResponse(
+            success=success, failed=failed, results=results, stock_not_set=stock_not_set
+        )
     except HTTPException:
         raise
     except Exception as exc:
