@@ -38,9 +38,11 @@ import {
   UNPAID_PREVIEW_DETAIL,
   UNPAID_PREVIEW_TITLE,
   NEED_PLAN,
+  listingCopyIsPresent,
   listingCopyTagsAfterAdd,
   listingCopyTagsAfterRemove,
   productEditorShowsVariants,
+  productPageShopifyDecision,
   publicationIdsAfterToggle,
   shopifyProductStatus,
 } from "@/lib/product-editor-copy";
@@ -113,6 +115,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [inventoryQuantity, setInventoryQuantity] = useState(0);
   const [shopifyListingStatus, setShopifyListingStatus] = useState<"DRAFT" | "ACTIVE">("DRAFT");
   const [selectedPublicationIds, setSelectedPublicationIds] = useState<string[]>([]);
+  const [shopifyWritePending, setShopifyWritePending] = useState(false);
 
   const deleteImageMutation = useDeleteImage();
   const unlinkFromGroupMutation = useUnlinkFromGroup();
@@ -141,7 +144,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
   const imageId = image?.id;
-  const { data: shopifyPublications } = useShopifyPublications(imageId);
+  const {
+    data: shopifyPublications,
+    isLoading: publicationsLoading,
+  } = useShopifyPublications(imageId);
 
   // Fetch all images in the product group directly from the server
   const { data: groupImages } = useProductGroup(image?.id);
@@ -298,6 +304,30 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   };
   const shopGpsr = (shopifyStatus?.gpsrIdentity ?? null) as GpsrIdentity | null;
   const shopConnected = Boolean(shopifyStatus?.connected);
+  const shopifyDecision = productPageShopifyDecision({
+    lastSentStatus: shopifyPublications?.productStatus ?? null,
+    lastSentPublicationIds: (shopifyPublications?.publications ?? [])
+      .filter((publication) => publication.published)
+      .map((publication) => publication.id),
+    shopPublications: shopifyPublications?.publications ?? [],
+    pickedStatus: shopifyListingStatus,
+    pickedPublicationIds: selectedPublicationIds,
+    listingCopyPresent: listingCopyIsPresent({
+      title,
+      description,
+      tags,
+      seoTitle,
+      seoDescription,
+      aeoSnippet,
+      aeoFaqs,
+    }),
+    listingCopyStale: image.listingCopyStale,
+    factsConfirmed: image.mayGenerateListingCopy === true,
+    price,
+    shopConnected,
+    publicationsReady: shopifyPublications?.publicationsReady === true,
+    publicationsPending: shopConnected && publicationsLoading,
+  });
   const shopHasGpsr = isCompleteGpsr(shopGpsr);
 
   const gpsrConfirmFields = {
@@ -426,40 +456,85 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const normalizePickerFiles = (files: FileList | File[]) => filterImageLikeFiles(files);
 
+  const pageUpdates = (
+    status: "DRAFT" | "ACTIVE",
+    publicationIds: string[],
+  ) => ({
+    title,
+    description,
+    price,
+    category,
+    productType,
+    seoTitle,
+    seoDescription,
+    altText,
+    aeoSnippet,
+    compareAtPrice,
+    costPerItem,
+    sku,
+    barcode,
+    trackQuantity: trackQuantity.toString(),
+    inventoryQuantity,
+    tags,
+    aeoFaqs: aeoFaqs.map((f) => ({ question: f.q, answer: f.a })),
+    shopifyProductStatus: status,
+    shopifyPublicationIds: publicationIds,
+  });
+
   const handleSave = () => {
-    updateMutation.mutate(
-      {
-        id: image.id,
-        updates: {
-          title,
-          description,
-          price,
-          category,
-          productType,
-          seoTitle,
-          seoDescription,
-          altText,
-          aeoSnippet,
-          compareAtPrice,
-          costPerItem,
-          sku,
-          barcode,
-          trackQuantity: trackQuantity.toString(),
-          inventoryQuantity,
-          tags,
-          aeoFaqs: aeoFaqs.map((f) => ({ question: f.q, answer: f.a })),
-          shopifyProductStatus: shopifyListingStatus,
-          shopifyPublicationIds: selectedPublicationIds,
-        },
-      },
-    );
+    updateMutation.mutate({
+      id: image.id,
+      updates: pageUpdates(shopifyListingStatus, selectedPublicationIds),
+    });
   };
+
+  const persistThenPush = async (status: "DRAFT" | "ACTIVE", publicationIds: string[]) => {
+    setShopifyWritePending(true);
+    try {
+      const url = buildUrl(api.images.update.path, { id: image.id });
+      await apiRequest("PUT", url, pageUpdates(status, publicationIds));
+      await queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      setShopifyListingStatus(status);
+      setSelectedPublicationIds(publicationIds);
+    } catch (err: any) {
+      toast({
+        title: "Save failed",
+        description: err?.message || "The page was not saved, so nothing was sent to Shopify.",
+        variant: "destructive",
+      });
+      return;
+    } finally {
+      setShopifyWritePending(false);
+    }
+    pushToShopifyMutation.mutate({
+      ids: [image.id],
+      publicationIds,
+      productStatus: status,
+    });
+  };
+
+  const handleHeaderWrite = () => {
+    if (!shopifyDecision.headerCanSend) return;
+    if (shopifyDecision.header === "go-live") {
+      void persistThenPush(shopifyDecision.goLiveStatus, shopifyDecision.goLivePublicationIds);
+      return;
+    }
+    void persistThenPush(shopifyDecision.pushStatus, shopifyDecision.pushPublicationIds);
+  };
+
+  const handleQuieterPush = () => {
+    if (!shopifyDecision.pushCanSend) return;
+    void persistThenPush(shopifyDecision.pushStatus, shopifyDecision.pushPublicationIds);
+  };
+
+  const shopifyWriteBusy = shopifyWritePending || pushToShopifyMutation.isPending;
 
   return (
     <div className="h-screen bg-transparent flex flex-col overflow-hidden">
       {/* Action bar */}
       <div className="sticky top-0 z-30 bg-background border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 min-h-14 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
               <ArrowLeft className="w-4 h-4" />
@@ -475,7 +550,41 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>
+            <div className="flex flex-col items-end gap-0.5">
+              {shopifyDecision.headerReason && (
+                <p className="text-[10px] text-muted-foreground text-right max-w-xs leading-tight">
+                  {shopifyDecision.headerReason}
+                  {(shopifyDecision.headerReason === PRODUCT_EDITOR_SHOPIFY_CONNECT ||
+                    shopifyDecision.headerReason === PRODUCT_EDITOR_SHOPIFY_RECONNECT) && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={() => setLocation("/settings")}
+                      >
+                        Settings
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                data-testid="button-go-live"
+                onClick={handleHeaderWrite}
+                disabled={!shopifyDecision.headerCanSend || shopifyWriteBusy}
+              >
+                {shopifyWriteBusy ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Store className="w-3 h-3 mr-1" />
+                )}
+                {shopifyDecision.headerLabel}
+              </Button>
+            </div>
+            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending || shopifyWritePending}>
               {updateMutation.isPending ? (
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               ) : (
@@ -1530,28 +1639,28 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                         </div>
                       )}
                     </div>
+                    {shopifyDecision.pushReason &&
+                      shopifyDecision.pushReason !== PRODUCT_EDITOR_SHOPIFY_RECONNECT && (
+                        <p className="text-xs text-muted-foreground">{shopifyDecision.pushReason}</p>
+                      )}
                     <Button
                         variant="outline"
                         size="sm"
                         className="h-8 text-[11px] px-2.5"
-                        onClick={() =>
-                          pushToShopifyMutation.mutate({
-                            ids: [image.id],
-                            publicationIds: selectedPublicationIds,
-                            productStatus: shopifyListingStatus,
-                          })
-                        }
+                        data-testid="button-shopify-push"
+                        onClick={handleQuieterPush}
                         disabled={
-                          pushToShopifyMutation.isPending ||
+                          !shopifyDecision.pushCanSend ||
+                          shopifyWriteBusy ||
                           shopifyPublications?.publicationsReady !== true
                         }
                       >
-                        {pushToShopifyMutation.isPending ? (
+                        {shopifyWriteBusy ? (
                           <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                         ) : (
                           <Store className="w-3.5 h-3.5 mr-1.5" />
                         )}
-                        {image.shopifyStatus === "synced" ? "Sync updates to Shopify" : "Push to Shopify"}
+                        {shopifyDecision.pushLabel}
                       </Button>
                   </>
                 )}

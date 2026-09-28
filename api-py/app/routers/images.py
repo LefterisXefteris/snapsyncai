@@ -63,7 +63,15 @@ from app.services.product_facts import (
     merge_product_facts,
     stored_from_facts,
 )
-from app.services.shopify import push_product_to_shopify, shopify_product_status
+from app.services.shopify import (
+    list_shopify_publications,
+    online_store_publication_id,
+    price_greater_than_zero,
+    push_product_to_shopify,
+    shopify_product_status,
+)
+
+STOREFRONT_PRICE_REQUIRED = "This product needs a price greater than zero."
 
 logger = logging.getLogger(__name__)
 
@@ -694,6 +702,49 @@ def _is_db_connection_limit(error: Exception) -> bool:
     return "EMAXCONN" in message or "max client connections reached" in message
 
 
+def _push_status(body: PushIdsBody, image) -> str:
+    return shopify_product_status(
+        body.product_status if body.product_status is not None else image.shopify_product_status
+    )
+
+
+def _push_publication_ids(body: PushIdsBody, image) -> list[str]:
+    if body.publication_ids is not None:
+        return list(body.publication_ids)
+    return list(image.shopify_publication_ids or [])
+
+
+async def _storefront_price_refusal(body, images, connection, settings) -> JSONResponse | None:
+    """A write that leaves the product Active on the Online Store needs a price greater than zero."""
+    active = [image for image in images if _push_status(body, image) == "ACTIVE"]
+    if not active:
+        return None
+    try:
+        listed = await list_shopify_publications(connection, settings)
+    except Exception:
+        logger.exception("Shopify publications lookup failed before push")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": (
+                    "Reconnect Shopify in Settings to choose where this product is available."
+                )
+            },
+        )
+    online_store = online_store_publication_id(listed)
+    if online_store is None:
+        return None
+    missing_price = [
+        image
+        for image in active
+        if online_store in _push_publication_ids(body, image)
+        and not price_greater_than_zero(image.price)
+    ]
+    if not missing_price:
+        return None
+    return JSONResponse(status_code=400, content={"message": STOREFRONT_PRICE_REQUIRED})
+
+
 def _sort_group_by_media_gallery(group: list) -> None:
     source = next(
         (item for item in group if isinstance(item.media_gallery, list) and item.media_gallery),
@@ -751,6 +802,12 @@ async def push_to_shopify(
                 },
             )
 
+        price_refusal = await _storefront_price_refusal(
+            body, images_to_push, connection, settings
+        )
+        if price_refusal is not None:
+            return price_refusal
+
         all_user_images = await store.list_images(session, user_id)
         group_map: dict[str, list] = {}
         for img in all_user_images:
@@ -794,16 +851,8 @@ async def push_to_shopify(
             if result.get("shopify_product_id"):
                 from app.services.inventory.service import register_published_shopify_product
 
-                desired_ids = (
-                    body.publication_ids
-                    if body.publication_ids is not None
-                    else list(full_primary.shopify_publication_ids or [])
-                )
-                desired_status = shopify_product_status(
-                    body.product_status
-                    if body.product_status is not None
-                    else full_primary.shopify_product_status
-                )
+                desired_ids = _push_publication_ids(body, full_primary)
+                desired_status = _push_status(body, full_primary)
 
                 await register_published_shopify_product(
                     session,

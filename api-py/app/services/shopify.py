@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
@@ -120,6 +121,22 @@ def shopify_product_status(value: str | None) -> str:
     if (value or "").strip().upper() == "ACTIVE":
         return "ACTIVE"
     return "DRAFT"
+
+
+def price_greater_than_zero(value: Any) -> bool:
+    if value is None:
+        return False
+    try:
+        return Decimal(str(value)) > 0
+    except (InvalidOperation, ValueError):
+        return False
+
+
+def online_store_publication_id(publications: list[dict[str, str]]) -> str | None:
+    for publication in publications:
+        if publication.get("name") == "Online Store":
+            return publication.get("id")
+    return None
 
 
 def publication_changes(
