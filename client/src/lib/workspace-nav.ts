@@ -1,5 +1,6 @@
 export type WorkspaceNavId =
   | "products"
+  | "conversation"
   | "new-listing"
   | "import"
   | "inventory"
@@ -16,9 +17,15 @@ export type WorkspaceNavItem = {
 };
 
 export const WORKSPACE_HOME_PATH = "/";
+export const CONVERSATION_PATH = "/conversation";
+
+export function workspaceArrivalPath(shopConnected: boolean): string {
+  return shopConnected ? WORKSPACE_HOME_PATH : CONVERSATION_PATH;
+}
 
 export const WORKSPACE_NAV: WorkspaceNavItem[] = [
   { id: "products", label: "Products", path: "/", stub: false },
+  { id: "conversation", label: "Conversation", path: CONVERSATION_PATH, stub: false },
   { id: "new-listing", label: "New listing", path: "/new", stub: false },
   {
     id: "import",

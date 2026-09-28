@@ -1,0 +1,3 @@
+# The conversation uses the existing jobs
+
+The **conversation** starts Bulk SEO, listing copy refresh, an Inventory read, and a website handoff through the same operations the catalogue pages use. It does not push, adjust Inventory, generate the first listing copy, confirm facts, or go live. Connect stays the seller completing Shopify sign-in. **Silence** is saved on the shop with that dialogue. **Channel claim** stays the way a missing shop is opened, and it waits until Shopify grants that API; until then a seller with no shop is offered connect. We rejected a second set of job APIs, and we rejected letting the dialogue call every route the app already has.

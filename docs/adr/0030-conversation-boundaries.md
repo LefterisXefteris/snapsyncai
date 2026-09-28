@@ -1,0 +1,3 @@
+# Conversation boundaries
+
+Declining one **job offer** does not **silence** that job. A later offer may return while the reason is still true. A website handoff from the conversation is the same handoff as the website page: the seller writes the look, only products already pushed and already with listing copy can be named, confirm is explicit, and Lovable still receives no Shopify credentials. The conversation speaks about the Shopify shop. Wix and Vinted stay on their own screens. A **Channel claim** waits until the seller has confirmed a shop name and the email for their Shopify account. We rejected treating one “no” as silence, inventing the look, and opening a shop from a vague request.

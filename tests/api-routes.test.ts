@@ -73,6 +73,13 @@ test("Bulk SEO catalogue lives on /api/bulk-seo", () => {
   assert.equal(api.bulkSeo.accept.method, "POST");
 });
 
+test("Conversation lives on /api/conversation", () => {
+  assert.equal(api.conversation.read.path, "/api/conversation");
+  assert.equal(api.conversation.read.method, "GET");
+  assert.equal(api.conversation.post.path, "/api/conversation");
+  assert.equal(api.conversation.post.method, "POST");
+});
+
 test("Import lives on /api/import", () => {
   assert.equal(api.import.status.path, "/api/import");
   assert.equal(api.import.status.method, "GET");

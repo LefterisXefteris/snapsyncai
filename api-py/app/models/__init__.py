@@ -5,8 +5,9 @@ Importing this package registers every table on `SQLModel.metadata`, which is wh
 it and will propose dropping the table.
 """
 
-from app.models.billing import PaidSession, Subscription, UserCredits, AllowanceSpend
+from app.models.billing import AllowanceSpend, PaidSession, Subscription, UserCredits
 from app.models.connections import ShopifyConnection
+from app.models.conversation import ShopConversation
 from app.models.image import Image
 from app.models.inventory import (
     InventoryBundleComponent,
@@ -33,6 +34,7 @@ __all__ = [
     "InventorySettings",
     "InventoryWebhookEvent",
     "PaidSession",
+    "ShopConversation",
     "ShopifyConnection",
     "Subscription",
     "UserCredits",
