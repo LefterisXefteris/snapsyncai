@@ -119,7 +119,7 @@ function AuthenticatedLayout() {
   useIdlePreload();
 
   return (
-    <SidebarProvider className="min-h-svh" defaultOpen={false}>
+    <SidebarProvider className="min-h-svh">
       <AppSidebar />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden bg-transparent">
         <header className="flex h-12 items-center gap-2 px-2 md:hidden shrink-0">

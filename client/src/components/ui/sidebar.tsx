@@ -7,6 +7,7 @@ import { PanelLeftIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { sidebarStartsOpen } from "@/lib/sidebar-start"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -60,7 +61,6 @@ function useSidebar() {
 }
 
 function SidebarProvider({
-  defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
   className,
@@ -68,7 +68,6 @@ function SidebarProvider({
   children,
   ...props
 }: React.ComponentProps<"div"> & {
-  defaultOpen?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
@@ -77,7 +76,9 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(() => readSidebarCookie() ?? defaultOpen)
+  const [_open, _setOpen] = React.useState(() =>
+    sidebarStartsOpen({ saved: readSidebarCookie(), viewportWidth: window.innerWidth })
+  )
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -170,10 +171,6 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-  const [hovering, setHovering] = React.useState(false)
-  const iconCollapsed = collapsible === "icon" && state === "collapsed"
-  const overlay = iconCollapsed && hovering
-  const visualCollapsible = state === "collapsed" && !overlay ? collapsible : ""
 
   if (collapsible === "none") {
     return (
@@ -219,34 +216,26 @@ function Sidebar({
     <div
       className="group peer text-sidebar-foreground hidden md:block"
       data-state={state}
-      data-collapsible={visualCollapsible}
-      data-collapse-mode={collapsible}
+      data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
-      onMouseEnter={() => {
-        if (collapsible === "icon" && state === "collapsed") setHovering(true)
-      }}
-      onMouseLeave={() => setHovering(false)}
     >
-      {/* Gap follows the pinned state. Hover widens the panel over the page
-          without pushing the canvas. */}
       <div
         data-slot="sidebar-gap"
         className={cn(
           "relative w-[var(--sidebar-width)] bg-transparent transition-[width] duration-200 ease-linear",
+          "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
-          "group-data-[collapse-mode=offcanvas]:group-data-[state=collapsed]:w-0",
           variant === "floating" || variant === "inset"
-            ? "group-data-[collapse-mode=icon]:group-data-[state=collapsed]:w-[calc(var(--sidebar-width-icon)+var(--spacing-4))]"
-            : "group-data-[collapse-mode=icon]:group-data-[state=collapsed]:w-[var(--sidebar-width-icon)]"
+            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+var(--spacing-4))]"
+            : "group-data-[collapsible=icon]:w-[var(--sidebar-width-icon)]"
         )}
       />
       <div
         data-slot="sidebar-container"
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-[var(--sidebar-width)] transition-[left,right,width] duration-200 ease-linear md:flex",
-          overlay && "z-40 shadow-xl",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
