@@ -103,6 +103,11 @@
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
     font-family: var(--font-body);
+    /* Neutral and corner-only so it never tints a product photo. */
+    background-image:
+      radial-gradient(ellipse 45% 40% at 0% 0%, hsl(0 0% 100% / 0.06), transparent 70%),
+      radial-gradient(ellipse 40% 35% at 100% 100%, hsl(0 0% 100% / 0.04), transparent 70%);
+    background-attachment: fixed;
   }
 
   h1,
@@ -139,6 +144,32 @@
 
 .glass-card:hover {
   @apply border-foreground/25;
+}
+
+/* Frosted chrome: sidebar and page headers. Content surfaces stay flat. */
+.glass-chrome {
+  background-color: hsl(var(--background) / 0.6);
+  backdrop-filter: blur(24px);
+  border-color: hsl(0 0% 100% / 0.1);
+}
+
+/* Frosted overlays: dialogs, dropdowns, tooltips. */
+.glass-overlay {
+  background-color: hsl(var(--popover) / 0.8);
+  backdrop-filter: blur(24px);
+  border-color: hsl(0 0% 100% / 0.1);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-chrome {
+    background-color: hsl(var(--background));
+    backdrop-filter: none;
+  }
+
+  .glass-overlay {
+    background-color: hsl(var(--popover));
+    backdrop-filter: none;
+  }
 }
 
 .cv-auto {

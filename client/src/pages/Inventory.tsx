@@ -147,7 +147,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
   return (
     <div className="min-h-screen bg-transparent text-foreground pb-28">
-      <header className="h-16 px-5 md:px-8 flex items-center justify-between border-b border-border bg-background sticky top-0 z-30">
+      <header className="h-16 px-5 md:px-8 flex items-center justify-between border-b glass-chrome sticky top-0 z-30">
         <button onClick={() => navigate("/")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronRight className="w-4 h-4 rotate-180" />
           Workspace
