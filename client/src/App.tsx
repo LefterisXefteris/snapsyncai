@@ -167,7 +167,7 @@ function AuthenticatedLayout() {
   useIdlePreload();
 
   return (
-    <SidebarProvider className="min-h-svh" defaultOpen={false}>
+    <SidebarProvider className="min-h-svh">
       <AppSidebar />
       <ShopArrival />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden bg-transparent">
