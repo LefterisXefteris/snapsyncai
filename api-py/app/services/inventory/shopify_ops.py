@@ -1,7 +1,7 @@
 """Shopify Admin GraphQL used by Inventory Autopilot.
 
-Port of the inventory half of `server/shopifyAdmin.ts`. Product-create lives in
-`app.services.shopify`; identity lives in `app.services.shopify_admin`.
+Port of the inventory half of `server/shopifyAdmin.ts`. Product-create and shop
+identity live in `app.services.shopify`.
 """
 
 from __future__ import annotations
@@ -11,10 +11,8 @@ from typing import Any
 
 import httpx
 
-from app.config import Settings
-from app.models import ShopifyConnection
 from app.services.inventory.errors import InventoryError
-from app.services.shopify import shopify_graphql
+from app.services.shopify import ShopifyGraphQL
 
 _WEBHOOK_TOPICS = (
     "INVENTORY_LEVELS_UPDATE",
@@ -27,12 +25,8 @@ _WEBHOOK_TOPICS = (
 )
 
 
-async def get_shopify_locations(
-    connection: ShopifyConnection, settings: Settings
-) -> list[dict[str, Any]]:
-    data = await shopify_graphql(
-        connection,
-        settings,
+async def get_shopify_locations(graphql: ShopifyGraphQL) -> list[dict[str, Any]]:
+    data = await graphql(
         """
         query InventoryLocations {
           locations(first: 100, query: "active:true") {
@@ -45,9 +39,7 @@ async def get_shopify_locations(
     return [location for location in nodes if location.get("isActive")]
 
 
-async def start_shopify_catalog_bulk_import(
-    connection: ShopifyConnection, settings: Settings
-) -> dict[str, Any]:
+async def start_shopify_catalog_bulk_import(graphql: ShopifyGraphQL) -> dict[str, Any]:
     bulk_query = """{
     inventoryItems {
       id
@@ -66,9 +58,7 @@ async def start_shopify_catalog_bulk_import(
       }
     }
   }"""
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         mutation StartInventoryCatalogImport($query: String!) {
           bulkOperationRunQuery(query: $query) {
@@ -91,11 +81,9 @@ async def start_shopify_catalog_bulk_import(
 
 
 async def get_shopify_bulk_operation(
-    connection: ShopifyConnection, settings: Settings, operation_id: str
+    graphql: ShopifyGraphQL, operation_id: str
 ) -> dict[str, Any]:
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         query InventoryBulkOperation($id: ID!) {
           node(id: $id) {
@@ -125,14 +113,11 @@ async def download_bulk_jsonl(url: str) -> str:
 
 
 async def get_shopify_inventory_quantity(
-    connection: ShopifyConnection,
-    settings: Settings,
+    graphql: ShopifyGraphQL,
     inventory_item_id: str,
     location_id: str,
 ) -> int:
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         query CurrentInventoryQuantity($inventoryItemId: ID!, $locationId: ID!) {
           inventoryItem(id: $inventoryItemId) {
@@ -159,8 +144,7 @@ async def get_shopify_inventory_quantity(
 
 
 async def set_shopify_inventory_quantity(
-    connection: ShopifyConnection,
-    settings: Settings,
+    graphql: ShopifyGraphQL,
     *,
     inventory_item_id: str,
     location_id: str,
@@ -168,9 +152,7 @@ async def set_shopify_inventory_quantity(
     compare_quantity: int,
     idempotency_key: str,
 ) -> dict[str, Any] | None:
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         mutation SetInventoryQuantity(
           $input: InventorySetQuantitiesInput!, $idempotencyKey: String!
@@ -216,13 +198,11 @@ async def set_shopify_inventory_quantity(
 
 
 async def register_inventory_webhooks(
-    connection: ShopifyConnection, settings: Settings, callback_url: str
+    graphql: ShopifyGraphQL, callback_url: str
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for topic in _WEBHOOK_TOPICS:
-        data = await shopify_graphql(
-            connection,
-            settings,
+        data = await graphql(
             """
             mutation RegisterInventoryWebhook(
               $topic: WebhookSubscriptionTopic!,
@@ -250,11 +230,9 @@ async def register_inventory_webhooks(
 
 
 async def unregister_inventory_webhooks(
-    connection: ShopifyConnection, settings: Settings, callback_url: str
+    graphql: ShopifyGraphQL, callback_url: str
 ) -> list[str]:
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         query InventoryWebhookSubscriptions($uri: String!) {
           webhookSubscriptions(first: 100, uri: $uri) {
@@ -266,9 +244,7 @@ async def unregister_inventory_webhooks(
     )
     deleted: list[str] = []
     for subscription in ((data.get("webhookSubscriptions") or {}).get("nodes")) or []:
-        result = await shopify_graphql(
-            connection,
-            settings,
+        result = await graphql(
             """
             mutation DeleteInventoryWebhook($id: ID!) {
               webhookSubscriptionDelete(id: $id) {
@@ -290,8 +266,7 @@ async def unregister_inventory_webhooks(
 
 
 async def replace_shopify_bundle_components(
-    connection: ShopifyConnection,
-    settings: Settings,
+    graphql: ShopifyGraphQL,
     *,
     parent_variant_id: str,
     components: list[dict[str, Any]],
@@ -304,9 +279,7 @@ async def replace_shopify_bundle_components(
           }
         }
     """
-    remove_data = await shopify_graphql(
-        connection,
-        settings,
+    remove_data = await graphql(
         mutation,
         {
             "input": [
@@ -322,9 +295,7 @@ async def replace_shopify_bundle_components(
         raise InventoryError("; ".join(error.get("message", "") for error in remove_errors), 502)
     if not components:
         return
-    create_data = await shopify_graphql(
-        connection,
-        settings,
+    create_data = await graphql(
         mutation,
         {
             "input": [
@@ -344,17 +315,14 @@ async def replace_shopify_bundle_components(
 
 
 async def set_shopify_variant_inventory_policies(
-    connection: ShopifyConnection,
-    settings: Settings,
+    graphql: ShopifyGraphQL,
     *,
     product_id: str,
     variant_ids: list[str],
 ) -> None:
     if not variant_ids:
         return
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         mutation ProtectInventoryVariants(
           $productId: ID!, $variants: [ProductVariantsBulkInput!]!

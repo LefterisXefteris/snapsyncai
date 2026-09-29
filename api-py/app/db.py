@@ -8,7 +8,8 @@ percent-encoded, and handing SQLAlchemy a raw URL makes that a silent connection
 rather than an obvious one.
 """
 
-from collections.abc import AsyncGenerator
+import logging
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Annotated
 from urllib.parse import unquote, urlparse
 
@@ -22,6 +23,10 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.config import Settings, get_settings
+
+logger = logging.getLogger(__name__)
+
+_AFTER_COMMIT = "after_commit"
 
 
 def build_engine_url(database_url: str) -> URL:
@@ -76,6 +81,25 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
+def after_commit(
+    session: AsyncSession, key: str, run: Callable[[AsyncSession], Awaitable[None]]
+) -> None:
+    """Run `run` once after this session's work commits, never after a rollback. Same key, once."""
+    session.info.setdefault(_AFTER_COMMIT, {})[key] = run
+
+
+async def run_after_commit(session: AsyncSession) -> None:
+    """Each step commits on its own; a failed step is logged and does not undo the request."""
+    pending = session.info.pop(_AFTER_COMMIT, {})
+    for key, run in pending.items():
+        try:
+            await run(session)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            logger.exception("After-commit step %s failed", key)
+
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency yielding a session that commits on success."""
     get_engine()
@@ -87,6 +111,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+        await run_after_commit(session)
 
 
 async def dispose_engine() -> None:

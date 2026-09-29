@@ -29,6 +29,7 @@ from app.models.inventory import (
     InventorySettings,
     InventoryWebhookEvent,
 )
+from app.services.crypto import encrypt_shopify_token
 from app.services.inventory.core import (
     INVENTORY_GRACE_DAYS,
     calculate_adjusted_quantity,
@@ -47,7 +48,7 @@ from app.services.inventory.shopify_ops import (
     start_shopify_catalog_bulk_import,
     unregister_inventory_webhooks,
 )
-from app.services.shopify_crypto import encrypt_shopify_token
+from app.services.shopify import shopify_graphql_for
 from app.services.subscriptions import ACTIVE_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,9 @@ async def _update_subscription_grace(
     session.add(inventory_settings)
     try:
         connection = await get_connection_for_user(session, user_id)
-        await unregister_inventory_webhooks(connection, settings, webhook_callback_url(settings))
+        await unregister_inventory_webhooks(
+            shopify_graphql_for(connection, settings), webhook_callback_url(settings)
+        )
     except Exception as exc:
         logger.warning("Could not unregister expired inventory webhooks: %s", exc)
     return {"active": False, "grace": False, "expired": True}
@@ -190,7 +193,8 @@ async def list_inventory_locations(
     session: AsyncSession, settings: Settings, user_id: str
 ) -> list[dict[str, Any]]:
     await assert_inventory_access(session, settings, user_id)
-    return await get_shopify_locations(await get_connection_for_user(session, user_id), settings)
+    connection = await get_connection_for_user(session, user_id)
+    return await get_shopify_locations(shopify_graphql_for(connection, settings))
 
 
 async def enqueue_inventory_job(
@@ -216,7 +220,8 @@ async def start_inventory_setup(
 ) -> InventoryImportJob:
     await assert_inventory_access(session, settings, user_id, write=True)
     connection = await get_connection_for_user(session, user_id)
-    locations = await get_shopify_locations(connection, settings)
+    graphql = shopify_graphql_for(connection, settings)
+    locations = await get_shopify_locations(graphql)
     location = next(
         (candidate for candidate in locations if candidate.get("id") == location_id), None
     )
@@ -231,7 +236,7 @@ async def start_inventory_setup(
             connection.access_token = encrypted
             session.add(connection)
 
-    await register_inventory_webhooks(connection, settings, webhook_callback_url(settings))
+    await register_inventory_webhooks(graphql, webhook_callback_url(settings))
     connection.webhooks_registered_at = _now()
     session.add(connection)
 
@@ -267,7 +272,7 @@ async def start_inventory_setup(
     session.add(job)
     await session.flush()
     try:
-        operation = await start_shopify_catalog_bulk_import(connection, settings)
+        operation = await start_shopify_catalog_bulk_import(graphql)
         job.external_operation_id = operation["id"]
         job.status = "processing" if operation.get("status") == "COMPLETED" else "running"
         session.add(job)
@@ -714,8 +719,7 @@ async def upsert_inventory_bundle(
     parent = by_id[bundle_item_id]
     connection = await get_connection_for_user(session, user_id)
     await replace_shopify_bundle_components(
-        connection,
-        settings,
+        shopify_graphql_for(connection, settings),
         parent_variant_id=parent[1].external_variant_id,
         components=[
             {
@@ -761,8 +765,7 @@ async def delete_inventory_bundle(
         return False
     item, link = row
     await replace_shopify_bundle_components(
-        await get_connection_for_user(session, user_id),
-        settings,
+        shopify_graphql_for(await get_connection_for_user(session, user_id), settings),
         parent_variant_id=link.external_variant_id,
         components=[],
     )
@@ -999,7 +1002,9 @@ async def disable_inventory_for_user(
         return
     try:
         connection = await get_connection_for_user(session, user_id)
-        await unregister_inventory_webhooks(connection, settings, webhook_callback_url(settings))
+        await unregister_inventory_webhooks(
+            shopify_graphql_for(connection, settings), webhook_callback_url(settings)
+        )
     except Exception as exc:
         logger.warning("Could not unregister inventory webhooks during disconnect: %s", exc)
     await session.execute(

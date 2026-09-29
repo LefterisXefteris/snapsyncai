@@ -1,0 +1,5 @@
+# Go live puts the product on the Online Store
+
+The product page still defaults to Draft with nothing ticked ([0011](./0011-shopify-publications-on-the-product-page.md)), so a finished product stayed off the storefront until the seller found Active and Online Store. **Go live**, in the header beside Save, writes the page as it stands, sets Active, includes Online Store, and Push. Push and Sync send that same page. A write that leaves the product Active on the Online Store needs listing copy and a price greater than zero; a Draft push needs only listing copy. The first of those storefront writes sets the single tracked variant’s available stock, including zero, at the Inventory location or the shop’s only or first active location. Later Sync does not change that stock. Several variants, a missing location, or a failed stock write still go live, and the seller is told stock was not set. Catalogue bulk Push and products already on the Online Store stay as they are.
+
+We rejected changing the Draft default, hiding Go live until the page was complete, writing stock on every Sync, and copying one quantity onto every variant.

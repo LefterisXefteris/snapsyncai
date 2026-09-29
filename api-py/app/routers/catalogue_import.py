@@ -8,7 +8,6 @@ import httpx
 from fastapi import APIRouter, HTTPException, status
 
 from app.auth.clerk import CurrentUser
-from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.services import connections
@@ -20,6 +19,7 @@ from app.services.import_catalogue import (
     start_import,
 )
 from app.services.import_persist import persist_imported_product
+from app.services.shopify import ShopifyGraphQLForDep
 from app.services.shopify_import import list_shopify_channel_products
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ async def import_status(user_id: CurrentUser, session: SessionDep) -> ImportStat
 
 @router.post("/api/import/start", response_model=ImportStatusResponse)
 async def import_start(
-    user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+    user_id: CurrentUser, session: SessionDep, graphql_for: ShopifyGraphQLForDep
 ) -> ImportStatusResponse:
     connection = await connections.get_shopify(session, user_id)
     lock = RUNS.for_user(user_id)
@@ -96,6 +96,7 @@ async def import_start(
     if blocked:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocked)
     assert connection is not None
+    graphql = graphql_for(connection)
 
     async def existing_ids() -> list[str]:
         images = await store.list_images(session, user_id)
@@ -103,7 +104,7 @@ async def import_start(
 
     async def channel_products() -> list:
         try:
-            return await list_shopify_channel_products(connection, settings)
+            return await list_shopify_channel_products(graphql)
         except Exception as exc:
             logger.exception("Import could not list Channel products")
             raise HTTPException(

@@ -447,9 +447,9 @@ def test_refresh_http_returns_a_pack_from_demand(monkeypatch) -> None:
     from app.auth.clerk import DEV_USER_ID
     from app.config import get_settings
     from app.models.image import Image
-    from app.routers import images as images_router
     from app.services import connections
     from app.services import images as store
+    from app.services import listing_copy_propose as propose_module
     from app.services.product_facts import stored_from_facts
 
     photo = Image(
@@ -486,8 +486,8 @@ def test_refresh_http_returns_a_pack_from_demand(monkeypatch) -> None:
     monkeypatch.setattr(store, "get_image", fake_get)
     monkeypatch.setattr(store, "get_image_group", fake_group)
     monkeypatch.setattr(connections, "get_shopify", fake_shopify)
-    monkeypatch.setattr(images_router, "fetch_search_demand", fake_fetch)
-    monkeypatch.setattr(images_router, "propose_refresh_pack", fake_propose)
+    monkeypatch.setattr(propose_module, "fetch_search_demand", fake_fetch)
+    monkeypatch.setattr(propose_module, "propose_refresh_pack", fake_propose)
     client = _refresh_client(monkeypatch)
     try:
         response = client.post(f"/api/images/{photo.id}/listing-copy/refresh")

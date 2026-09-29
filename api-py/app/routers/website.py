@@ -1,7 +1,5 @@
 """Website prototype listing and Lovable handoff."""
 
-from dataclasses import replace
-
 from fastapi import APIRouter, HTTPException, status
 
 from app.auth.clerk import CurrentUser
@@ -10,14 +8,11 @@ from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.services import connections
 from app.services import images as store
-from app.services.plan_charge import authorize_plan_job, settle_plan_job
-from app.services.shopify import list_shopify_product_image_urls
 from app.services.website_handoff import (
-    HandoffError,
-    WebsiteProduct,
-    build_handoff,
     eligible_products,
+    hand_off_website,
     photos_from_images,
+    with_channel_photos,
 )
 
 router = APIRouter(tags=["website"])
@@ -47,30 +42,13 @@ class WebsiteHandoffResponse(CamelModel):
     product_count: int
 
 
-async def _with_channel_photos(
-    connection, settings, products: list[WebsiteProduct]
-) -> list[WebsiteProduct]:
-    if connection is None:
-        return products
-    filled: list[WebsiteProduct] = []
-    for product in products:
-        try:
-            urls = await list_shopify_product_image_urls(
-                connection, settings, product.shopify_product_id
-            )
-        except Exception:
-            urls = ()
-        filled.append(replace(product, photo_urls=urls) if urls else product)
-    return filled
-
-
 @router.get("/api/website/prototype", response_model=WebsitePrototypeResponse)
 async def website_prototype(
     user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> WebsitePrototypeResponse:
     connection = await connections.get_shopify(session, user_id)
     images = await store.list_images(session, user_id)
-    products = await _with_channel_photos(
+    products = await with_channel_photos(
         connection, settings, eligible_products(photos_from_images(images))
     )
     return WebsitePrototypeResponse(
@@ -88,43 +66,30 @@ async def website_prototype(
     )
 
 
+_HANDOFF_STATUS = {
+    "not_connected": status.HTTP_409_CONFLICT,
+    "plan_blocked": status.HTTP_403_FORBIDDEN,
+    "overflow_confirm": status.HTTP_403_FORBIDDEN,
+    "invalid": status.HTTP_400_BAD_REQUEST,
+}
+
+
 @router.post("/api/website/handoff", response_model=WebsiteHandoffResponse)
 async def website_handoff(
     body: WebsiteHandoffBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> WebsiteHandoffResponse:
-    connection = await connections.get_shopify(session, user_id)
-    if connection is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Shopify is not connected"
-        )
-    images = await store.list_images(session, user_id)
-    eligible = await _with_channel_photos(
-        connection, settings, eligible_products(photos_from_images(images))
-    )
-    wanted = set(body.product_ids)
-    selected = [product for product in eligible if product.id in wanted]
-    blocked = await authorize_plan_job(
+    result = await hand_off_website(
         session,
         settings,
         user_id,
-        "website_handoff",
+        look=body.look,
+        product_ids=body.product_ids,
         confirm_overflow=body.confirm_overflow,
-        completing=True,
     )
-    if blocked:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=blocked)
-    try:
-        result = build_handoff(
-            shop_domain=connection.shop_domain,
-            look=body.look,
-            products=selected,
-            shop_gpsr=connection.gpsr_identity if isinstance(connection.gpsr_identity, dict) else None,
+    if result.refused is not None or result.handoff is None:
+        raise HTTPException(
+            status_code=_HANDOFF_STATUS[result.refused or "invalid"], detail=result.message
         )
-    except HandoffError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    await settle_plan_job(
-        session, settings, user_id, "website_handoff", confirm_overflow=body.confirm_overflow
-    )
     return WebsiteHandoffResponse(
-        lovable_url=result.lovable_url, product_count=result.product_count
+        lovable_url=result.handoff.lovable_url, product_count=result.handoff.product_count
     )

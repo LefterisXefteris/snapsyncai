@@ -1,17 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
 import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
-
-const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
-
-function useAppUserId(): string | undefined {
-  if (DEV_BYPASS_AUTH) return "dev_local_user";
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { user } = useUser();
-  return user?.id;
-}
+import { useAppUserId } from "@/hooks/use-app-user-id";
 
 export type ConversationSilence = {
   offers: boolean;
@@ -71,8 +62,13 @@ export function useSendConversation() {
       const res = await apiRequest(api.conversation.post.method, api.conversation.post.path, body);
       return res.json() as Promise<ConversationView>;
     },
-    onSuccess: (view) => {
+    onSuccess: (view, body) => {
       queryClient.setQueryData([api.conversation.read.path, userId], view);
+      if (body.act?.kind === "accept" || body.act?.kind === "handoff") {
+        queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+        queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+        queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      }
     },
   });
 }

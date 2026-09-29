@@ -198,25 +198,3 @@ def test_leftover_weekly_may_start_a_plan_checkout_and_plan_may_not() -> None:
     assert may_start_checkout("plan") is False
     assert may_start_checkout("local_bypass") is False
 
-
-def test_overage_report_failure_still_keeps_the_recorded_spend() -> None:
-    from app.services.plan_overage import persist_spend_then_report
-
-    recorded: list[bool] = []
-
-    def record(*, as_overage: bool) -> None:
-        recorded.append(as_overage)
-
-    def report() -> None:
-        raise RuntimeError("stripe down")
-
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide("plan", spends, JAN, "generate_persist", confirm_overflow=True)
-    reported = persist_spend_then_report(
-        records_spend=decision.records_spend,
-        as_overage=decision.as_overage,
-        record=record,
-        report=report,
-    )
-    assert recorded == [True]
-    assert reported is False

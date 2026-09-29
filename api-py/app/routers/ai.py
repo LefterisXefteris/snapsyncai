@@ -43,7 +43,7 @@ from app.services.listing_copy_trace import (
     record_listing_copy_call,
 )
 from app.services.openai_client import get_openai
-from app.services.plan_charge import authorize_plan_job
+from app.services.plan_charge import may_start
 from app.services.product_facts import (
     PersistableVision,
     generation_blocked_reason,
@@ -486,7 +486,7 @@ async def generate_content(
     refused = _refuse_ungated_listing_copy(facts)
     if refused is not None:
         return refused
-    blocked = await authorize_plan_job(session, settings, user_id, "generate_persist")
+    blocked = await may_start(session, settings, user_id, "generate_persist")
     if blocked:
         return _message(403, blocked)
     buf = await store.load_image_bytes(image)
@@ -535,7 +535,7 @@ async def regenerate_field(
     refused = _refuse_ungated_listing_copy(facts)
     if refused is not None:
         return refused
-    blocked = await authorize_plan_job(session, settings, user_id, "generate_persist")
+    blocked = await may_start(session, settings, user_id, "generate_persist")
     if blocked:
         return _message(403, blocked)
     buf = await store.load_image_bytes(image)

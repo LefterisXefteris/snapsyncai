@@ -15,10 +15,9 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 import stripe
-from sqlalchemy import distinct, func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.types import String
 
 from app.auth.clerk import _client
 from app.config import Settings, get_settings
@@ -288,20 +287,6 @@ async def claim_paid_session(session: AsyncSession, checkout_session_id: str) ->
     return True
 
 
-async def get_weekly_product_count(session: AsyncSession, user_id: str) -> int:
-    week_start = get_week_start_utc()
-    result = await session.execute(
-        select(
-            func.count(distinct(func.coalesce(Image.product_group_id, func.cast(Image.id, String))))
-        ).where(
-            Image.session_id == user_id,
-            Image.payment_status == "paid",
-            Image.created_at >= week_start,
-        )
-    )
-    return int(result.scalar() or 0)
-
-
 async def get_or_create_weekly_subscription_price_id() -> str:
     """Plan monthly price. Name kept so checkout callers stay stable."""
     global _cached_weekly_price_id
@@ -450,13 +435,14 @@ def recurring_interval_of(stripe_sub) -> str | None:
     return str(interval) if interval else None
 
 
-def report_overage(customer_id: str) -> None:
+def report_overage(customer_id: str, *, idempotency_key: str) -> None:
     configure_stripe()
     stripe.InvoiceItem.create(
         customer=customer_id,
         amount=OVERAGE_PENCE,
         currency="gbp",
         description="Allowance overage",
+        idempotency_key=idempotency_key,
     )
 
 
@@ -478,7 +464,6 @@ __all__ = [
     "get_subscription",
     "get_subscription_by_stripe_id",
     "get_week_start_utc",
-    "get_weekly_product_count",
     "is_active_status",
     "is_dev_free_user",
     "is_local_pro",

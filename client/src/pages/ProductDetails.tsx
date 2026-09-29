@@ -533,7 +533,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   return (
     <div className="h-screen bg-transparent flex flex-col overflow-hidden">
       {/* Action bar */}
-      <div className="sticky top-0 z-30 bg-background border-b border-border">
+      <div className="sticky top-0 z-30 glass-chrome border-b">
         <div className="max-w-6xl mx-auto px-4 min-h-14 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">

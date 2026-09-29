@@ -3,17 +3,20 @@
 Seam: `app.services.website_handoff`.
 """
 
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import pytest
 
+from app.services import website_handoff
 from app.services.website_handoff import (
     HandoffError,
     WebsitePhoto,
     build_handoff,
     eligible_products,
+    hand_off_website,
     snapshot_product,
 )
+from tests import seed
 
 PUSHED = "gid://shopify/Product/99"
 
@@ -158,3 +161,45 @@ def test_handoff_refuses_without_eligible_products() -> None:
             look="",
             products=eligible_products([_photo(shopify_product_id=None)]),
         )
+
+
+CHANNEL_PHOTO = "https://cdn.shopify.com/tee-front.jpg"
+
+
+@pytest.fixture
+def channel_photos(monkeypatch) -> None:
+    async def urls(_graphql, _product_id):
+        return (CHANNEL_PHOTO,)
+
+    monkeypatch.setattr(website_handoff, "list_shopify_product_image_urls", urls)
+
+
+async def test_hand_off_sends_channel_photos_and_spends_one_use(
+    db, db_settings, channel_photos
+) -> None:
+    await seed.plan(db)
+    await seed.shop(db)
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    result = await hand_off_website(db, db_settings, seed.SELLER, look="", product_ids=[pid])
+    assert result.refused is None
+    assert result.spent is True
+    assert result.handoff.product_count == 1
+    assert CHANNEL_PHOTO in unquote(result.handoff.lovable_url)
+    assert [row.kind for row in await seed.spends(db)] == ["website_handoff"]
+
+
+async def test_hand_off_without_a_shop_spends_nothing(db, db_settings) -> None:
+    await seed.plan(db)
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    result = await hand_off_website(db, db_settings, seed.SELLER, look="", product_ids=[pid])
+    assert result.refused == "not_connected"
+    assert await seed.spends(db) == []
+
+
+async def test_hand_off_without_a_plan_spends_nothing(db, db_settings, channel_photos) -> None:
+    await seed.shop(db)
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    result = await hand_off_website(db, db_settings, seed.SELLER, look="", product_ids=[pid])
+    assert result.refused == "plan_blocked"
+    assert result.handoff is None
+    assert await seed.spends(db) == []

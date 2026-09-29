@@ -35,7 +35,7 @@ from app.services.plan import (
     view,
     workspace_origin,
 )
-from app.services.plan_charge import overflow_view
+from app.services.plan_charge import entitlement_for, overflow_view
 from app.services.plan_ledger import list_spends
 
 logger = logging.getLogger(__name__)
@@ -47,13 +47,7 @@ async def _plan_status(
     session, user_id: str, settings, sub
 ) -> SubscriptionStatusResponse:
     local = billing.is_local_pro(settings) or await billing.is_dev_free_user(user_id, settings)
-    active = sub is not None and billing.is_active_status(sub.status)
-    leftover = bool(
-        active and leftover_weekly_from_interval(sub.billing_interval if sub else None)
-    )
-    entitlement = entitlement_of(
-        local_pro=local, has_active_plan=active, leftover_weekly=leftover
-    )
+    entitlement = entitlement_for(sub, local=local)
     spends = await list_spends(session, user_id)
     snapshot = view(entitlement, spends, datetime.now(UTC))
     overflow_notice, overflow_confirm_required = await overflow_view(

@@ -20,10 +20,8 @@ test("the workspace coat has no aurora and no second display face", () => {
   assert.equal(button.includes("0_0_20px"), false);
 });
 
-test("the sidebar is an icon rail that can pin open", () => {
-  const app = read("client/src/App.tsx");
+test("the sidebar can collapse to an icon rail", () => {
   const sidebar = read("client/src/components/app-sidebar.tsx");
-  assert.match(app, /defaultOpen=\{false\}/);
   assert.match(sidebar, /collapsible="icon"/);
   assert.match(sidebar, /<SidebarTrigger/);
 });

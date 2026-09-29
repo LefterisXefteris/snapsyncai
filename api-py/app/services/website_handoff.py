@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Literal
 from urllib.parse import urlencode
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import Settings
+from app.services import connections
+from app.services import images as store
+from app.services.plan import NEED_OVERFLOW_CONFIRM
+from app.services.plan_charge import spend_when_landed
 from app.services.product_facts import facts_from_stored, listing_copy_present, stored_from_facts
+from app.services.shopify import list_shopify_product_image_urls, shopify_graphql_for
 from app.services.supabase_storage import channel_photo_url
 
 LOVABLE_BUILD_ORIGIN = "https://lovable.dev/"
@@ -241,3 +249,71 @@ def build_handoff(
     if "shpat_" in lowered or "shpss_" in lowered or "access_token" in lowered:
         raise HandoffError("Website handoff refused to include Shopify credentials")
     return WebsiteHandoff(lovable_url=url, product_count=len(products))
+
+
+async def with_channel_photos(
+    connection, settings: Settings, products: list[WebsiteProduct]
+) -> list[WebsiteProduct]:
+    if connection is None:
+        return products
+    graphql = shopify_graphql_for(connection, settings)
+    filled: list[WebsiteProduct] = []
+    for product in products:
+        try:
+            urls = await list_shopify_product_image_urls(graphql, product.shopify_product_id)
+        except Exception:
+            urls = ()
+        filled.append(replace(product, photo_urls=urls) if urls else product)
+    return filled
+
+
+HandoffRefused = Literal["not_connected", "plan_blocked", "overflow_confirm", "invalid"]
+
+
+@dataclass(frozen=True)
+class HandedOff:
+    handoff: WebsiteHandoff | None = None
+    spent: bool = False
+    refused: HandoffRefused | None = None
+    message: str | None = None
+
+
+async def hand_off_website(
+    session: AsyncSession,
+    settings: Settings,
+    user_id: str,
+    *,
+    look: str,
+    product_ids: Sequence[int],
+    confirm_overflow: bool = False,
+) -> HandedOff:
+    """The website page and the conversation both hand off here; one Allowance use when it lands."""
+    connection = await connections.get_shopify(session, user_id)
+    if connection is None:
+        return HandedOff(refused="not_connected", message="Shopify is not connected")
+    images = await store.list_images(session, user_id)
+    eligible = await with_channel_photos(
+        connection, settings, eligible_products(photos_from_images(images))
+    )
+    wanted = set(product_ids)
+    selected = [product for product in eligible if product.id in wanted]
+    identity = connection.gpsr_identity
+
+    async def build():
+        return build_handoff(
+            shop_domain=connection.shop_domain,
+            look=look,
+            products=selected,
+            shop_gpsr=identity if isinstance(identity, dict) else None,
+        )
+
+    try:
+        landed = await spend_when_landed(
+            session, settings, user_id, "website_handoff", build, confirm_overflow=confirm_overflow
+        )
+    except HandoffError as exc:
+        return HandedOff(refused="invalid", message=str(exc))
+    if landed.refused:
+        refused = "overflow_confirm" if landed.refused == NEED_OVERFLOW_CONFIRM else "plan_blocked"
+        return HandedOff(refused=refused, message=landed.refused)
+    return HandedOff(handoff=landed.result, spent=landed.spent)

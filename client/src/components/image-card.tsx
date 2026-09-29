@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDeleteImage, useDeleteProduct } from "@/hooks/use-images";
 import { api, buildUrl } from "@/lib/api-routes";
-import { apiFetch } from "@/lib/api-fetch";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { AuthenticatedImg } from "@/components/authenticated-img";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ interface ImageCardProps {
 export const ImageCard = memo(function ImageCard({ image, views = [], index, selected, highlighted = false, analyzing = false, onSelect }: ImageCardProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const deleteMutation = useDeleteImage();
   const deleteProductMutation = useDeleteProduct();
 
@@ -67,15 +69,19 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
     const cleaned = draftPrice.replace(/[^0-9.]/g, "");
     if (cleaned === String(image.price)) { setEditingPrice(false); return; }
     try {
-      await apiFetch(buildUrl(api.images.update.path, { id: image.id }), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ price: cleaned || null }),
+      await apiRequest("PUT", buildUrl(api.images.update.path, { id: image.id }), {
+        price: cleaned || null,
       });
       queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
-    } catch { /* silent */ }
+    } catch (error) {
+      toast({
+        title: "Price not saved",
+        description: error instanceof Error ? error.message : "Update failed",
+        variant: "destructive",
+      });
+    }
     setEditingPrice(false);
   };
 

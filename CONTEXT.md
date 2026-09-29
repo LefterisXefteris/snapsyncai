@@ -28,6 +28,10 @@ _Avoid_: suggestion, agent nudge, autopilot
 Where this product is available inside a connected Shopify shop — Online Store, Point of Sale, Shop, and other sales apps on that shop. Not a Channel.
 _Avoid_: Channel, sales channel (as SnapSync language), available channels
 
+**Push**:
+Sending the product page as it stands to the seller’s Shopify shop — listing copy, price, photos, status, and publications. Go live and Sync are Pushes; catalogue bulk Push sends several products at once.
+_Avoid_: publish, upload, export
+
 **Go live**:
 The seller’s choice, on the product page, to put this product on the Online Store as Active, once listing copy exists and the price is greater than zero. It is a Push with that status and that publication. Other publications already chosen stay chosen. On a single tracked variant it also sets that variant’s available stock, including zero.
 _Avoid_: production, publish, make live, push production
@@ -63,6 +67,10 @@ _Avoid_: SEO (alone), Agentic SEO, SEO agent
 **Listing copy refresh**:
 The job of proposing new tags, description, SEO title, and meta description for one product after looking at search demand. The seller starts it and accepts; it is not the first generate, not Bulk SEO, and it does not run when listing copy is missing or stale.
 _Avoid_: Agentic SEO, SEO agent, trend rewrite, competitor SEO
+
+**Accept**:
+The seller's explicit choice to keep proposed listing copy for one product. It saves that copy, spends one Allowance use when the write lands (not when stale listing copy is regenerated), and does not Push. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page, the Bulk SEO page, or the conversation.
+_Avoid_: approve, apply, save (as the seller act)
 
 **Search demand**:
 Queries people type for this kind of product, from a query source — not the model’s guesses — and this shop’s performance when it exists. Not fashion-season media and not other sellers’ listings.
