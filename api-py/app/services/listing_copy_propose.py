@@ -27,7 +27,6 @@ from app.services.bulk_seo import Pack, PackItem, photos_from_images, regenerate
 from app.services.listing_copy_accept import PRODUCT_NOT_FOUND
 from app.services.listing_copy_refresh import (
     REFRESH_PROPOSAL_SYSTEM,
-    listing_copy_from_image,
     parse_refresh_proposal,
     refresh_blocked_reason,
     rewrite_constraints,
@@ -197,8 +196,9 @@ async def propose_refresh(
     loaded = await product.load(session, user_id, product_id)
     if loaded is None:
         return Proposed(refused="not_found", message=PRODUCT_NOT_FOUND)
-    image, facts, shop_gpsr = loaded.photo, loaded.facts, loaded.shop_gpsr
-    listing_copy = listing_copy_from_image(image)
+    image, facts, shop_gpsr, listing_copy = (
+        loaded.photo, loaded.facts, loaded.shop_gpsr, loaded.listing_copy
+    )
     configured = _demand_configured(settings)
     blocked = refresh_blocked_reason(facts, listing_copy, configured)
     if blocked:

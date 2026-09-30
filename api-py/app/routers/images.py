@@ -55,11 +55,12 @@ def _catalogue_payload(items: list[ImageListOut]) -> list[dict]:
     ]
 
 
-def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False):
+def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False, photos=()):
     return with_facts_outcomes(
         image,
         shop_gpsr,
         list_item=list_item,
+        photos=photos,
         demand_configured=search_demand_configured(
             settings.search_demand_api_key,
             settings.search_demand_url,
@@ -79,7 +80,14 @@ async def list_images(
         rows = await store.list_images(session, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch images") from None
-    items = [_image_out(row, settings, list_item=True) for row in rows]
+    groups: dict[str, list] = {}
+    for row in rows:
+        if row.product_group_id:
+            groups.setdefault(row.product_group_id, []).append(row)
+    items = [
+        _image_out(row, settings, list_item=True, photos=groups.get(row.product_group_id, ()))
+        for row in rows
+    ]
     await catalogue_cache.put(user_id, _catalogue_payload(items))
     return items
 
@@ -96,7 +104,7 @@ async def get_group(
         rows = await store.get_image_group(session, image_id, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch product group") from None
-    return [_image_out(row, settings, list_item=True) for row in rows]
+    return [_image_out(row, settings, list_item=True, photos=rows) for row in rows]
 
 
 @router.post("/api/images/{image_id}/unlink-from-group", response_model=OkResponse)

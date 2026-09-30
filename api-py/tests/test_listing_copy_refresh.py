@@ -4,8 +4,10 @@ The HTTP tests map each propose and accept outcome to its status; the rules behi
 are tested in `test_listing_copy_propose.py` and `test_listing_copy_accept.py`.
 """
 
+import httpx
 import pytest
 
+from app.config import get_settings
 from app.services import listing_copy_propose
 from app.services.listing_copy_refresh import (
     accept_listing_copy_refresh,
@@ -435,6 +437,27 @@ async def test_refresh_http_returns_the_proposal_and_queries(db, api, settings, 
 
     assert response.status_code == 200
     assert response.json() == {**PROPOSAL, "queries": ["cotton t-shirt"]}
+
+
+async def test_catalogue_offers_refresh_on_a_photo_whose_sibling_has_listing_copy(
+    db, seller_app, settings
+) -> None:
+    front = await seed.product(db, facts=seed.confirmed_facts(), product_group_id="tee")
+    back = await seed.product(
+        db, facts=seed.confirmed_facts(), listed=False, product_group_id="tee"
+    )
+    standalone = await seed.product(db, facts=seed.confirmed_facts(), listed=False)
+    seller_app.dependency_overrides[get_settings] = lambda: settings
+    transport = httpx.ASGITransport(app=seller_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/images")
+
+    by_id = {item["id"]: item for item in response.json()}
+    assert by_id[front]["mayRefreshListingCopy"] is True
+    assert by_id[back]["mayRefreshListingCopy"] is True
+    assert by_id[standalone]["refreshBlockedReason"] == (
+        "Generate listing copy before refreshing from search demand."
+    )
 
 
 async def test_refresh_http_is_a_conflict_while_blocked(db, api, settings) -> None:
