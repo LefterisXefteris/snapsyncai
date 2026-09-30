@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,15 @@ import { AmbientProvider } from "@/components/ambient/AmbientProvider";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { lazy, Suspense, useEffect, useRef } from "react";
+import { useShopifyStatus } from "@/hooks/use-images";
+import { useToast } from "@/hooks/use-toast";
+import {
+  clearConnectFrom,
+  readWorkspaceChoice,
+  rememberWorkspaceChoice,
+  shopifyConnectNotice,
+  workspaceArrival,
+} from "@/lib/workspace-arrival";
 
 // Route-level code splitting: each page ships as its own chunk so the
 // initial bundle stays small and loads fast.
@@ -20,6 +29,7 @@ const ImportPage = lazy(() => import("@/pages/Import"));
 const InventoryPage = lazy(() => import("@/pages/Inventory"));
 const WebsitePage = lazy(() => import("@/pages/Website"));
 const BulkSeoPage = lazy(() => import("@/pages/BulkSeo"));
+const ConversationPage = lazy(() => import("@/pages/Conversation"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Landing = lazy(() => import("@/pages/Landing"));
 const ProductDetails = lazy(() => import("@/pages/ProductDetails"));
@@ -72,6 +82,7 @@ function AuthenticatedRouter() {
       <Route path="/inventory" component={InventoryPage} />
       <Route path="/website" component={WebsitePage} />
       <Route path="/bulk-seo" component={BulkSeoPage} />
+      <Route path="/conversation" component={ConversationPage} />
       <Route path="/settings" component={Settings} />
       <Route path="/product/:id" component={ProductDetails} />
       <Route component={NotFound} />
@@ -115,12 +126,50 @@ function useIdlePreload() {
   }, []);
 }
 
+function ShopArrival() {
+  const shopify = useShopifyStatus();
+  const { toast } = useToast();
+  const [pathname, setLocation] = useLocation();
+  const toldConnect = useRef<string | null>(null);
+  useEffect(() => {
+    if (!shopify.isSuccess) return;
+    const choice = readWorkspaceChoice();
+    const search = window.location.search;
+    const arrival = workspaceArrival({
+      shopConnected: shopify.data?.connected === true,
+      pathname,
+      search,
+      chosenPath: choice.chosenPath,
+      connectFrom: choice.connectFrom,
+    });
+    const destination = arrival.path.split("?")[0];
+    if (destination !== pathname) {
+      setLocation(arrival.path);
+      return;
+    }
+    rememberWorkspaceChoice(arrival.chosenPath);
+    if (arrival.clearConnectFrom) clearConnectFrom();
+    const notice = shopifyConnectNotice(search);
+    if (notice && toldConnect.current !== search) {
+      toldConnect.current = search;
+      toast(notice);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("shopify");
+      url.searchParams.delete("reason");
+      const next = `${url.pathname}${url.search}`;
+      window.history.replaceState({}, "", next);
+    }
+  }, [shopify.isSuccess, shopify.data, pathname, setLocation, toast]);
+  return null;
+}
+
 function AuthenticatedLayout() {
   useIdlePreload();
 
   return (
     <SidebarProvider className="min-h-svh">
       <AppSidebar />
+      <ShopArrival />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden bg-transparent">
         <header className="flex h-12 items-center gap-2 px-2 md:hidden shrink-0">
           <SidebarTrigger />

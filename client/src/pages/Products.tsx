@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
 import { BrainCircuit, CheckSquare, ImagePlus, Loader2, Store } from "lucide-react";
 import { useImages, usePushToShopify, useShopifyStatus, useVerifySubscription } from "@/hooks/use-images";
 import { ImageCard } from "@/components/image-card";
@@ -16,7 +15,6 @@ import { workspaceNavItem } from "@/lib/workspace-nav";
 export default function Products() {
   const { data: images, isLoading } = useImages();
   const { data: shopifyStatus } = useShopifyStatus();
-  const queryClient = useQueryClient();
   const pushToShopify = usePushToShopify();
   const verifySubscription = useVerifySubscription();
   const { toast } = useToast();
@@ -37,26 +35,6 @@ export default function Products() {
       toast({
         title: "Subscription Cancelled",
         description: "Your subscription checkout was cancelled. You can try again.",
-        variant: "destructive",
-      });
-      window.history.replaceState({}, "", "/");
-    } else if (params.get("shopify") === "connected") {
-      queryClient.invalidateQueries({ queryKey: ["/api/shopify/status"] });
-      toast({ title: "Shopify Connected", description: "Your Shopify store is ready to receive products." });
-      window.history.replaceState({}, "", "/");
-    } else if (params.get("shopify") === "error") {
-      const reason = params.get("reason");
-      const messages: Record<string, string> = {
-        invalid_shop: "Shopify sent an invalid shop domain. Please try connecting again.",
-        invalid_hmac: "Shopify callback verification failed. Check the app callback URL and API secret.",
-        missing_write_products: "SnapSync AI needs Shopify's write_products permission to create draft products.",
-        missing_inventory_scopes: "Reconnect Shopify and approve product, inventory, and location access.",
-        token_exchange_failed: "Shopify authorization succeeded, but SnapSync AI could not exchange the code for an access token.",
-        not_configured: "Shopify OAuth is not configured for this deployment.",
-      };
-      toast({
-        title: "Shopify Connection Failed",
-        description: messages[reason || ""] || "Shopify could not be connected. Please try again.",
         variant: "destructive",
       });
       window.history.replaceState({}, "", "/");

@@ -59,6 +59,7 @@ from app.services.inventory.shopify_ops import (
     set_shopify_variant_inventory_policies,
     start_shopify_catalog_bulk_import,
 )
+from app.services.shopify import shopify_graphql_for
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,9 @@ async def finish_catalog_import(
     if not inventory_settings:
         raise InventoryError("Inventory settings were not found", 404)
 
-    operation = await get_shopify_bulk_operation(connection, settings, job.external_operation_id)
+    operation = await get_shopify_bulk_operation(
+        shopify_graphql_for(connection, settings), job.external_operation_id
+    )
     if operation.get("status") != "COMPLETED":
         if operation.get("status") in {"FAILED", "CANCELED", "EXPIRED"}:
             raise InventoryError(
@@ -328,7 +331,7 @@ async def start_webhook_catalog_refresh(
     await session.flush()
     try:
         operation = await start_shopify_catalog_bulk_import(
-            await get_connection_for_user(session, user_id), settings
+            shopify_graphql_for(await get_connection_for_user(session, user_id), settings)
         )
         job.external_operation_id = operation["id"]
         job.status = "processing" if operation.get("status") == "COMPLETED" else "running"
@@ -422,11 +425,11 @@ async def sync_inventory_item_unlocked(
     link.updated_at = _now()
     session.add(link)
     compare_quantity = link.observed_quantity
+    graphql = shopify_graphql_for(connection, settings)
     for attempt in range(3):
         try:
             await set_shopify_inventory_quantity(
-                connection,
-                settings,
+                graphql,
                 inventory_item_id=link.external_inventory_item_id,
                 location_id=link.external_location_id,
                 quantity=target,
@@ -491,8 +494,7 @@ async def sync_inventory_item_unlocked(
                 )
                 raise
             latest_quantity = await get_shopify_inventory_quantity(
-                connection,
-                settings,
+                graphql,
                 link.external_inventory_item_id,
                 link.external_location_id,
             )
@@ -763,10 +765,10 @@ async def protect_variant_policies(
     by_product: dict[str, list[str]] = {}
     for link in links:
         by_product.setdefault(link.external_product_id, []).append(link.external_variant_id)
-    connection = await get_connection_for_user(session, user_id)
+    graphql = shopify_graphql_for(await get_connection_for_user(session, user_id), settings)
     for product_id, variant_ids in by_product.items():
         await set_shopify_variant_inventory_policies(
-            connection, settings, product_id=product_id, variant_ids=variant_ids
+            graphql, product_id=product_id, variant_ids=variant_ids
         )
     if len(links) == 100:
         await enqueue_inventory_job(

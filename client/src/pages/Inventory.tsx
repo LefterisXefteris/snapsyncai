@@ -35,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiUrl } from "@/lib/api-origin";
 import { api } from "@/lib/api-routes";
+import { rememberConnectFrom } from "@/lib/workspace-arrival";
 import { useShopifyStatus } from "@/hooks/use-images";
 import {
   type InventoryItemDto,
@@ -95,6 +96,7 @@ export default function Inventory() {
     if (!shopify.isLoading && !shopify.data?.inventoryReady) {
       const reconnect = () => {
         if (shopify.data?.shopDomain) {
+          rememberConnectFrom(window.location.pathname);
           const params = new URLSearchParams({ shop: shopify.data.shopDomain });
           window.location.assign(`${apiUrl(api.shopify.oauthStart.path)}?${params.toString()}`);
         } else {

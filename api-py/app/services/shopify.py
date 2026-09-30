@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Annotated, Any, Protocol
 
 import httpx
+from fastapi import Depends
 
-from app.config import Settings
+from app.config import Settings, SettingsDep
 from app.models import ShopifyConnection
 from app.services.crypto import decrypt_shopify_token
 from app.services.supabase_storage import media_original_source
@@ -19,69 +21,116 @@ logger = logging.getLogger(__name__)
 SHOPIFY_API_VERSION = "2026-07"
 
 
-def _token(connection: ShopifyConnection, settings: Settings) -> str:
+def _token(access_token: str, settings: Settings) -> str:
     secret = settings.connection_encryption_key
     if not secret:
-        if connection.access_token.startswith("enc:v1:"):
+        if access_token.startswith("enc:v1:"):
             raise RuntimeError(
                 "CONNECTION_ENCRYPTION_KEY is required to decrypt Shopify credentials"
             )
-        return connection.access_token
-    return decrypt_shopify_token(connection.access_token, secret)
+        return access_token
+    return decrypt_shopify_token(access_token, secret)
 
 
-async def shopify_graphql(
-    connection: ShopifyConnection,
-    settings: Settings,
-    query: str,
-    variables: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    token = _token(connection, settings)
-    endpoint = f"https://{connection.shop_domain}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
-    payload = {"query": query, "variables": variables or {}}
+class ShopifyGraphQL(Protocol):
+    async def __call__(
+        self, query: str, variables: dict[str, Any] | None = None
+    ) -> dict[str, Any]: ...
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        for attempt in range(3):
-            response = await client.post(
-                endpoint,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Shopify-Access-Token": token,
-                },
-                json=payload,
-            )
-            if response.status_code == 429 or response.status_code >= 500:
-                if attempt == 2:
-                    raise RuntimeError(
-                        f"Shopify GraphQL request failed with {response.status_code}"
-                    )
-                retry_after = float(response.headers.get("retry-after") or 0)
-                await asyncio.sleep(retry_after if retry_after > 0 else 0.25 * (2**attempt))
-                continue
 
-            body = response.json()
-            errors = body.get("errors") or []
-            if not response.is_success or errors:
-                message = "; ".join(e.get("message", "") for e in errors if e.get("message"))
-                raise RuntimeError(
-                    message or f"Shopify GraphQL request failed with {response.status_code}"
+def shopify_graphql_at(shop_domain: str, access_token: str, settings: Settings) -> ShopifyGraphQL:
+    """`access_token` may be stored (`enc:v1:`) or plain, as fresh from OAuth."""
+
+    async def graphql(query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        token = _token(access_token, settings)
+        endpoint = f"https://{shop_domain}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+        payload = {"query": query, "variables": variables or {}}
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            for attempt in range(3):
+                response = await client.post(
+                    endpoint,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Shopify-Access-Token": token,
+                    },
+                    json=payload,
                 )
-            data = body.get("data")
-            if not data:
-                raise RuntimeError("Shopify returned an empty GraphQL response")
-            return data
+                if response.status_code == 429 or response.status_code >= 500:
+                    if attempt == 2:
+                        raise RuntimeError(
+                            f"Shopify GraphQL request failed with {response.status_code}"
+                        )
+                    retry_after = float(response.headers.get("retry-after") or 0)
+                    await asyncio.sleep(retry_after if retry_after > 0 else 0.25 * (2**attempt))
+                    continue
 
-    raise RuntimeError("Shopify GraphQL request exhausted retries")
+                body = response.json()
+                errors = body.get("errors") or []
+                if not response.is_success or errors:
+                    message = "; ".join(e.get("message", "") for e in errors if e.get("message"))
+                    raise RuntimeError(
+                        message or f"Shopify GraphQL request failed with {response.status_code}"
+                    )
+                data = body.get("data")
+                if not data:
+                    raise RuntimeError("Shopify returned an empty GraphQL response")
+                return data
+
+        raise RuntimeError("Shopify GraphQL request exhausted retries")
+
+    return graphql
+
+
+def shopify_graphql_for(connection: ShopifyConnection, settings: Settings) -> ShopifyGraphQL:
+    return shopify_graphql_at(connection.shop_domain, connection.access_token, settings)
+
+
+ShopifyGraphQLFor = Callable[[ShopifyConnection], ShopifyGraphQL]
+
+
+def get_shopify_graphql_for(settings: SettingsDep) -> ShopifyGraphQLFor:
+    return lambda connection: shopify_graphql_for(connection, settings)
+
+
+ShopifyGraphQLForDep = Annotated[ShopifyGraphQLFor, Depends(get_shopify_graphql_for)]
+
+# OAuth connect has a shop domain and token but no connection row yet.
+ShopifyGraphQLAt = Callable[[str, str], ShopifyGraphQL]
+
+
+def get_shopify_graphql_at(settings: SettingsDep) -> ShopifyGraphQLAt:
+    return lambda shop_domain, access_token: shopify_graphql_at(
+        shop_domain, access_token, settings
+    )
+
+
+ShopifyGraphQLAtDep = Annotated[ShopifyGraphQLAt, Depends(get_shopify_graphql_at)]
+
+
+async def get_shopify_shop_identity(graphql: ShopifyGraphQL) -> dict[str, Any]:
+    data = await graphql(
+        """
+        query SnapSyncShopIdentity {
+          shop { name }
+          currentAppInstallation {
+            accessScopes { handle }
+          }
+        }
+        """,
+    )
+    installation = data.get("currentAppInstallation") or {}
+    scopes = installation.get("accessScopes") or []
+    return {
+        "name": (data.get("shop") or {}).get("name"),
+        "granted_scopes": [scope.get("handle") for scope in scopes if scope.get("handle")],
+    }
 
 
 async def list_shopify_product_image_urls(
-    connection: ShopifyConnection,
-    settings: Settings,
-    product_id: str,
+    graphql: ShopifyGraphQL, product_id: str
 ) -> tuple[str, ...]:
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         query SnapSyncProductMedia($id: ID!) {
           product(id: $id) {
@@ -164,12 +213,8 @@ def _publication_nodes(data: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-async def list_shopify_publications(
-    connection: ShopifyConnection, settings: Settings
-) -> list[dict[str, str]]:
-    data = await shopify_graphql(
-        connection,
-        settings,
+async def list_shopify_publications(graphql: ShopifyGraphQL) -> list[dict[str, str]]:
+    data = await graphql(
         """
         query SnapSyncPublications {
           publications(first: 50) {
@@ -188,12 +233,8 @@ async def list_shopify_publications(
     ]
 
 
-async def product_publishing(
-    connection: ShopifyConnection, settings: Settings, product_id: str
-) -> tuple[str, set[str]]:
-    data = await shopify_graphql(
-        connection,
-        settings,
+async def product_publishing(graphql: ShopifyGraphQL, product_id: str) -> tuple[str, set[str]]:
+    data = await graphql(
         """
         query SnapSyncProductPublishing($id: ID!) {
           product(id: $id) {
@@ -223,17 +264,14 @@ async def product_publishing(
 
 
 async def apply_shopify_publications(
-    connection: ShopifyConnection,
-    settings: Settings,
+    graphql: ShopifyGraphQL,
     product_id: str,
     desired_ids: list[str],
 ) -> None:
-    _status, current = await product_publishing(connection, settings, product_id)
+    _status, current = await product_publishing(graphql, product_id)
     to_publish, to_unpublish = publication_changes(set(desired_ids), current)
     if to_publish:
-        data = await shopify_graphql(
-            connection,
-            settings,
+        data = await graphql(
             """
             mutation SnapSyncPublish($id: ID!, $input: [PublicationInput!]!) {
               publishablePublish(id: $id, input: $input) {
@@ -250,9 +288,7 @@ async def apply_shopify_publications(
         if errors:
             raise RuntimeError("; ".join(e.get("message") or "" for e in errors))
     if to_unpublish:
-        data = await shopify_graphql(
-            connection,
-            settings,
+        data = await graphql(
             """
             mutation SnapSyncUnpublish($id: ID!, $input: [PublicationInput!]!) {
               publishableUnpublish(id: $id, input: $input) {
@@ -272,11 +308,12 @@ async def apply_shopify_publications(
 
 
 async def create_shopify_product(
-    connection: ShopifyConnection,
+    graphql: ShopifyGraphQL,
     settings: Settings,
     image: Any,
     view_images: list[Any] | None = None,
     *,
+    granted_scopes: list[str],
     publication_ids: list[str] | None = None,
     product_status: str | None = None,
 ) -> dict[str, Any]:
@@ -354,9 +391,7 @@ async def create_shopify_product(
         ],
     })
 
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         mutation CreateSnapSyncProduct($productSet: ProductSetInput!) {
           productSet(synchronous: true, input: $productSet) {
@@ -392,9 +427,7 @@ async def create_shopify_product(
                 }
             )
     if media:
-        media_data = await shopify_graphql(
-            connection,
-            settings,
+        media_data = await graphql(
             """
             mutation AddSnapSyncProductMedia($productId: ID!, $media: [CreateMediaInput!]!) {
               productCreateMedia(productId: $productId, media: $media) {
@@ -415,24 +448,20 @@ async def create_shopify_product(
         if publication_ids is not None
         else list(getattr(image, "shopify_publication_ids", None) or [])
     )
-    granted = connection.granted_scopes or []
-    if all(scope in granted for scope in ("read_publications", "write_publications")):
-        await apply_shopify_publications(connection, settings, product["id"], desired_ids)
+    if all(scope in granted_scopes for scope in ("read_publications", "write_publications")):
+        await apply_shopify_publications(graphql, product["id"], desired_ids)
     return product
 
 
 async def set_storefront_available_stock(
-    connection: ShopifyConnection,
-    settings: Settings,
+    graphql: ShopifyGraphQL,
     *,
     inventory_item_id: str,
     location_id: str,
     quantity: int,
 ) -> None:
     """Set one variant's available stock to the page quantity. Skips compare-and-swap."""
-    data = await shopify_graphql(
-        connection,
-        settings,
+    data = await graphql(
         """
         mutation SetStorefrontAvailable(
           $input: InventorySetQuantitiesInput!, $idempotencyKey: String!
@@ -468,19 +497,21 @@ async def set_storefront_available_stock(
 
 async def push_product_to_shopify(
     image: Any,
-    connection: ShopifyConnection,
+    graphql: ShopifyGraphQL,
     settings: Settings,
     view_images: list[Any] | None = None,
     *,
+    granted_scopes: list[str],
     publication_ids: list[str] | None = None,
     product_status: str | None = None,
 ) -> dict[str, Any]:
     try:
         product = await create_shopify_product(
-            connection,
+            graphql,
             settings,
             image,
             view_images,
+            granted_scopes=granted_scopes,
             publication_ids=publication_ids,
             product_status=product_status,
         )

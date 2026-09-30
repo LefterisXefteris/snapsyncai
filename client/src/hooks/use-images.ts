@@ -3,22 +3,15 @@ import { api, buildUrl } from "@/lib/api-routes";
 import { apiRequest } from "@/lib/queryClient";
 import { apiUrl } from "@/lib/api-origin";
 import { apiFetch } from "@/lib/api-fetch";
+import { rememberConnectFrom } from "@/lib/workspace-arrival";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "@clerk/clerk-react";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import { useAmbient } from "@/components/ambient/AmbientProvider";
 import { isOverflowConfirmError } from "@/lib/overflow-copy";
 import { AVAILABLE_STOCK_NOT_SET } from "@/lib/product-editor-copy";
 import type { Image } from "@/lib/image";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
-
-function useAppUserId(): string | undefined {
-  if (DEV_BYPASS_AUTH) return "dev_local_user";
-  // Compile-time constant: bypass builds never call useUser (no ClerkProvider).
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { user } = useUser();
-  return user?.id;
-}
 
 export function useImages() {
   const userId = useAppUserId();
@@ -441,6 +434,7 @@ export function useShopifyConnect() {
 
   return useMutation({
     mutationFn: async ({ shopDomain }: { shopDomain: string }) => {
+      rememberConnectFrom(window.location.pathname);
       const params = new URLSearchParams({ shop: shopDomain });
       window.location.assign(`${apiUrl(api.shopify.oauthStart.path)}?${params.toString()}`);
     },

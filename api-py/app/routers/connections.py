@@ -29,6 +29,7 @@ from app.services.product_facts import (
     stored_from_facts,
     stored_gpsr_identity,
 )
+from app.services.shopify import ShopifyGraphQLForDep
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ async def shopify_status(user_id: CurrentUser, session: SessionDep) -> ShopifySt
 async def shopify_publications(
     user_id: CurrentUser,
     session: SessionDep,
-    settings: SettingsDep,
+    graphql_for: ShopifyGraphQLForDep,
     image_id: int | None = Query(default=None, alias="imageId"),
 ) -> ShopifyPublicationsResponse:
     connection = await _safe_get(connections.get_shopify, session, user_id, "shopify")
@@ -123,8 +124,9 @@ async def shopify_publications(
 
     from app.services.shopify import list_shopify_publications, product_publishing
 
+    graphql = graphql_for(connection)
     try:
-        listed = await list_shopify_publications(connection, settings)
+        listed = await list_shopify_publications(graphql)
     except Exception:
         logger.exception("Shopify publications lookup failed for user %s", user_id)
         return ShopifyPublicationsResponse(connected=True, publications_ready=False, publications=[])
@@ -136,7 +138,7 @@ async def shopify_publications(
         if image is not None and image.session_id == user_id and image.shopify_product_id:
             try:
                 product_status, published = await product_publishing(
-                    connection, settings, image.shopify_product_id
+                    graphql, image.shopify_product_id
                 )
             except Exception:
                 logger.exception(

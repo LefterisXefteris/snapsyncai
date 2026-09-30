@@ -18,8 +18,8 @@ from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.services import connections
-from app.services.shopify_admin import get_shopify_shop_identity
-from app.services.shopify_crypto import encrypt_shopify_token
+from app.services.crypto import encrypt_shopify_token
+from app.services.shopify import ShopifyGraphQLAtDep, get_shopify_shop_identity
 from app.services.shopify_oauth import (
     build_shopify_oauth_authorize_url,
     create_shopify_oauth_state,
@@ -113,6 +113,7 @@ async def shopify_oauth_callback(
     request: Request,
     session: SessionDep,
     settings: SettingsDep,
+    shopify_graphql_at: ShopifyGraphQLAtDep,
 ) -> RedirectResponse:
     config = shopify_oauth_config(settings)
 
@@ -174,7 +175,7 @@ async def shopify_oauth_callback(
         if any(scope not in granted for scope in required):
             return fail("missing_inventory_scopes")
 
-        identity = await get_shopify_shop_identity(shop, access_token)
+        identity = await get_shopify_shop_identity(shopify_graphql_at(shop, access_token))
         shop_name = identity["name"] or shop.replace(".myshopify.com", "")
 
         await connections.upsert_shopify(
@@ -202,6 +203,7 @@ async def shopify_connect(
     user_id: CurrentUser,
     session: SessionDep,
     settings: SettingsDep,
+    shopify_graphql_at: ShopifyGraphQLAtDep,
 ) -> ShopifyConnectResponse | JSONResponse:
     try:
         if not body.shop_domain or not body.access_token:
@@ -212,7 +214,9 @@ async def shopify_connect(
             domain = domain[:-1]
         full_domain = domain if ".myshopify.com" in domain else f"{domain}.myshopify.com"
 
-        identity = await get_shopify_shop_identity(full_domain, body.access_token)
+        identity = await get_shopify_shop_identity(
+            shopify_graphql_at(full_domain, body.access_token)
+        )
         shop_name = identity["name"] or full_domain.replace(".myshopify.com", "")
 
         await connections.upsert_shopify(

@@ -1,34 +1,21 @@
 """Bulk SEO catalogue picker and pack start."""
 
-import uuid
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, HTTPException, status
 
 from app.auth.clerk import CurrentUser
 from app.config import SettingsDep
 from app.db import SessionDep
-from app.routers.images import fetch_search_demand, propose_refresh_pack
 from app.schemas.base import CamelModel
-from app.services import connections
 from app.services import images as store
 from app.services.bulk_seo import (
     PackItem,
-    accept_item,
     photos_from_images,
     picker,
-    regenerate_item,
-    start_pack,
 )
+from app.services.listing_copy_accept import accept_refresh
+from app.services.listing_copy_propose import propose_bulk_seo, regenerate_bulk_seo
 from app.services.listing_copy_refresh import search_demand_configured
-from app.services.listing_copy_trace import (
-    JOB_BULK,
-    listing_copy_trace_store,
-    mark_bulk_accept,
-)
-from app.services.plan import NEED_OVERFLOW_CONFIRM, NEED_PLAN, WEEKLY_LIMIT
-from app.services.plan_charge import current_entitlement, overflow_ack_month, settle_plan_job
-from app.services.plan_ledger import list_spends
+from app.services.plan_charge import current_entitlement
 
 router = APIRouter(tags=["bulk-seo"])
 
@@ -144,40 +131,7 @@ async def bulk_seo_start(
     session: SessionDep,
     settings: SettingsDep,
 ) -> BulkSeoPackResponse:
-    images = await store.list_images(session, user_id)
-    entitlement = await current_entitlement(session, settings, user_id)
-    connection = await connections.get_shopify(session, user_id)
-    shop_gpsr = connection.gpsr_identity if connection is not None else None
-    configured = _demand_configured(settings)
-
-    pack_id = uuid.uuid4().hex
-    photos = photos_from_images(images)
-    by_id = {photo.id: photo for photo in photos}
-
-    async def fetch(_product_id: int, seeds):
-        return await fetch_search_demand(
-            seeds,
-            settings.search_demand_url,
-            settings.search_demand_api_key,
-            login=settings.search_demand_login,
-        )
-
-    async def propose(product_id: int, **kwargs):
-        photo = by_id.get(product_id)
-        return await propose_refresh_pack(
-            kwargs["constraints"],
-            trace=_bulk_trace(settings, product_id, photo, pack_id),
-        )
-
-    pack = await start_pack(
-        photos,
-        body.product_ids,
-        demand_configured=configured,
-        entitlement=entitlement,
-        fetch=fetch,
-        propose=propose,
-        shop_gpsr=shop_gpsr if isinstance(shop_gpsr, dict) else None,
-    )
+    pack, pack_id = await propose_bulk_seo(session, settings, user_id, body.product_ids)
     if pack.error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=pack.error)
     return BulkSeoPackResponse(
@@ -194,29 +148,11 @@ async def bulk_seo_regenerate(
     session: SessionDep,
     settings: SettingsDep,
 ) -> BulkSeoPackItem:
-    images = await store.list_images(session, user_id)
-    photos = photos_from_images(images)
-    photo = next((item for item in photos if item.id == body.product_id), None)
-    if photo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    connection = await connections.get_shopify(session, user_id)
-    shop_gpsr = connection.gpsr_identity if connection is not None else None
-    configured = _demand_configured(settings)
-
-    async def propose(**kwargs):
-        return await propose_refresh_pack(
-            kwargs["constraints"],
-            trace=_bulk_trace(settings, photo.id, photo, body.pack_id),
-        )
-
-    item = await regenerate_item(
-        photo,
-        body.queries,
-        demand_configured=configured,
-        propose=propose,
-        fetch=lambda *_args: (),
-        shop_gpsr=shop_gpsr if isinstance(shop_gpsr, dict) else None,
+    item = await regenerate_bulk_seo(
+        session, settings, user_id, body.product_id, body.queries, pack_id=body.pack_id
     )
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return _pack_item_out(item)
 
 
@@ -227,71 +163,26 @@ async def bulk_seo_accept(
     session: SessionDep,
     settings: SettingsDep,
 ) -> dict:
-    images = await store.list_images(session, user_id)
-    photos = photos_from_images(images)
-    photo = next((item for item in photos if item.id == body.product_id), None)
-    if photo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    connection = await connections.get_shopify(session, user_id)
-    shop_gpsr = connection.gpsr_identity if connection is not None else None
-    entitlement = await current_entitlement(session, settings, user_id)
-    spends = await list_spends(session, user_id)
-    ack_month = await overflow_ack_month(session, settings, user_id)
-    stash: dict = {}
-
-    def persist(product_id: int, listing_copy):
-        stash["id"] = product_id
-        stash["copy"] = dict(listing_copy)
-
-    result = accept_item(
-        photo,
+    result = await accept_refresh(
+        session,
+        settings,
+        user_id,
+        body.product_id,
         {
             "tags": body.tags,
             "description": body.description,
             "seoTitle": body.seo_title,
             "seoDescription": body.seo_description,
         },
-        entitlement=entitlement,
-        spends=spends,
-        now=datetime.now(UTC),
-        persist=persist,
-        record_spend=lambda: None,
-        shop_gpsr=shop_gpsr if isinstance(shop_gpsr, dict) else None,
+        job="bulk_seo",
         confirm_overflow=body.confirm_overflow,
-        overflow_confirmed_month=ack_month,
+        trace_id=body.trace_id,
+        pack_id=body.pack_id or "",
     )
-    if result.error in (NEED_PLAN, WEEKLY_LIMIT, NEED_OVERFLOW_CONFIRM):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=result.error)
-    if result.error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.error)
-    if "copy" in stash:
-        updated = await store.update_image(session, stash["id"], stash["copy"], user_id)
-        if updated is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if result.spent:
-        await settle_plan_job(
-            session,
-            settings,
-            user_id,
-            "bulk_seo_persist",
-            confirm_overflow=body.confirm_overflow,
-            product_id=photo.id,
-        )
-    if "copy" in stash:
-        mark_bulk_accept(
-            listing_copy_trace_store(settings),
-            product_id=photo.id,
-            pack_id=body.pack_id or "",
-            trace_id=body.trace_id,
-        )
+    if result.refused in ("plan_blocked", "overflow_confirm"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=result.message)
+    if result.refused == "not_found":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.message)
+    if result.refused is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.message)
     return {"ok": True}
-
-
-def _bulk_trace(settings, product_id: int, photo, pack_id: str | None) -> dict:
-    return {
-        "store": listing_copy_trace_store(settings),
-        "job": JOB_BULK,
-        "product_id": product_id,
-        "group_id": getattr(photo, "product_group_id", None) if photo is not None else None,
-        "pack_id": pack_id,
-    }

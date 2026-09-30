@@ -7,13 +7,18 @@ so Python must decrypt existing DB rows and write ciphertext Express can still r
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from cryptography.exceptions import InvalidTag
 from fastapi.testclient import TestClient
 
+from app.auth.clerk import current_user_id
 from app.config import get_settings
+from app.db import get_session
 from app.main import create_app
-from app.services.shopify_crypto import decrypt_shopify_token, encrypt_shopify_token
+from app.services import connections
+from app.services.crypto import decrypt_shopify_token, encrypt_shopify_token
+from app.services.shopify import get_shopify_graphql_at
 from app.services.shopify_oauth import (
     build_shopify_oauth_authorize_url,
     create_shopify_oauth_state,
@@ -22,6 +27,7 @@ from app.services.shopify_oauth import (
     verify_shopify_hmac,
     verify_shopify_oauth_state,
 )
+from tests.seed import SELLER
 
 NODE_KEY = "inventory-test-key"
 NODE_TOKEN = "shpat_secret"
@@ -171,3 +177,52 @@ class TestOAuthRouteContract:
         schemas = client.get("/openapi.json").json()["components"]["schemas"]
         assert "shopName" in schemas["ShopifyConnectResponse"]["properties"]
         assert "shopDomain" in schemas["ShopifyConnectResponse"]["properties"]
+
+
+async def test_connect_stores_the_shop_identity_and_encrypted_token(
+    db, db_settings, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", db_settings.database_url)
+    settings = db_settings.model_copy(update={"connection_encryption_key": NODE_KEY})
+    reached: list[tuple[str, str]] = []
+
+    def shopify_graphql_at(shop_domain: str, access_token: str):
+        reached.append((shop_domain, access_token))
+
+        async def graphql(query: str, variables: dict | None = None) -> dict:
+            return {
+                "shop": {"name": "Tees"},
+                "currentAppInstallation": {
+                    "accessScopes": [{"handle": "read_products"}, {"handle": "write_products"}]
+                },
+            }
+
+        return graphql
+
+    async def _db():
+        yield db
+
+    get_settings.cache_clear()
+    app = create_app()
+    get_settings.cache_clear()
+    app.dependency_overrides[get_session] = _db
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[current_user_id] = lambda: SELLER
+    app.dependency_overrides[get_shopify_graphql_at] = lambda: shopify_graphql_at
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+        response = await http.post(
+            "/api/shopify/connect", json={"shopDomain": "tees", "accessToken": NODE_TOKEN}
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "connected": True,
+        "shopName": "Tees",
+        "shopDomain": "tees.myshopify.com",
+    }
+    assert reached == [("tees.myshopify.com", NODE_TOKEN)]
+    connection = await connections.get_shopify(db, SELLER)
+    assert connection.shop_name == "Tees"
+    assert connection.granted_scopes == ["read_products", "write_products"]
+    assert decrypt_shopify_token(connection.access_token, NODE_KEY) == NODE_TOKEN

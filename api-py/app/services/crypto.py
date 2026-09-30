@@ -1,55 +1,63 @@
 """AES-256-GCM token encryption — byte-compatible with `server/shopifyAdmin.ts`.
 
-Format: `enc:v1:{iv_b64url}:{tag_b64url}:{ciphertext_b64url}`
-Key: SHA-256(CONNECTION_ENCRYPTION_KEY).
+Existing `shopify_connections.access_token` rows were written by Node as
+`enc:v1:{iv}:{tag}:{ciphertext}` (all base64url, no padding). The key is
+SHA-256(CONNECTION_ENCRYPTION_KEY) as raw bytes, 12-byte IV, 16-byte GCM tag.
+Decrypting a Node-produced value here (and vice versa) is load-bearing: those rows
+are still read as they were written.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-
-def _key(secret: str) -> bytes:
-    return hashlib.sha256(secret.encode("utf-8")).digest()
+_PREFIX = "enc:v1:"
+_GCM_TAG_LEN = 16
+_GCM_IV_LEN = 12
 
 
 def _b64url_encode(data: bytes) -> str:
-    return urlsafe_b64encode(data).decode("ascii").rstrip("=")
+    return urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
 def _b64url_decode(text: str) -> bytes:
-    padding = "=" * (-len(text) % 4)
-    return urlsafe_b64decode(text + padding)
+    pad = "=" * (-len(text) % 4)
+    return urlsafe_b64decode(text + pad)
 
 
-def encrypt_shopify_token(token: str, secret: str) -> str:
-    if token.startswith("enc:v1:"):
+def _key_bytes(key_source: str) -> bytes:
+    if not key_source:
+        raise RuntimeError("CONNECTION_ENCRYPTION_KEY is required to store Shopify credentials")
+    return hashlib.sha256(key_source.encode("utf-8")).digest()
+
+
+def encrypt_shopify_token(token: str, key_source: str, *, iv: bytes | None = None) -> str:
+    if token.startswith(_PREFIX):
         return token
-    import os
+    key = _key_bytes(key_source)
+    nonce = iv if iv is not None else os.urandom(_GCM_IV_LEN)
+    if len(nonce) != _GCM_IV_LEN:
+        raise ValueError("AES-256-GCM nonce must be 12 bytes")
+    packed = AESGCM(key).encrypt(nonce, token.encode("utf-8"), None)
+    ciphertext, tag = packed[:-_GCM_TAG_LEN], packed[-_GCM_TAG_LEN:]
+    return f"{_PREFIX}{_b64url_encode(nonce)}:{_b64url_encode(tag)}:{_b64url_encode(ciphertext)}"
 
-    iv = os.urandom(12)
-    aes = AESGCM(_key(secret))
-    packed = aes.encrypt(iv, token.encode("utf-8"), None)
-    ciphertext, tag = packed[:-16], packed[-16:]
-    return f"enc:v1:{_b64url_encode(iv)}:{_b64url_encode(tag)}:{_b64url_encode(ciphertext)}"
 
-
-def decrypt_shopify_token(stored: str, secret: str) -> str:
-    if not stored.startswith("enc:v1:"):
-        return stored
-    parts = stored.split(":")
-    if len(parts) != 5 or parts[1] != "v1":
+def decrypt_shopify_token(stored_token: str, key_source: str | None = None) -> str:
+    if not stored_token.startswith(_PREFIX):
+        return stored_token
+    parts = stored_token.split(":")
+    if len(parts) != 5 or parts[0] != "enc" or parts[1] != "v1" or not all(parts[2:]):
         raise ValueError("Stored Shopify credential is malformed")
-    _, _, iv_text, tag_text, encrypted_text = parts
-    iv = _b64url_decode(iv_text)
-    tag = _b64url_decode(tag_text)
-    ciphertext = _b64url_decode(encrypted_text)
-    aes = AESGCM(_key(secret))
-    return aes.decrypt(iv, ciphertext + tag, None).decode("utf-8")
+    _enc, _version, iv_text, tag_text, encrypted_text = parts
+    key = _key_bytes(key_source or "")
+    packed = _b64url_decode(encrypted_text) + _b64url_decode(tag_text)
+    return AESGCM(key).decrypt(_b64url_decode(iv_text), packed, None).decode("utf-8")
 
 
 def verify_shopify_webhook_hmac(raw_body: bytes, signature: str | None, secret: str | None) -> bool:

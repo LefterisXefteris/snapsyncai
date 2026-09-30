@@ -1,20 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useUser } from "@clerk/clerk-react";
 import { api } from "@/lib/api-routes";
 import { apiFetch } from "@/lib/api-fetch";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import { useToast } from "@/hooks/use-toast";
 import { isOverflowConfirmError } from "@/lib/overflow-copy";
 import type { BulkSeoCatalogueRow } from "@/lib/bulk-seo";
-
-const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
-
-function useAppUserId(): string | undefined {
-  if (DEV_BYPASS_AUTH) return "dev_local_user";
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { user } = useUser();
-  return user?.id;
-}
 
 export type BulkSeoCatalogue = {
   startBlockedReason: string | null;
@@ -112,6 +103,9 @@ export function useBulkSeoAccept() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
+      queryClient.invalidateQueries({ queryKey: [api.bulkSeo.catalogue.path] });
     },
     onError: (error) => {
       if (isOverflowConfirmError(error instanceof Error ? error.message : "")) return;

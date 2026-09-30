@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.config import Settings
-from app.models import ShopifyConnection
 from app.services.import_catalogue import ChannelProduct
-from app.services.shopify import shopify_graphql
+from app.services.shopify import ShopifyGraphQL
 
 _PRODUCTS_QUERY = """
 query SnapSyncImportProducts($cursor: String) {
@@ -163,15 +161,11 @@ def channel_product_from_shopify(node: dict[str, Any]) -> ChannelProduct | None:
     )
 
 
-async def list_shopify_channel_products(
-    connection: ShopifyConnection, settings: Settings
-) -> list[ChannelProduct]:
+async def list_shopify_channel_products(graphql: ShopifyGraphQL) -> list[ChannelProduct]:
     products: list[ChannelProduct] = []
     cursor: str | None = None
     while True:
-        data = await shopify_graphql(
-            connection, settings, _PRODUCTS_QUERY, {"cursor": cursor}
-        )
+        data = await graphql(_PRODUCTS_QUERY, {"cursor": cursor})
         connection_data = data.get("products") or {}
         for node in connection_data.get("nodes") or []:
             if not isinstance(node, dict):

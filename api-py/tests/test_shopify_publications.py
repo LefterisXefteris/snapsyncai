@@ -1,9 +1,11 @@
 """Shopify publications on the product page — Available-on list, Draft/Active, exact-set push."""
 
+from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
-from app.config import Settings
 from app.models import ShopifyConnection
+from app.services import images as store
 from app.services import shopify as shopify_svc
 from app.services.shopify import (
     publication_changes,
@@ -11,12 +13,10 @@ from app.services.shopify import (
     shopify_product_status,
 )
 from app.services.shopify_oauth import DEFAULT_SHOPIFY_SCOPES
+from tests import seed
+from tests.shopify_shop import ONLINE_STORE, POINT_OF_SALE, SHOP_APP, ShopifyShop
 
-ONLINE_STORE = "gid://shopify/Publication/1"
-POINT_OF_SALE = "gid://shopify/Publication/2"
-SHOP_APP = "gid://shopify/Publication/3"
-
-_SETTINGS = Settings(database_url="postgresql://u:p@localhost:5432/db")
+PUBLICATION_SCOPES = ["read_publications", "write_publications"]
 
 
 def _connection(**kwargs) -> ShopifyConnection:
@@ -67,10 +67,10 @@ def test_oauth_requests_publication_scopes() -> None:
     assert "write_publications" in DEFAULT_SHOPIFY_SCOPES
 
 
-async def test_available_on_list_uses_the_shop_catalog_titles(monkeypatch) -> None:
+async def test_available_on_list_uses_the_shop_catalog_titles() -> None:
     """Admin API 2026-07 deprecates Publication.name; labels come from catalog.title."""
 
-    async def fake_graphql(_connection, _settings, query, variables=None):
+    async def fake_graphql(query, variables=None):
         nodes = [
             {
                 "id": ONLINE_STORE,
@@ -89,165 +89,64 @@ async def test_available_on_list_uses_the_shop_catalog_titles(monkeypatch) -> No
                 node.pop("name")
         return {"publications": {"nodes": nodes}}
 
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    listed = await shopify_svc.list_shopify_publications(_connection(), _SETTINGS)
+    listed = await shopify_svc.list_shopify_publications(fake_graphql)
     assert listed == [
         {"id": ONLINE_STORE, "name": "Online Store"},
         {"id": POINT_OF_SALE, "name": "Point of Sale"},
     ]
 
 
-async def test_push_sends_exactly_the_ticked_publications(monkeypatch) -> None:
-    calls: list[tuple[str, dict]] = []
-
-    async def fake_graphql(_connection, _settings, query, variables=None):
-        calls.append((query, variables or {}))
-        if "SnapSyncProductPublishing" in query:
-            return {
-                "product": {
-                    "status": "DRAFT",
-                    "resourcePublicationsV2": {
-                        "nodes": [
-                            {"isPublished": True, "publication": {"id": ONLINE_STORE}},
-                            {"isPublished": True, "publication": {"id": POINT_OF_SALE}},
-                        ]
-                    },
-                }
-            }
-        if "SnapSyncPublish" in query:
-            return {"publishablePublish": {"userErrors": []}}
-        if "SnapSyncUnpublish" in query:
-            return {"publishableUnpublish": {"userErrors": []}}
-        raise AssertionError(query)
-
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    await shopify_svc.apply_shopify_publications(
-        _connection(), _SETTINGS, "gid://shopify/Product/9", [ONLINE_STORE, SHOP_APP]
+async def test_push_sends_exactly_the_ticked_publications(db, push) -> None:
+    shop = ShopifyShop(
+        publications={
+            ONLINE_STORE: "Online Store",
+            POINT_OF_SALE: "Point of Sale",
+            SHOP_APP: "Shop",
+        }
     )
-    publish = next(variables for query, variables in calls if "SnapSyncPublish" in query)
-    unpublish = next(variables for query, variables in calls if "SnapSyncUnpublish" in query)
-    assert publish["input"] == [{"publicationId": SHOP_APP}]
-    assert unpublish["input"] == [{"publicationId": POINT_OF_SALE}]
-
-
-async def test_first_push_is_draft_and_unpublishes_unticked_publications(monkeypatch) -> None:
-    from app.models.image import Image
-
-    calls: list[tuple[str, dict]] = []
-
-    async def fake_graphql(_connection, _settings, query, variables=None):
-        calls.append((query, variables or {}))
-        if "CreateSnapSyncProduct" in query:
-            return {
-                "productSet": {
-                    "product": {
-                        "id": "gid://shopify/Product/9",
-                        "variants": {"nodes": []},
-                    },
-                    "userErrors": [],
-                }
-            }
-        if "SnapSyncProductPublishing" in query:
-            return {
-                "product": {
-                    "status": "DRAFT",
-                    "resourcePublicationsV2": {
-                        "nodes": [
-                            {"isPublished": True, "publication": {"id": ONLINE_STORE}},
-                        ]
-                    },
-                }
-            }
-        if "SnapSyncUnpublish" in query:
-            return {"publishableUnpublish": {"userErrors": []}}
-        raise AssertionError(query)
-
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    product = await shopify_svc.create_shopify_product(
-        _connection(),
-        _SETTINGS,
-        Image(id=1, original_name="tee.jpg", mime_type="image/jpeg", size=1, title="Tee"),
-        publication_ids=[],
-        product_status=None,
+    listed = shop.add_product(status="DRAFT", publications={ONLINE_STORE, POINT_OF_SALE})
+    await seed.shop(db, granted_scopes=PUBLICATION_SCOPES)
+    pid = await seed.product(db, shopify_product_id=listed.id)
+    pushed = await push(
+        shop, [pid], product_status="DRAFT", publication_ids=[ONLINE_STORE, SHOP_APP]
     )
-    product_set = next(variables for query, variables in calls if "CreateSnapSyncProduct" in query)
-    unpublish = next(variables for query, variables in calls if "SnapSyncUnpublish" in query)
-    assert product["id"] == "gid://shopify/Product/9"
-    assert product_set["productSet"]["status"] == "DRAFT"
-    assert unpublish["input"] == [{"publicationId": ONLINE_STORE}]
-    assert not any("SnapSyncPublish" in query for query, _ in calls)
+    assert pushed.success == 1
+    assert listed.publications == {ONLINE_STORE, SHOP_APP}
 
 
-async def test_push_sends_active_when_the_seller_picks_it(monkeypatch) -> None:
-    from app.models.image import Image
-
-    calls: list[tuple[str, dict]] = []
-
-    async def fake_graphql(_connection, _settings, query, variables=None):
-        calls.append((query, variables or {}))
-        if "CreateSnapSyncProduct" in query:
-            return {
-                "productSet": {
-                    "product": {
-                        "id": "gid://shopify/Product/9",
-                        "variants": {"nodes": []},
-                    },
-                    "userErrors": [],
-                }
-            }
-        if "SnapSyncProductPublishing" in query:
-            return {"product": {"status": "ACTIVE", "resourcePublicationsV2": {"nodes": []}}}
-        if "SnapSyncPublish" in query:
-            return {"publishablePublish": {"userErrors": []}}
-        raise AssertionError(query)
-
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    await shopify_svc.create_shopify_product(
-        _connection(),
-        _SETTINGS,
-        Image(id=1, original_name="tee.jpg", mime_type="image/jpeg", size=1, title="Tee"),
-        publication_ids=[ONLINE_STORE],
-        product_status="ACTIVE",
-    )
-    product_set = next(variables for query, variables in calls if "CreateSnapSyncProduct" in query)
-    publish = next(variables for query, variables in calls if "SnapSyncPublish" in query)
-    assert product_set["productSet"]["status"] == "ACTIVE"
-    assert publish["input"] == [{"publicationId": ONLINE_STORE}]
+async def test_first_push_is_draft_and_unpublishes_unticked_publications(db, push) -> None:
+    shop = ShopifyShop(new_products_published_on={ONLINE_STORE})
+    await seed.shop(db, granted_scopes=PUBLICATION_SCOPES)
+    pid = await seed.product(db)
+    pushed = await push(shop, [pid])
+    assert pushed.success == 1
+    product = shop.only_product()
+    assert product.status == "DRAFT"
+    assert product.publications == set()
+    assert (await store.get_image(db, pid, seed.SELLER)).shopify_product_id == product.id
 
 
-async def test_push_skips_publications_until_the_shop_is_reconnected(monkeypatch) -> None:
-    from app.models.image import Image
-
-    calls: list[str] = []
-
-    async def fake_graphql(_connection, _settings, query, variables=None):
-        calls.append(query)
-        if "CreateSnapSyncProduct" in query:
-            return {
-                "productSet": {
-                    "product": {
-                        "id": "gid://shopify/Product/9",
-                        "variants": {"nodes": []},
-                    },
-                    "userErrors": [],
-                }
-            }
-        raise AssertionError(query)
-
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    await shopify_svc.create_shopify_product(
-        _connection(granted_scopes=["read_products", "write_products"]),
-        _SETTINGS,
-        Image(id=1, original_name="tee.jpg", mime_type="image/jpeg", size=1, title="Tee"),
-        publication_ids=[ONLINE_STORE],
-        product_status="DRAFT",
-    )
-    assert all("SnapSyncPublish" not in query for query in calls)
-    assert all("SnapSyncUnpublish" not in query for query in calls)
-    assert all("SnapSyncProductPublishing" not in query for query in calls)
+async def test_push_sends_active_when_the_seller_picks_it(db, push) -> None:
+    shop = ShopifyShop()
+    await seed.shop(db, granted_scopes=PUBLICATION_SCOPES)
+    pid = await seed.product(db, price=Decimal("24.00"))
+    pushed = await push(shop, [pid], product_status="ACTIVE", publication_ids=[ONLINE_STORE])
+    assert pushed.success == 1
+    product = shop.only_product()
+    assert product.status == "ACTIVE"
+    assert product.publications == {ONLINE_STORE}
 
 
-def _publications_client(monkeypatch) -> TestClient:
+async def test_push_skips_publications_until_the_shop_is_reconnected(db, push) -> None:
+    shop = ShopifyShop(new_products_published_on={POINT_OF_SALE})
+    await seed.shop(db, granted_scopes=["read_products", "write_products"])
+    pid = await seed.product(db)
+    pushed = await push(shop, [pid], product_status="DRAFT", publication_ids=[ONLINE_STORE])
+    assert pushed.success == 1
+    assert shop.only_product().publications == {POINT_OF_SALE}
+
+
+def _publications_client(monkeypatch, graphql=None) -> TestClient:
     from app.config import get_settings
     from app.db import get_session
     from app.main import create_app
@@ -262,6 +161,7 @@ def _publications_client(monkeypatch) -> TestClient:
         yield None
 
     app.dependency_overrides[get_session] = _no_db
+    app.dependency_overrides[shopify_svc.get_shopify_graphql_for] = lambda: lambda _conn: graphql
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -332,7 +232,7 @@ def test_publications_endpoint_returns_the_shop_live_list(monkeypatch) -> None:
     async def ready_connection(_session, _user_id):
         return _connection()
 
-    async def fake_graphql(_connection, _settings, query, variables=None):
+    async def fake_graphql(query, variables=None):
         if "SnapSyncPublications" in query:
             return {
                 "publications": {
@@ -353,8 +253,7 @@ def test_publications_endpoint_returns_the_shop_live_list(monkeypatch) -> None:
         raise AssertionError(query)
 
     monkeypatch.setattr(connections, "get_shopify", ready_connection)
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    client = _publications_client(monkeypatch)
+    client = _publications_client(monkeypatch, fake_graphql)
     try:
         response = client.get("/api/shopify/publications")
         assert response.status_code == 200
@@ -394,7 +293,7 @@ def test_publications_endpoint_ticks_the_product_live_set(monkeypatch) -> None:
             shopify_product_id="gid://shopify/Product/9",
         )
 
-    async def fake_graphql(_connection, _settings, query, variables=None):
+    async def fake_graphql(query, variables=None):
         if "SnapSyncPublications" in query:
             return {
                 "publications": {
@@ -421,8 +320,7 @@ def test_publications_endpoint_ticks_the_product_live_set(monkeypatch) -> None:
 
     monkeypatch.setattr(connections, "get_shopify", ready_connection)
     monkeypatch.setattr(store, "get_image", fake_get)
-    monkeypatch.setattr(shopify_svc, "shopify_graphql", fake_graphql)
-    client = _publications_client(monkeypatch)
+    client = _publications_client(monkeypatch, fake_graphql)
     try:
         response = client.get("/api/shopify/publications?imageId=14")
         assert response.status_code == 200

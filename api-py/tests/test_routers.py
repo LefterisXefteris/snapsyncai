@@ -232,6 +232,7 @@ class TestResponseContract:
             "/api/stripe/webhook",
             "/api/website/prototype",
             "/api/website/handoff",
+            "/api/conversation",
         } <= paths
 
 

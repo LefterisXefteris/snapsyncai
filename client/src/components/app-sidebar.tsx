@@ -5,6 +5,7 @@ import {
   Download,
   Globe,
   ImagePlus,
+  MessageSquare,
   Package,
   Search,
   Settings,
@@ -38,6 +39,7 @@ const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
 const NAV_ICONS: Record<WorkspaceNavId, typeof Package> = {
   products: Package,
+  conversation: MessageSquare,
   "new-listing": ImagePlus,
   import: Download,
   inventory: Boxes,

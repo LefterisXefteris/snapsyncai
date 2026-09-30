@@ -1,0 +1,3 @@
+# Conversation starts the job; the seller still accepts
+
+The seller can ask in a **conversation** for Inventory, Bulk SEO, listing copy refresh, a website prototype, a Channel claim, or a connect. The conversation starts those jobs. It may take the seller to the product page for fibre composition, care instructions, and GPSR identity, and it must not invent those facts. Go live stays on the product page. The seller still confirms facts, accepts listing copy, and hands the website prototype to Lovable. We rejected an actor that finishes that work on its own, and we rejected calling this Agentic SEO.

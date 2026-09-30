@@ -1,10 +1,7 @@
 """Image CRUD + grouping + Shopify push — port of `server/routes.ts`."""
 
 import logging
-import time
-from collections.abc import Sequence
 
-import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
@@ -29,51 +26,24 @@ from app.schemas.image import (
     OkUpdatedResponse,
     PushIdsBody,
     PushResponse,
-    PushResult,
     with_facts_outcomes,
 )
 from app.services import catalogue_cache, connections
 from app.services import images as store
-from app.services.listing_copy_refresh import (
-    REFRESH_PROPOSAL_SYSTEM,
-    accept_listing_copy_refresh,
-    listing_copy_from_image,
-    parse_refresh_proposal,
-    refresh_blocked_reason,
-    rewrite_constraints,
-    search_demand_configured,
-    seed_search_demand,
-    start_listing_copy_refresh,
-)
+from app.services.listing_copy_accept import Accepted, accept_generated, accept_refresh
+from app.services.listing_copy_propose import Proposed, propose_refresh
+from app.services.listing_copy_refresh import search_demand_configured
 from app.services.listing_copy_trace import (
-    JOB_REFRESH,
-    ListingCopyCall,
     listing_copy_trace_store,
-    mark_generated_field,
     mark_refresh,
-    record_listing_copy_call,
 )
-from app.services.openai_client import get_openai
-from app.services.plan_charge import authorize_plan_job, settle_plan_job
 from app.services.product_facts import (
-    accept_generated_listing_copy,
     confirm_facts,
-    generation_blocked_reason,
-    listing_copy_present,
     merge_product_facts,
     stored_from_facts,
 )
-from app.services.shopify import (
-    list_shopify_publications,
-    online_store_publication_id,
-    price_greater_than_zero,
-    product_publishing,
-    push_product_to_shopify,
-    set_storefront_available_stock,
-    shopify_product_status,
-)
-
-STOREFRONT_PRICE_REQUIRED = "This product needs a price greater than zero."
+from app.services.push import push_products
+from app.services.shopify import ShopifyGraphQLForDep
 
 logger = logging.getLogger(__name__)
 
@@ -254,230 +224,46 @@ async def accept_generated_listing_copy_route(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
-        raise HTTPException(status_code=404, detail="Image not found")
-    group = await store.get_image_group(session, image_id, user_id)
-    current = merge_product_facts(
-        [img.product_facts for img in group] or [image.product_facts]
-    )
-    connection = await connections.get_shopify(session, user_id)
-    shop_gpsr = connection.gpsr_identity if connection is not None else None
-    facts_blocked = generation_blocked_reason(current)
-    if facts_blocked:
-        raise HTTPException(status_code=409, detail=facts_blocked)
-    accepted = accept_generated_listing_copy(
-        current,
-        body.model_dump(exclude_unset=True, exclude={"confirm_overflow", "trace_id"}),
-        shop_gpsr,
-    )
-    blocked = await authorize_plan_job(
+    result = await accept_generated(
         session,
         settings,
         user_id,
-        "generate_persist",
-        listing_copy_was_stale=current.listing_copy_stale,
+        image_id,
+        body.model_dump(exclude_unset=True, exclude={"confirm_overflow", "trace_id"}),
         confirm_overflow=body.confirm_overflow,
-        completing=True,
+        trace_id=body.trace_id,
     )
-    if blocked:
-        raise HTTPException(status_code=403, detail=blocked)
-    if accepted.listing_copy:
-        written = await store.update_image(
-            session, image_id, accepted.listing_copy, user_id
-        )
-        if written is None:
-            raise HTTPException(status_code=404, detail="Image not found")
-        image = written
-        await settle_plan_job(
-            session,
-            settings,
-            user_id,
-            "generate_persist",
-            listing_copy_was_stale=current.listing_copy_stale,
-            confirm_overflow=body.confirm_overflow,
-            product_id=image_id,
-        )
-    updated = await store.persist_product_facts(
-        session, image, stored_from_facts(accepted.facts)
-    )
-    if updated is None:
+    if result.refused == "facts_blocked":
+        raise HTTPException(status_code=409, detail=result.message)
+    return _accepted_out(result, settings)
+
+
+def _accepted_out(result: Accepted, settings) -> ImageOut:
+    if result.refused in ("plan_blocked", "overflow_confirm"):
+        raise HTTPException(status_code=403, detail=result.message)
+    if result.refused is not None or result.product is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    _mark_generated_fields(settings, image_id, body)
-    return _image_out(updated, settings, shop_gpsr)
-
-
-def _mark_generated_fields(settings, image_id: int, body: AcceptGeneratedListingCopyBody) -> None:
-    data = body.model_dump(exclude_unset=True)
-    fields = (
-        ("title", "title"),
-        ("description", "description"),
-        ("tags", "tags"),
-        ("seo_title", "seoTitle"),
-        ("seo_description", "seoDescription"),
-        ("aeo_faqs", "aeoFaqs"),
-    )
-    trace_store = listing_copy_trace_store(settings)
-    for key, field_name in fields:
-        if key not in data or data[key] is None:
-            continue
-        mark_generated_field(
-            trace_store,
-            product_id=image_id,
-            field=field_name,
-            accepted=data[key],
-            trace_id=body.trace_id,
-        )
-
-
-def _refresh_trace(settings, image) -> dict:
-    return {
-        "store": listing_copy_trace_store(settings),
-        "job": JOB_REFRESH,
-        "product_id": image.id,
-        "group_id": image.product_group_id,
-    }
+    return _image_out(result.product, settings, result.shop_gpsr)
 
 
 def _refresh_conflict(reason: str) -> JSONResponse:
     return JSONResponse(status_code=409, content={"message": reason})
 
 
-async def fetch_search_demand(
-    seeds: Sequence[str],
-    url: str | None,
-    api_key: str | None,
-    *,
-    login: str | None = None,
-) -> tuple[str, ...]:
-    from app.services.search_demand import fetch_dataforseo, is_dataforseo_url
-
-    if is_dataforseo_url(url):
-        return await fetch_dataforseo(seeds, str(url), login, api_key)
-    if not url or not str(url).strip():
-        return ()
-    headers = {}
-    if api_key and str(api_key).strip():
-        headers["Authorization"] = f"Bearer {api_key.strip()}"
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(
-            url,
-            params={"q": " ".join(seeds)},
-            headers=headers,
-        )
-        response.raise_for_status()
-        data = response.json()
-    raw = data.get("queries") if isinstance(data, dict) else None
-    if not isinstance(raw, list):
-        return ()
-    return tuple(str(item).strip() for item in raw if str(item).strip())
-
-
-async def propose_refresh_pack(constraints: str, *, trace: dict | None = None) -> dict | None:
-    started = time.perf_counter()
-    text = ""
-    error: str | None = None
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    try:
-        response = await get_openai().chat.completions.create(
-            model="gpt-5.2",
-            max_completion_tokens=1500,
-            messages=[
-                {"role": "system", "content": REFRESH_PROPOSAL_SYSTEM},
-                {"role": "user", "content": constraints},
-            ],
-        )
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            input_tokens = getattr(usage, "prompt_tokens", None)
-            output_tokens = getattr(usage, "completion_tokens", None)
-        if response.choices:
-            text = response.choices[0].message.content or ""
-        parsed = parse_refresh_proposal(text)
-        if parsed is None:
-            error = "Could not parse listing copy refresh."
-    except Exception:
-        logger.exception("listing copy refresh generation failed")
-        _record_refresh_trace(trace, constraints, text, "Generation failed", started, None, None)
-        raise
-    recorded = _record_refresh_trace(
-        trace, constraints, text, error, started, input_tokens, output_tokens
-    )
-    if parsed is not None and recorded is not None:
-        return {**parsed, "traceId": recorded.id}
-    return parsed
-
-
-def _record_refresh_trace(
-    trace: dict | None,
-    constraints: str,
-    text: str,
-    error: str | None,
-    started: float,
-    input_tokens: int | None,
-    output_tokens: int | None,
-):
-    if trace is None:
-        return None
-    return record_listing_copy_call(
-        trace["store"],
-        ListingCopyCall(
-            job=trace["job"],
-            messages=[
-                {"role": "system", "content": REFRESH_PROPOSAL_SYSTEM},
-                {"role": "user", "content": constraints},
-            ],
-            completion=text,
-            error=error,
-            model="gpt-5.2",
-            latency_ms=int((time.perf_counter() - started) * 1000),
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            product_id=trace["product_id"],
-            group_id=trace.get("group_id"),
-            pack_id=trace.get("pack_id"),
-        ),
-    )
-
-
-async def _listing_copy_refresh_context(session, image, user_id: str, settings):
-    group = await store.get_image_group(session, image.id, user_id)
-    facts = merge_product_facts(
-        [img.product_facts for img in group] or [image.product_facts]
-    )
-    connection = await connections.get_shopify(session, user_id)
-    shop_gpsr = connection.gpsr_identity if connection is not None else None
-    return (
-        facts,
-        listing_copy_from_image(image),
-        search_demand_configured(
-            settings.search_demand_api_key,
-            settings.search_demand_url,
-            settings.search_demand_login,
-        ),
-        shop_gpsr,
-    )
-
-
-async def _listing_copy_refresh_pack(facts, listing_copy, started, shop_gpsr, trace=None):
-    if started.error:
-        return _refresh_conflict(started.error)
-    pack = await propose_refresh_pack(
-        rewrite_constraints(facts, started.queries, listing_copy, shop_gpsr),
-        trace=trace,
-    )
-    if pack is None:
-        return JSONResponse(
-            status_code=502,
-            content={"message": "Could not parse listing copy refresh."},
-        )
+def _proposed_out(result: Proposed):
+    if result.refused == "not_found":
+        raise HTTPException(status_code=404, detail="Image not found")
+    if result.refused == "blocked":
+        return _refresh_conflict(result.message or "")
+    if result.proposal is None:
+        return JSONResponse(status_code=502, content={"message": result.message})
+    pack = result.proposal
     return ListingCopyRefreshOut(
         tags=pack["tags"],
         description=pack["description"],
         seo_title=pack["seoTitle"],
         seo_description=pack["seoDescription"],
-        queries=list(started.queries),
+        queries=list(result.queries),
         trace_id=pack.get("traceId"),
     )
 
@@ -493,31 +279,7 @@ async def listing_copy_refresh_route(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
-        raise HTTPException(status_code=404, detail="Image not found")
-    facts, listing_copy, configured, shop_gpsr = await _listing_copy_refresh_context(
-        session, image, user_id, settings
-    )
-    blocked = refresh_blocked_reason(facts, listing_copy, configured)
-    if blocked:
-        return _refresh_conflict(blocked)
-    queries = await fetch_search_demand(
-        seed_search_demand(facts, listing_copy),
-        settings.search_demand_url,
-        settings.search_demand_api_key,
-        login=settings.search_demand_login,
-    )
-    started = start_listing_copy_refresh(
-        facts,
-        listing_copy,
-        configured,
-        fetch=lambda _seeds: queries,
-        shop_gpsr=shop_gpsr,
-    )
-    return await _listing_copy_refresh_pack(
-        facts, listing_copy, started, shop_gpsr, _refresh_trace(settings, image)
-    )
+    return _proposed_out(await propose_refresh(session, settings, user_id, image_id))
 
 
 @router.post(
@@ -532,25 +294,8 @@ async def listing_copy_refresh_regenerate_route(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
-        raise HTTPException(status_code=404, detail="Image not found")
-    facts, listing_copy, configured, shop_gpsr = await _listing_copy_refresh_context(
-        session, image, user_id, settings
-    )
-    blocked = refresh_blocked_reason(facts, listing_copy, configured)
-    if blocked:
-        return _refresh_conflict(blocked)
-    started = start_listing_copy_refresh(
-        facts,
-        listing_copy,
-        configured,
-        fetch=lambda _seeds: (),
-        shop_gpsr=shop_gpsr,
-        queries=body.queries,
-    )
-    return await _listing_copy_refresh_pack(
-        facts, listing_copy, started, shop_gpsr, _refresh_trace(settings, image)
+    return _proposed_out(
+        await propose_refresh(session, settings, user_id, image_id, queries=body.queries)
     )
 
 
@@ -562,49 +307,19 @@ async def listing_copy_refresh_accept_route(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
-        raise HTTPException(status_code=404, detail="Image not found")
-    facts, _listing_copy, _configured, shop_gpsr = await _listing_copy_refresh_context(
-        session, image, user_id, settings
-    )
-    accepted = accept_listing_copy_refresh(
-        facts,
+    result = await accept_refresh(
+        session,
+        settings,
+        user_id,
+        image_id,
         body.model_dump(),
-        shop_gpsr,
-    )
-    if accepted.error:
-        return _refresh_conflict(accepted.error)
-    blocked = await authorize_plan_job(
-        session,
-        settings,
-        user_id,
-        "refresh_accept",
+        job="refresh",
         confirm_overflow=body.confirm_overflow,
-        completing=True,
-    )
-    if blocked:
-        raise HTTPException(status_code=403, detail=blocked)
-    updated = await store.update_image(
-        session, image_id, accepted.listing_copy or {}, user_id
-    )
-    if updated is None:
-        raise HTTPException(status_code=404, detail="Image not found")
-    await settle_plan_job(
-        session,
-        settings,
-        user_id,
-        "refresh_accept",
-        confirm_overflow=body.confirm_overflow,
-        product_id=image_id,
-    )
-    mark_refresh(
-        listing_copy_trace_store(settings),
-        product_id=image_id,
-        outcome="accepted",
         trace_id=body.trace_id,
     )
-    return _image_out(updated, settings, shop_gpsr)
+    if result.refused == "invalid_proposal":
+        return _refresh_conflict(result.message or "Could not accept listing copy.")
+    return _accepted_out(result, settings)
 
 
 @router.post("/api/images/{image_id}/listing-copy/refresh/dismiss", response_model=OkResponse)
@@ -704,151 +419,13 @@ def _is_db_connection_limit(error: Exception) -> bool:
     return "EMAXCONN" in message or "max client connections reached" in message
 
 
-def _push_status(body: PushIdsBody, image) -> str:
-    return shopify_product_status(
-        body.product_status if body.product_status is not None else image.shopify_product_status
-    )
-
-
-def _push_publication_ids(body: PushIdsBody, image) -> list[str]:
-    if body.publication_ids is not None:
-        return list(body.publication_ids)
-    return list(image.shopify_publication_ids or [])
-
-
-def _page_quantity(image) -> int:
-    raw = getattr(image, "inventory_quantity", None)
-    try:
-        quantity = int(raw if raw is not None else 0)
-    except (TypeError, ValueError):
-        return 0
-    return max(0, quantity)
-
-
-def _tracks_quantity(image) -> bool:
-    return getattr(image, "track_quantity", None) != "false"
-
-
-def _is_storefront_write(status: str, publication_ids: list[str], online_store: str | None) -> bool:
-    return status == "ACTIVE" and online_store is not None and online_store in publication_ids
-
-
-async def _storefront_price_refusal(body, images, listed) -> JSONResponse | None:
-    """A storefront write needs a price greater than zero."""
-    active = [image for image in images if _push_status(body, image) == "ACTIVE"]
-    if not active:
-        return None
-    online_store = online_store_publication_id(listed)
-    if online_store is None:
-        return None
-    missing_price = [
-        image
-        for image in active
-        if online_store in _push_publication_ids(body, image)
-        and not price_greater_than_zero(image.price)
-    ]
-    if not missing_price:
-        return None
-    return JSONResponse(status_code=400, content={"message": STOREFRONT_PRICE_REQUIRED})
-
-
-async def _previously_on_online_store(
-    image, connection, settings, online_store: str
-) -> bool | None:
-    """Whether Shopify already has this product Active on the Online Store.
-
-    None means the read failed, so stock must not be written over an unknown quantity.
-    """
-    product_id = getattr(image, "shopify_product_id", None)
-    if not isinstance(product_id, str) or not product_id:
-        return False
-    try:
-        status, published = await product_publishing(connection, settings, product_id)
-    except Exception:
-        logger.exception("Shopify publishing lookup failed before setting available stock")
-        return None
-    return shopify_product_status(status) == "ACTIVE" and online_store in published
-
-
-async def _stock_location(session, settings, connection, user_id: str) -> str | None:
-    from app.services.inventory.service import inventory_location_for_user
-    from app.services.inventory.shopify_ops import get_shopify_locations
-
-    chosen = await inventory_location_for_user(session, user_id)
-    if chosen:
-        return chosen
-    locations = await get_shopify_locations(connection, settings)
-    if not locations:
-        return None
-    location_id = locations[0].get("id")
-    return location_id if isinstance(location_id, str) and location_id else None
-
-
-async def _landing_available_stock(
-    session, settings, connection, user_id, image, variants: list
-) -> tuple[bool, int | None]:
-    """Set available stock on a first storefront landing.
-
-    Returns whether stock was not set, and the quantity written when it was.
-    """
-    if not _tracks_quantity(image):
-        return False, None
-    if len(variants) != 1:
-        return True, None
-    inventory_item = variants[0].get("inventoryItem") if isinstance(variants[0], dict) else None
-    inventory_item_id = (
-        (inventory_item or {}).get("id") if isinstance(inventory_item, dict) else None
-    )
-    if not isinstance(inventory_item_id, str) or not inventory_item_id:
-        return True, None
-    try:
-        location_id = await _stock_location(session, settings, connection, user_id)
-    except Exception:
-        logger.exception("Could not choose a location for available stock")
-        return True, None
-    if not location_id:
-        return True, None
-    quantity = _page_quantity(image)
-    try:
-        await set_storefront_available_stock(
-            connection,
-            settings,
-            inventory_item_id=inventory_item_id,
-            location_id=location_id,
-            quantity=quantity,
-        )
-    except Exception:
-        logger.exception("Available stock was not set")
-        return True, None
-    return False, quantity
-
-
-def _sort_group_by_media_gallery(group: list) -> None:
-    source = next(
-        (item for item in group if isinstance(item.media_gallery, list) and item.media_gallery),
-        None,
-    )
-    ordered_ids = []
-    if source is not None:
-        for raw in source.media_gallery:
-            try:
-                ordered_ids.append(int(raw))
-            except (TypeError, ValueError):
-                continue
-    rank = {image_id: index for index, image_id in enumerate(ordered_ids)}
-
-    def key(item):
-        item_rank = rank.get(item.id)
-        if item_rank is not None or rank:
-            return (item_rank if item_rank is not None else 10**9, item.id or 0)
-        return (0 if item.description else 1, item.id or 0)
-
-    group.sort(key=key)
-
-
 @router.post("/api/images/push-to-shopify", response_model=PushResponse)
 async def push_to_shopify(
-    body: PushIdsBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+    body: PushIdsBody,
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+    graphql_for: ShopifyGraphQLForDep,
 ) -> PushResponse | JSONResponse:
     if not body.ids:
         raise HTTPException(status_code=400, detail="No image IDs provided")
@@ -858,152 +435,38 @@ async def push_to_shopify(
             raise HTTPException(
                 status_code=400, detail="Shopify not connected. Please connect your store first."
             )
+        graphql = graphql_for(connection)
 
         selected = await store.get_images_by_ids(session, body.ids, user_id)
         images_to_push = [img for img in selected if img.session_id == user_id]
         if not images_to_push:
             raise HTTPException(status_code=400, detail="No images found for given IDs")
 
-        missing_copy = [
-            img
-            for img in images_to_push
-            if not listing_copy_present(listing_copy_from_image(img))
-        ]
-        if missing_copy:
+        pushed = await push_products(
+            session,
+            settings,
+            graphql,
+            user_id,
+            images_to_push,
+            granted_scopes=connection.granted_scopes or [],
+            product_status=body.product_status,
+            publication_ids=body.publication_ids,
+        )
+        if pushed.refused == "missing_copy":
             return JSONResponse(
                 status_code=402,
                 content={
-                    "message": (
-                        f"{len(missing_copy)} product(s) still need listing copy."
-                    ),
-                    "missingCopyCount": len(missing_copy),
+                    "message": pushed.message,
+                    "missingCopyCount": pushed.missing_copy_count,
                 },
             )
-
-        listed = None
-        if any(_push_status(body, image) == "ACTIVE" for image in images_to_push):
-            try:
-                listed = await list_shopify_publications(connection, settings)
-            except Exception:
-                logger.exception("Shopify publications lookup failed before push")
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "message": (
-                            "Reconnect Shopify in Settings to choose "
-                            "where this product is available."
-                        ),
-                    },
-                )
-            price_refusal = await _storefront_price_refusal(body, images_to_push, listed)
-            if price_refusal is not None:
-                return price_refusal
-        online_store = online_store_publication_id(listed or [])
-
-        all_user_images = await store.list_images(session, user_id)
-        group_map: dict[str, list] = {}
-        for img in all_user_images:
-            if img.product_group_id:
-                group_map.setdefault(img.product_group_id, []).append(img)
-        for group in group_map.values():
-            _sort_group_by_media_gallery(group)
-
-        processed_groups: set[str] = set()
-        products: list[tuple] = []
-        for img in images_to_push:
-            if img.product_group_id:
-                if img.product_group_id in processed_groups:
-                    continue
-                processed_groups.add(img.product_group_id)
-                group = group_map.get(img.product_group_id) or [img]
-                products.append((group[0], group[1:]))
-            else:
-                products.append((img, []))
-
-        full_map = {img.id: img for img in selected}
-        success = 0
-        failed = 0
-        stock_not_set = False
-        results: list[PushResult] = []
-        for primary, views in products:
-            needed = [primary.id, *[view.id for view in views]]
-            missing = [image_id for image_id in needed if image_id not in full_map]
-            if missing:
-                for img in await store.get_images_by_ids(session, missing, user_id):
-                    full_map[img.id] = img
-            full_primary = full_map.get(primary.id) or primary
-            view_images = [full_map.get(view.id) or view for view in views]
-            desired_ids = _push_publication_ids(body, full_primary)
-            desired_status = _push_status(body, full_primary)
-            # Read Shopify before the write. Afterwards the product is already on the store.
-            previous = None
-            landing = bool(
-                online_store and _is_storefront_write(desired_status, desired_ids, online_store)
-            )
-            if landing and online_store:
-                previous = await _previously_on_online_store(
-                    full_primary, connection, settings, online_store
-                )
-            result = await push_product_to_shopify(
-                full_primary,
-                connection,
-                settings,
-                view_images,
-                publication_ids=body.publication_ids,
-                product_status=body.product_status,
-            )
-            if result.get("shopify_product_id"):
-                from app.services.inventory.service import register_published_shopify_product
-
-                written: int | None = None
-                if landing:
-                    if previous is None:
-                        stock_not_set = True
-                    elif previous is False:
-                        missed, written = await _landing_available_stock(
-                            session,
-                            settings,
-                            connection,
-                            user_id,
-                            full_primary,
-                            result.get("variants") or [],
-                        )
-                        stock_not_set = stock_not_set or missed
-
-                await register_published_shopify_product(
-                    session,
-                    settings,
-                    user_id=user_id,
-                    image=full_primary,
-                    product_id=result["shopify_product_id"],
-                    variants=result.get("variants") or [],
-                    available_stock=written,
-                    queue_sync=False,
-                )
-                updates = {
-                    "shopify_product_id": result["shopify_product_id"],
-                    "shopify_status": "synced",
-                    "shopify_product_status": desired_status,
-                    "shopify_publication_ids": desired_ids,
-                }
-                if primary.product_group_id:
-                    await store.update_images_by_group_id(
-                        session, primary.product_group_id, updates
-                    )
-                else:
-                    await store.update_image(session, primary.id, updates, user_id)
-                success += 1
-                results.append(
-                    PushResult(id=primary.id, shopify_product_id=result["shopify_product_id"])
-                )
-            else:
-                await store.update_image(
-                    session, primary.id, {"shopify_status": "failed"}, user_id
-                )
-                failed += 1
-                results.append(PushResult(id=primary.id, error=result.get("error")))
+        if pushed.refused is not None:
+            return JSONResponse(status_code=400, content={"message": pushed.message})
         return PushResponse(
-            success=success, failed=failed, results=results, stock_not_set=stock_not_set
+            success=pushed.success,
+            failed=pushed.failed,
+            results=list(pushed.results),
+            stock_not_set=pushed.stock_not_set,
         )
     except HTTPException:
         raise

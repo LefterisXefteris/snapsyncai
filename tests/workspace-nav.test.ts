@@ -9,6 +9,11 @@ import {
   workspaceStubCopy,
 } from "../client/src/lib/workspace-nav.ts";
 
+test("Conversation sits beside the catalogue", () => {
+  assert.equal(workspaceNavItem("conversation").path, "/conversation");
+  assert.equal(workspaceNavItem("conversation").stub, false);
+});
+
 test("Products is the home path", () => {
   assert.equal(WORKSPACE_HOME_PATH, "/");
   assert.equal(workspaceNavItem("products").path, "/");
@@ -18,7 +23,16 @@ test("Products is the home path", () => {
 test("nav order is catalogue, then entry jobs, then Settings", () => {
   assert.deepEqual(
     WORKSPACE_NAV.map((item) => item.label),
-    ["Products", "New listing", "Import", "Inventory", "Website", "Bulk SEO", "Settings"],
+    [
+      "Products",
+      "Conversation",
+      "New listing",
+      "Import",
+      "Inventory",
+      "Website",
+      "Bulk SEO",
+      "Settings",
+    ],
   );
 });
 
@@ -51,6 +65,7 @@ test("the catalogue and a product drill-in both activate Products", () => {
 });
 
 test("each destination path activates its own nav item", () => {
+  assert.equal(activeWorkspaceNavId("/conversation"), "conversation");
   assert.equal(activeWorkspaceNavId("/new"), "new-listing");
   assert.equal(activeWorkspaceNavId("/import"), "import");
   assert.equal(activeWorkspaceNavId("/inventory"), "inventory");

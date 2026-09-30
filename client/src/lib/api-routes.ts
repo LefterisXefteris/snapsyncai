@@ -54,6 +54,10 @@ export const api = {
     regenerate: { method: "POST" as const, path: "/api/bulk-seo/regenerate" as const },
     accept: { method: "POST" as const, path: "/api/bulk-seo/accept" as const },
   },
+  conversation: {
+    read: { method: "GET" as const, path: "/api/conversation" as const },
+    post: { method: "POST" as const, path: "/api/conversation" as const },
+  },
   import: {
     status: { method: "GET" as const, path: "/api/import" as const },
     start: { method: "POST" as const, path: "/api/import/start" as const },

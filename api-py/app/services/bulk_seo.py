@@ -10,14 +10,13 @@ from typing import Any
 
 from app.services.listing_copy_refresh import (
     DEMAND_UNCONFIGURED,
-    accept_listing_copy_refresh,
     listing_copy_from_image,
     refresh_blocked_reason,
     rewrite_constraints,
     seed_search_demand,
     start_listing_copy_refresh,
 )
-from app.services.plan import Entitlement, Spend, decide
+from app.services.plan import Entitlement, decide
 from app.services.product_facts import ProductFacts, facts_from_stored, listing_copy_present
 from app.services.supabase_storage import channel_photo_url
 
@@ -232,45 +231,6 @@ async def regenerate_item(
         )
     )
     return _pack_item(photo.id, started, proposal)
-
-
-@dataclass(frozen=True)
-class AcceptResult:
-    error: str | None = None
-    listing_copy: dict[str, Any] | None = None
-    spent: bool = False
-
-
-def accept_item(
-    photo: BulkSeoPhoto,
-    proposal: Mapping[str, Any],
-    *,
-    entitlement: Entitlement,
-    spends: Sequence[Spend],
-    now: datetime,
-    persist: Callable[[int, Mapping[str, Any]], None],
-    record_spend: Callable[[], None],
-    shop_gpsr: Mapping[str, Any] | None = None,
-    confirm_overflow: bool = False,
-    overflow_confirmed_month: str | None = None,
-) -> AcceptResult:
-    accepted = accept_listing_copy_refresh(photo.facts, proposal, shop_gpsr)
-    if accepted.error or accepted.listing_copy is None:
-        return AcceptResult(error=accepted.error)
-    decision = decide(
-        entitlement,
-        spends,
-        now,
-        "bulk_seo_persist",
-        confirm_overflow=confirm_overflow,
-        overflow_confirmed_month=overflow_confirmed_month,
-    )
-    if not decision.allowed:
-        return AcceptResult(error=decision.blocked_reason)
-    persist(photo.id, accepted.listing_copy)
-    if decision.records_spend:
-        record_spend()
-    return AcceptResult(listing_copy=accepted.listing_copy, spent=decision.records_spend)
 
 
 def picker(
