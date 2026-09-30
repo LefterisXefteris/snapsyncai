@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.models import Image
-from app.services import connections
 from app.services import images as store
+from app.services import product
 from app.services.listing_copy_refresh import accept_listing_copy_refresh
 from app.services.listing_copy_trace import (
     listing_copy_trace_store,
@@ -27,10 +27,8 @@ from app.services.listing_copy_trace import (
 from app.services.plan import NEED_OVERFLOW_CONFIRM
 from app.services.plan_charge import spend_when_landed
 from app.services.product_facts import (
-    ProductFacts,
     accept_generated_listing_copy,
     generation_blocked_reason,
-    merge_product_facts,
     stored_from_facts,
 )
 
@@ -70,17 +68,6 @@ def _plan_refusal(reason: str) -> Accepted:
     return _refuse("plan_blocked", reason)
 
 
-async def product_facts_for(
-    session: AsyncSession, image: Image, user_id: str
-) -> tuple[ProductFacts, dict | None]:
-    """The product's facts merged across its photos, and the Shop GPSR identity they may use."""
-    group = await store.get_image_group(session, image.id, user_id)
-    facts = merge_product_facts([img.product_facts for img in group] or [image.product_facts])
-    connection = await connections.get_shopify(session, user_id)
-    identity = connection.gpsr_identity if connection is not None else None
-    return facts, identity if isinstance(identity, dict) else None
-
-
 async def accept_generated(
     session: AsyncSession,
     settings: Settings,
@@ -92,10 +79,10 @@ async def accept_generated(
     trace_id: str | None = None,
 ) -> Accepted:
     """Accept generated listing copy. Regenerating stale listing copy does not spend."""
-    image = await store.get_image(session, product_id, user_id)
-    if image is None:
+    loaded = await product.load(session, user_id, product_id)
+    if loaded is None:
         return _refuse("not_found", PRODUCT_NOT_FOUND)
-    facts, shop_gpsr = await product_facts_for(session, image, user_id)
+    image, facts, shop_gpsr = loaded.photo, loaded.facts, loaded.shop_gpsr
     facts_blocked = generation_blocked_reason(facts)
     if facts_blocked:
         return _refuse("facts_blocked", facts_blocked)
@@ -148,10 +135,10 @@ async def accept_refresh(
     pack_id: str = "",
 ) -> Accepted:
     """Accept a listing copy refresh proposal, alone or as one product of a Bulk SEO run."""
-    image = await store.get_image(session, product_id, user_id)
-    if image is None:
+    loaded = await product.load(session, user_id, product_id)
+    if loaded is None:
         return _refuse("not_found", PRODUCT_NOT_FOUND)
-    facts, shop_gpsr = await product_facts_for(session, image, user_id)
+    facts, shop_gpsr = loaded.facts, loaded.shop_gpsr
     accepted = accept_listing_copy_refresh(facts, proposal, shop_gpsr)
     if accepted.error or accepted.listing_copy is None:
         return _refuse("invalid_proposal", accepted.error or "Could not accept listing copy.")

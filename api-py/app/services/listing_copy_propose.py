@@ -21,10 +21,10 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.services import connections
 from app.services import images as store
+from app.services import product
 from app.services.bulk_seo import Pack, PackItem, photos_from_images, regenerate_item, start_pack
-from app.services.listing_copy_accept import PRODUCT_NOT_FOUND, product_facts_for
+from app.services.listing_copy_accept import PRODUCT_NOT_FOUND
 from app.services.listing_copy_refresh import (
     REFRESH_PROPOSAL_SYSTEM,
     listing_copy_from_image,
@@ -185,12 +185,6 @@ def _trace(settings: Settings, job: str, product_id: int, photo, pack_id: str | 
     }
 
 
-async def _shop_gpsr(session: AsyncSession, user_id: str) -> dict | None:
-    connection = await connections.get_shopify(session, user_id)
-    identity = connection.gpsr_identity if connection is not None else None
-    return identity if isinstance(identity, dict) else None
-
-
 async def propose_refresh(
     session: AsyncSession,
     settings: Settings,
@@ -200,10 +194,10 @@ async def propose_refresh(
     queries: Sequence[str] | None = None,
 ) -> Proposed:
     """Propose a listing copy refresh. Seller-edited `queries` skip the search demand fetch."""
-    image = await store.get_image(session, product_id, user_id)
-    if image is None:
+    loaded = await product.load(session, user_id, product_id)
+    if loaded is None:
         return Proposed(refused="not_found", message=PRODUCT_NOT_FOUND)
-    facts, shop_gpsr = await product_facts_for(session, image, user_id)
+    image, facts, shop_gpsr = loaded.photo, loaded.facts, loaded.shop_gpsr
     listing_copy = listing_copy_from_image(image)
     configured = _demand_configured(settings)
     blocked = refresh_blocked_reason(facts, listing_copy, configured)
@@ -258,7 +252,7 @@ async def propose_bulk_seo(
         entitlement=await current_entitlement(session, settings, user_id),
         fetch=fetch,
         propose=propose,
-        shop_gpsr=await _shop_gpsr(session, user_id),
+        shop_gpsr=await product.shop_gpsr(session, user_id),
     )
     return pack, pack_id
 
@@ -290,5 +284,5 @@ async def regenerate_bulk_seo(
         demand_configured=_demand_configured(settings),
         propose=propose,
         fetch=lambda *_args: (),
-        shop_gpsr=await _shop_gpsr(session, user_id),
+        shop_gpsr=await product.shop_gpsr(session, user_id),
     )
