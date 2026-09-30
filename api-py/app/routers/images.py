@@ -28,7 +28,7 @@ from app.schemas.image import (
     PushResponse,
     with_facts_outcomes,
 )
-from app.services import catalogue_cache, connections
+from app.services import catalogue_cache, connections, product
 from app.services import images as store
 from app.services.listing_copy_accept import Accepted, accept_generated, accept_refresh
 from app.services.listing_copy_propose import Proposed, propose_refresh
@@ -36,11 +36,6 @@ from app.services.listing_copy_refresh import search_demand_configured
 from app.services.listing_copy_trace import (
     listing_copy_trace_store,
     mark_refresh,
-)
-from app.services.product_facts import (
-    confirm_facts,
-    merge_product_facts,
-    stored_from_facts,
 )
 from app.services.push import push_products
 from app.services.shopify import ShopifyGraphQLForDep
@@ -54,23 +49,18 @@ def _owned(image, user_id: str) -> bool:
     return image is not None and image.session_id == user_id
 
 
-async def _sync_product_facts(session, user_id: str, image) -> None:
-    group = await store.get_image_group(session, image.id, user_id)
-    merged = merge_product_facts([img.product_facts for img in group])
-    await store.persist_product_facts(session, image, stored_from_facts(merged))
-
-
 def _catalogue_payload(items: list[ImageListOut]) -> list[dict]:
     return [
         item.model_dump(by_alias=True, mode="json", exclude=LIST_EXCLUDE) for item in items
     ]
 
 
-def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False):
+def _image_out(image, settings, shop_gpsr=None, *, list_item: bool = False, photos=()):
     return with_facts_outcomes(
         image,
         shop_gpsr,
         list_item=list_item,
+        photos=photos,
         demand_configured=search_demand_configured(
             settings.search_demand_api_key,
             settings.search_demand_url,
@@ -90,7 +80,14 @@ async def list_images(
         rows = await store.list_images(session, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch images") from None
-    items = [_image_out(row, settings, list_item=True) for row in rows]
+    groups: dict[str, list] = {}
+    for row in rows:
+        if row.product_group_id:
+            groups.setdefault(row.product_group_id, []).append(row)
+    items = [
+        _image_out(row, settings, list_item=True, photos=groups.get(row.product_group_id, ()))
+        for row in rows
+    ]
     await catalogue_cache.put(user_id, _catalogue_payload(items))
     return items
 
@@ -107,7 +104,7 @@ async def get_group(
         rows = await store.get_image_group(session, image_id, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch product group") from None
-    return [_image_out(row, settings, list_item=True) for row in rows]
+    return [_image_out(row, settings, list_item=True, photos=rows) for row in rows]
 
 
 @router.post("/api/images/{image_id}/unlink-from-group", response_model=OkResponse)
@@ -143,9 +140,7 @@ async def assign_group_batch(
                 user_id,
             )
             updated += 1
-    synced = await store.get_image(session, body.image_ids[0], user_id)
-    if _owned(synced, user_id):
-        await _sync_product_facts(session, user_id, synced)
+    await product.sync_facts_after_grouping(session, user_id, body.image_ids[0])
     return OkUpdatedResponse(updated=updated)
 
 
@@ -170,9 +165,7 @@ async def assign_group(
                 {"product_group_id": body.product_group_id},
                 user_id,
             )
-    refreshed = await store.get_image(session, image_id, user_id)
-    if _owned(refreshed, user_id):
-        await _sync_product_facts(session, user_id, refreshed)
+    await product.sync_facts_after_grouping(session, user_id, image_id)
     return OkResponse()
 
 
@@ -184,36 +177,24 @@ async def confirm_product_facts(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImageOut:
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
-        raise HTTPException(status_code=404, detail="Image not found")
-    group = await store.get_image_group(session, image_id, user_id)
-    current = merge_product_facts(
-        [img.product_facts for img in group] or [image.product_facts]
-    )
-    connection = await connections.get_shopify(session, user_id)
-    shop_gpsr = connection.gpsr_identity if connection is not None else None
-    result = confirm_facts(
-        current,
+    confirmed = await product.confirm(
+        session,
+        user_id,
+        image_id,
         is_textile=body.is_textile,
         composition=[row.model_dump() for row in body.composition]
         if body.composition is not None
         else None,
         gpsr_choice=body.gpsr_choice,
         gpsr_identity=body.gpsr_identity.model_dump(by_alias=True) if body.gpsr_identity else None,
-        shop_gpsr=shop_gpsr,
         care_choice=body.care_choice,
         care=body.care.model_dump(by_alias=True) if body.care else None,
-        listing_copy=store.listing_copy_from_images([image, *group]),
     )
-    if not result.ok:
-        raise HTTPException(status_code=400, detail=result.error)
-    updated = await store.persist_product_facts(
-        session, image, stored_from_facts(result.facts)
-    )
-    if updated is None:
-        raise HTTPException(status_code=404, detail="Image not found")
-    return _image_out(updated, settings, shop_gpsr)
+    if confirmed.refused == "invalid":
+        raise HTTPException(status_code=400, detail=confirmed.message)
+    if confirmed.product is None:
+        raise HTTPException(status_code=404, detail=confirmed.message)
+    return _image_out(confirmed.product, settings, confirmed.shop_gpsr)
 
 
 @router.post("/api/images/{image_id}/listing-copy/accept", response_model=ImageOut)

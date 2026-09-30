@@ -130,8 +130,8 @@ def push(db, db_settings):
 
 
 @pytest.fixture
-def push_route(db, db_settings, monkeypatch):
-    """POST /api/images/push-to-shopify as the seed seller, on `db`, against a given shop."""
+def seller_app(db, db_settings, monkeypatch):
+    """The app as the seed seller, on `db`."""
     monkeypatch.setenv("DATABASE_URL", db_settings.database_url)
     get_settings.cache_clear()
     app = create_app()
@@ -142,14 +142,39 @@ def push_route(db, db_settings, monkeypatch):
 
     app.dependency_overrides[get_session] = _db
     app.dependency_overrides[current_user_id] = lambda: SELLER
+    return app
+
+
+async def _post(app, path: str, body: dict | None) -> httpx.Response:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.post(path, json=body)
+
+
+@pytest.fixture
+def api(seller_app, db_settings):
+    """POST to the app as the seed seller, on `db`."""
+
+    async def post(
+        path: str, body: dict | None = None, *, settings: Settings = db_settings
+    ) -> httpx.Response:
+        seller_app.dependency_overrides[get_settings] = lambda: settings
+        return await _post(seller_app, path, body)
+
+    return post
+
+
+@pytest.fixture
+def push_route(seller_app, db_settings):
+    """POST /api/images/push-to-shopify as the seed seller, on `db`, against a given shop."""
 
     async def post(
         shop: ShopifyShop, body: dict, *, settings: Settings = db_settings
     ) -> httpx.Response:
-        app.dependency_overrides[get_settings] = lambda: settings
-        app.dependency_overrides[get_shopify_graphql_for] = lambda: lambda _connection: shop
-        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            return await client.post("/api/images/push-to-shopify", json=body)
+        seller_app.dependency_overrides[get_settings] = lambda: settings
+        seller_app.dependency_overrides[get_shopify_graphql_for] = (
+            lambda: lambda _connection: shop
+        )
+        return await _post(seller_app, "/api/images/push-to-shopify", body)
 
     return post

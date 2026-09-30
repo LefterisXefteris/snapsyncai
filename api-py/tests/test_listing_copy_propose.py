@@ -7,6 +7,7 @@ the model are replaced on that module; nothing else is.
 import pytest
 
 from app.services import listing_copy_propose
+from app.services.listing_copy_accept import accept_generated
 from app.services.listing_copy_propose import (
     propose_bulk_seo,
     propose_refresh,
@@ -85,6 +86,23 @@ async def test_refresh_waits_for_listing_copy(db, settings, external) -> None:
     )
     assert external.seeds == []
     assert external.prompts == []
+
+
+async def test_listing_copy_accepted_on_one_photo_refreshes_from_another(
+    db, settings, external
+) -> None:
+    await plan(db)
+    front = await product(db, facts=confirmed_facts(), listed=False, product_group_id="tee")
+    back = await product(db, facts=confirmed_facts(), listed=False, product_group_id="tee")
+    accepted = await accept_generated(
+        db, settings, SELLER, front, {"title": "Cotton tee", "tags": ["crew neck"]}
+    )
+    assert accepted.refused is None
+
+    result = await propose_refresh(db, settings, SELLER, back)
+
+    assert result.refused is None
+    assert external.seeds == [("Cotton tee", "crew neck")]
 
 
 async def test_no_search_demand_asks_the_model_nothing(db, settings, external) -> None:

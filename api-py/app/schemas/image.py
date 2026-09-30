@@ -82,9 +82,19 @@ class ImageListOut(ImageOut):
 
 
 def with_facts_outcomes(
-    image, shop_gpsr=None, *, list_item: bool = False, demand_configured: bool = False,
+    image,
+    shop_gpsr=None,
+    *,
+    list_item: bool = False,
+    demand_configured: bool = False,
+    photos=(),
 ):
-    """Copy Product facts and listing-copy-refresh outcomes onto the HTTP payload."""
+    """Copy Product facts and listing-copy-refresh outcomes onto the HTTP payload.
+
+    Refresh outcomes read listing copy across the product's `photos`;
+    `listing_copy_present` stays this photo's, because Push reads each photo alone.
+    """
+    from app.services.images import listing_copy_from_images
     from app.services.listing_copy_refresh import (
         listing_copy_from_image,
         refresh_payload_outcomes,
@@ -92,11 +102,12 @@ def with_facts_outcomes(
     from app.services.product_facts import facts_from_stored, listing_copy_present, payload_outcomes
 
     facts = facts_from_stored(getattr(image, "product_facts", None))
-    listing_copy = listing_copy_from_image(image)
     outcomes = {
         **payload_outcomes(facts, shop_gpsr),
-        **refresh_payload_outcomes(facts, listing_copy, demand_configured),
-        "listing_copy_present": listing_copy_present(listing_copy),
+        **refresh_payload_outcomes(
+            facts, listing_copy_from_images([image, *photos]), demand_configured
+        ),
+        "listing_copy_present": listing_copy_present(listing_copy_from_image(image)),
     }
     model = ImageListOut if list_item else ImageOut
     return model.model_validate(image).model_copy(update=outcomes)

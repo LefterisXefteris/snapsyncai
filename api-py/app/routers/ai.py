@@ -25,8 +25,8 @@ from app.schemas.ai import (
     RegenerateFieldBody,
 )
 from app.schemas.image import ImageOut, with_facts_outcomes
-from app.services import connections
 from app.services import images as store
+from app.services import product
 from app.services.image_analysis import (
     full_analyze_image,
     full_analyze_multiple_images,
@@ -48,7 +48,6 @@ from app.services.product_facts import (
     PersistableVision,
     generation_blocked_reason,
     listing_copy_constraints,
-    merge_product_facts,
     persistable_from_vision,
 )
 from app.services.subscriptions import has_active_subscription
@@ -169,27 +168,11 @@ def _new_image_values(
     return values
 
 
-def _owned(image, user_id: str) -> bool:
-    return image is not None and image.session_id == user_id
-
-
-async def _facts_for_product(session, image, user_id: str):
-    group = await store.get_image_group(session, image.id, user_id)
-    return merge_product_facts(
-        [img.product_facts for img in group] or [image.product_facts]
-    )
-
-
 def _refuse_ungated_listing_copy(facts) -> JSONResponse | None:
     reason = generation_blocked_reason(facts)
     if reason:
         return _message(409, reason)
     return None
-
-
-async def _shop_gpsr(session, user_id: str):
-    connection = await connections.get_shopify(session, user_id)
-    return connection.gpsr_identity if connection is not None else None
 
 
 def _generation_system(base: str, facts, shop_gpsr=None) -> str:
@@ -479,10 +462,10 @@ async def generate_content(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
+    loaded = await product.load(session, user_id, image_id)
+    if loaded is None:
         return _message(404, "Image not found")
-    facts = await _facts_for_product(session, image, user_id)
+    image, facts = loaded.photo, loaded.facts
     refused = _refuse_ungated_listing_copy(facts)
     if refused is not None:
         return refused
@@ -499,9 +482,11 @@ async def generate_content(
         f"Target audience: {body.audience or 'general buyers'}\n"
         f"Product title context: {image.title or image.original_name or ''}"
     )
-    shop_gpsr = await _shop_gpsr(session, user_id)
     messages = [
-        {"role": "system", "content": _generation_system(GENERATE_CONTENT_SYSTEM, facts, shop_gpsr)},
+        {
+            "role": "system",
+            "content": _generation_system(GENERATE_CONTENT_SYSTEM, facts, loaded.shop_gpsr),
+        },
         {
             "role": "user",
             "content": [
@@ -528,10 +513,10 @@ async def regenerate_field(
     session: SessionDep,
     settings: SettingsDep,
 ):
-    image = await store.get_image(session, image_id, user_id)
-    if not _owned(image, user_id):
+    loaded = await product.load(session, user_id, image_id)
+    if loaded is None:
         return _message(404, "Image not found")
-    facts = await _facts_for_product(session, image, user_id)
+    image, facts = loaded.photo, loaded.facts
     refused = _refuse_ungated_listing_copy(facts)
     if refused is not None:
         return refused
@@ -551,9 +536,8 @@ async def regenerate_field(
         f"Target audience: {body.audience or 'general buyers'}\n"
         f"Product title context: {image.title or image.original_name or ''}"
     )
-    shop_gpsr = await _shop_gpsr(session, user_id)
     messages = [
-        {"role": "system", "content": _generation_system(system_prompt, facts, shop_gpsr)},
+        {"role": "system", "content": _generation_system(system_prompt, facts, loaded.shop_gpsr)},
         {
             "role": "user",
             "content": [
