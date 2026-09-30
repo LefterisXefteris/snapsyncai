@@ -1,5 +1,12 @@
-"""Listing copy refresh module — demand-shaped rewrite stays gated on facts and copy."""
+"""Listing copy refresh module — demand-shaped rewrite stays gated on facts and copy.
 
+The HTTP tests map each propose and accept outcome to its status; the rules behind them
+are tested in `test_listing_copy_propose.py` and `test_listing_copy_accept.py`.
+"""
+
+import pytest
+
+from app.services import listing_copy_propose
 from app.services.listing_copy_refresh import (
     accept_listing_copy_refresh,
     parse_refresh_proposal,
@@ -9,6 +16,7 @@ from app.services.listing_copy_refresh import (
     seed_search_demand,
     start_listing_copy_refresh,
 )
+from app.services.plan import NEED_PLAN
 from app.services.product_facts import (
     ProductFacts,
     confirm_facts,
@@ -16,6 +24,8 @@ from app.services.product_facts import (
     facts_from_stored,
     persistable_from_vision,
 )
+from tests import seed
+from tests.seed import OTHER_SELLER
 
 VISION_NON_TEXTILE = {"isTextile": False}
 
@@ -382,122 +392,120 @@ def test_accept_refresh_rejects_a_mutated_facts_block() -> None:
     assert accepted.listing_copy is None
 
 
-def _refresh_client(monkeypatch):
-    from fastapi.testclient import TestClient
-
-    from app.config import get_settings
-    from app.db import get_session
-    from app.main import create_app
-
-    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@localhost:5432/db")
-    monkeypatch.setenv("CLERK_SECRET_KEY", "sk_test_fake")
-    monkeypatch.setenv("DEV_BYPASS_AUTH", "true")
-    monkeypatch.setenv("SEARCH_DEMAND_API_KEY", "sk-demand")
-    monkeypatch.setenv("SEARCH_DEMAND_URL", "https://demand.example/queries")
-    get_settings.cache_clear()
-    app = create_app()
-
-    async def _no_db():
-        yield None
-
-    app.dependency_overrides[get_session] = _no_db
-    return TestClient(app, raise_server_exceptions=False)
+PROPOSAL = {
+    "tags": ["cotton", "tee"],
+    "description": "<p>A cotton tee.</p>",
+    "seoTitle": "Cotton tee",
+    "seoDescription": "Buy a cotton tee",
+}
 
 
-def test_refresh_http_refuses_unconfirmed_facts(monkeypatch) -> None:
-    from app.auth.clerk import DEV_USER_ID
-    from app.config import get_settings
-    from app.models.image import Image
-    from app.services import connections
-    from app.services import images as store
+class External:
+    """Stands in for search demand and the model on the propose module."""
 
-    photo = Image(
-        id=21,
-        original_name="shirt.jpg",
-        mime_type="image/jpeg",
-        size=12,
-        session_id=DEV_USER_ID,
-        title="Cotton tee",
-    )
+    def __init__(self) -> None:
+        self.reply: dict | None = PROPOSAL
 
-    async def fake_get(_session, image_id: int, _session_id: str = ""):
-        return photo if image_id == photo.id else None
-
-    async def fake_group(_session, image_id: int, _user_id: str):
-        return [photo] if image_id == photo.id else []
-
-    async def fake_shopify(_session, _user_id: str):
-        return None
-
-    monkeypatch.setattr(store, "get_image", fake_get)
-    monkeypatch.setattr(store, "get_image_group", fake_group)
-    monkeypatch.setattr(connections, "get_shopify", fake_shopify)
-    client = _refresh_client(monkeypatch)
-    try:
-        response = client.post(f"/api/images/{photo.id}/listing-copy/refresh")
-        assert response.status_code == 409
-        assert response.json() == {
-            "message": "Confirm product facts before refreshing listing copy."
-        }
-    finally:
-        get_settings.cache_clear()
-
-
-def test_refresh_http_returns_a_pack_from_demand(monkeypatch) -> None:
-    from app.auth.clerk import DEV_USER_ID
-    from app.config import get_settings
-    from app.models.image import Image
-    from app.services import connections
-    from app.services import images as store
-    from app.services import listing_copy_propose as propose_module
-    from app.services.product_facts import stored_from_facts
-
-    photo = Image(
-        id=22,
-        original_name="shirt.jpg",
-        mime_type="image/jpeg",
-        size=12,
-        session_id=DEV_USER_ID,
-        title="Cotton tee",
-        description="<p>A tee.</p>",
-        product_facts=stored_from_facts(_confirmed_facts()),
-    )
-
-    async def fake_get(_session, image_id: int, _session_id: str = ""):
-        return photo if image_id == photo.id else None
-
-    async def fake_group(_session, image_id: int, _user_id: str):
-        return [photo] if image_id == photo.id else []
-
-    async def fake_fetch(_seeds, _url, _key, *, login=None):
+    async def fetch(self, _seeds, _url, _key, *, login=None):
         return ("cotton t-shirt",)
 
-    async def fake_propose(_constraints, **_kwargs):
-        return {
-            "tags": ["cotton", "tee"],
-            "description": "<p>A cotton tee.</p>",
-            "seoTitle": "Cotton tee",
-            "seoDescription": "Buy a cotton tee",
-        }
+    async def propose(self, _constraints, *, trace=None):
+        return self.reply
 
-    async def fake_shopify(_session, _user_id: str):
-        return None
 
-    monkeypatch.setattr(store, "get_image", fake_get)
-    monkeypatch.setattr(store, "get_image_group", fake_group)
-    monkeypatch.setattr(connections, "get_shopify", fake_shopify)
-    monkeypatch.setattr(propose_module, "fetch_search_demand", fake_fetch)
-    monkeypatch.setattr(propose_module, "propose_refresh_pack", fake_propose)
-    client = _refresh_client(monkeypatch)
-    try:
-        response = client.post(f"/api/images/{photo.id}/listing-copy/refresh")
-        assert response.status_code == 200
-        assert response.json() == {
-            "tags": ["cotton", "tee"],
-            "description": "<p>A cotton tee.</p>",
-            "seoTitle": "Cotton tee",
-            "seoDescription": "Buy a cotton tee",
-            "queries": ["cotton t-shirt"],
-        }
-    finally:
-        get_settings.cache_clear()
+@pytest.fixture
+def external(monkeypatch) -> External:
+    fake = External()
+    monkeypatch.setattr(listing_copy_propose, "fetch_search_demand", fake.fetch)
+    monkeypatch.setattr(listing_copy_propose, "propose_refresh_pack", fake.propose)
+    return fake
+
+
+@pytest.fixture
+def settings(db_settings):
+    return db_settings.model_copy(
+        update={"search_demand_url": "https://demand.test/queries", "search_demand_api_key": "k"}
+    )
+
+
+async def test_refresh_http_returns_the_proposal_and_queries(db, api, settings, external) -> None:
+    tee = await seed.product(db, facts=seed.confirmed_facts())
+
+    response = await api(f"/api/images/{tee}/listing-copy/refresh", settings=settings)
+
+    assert response.status_code == 200
+    assert response.json() == {**PROPOSAL, "queries": ["cotton t-shirt"]}
+
+
+async def test_refresh_http_is_a_conflict_while_blocked(db, api, settings) -> None:
+    tee = await seed.product(db)
+
+    response = await api(f"/api/images/{tee}/listing-copy/refresh", settings=settings)
+
+    assert response.status_code == 409
+    assert response.json() == {"message": "Confirm product facts before refreshing listing copy."}
+
+
+async def test_refresh_http_is_a_bad_gateway_when_the_reply_is_unreadable(
+    db, api, settings, external
+) -> None:
+    external.reply = None
+    tee = await seed.product(db, facts=seed.confirmed_facts())
+
+    response = await api(f"/api/images/{tee}/listing-copy/refresh", settings=settings)
+
+    assert response.status_code == 502
+    assert response.json() == {"message": "Could not parse listing copy refresh."}
+
+
+async def test_refresh_http_of_another_sellers_product_is_not_found(db, api, settings) -> None:
+    theirs = await seed.product(db, owner=OTHER_SELLER, facts=seed.confirmed_facts())
+
+    response = await api(f"/api/images/{theirs}/listing-copy/refresh", settings=settings)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Image not found"}
+
+
+async def test_refresh_accept_http_returns_the_saved_product(db, api) -> None:
+    await seed.plan(db)
+    tee = await seed.product(db, facts=seed.confirmed_facts())
+
+    response = await api(f"/api/images/{tee}/listing-copy/refresh/accept", PROPOSAL)
+
+    assert response.status_code == 200
+    assert response.json()["seoTitle"] == "Cotton tee"
+    assert response.json()["tags"] == ["cotton", "tee"]
+
+
+async def test_refresh_accept_http_is_a_conflict_when_the_proposal_drops_the_facts_block(
+    db, api
+) -> None:
+    await seed.plan(db)
+    tee = await seed.product(db, facts=seed.confirmed_facts(textile=True))
+
+    response = await api(f"/api/images/{tee}/listing-copy/refresh/accept", PROPOSAL)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "message": "Proposed description must keep the product-facts block unchanged."
+    }
+
+
+async def test_refresh_accept_http_without_a_plan_is_forbidden(db, api) -> None:
+    tee = await seed.product(db, facts=seed.confirmed_facts())
+
+    response = await api(f"/api/images/{tee}/listing-copy/refresh/accept", PROPOSAL)
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": NEED_PLAN}
+
+
+async def test_refresh_accept_http_of_another_sellers_product_is_not_found(db, api) -> None:
+    await seed.plan(db)
+    theirs = await seed.product(db, owner=OTHER_SELLER, facts=seed.confirmed_facts())
+
+    response = await api(f"/api/images/{theirs}/listing-copy/refresh/accept", PROPOSAL)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Image not found"}

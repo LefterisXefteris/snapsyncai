@@ -1,9 +1,7 @@
 """POST /api/images/{id}/generate-content — listing copy stays gated on facts and photo bytes."""
 
-import httpx
 from fastapi.testclient import TestClient
 
-from app.auth.clerk import current_user_id
 from app.config import get_settings
 from app.db import get_session
 from app.main import create_app
@@ -28,7 +26,7 @@ def _client(monkeypatch) -> TestClient:
 
 
 async def test_generate_content_tells_the_seller_to_reupload_a_missing_photo(
-    db, db_settings, monkeypatch
+    db, api, monkeypatch
 ) -> None:
     await seed.plan(db)
     photo_id = await seed.product(db, facts=seed.confirmed_facts(), listed=False)
@@ -37,23 +35,10 @@ async def test_generate_content_tells_the_seller_to_reupload_a_missing_photo(
         return None
 
     monkeypatch.setattr(store, "load_image_bytes", no_bytes)
-    monkeypatch.setenv("DATABASE_URL", db_settings.database_url)
-    get_settings.cache_clear()
-    app = create_app()
-    get_settings.cache_clear()
-
-    async def _db():
-        yield db
-
-    app.dependency_overrides[get_session] = _db
-    app.dependency_overrides[current_user_id] = lambda: seed.SELLER
-    app.dependency_overrides[get_settings] = lambda: db_settings
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post(
-            f"/api/images/{photo_id}/generate-content",
-            json={"category": "", "styleTone": "professional", "audience": ""},
-        )
+    response = await api(
+        f"/api/images/{photo_id}/generate-content",
+        {"category": "", "styleTone": "professional", "audience": ""},
+    )
     assert response.status_code == 400
     assert response.json() == {
         "message": "This photo's file is missing. Re-upload it before generating listing copy."
