@@ -7,6 +7,8 @@ so Python must decrypt existing DB rows and write ciphertext Express can still r
 
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlparse
+
 import httpx
 import pytest
 from cryptography.exceptions import InvalidTag
@@ -172,6 +174,28 @@ class TestOAuthRouteContract:
             assert "shopify=error" in shopify.headers["location"]
         finally:
             client.app.dependency_overrides.clear()
+
+    def test_start_returns_the_authorize_url_for_the_signed_in_seller(
+        self, client: TestClient, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("SHOPIFY_API_KEY", "key")
+        monkeypatch.setenv("SHOPIFY_API_SECRET", "shopify-secret")
+        get_settings.cache_clear()
+        client.app.dependency_overrides[current_user_id] = lambda: "user_123"
+        try:
+            response = client.get(
+                "/api/shopify/oauth/start",
+                params={"shop": "rawurban-3"},
+                follow_redirects=False,
+            )
+        finally:
+            client.app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        url = response.json()["url"]
+        assert url.startswith("https://rawurban-3.myshopify.com/admin/oauth/authorize?")
+        state = parse_qs(urlparse(url).query)["state"][0]
+        assert verify_shopify_oauth_state(state, "shopify-secret")["userId"] == "user_123"
 
     def test_openapi_connect_payloads_are_camel_case(self, client: TestClient) -> None:
         schemas = client.get("/openapi.json").json()["components"]["schemas"]

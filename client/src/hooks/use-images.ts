@@ -434,9 +434,14 @@ export function useShopifyConnect() {
 
   return useMutation({
     mutationFn: async ({ shopDomain }: { shopDomain: string }) => {
-      rememberConnectFrom(window.location.pathname);
       const params = new URLSearchParams({ shop: shopDomain });
-      window.location.assign(`${apiUrl(api.shopify.oauthStart.path)}?${params.toString()}`);
+      const res = await apiFetch(`${api.shopify.oauthStart.path}?${params.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) {
+        throw new Error(data.message || "Failed to start Shopify authorization.");
+      }
+      rememberConnectFrom(window.location.pathname);
+      window.location.assign(data.url);
     },
     onError: (error) => {
       toast({ title: "Connection Failed", description: error.message || "Failed to start Shopify authorization.", variant: "destructive" });
