@@ -132,6 +132,18 @@ class ShopifyShop:
 
     def _product_set(self, variables: dict) -> dict:
         given = variables["productSet"]
+        if given.get("variants") and not given.get("productOptions"):
+            return {
+                "productSet": {
+                    "product": None,
+                    "userErrors": [
+                        {
+                            "field": ["productOptions"],
+                            "message": "Product options input is required when updating variants",
+                        }
+                    ],
+                }
+            }
         if "id" in given:
             product = self.products.get(given["id"])
             if product is None:

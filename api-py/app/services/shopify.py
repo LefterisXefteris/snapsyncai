@@ -318,6 +318,9 @@ async def create_shopify_product(
     product_status: str | None = None,
 ) -> dict[str, Any]:
     image_variants = image.variants if isinstance(getattr(image, "variants", None), list) else []
+    if not image_variants:
+        # productSet rejects variants without options; Shopify's own option-less shape.
+        image_variants = [{"name": "Title", "values": ["Default Title"]}]
     combinations: list[list[str]] = [[]]
     if image_variants:
         combinations = []
