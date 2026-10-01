@@ -197,6 +197,25 @@ class TestOAuthRouteContract:
         state = parse_qs(urlparse(url).query)["state"][0]
         assert verify_shopify_oauth_state(state, "shopify-secret")["userId"] == "user_123"
 
+    def test_shopify_returns_the_seller_to_the_api_host(
+        self, client: TestClient, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("SHOPIFY_API_KEY", "key")
+        monkeypatch.setenv("SHOPIFY_API_SECRET", "shopify-secret")
+        monkeypatch.setenv("APP_BASE_URL", "https://www.snapsyncai.co.uk")
+        monkeypatch.setenv("API_BASE_URL", "https://api.snapsyncai.co.uk")
+        get_settings.cache_clear()
+        client.app.dependency_overrides[current_user_id] = lambda: "user_123"
+        try:
+            response = client.get("/api/shopify/oauth/start", params={"shop": "rawurban-3"})
+        finally:
+            client.app.dependency_overrides.clear()
+
+        query = parse_qs(urlparse(response.json()["url"]).query)
+        assert query["redirect_uri"] == [
+            "https://api.snapsyncai.co.uk/api/shopify/oauth/callback"
+        ]
+
     def test_openapi_connect_payloads_are_camel_case(self, client: TestClient) -> None:
         schemas = client.get("/openapi.json").json()["components"]["schemas"]
         assert "shopName" in schemas["ShopifyConnectResponse"]["properties"]

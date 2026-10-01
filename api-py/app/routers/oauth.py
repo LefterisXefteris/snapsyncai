@@ -99,7 +99,7 @@ async def shopify_oauth_start(
         if not shop or not is_valid_shopify_domain(shop):
             return _message(400, "Invalid Shopify shop domain. Use your-store.myshopify.com.")
 
-        redirect_uri = f"{config['app_base_url']}/api/shopify/oauth/callback"
+        redirect_uri = f"{config['api_base_url']}/api/shopify/oauth/callback"
         state = create_shopify_oauth_state(user_id, config["api_secret"])
         auth_url = build_shopify_oauth_authorize_url(
             shop=shop,

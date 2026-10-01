@@ -46,6 +46,7 @@ STRIPE_SECRET_KEY
 STRIPE_PUBLISHABLE_KEY
 STRIPE_WEBHOOK_SECRET
 APP_BASE_URL=https://www.snapsyncai.co.uk
+API_BASE_URL=https://api.snapsyncai.co.uk
 CORS_ALLOW_ORIGINS=https://www.snapsyncai.co.uk,https://snapsyncai.co.uk
 SENTRY_DSN
 SUPABASE_URL

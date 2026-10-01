@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     environment: Literal["development", "production", "test"] = "development"
     port: int = 8000
     app_base_url: str = "http://localhost:5001"
+    # Public origin of this API when it is not served under `app_base_url` (prod: `api.`).
+    api_base_url: str | None = None
     sentry_dsn: str | None = None
 
     # --- Auth ---------------------------------------------------------------
