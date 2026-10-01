@@ -15,6 +15,7 @@ WAREHOUSE = "gid://shopify/Location/10"
 SHOP_FLOOR = "gid://shopify/Location/11"
 
 _OPERATION = re.compile(r"\b(?:query|mutation)\s+(\w+)")
+_FIRST = re.compile(r"\bfirst:\s*(\d+)")
 
 
 @dataclass
@@ -79,6 +80,8 @@ class ShopifyShop:
         }
 
     async def __call__(self, query: str, variables: dict[str, Any] | None = None) -> dict:
+        if any(int(n) > 250 for n in _FIRST.findall(query)):
+            raise RuntimeError("first cannot exceed 250.")
         match = _OPERATION.search(query)
         name = match.group(1) if match else None
         handler = {

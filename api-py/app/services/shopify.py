@@ -332,8 +332,9 @@ async def create_shopify_product(
                 combinations = [[value] for value in values]
             else:
                 combinations = [combo + [value] for combo in combinations for value in values]
-    if len(combinations) > 2048:
-        raise RuntimeError("Shopify supports at most 2048 variants per product")
+    # The productSet response reads variants back in one page, and Shopify caps a page at 250.
+    if len(combinations) > 250:
+        raise RuntimeError("SnapSync supports at most 250 variants per product")
 
     base_sku = str(getattr(image, "sku", None) or f"SS-{image.id}")
     product_set: dict[str, Any] = {}
@@ -400,7 +401,7 @@ async def create_shopify_product(
           productSet(synchronous: true, input: $productSet) {
             product {
               id
-              variants(first: 2048) {
+              variants(first: 250) {
                 nodes { id sku inventoryItem { id tracked } }
               }
             }
