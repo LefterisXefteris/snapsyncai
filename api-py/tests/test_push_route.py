@@ -28,6 +28,27 @@ async def test_a_push_answers_the_results(db, push_route) -> None:
     }
 
 
+async def test_a_retry_after_a_failed_publish_updates_the_same_product(db, push_route) -> None:
+    pid = await _product(db)
+    shop = ShopifyShop()
+    publish_fails = True
+
+    async def flaky(query, variables=None):
+        if publish_fails and "mutation SnapSyncPublish" in query:
+            raise RuntimeError("Shopify is down")
+        return await shop(query, variables)
+
+    first = await push_route(flaky, {"ids": [pid], **STOREFRONT})
+    assert first.json()["failed"] == 1
+    assert first.json()["results"][0]["error"] == "Shopify is down"
+
+    publish_fails = False
+    second = await push_route(flaky, {"ids": [pid], **STOREFRONT})
+    assert second.json()["success"] == 1
+    assert len(shop.products) == 1
+    assert shop.only_product().publications == {ONLINE_STORE}
+
+
 async def test_missing_listing_copy_is_402_with_the_count(db, push_route) -> None:
     first = await _product(db, listed=False)
     second = await seed.product(db, listed=False)

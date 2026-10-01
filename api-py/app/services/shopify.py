@@ -453,7 +453,12 @@ async def create_shopify_product(
         else list(getattr(image, "shopify_publication_ids", None) or [])
     )
     if all(scope in granted_scopes for scope in ("read_publications", "write_publications")):
-        await apply_shopify_publications(graphql, product["id"], desired_ids)
+        # The product exists now; raising would lose its id and a retry would create another.
+        try:
+            await apply_shopify_publications(graphql, product["id"], desired_ids)
+        except Exception as exc:
+            logger.exception("Shopify publications failed for created product %s", product["id"])
+            product["publications_error"] = str(exc) or "Failed to set where the product is available"
     return product
 
 
@@ -522,6 +527,7 @@ async def push_product_to_shopify(
         return {
             "shopify_product_id": product["id"],
             "variants": product["variants"]["nodes"],
+            "error": product.get("publications_error"),
         }
     except Exception as exc:
         logger.exception("Shopify push error")

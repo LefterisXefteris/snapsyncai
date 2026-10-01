@@ -278,8 +278,9 @@ async def push_products(
         if result.get("shopify_product_id"):
             from app.services.inventory.service import register_published_shopify_product
 
+            error = result.get("error")
             written: int | None = None
-            if landing:
+            if landing and not error:
                 if previous is None:
                     stock_not_set = True
                 elif previous is False:
@@ -304,17 +305,23 @@ async def push_products(
             )
             updates = {
                 "shopify_product_id": result["shopify_product_id"],
-                "shopify_status": "synced",
+                "shopify_status": "failed" if error else "synced",
                 "shopify_product_status": desired_status,
-                "shopify_publication_ids": desired_ids,
             }
+            if not error:
+                updates["shopify_publication_ids"] = desired_ids
             if primary.product_group_id:
                 await store.update_images_by_group_id(session, primary.product_group_id, updates)
             else:
                 await store.update_image(session, primary.id, updates, user_id)
-            success += 1
+            if error:
+                failed += 1
+            else:
+                success += 1
             results.append(
-                PushResult(id=primary.id, shopify_product_id=result["shopify_product_id"])
+                PushResult(
+                    id=primary.id, shopify_product_id=result["shopify_product_id"], error=error
+                )
             )
         else:
             await store.update_image(session, primary.id, {"shopify_status": "failed"}, user_id)
