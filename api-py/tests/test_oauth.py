@@ -24,6 +24,7 @@ from app.services.shopify import get_shopify_graphql_at
 from app.services.shopify_oauth import (
     build_shopify_oauth_authorize_url,
     create_shopify_oauth_state,
+    granted_shopify_scopes,
     is_valid_shopify_domain,
     normalize_shopify_domain,
     verify_shopify_hmac,
@@ -141,6 +142,20 @@ class TestShopifyOAuthHelpers:
         assert verify_shopify_oauth_state(state, "shopify-secret", now=11 * 60 * 1_000) == {
             "ok": False,
             "reason": "expired",
+        }
+
+    def test_write_scopes_grant_their_read_scopes(self) -> None:
+        # Shopify drops `read_x` from the granted list when `write_x` was also granted.
+        assert granted_shopify_scopes(
+            "write_products,write_inventory,read_locations,write_publications"
+        ) == {
+            "read_products",
+            "write_products",
+            "read_inventory",
+            "write_inventory",
+            "read_locations",
+            "read_publications",
+            "write_publications",
         }
 
     def test_authorize_url(self) -> None:
