@@ -147,9 +147,11 @@ def build_shopify_oauth_authorize_url(
 
 
 def shopify_oauth_config(settings: Settings) -> dict[str, str]:
+    app_base_url = (settings.app_base_url or DEFAULT_APP_BASE_URL).rstrip("/")
     return {
         "api_key": settings.shopify_client_id_resolved or "",
         "api_secret": settings.shopify_client_secret_resolved or "",
         "scopes": settings.shopify_scopes or DEFAULT_SHOPIFY_SCOPES,
-        "app_base_url": (settings.app_base_url or DEFAULT_APP_BASE_URL).rstrip("/"),
+        "app_base_url": app_base_url,
+        "api_base_url": (settings.api_base_url or app_base_url).rstrip("/"),
     }

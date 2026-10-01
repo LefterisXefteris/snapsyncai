@@ -74,12 +74,18 @@ def _query_str(query: dict[str, str | list[str]], key: str) -> str:
 # --- Shopify ----------------------------------------------------------------
 
 
-@router.get("/api/shopify/oauth/start", response_model=None)
+class ShopifyOAuthStartResponse(CamelModel):
+    url: str
+
+
+# JSON, not a redirect: a top-level navigation to the `api.` host carries no Bearer
+# token, so the SPA fetches this and then navigates to `url` itself.
+@router.get("/api/shopify/oauth/start", response_model=ShopifyOAuthStartResponse)
 async def shopify_oauth_start(
     request: Request,
     user_id: CurrentUser,
     settings: SettingsDep,
-) -> RedirectResponse | JSONResponse:
+) -> ShopifyOAuthStartResponse | JSONResponse:
     try:
         config = shopify_oauth_config(settings)
         if not config["api_key"] or not config["api_secret"]:
@@ -93,7 +99,7 @@ async def shopify_oauth_start(
         if not shop or not is_valid_shopify_domain(shop):
             return _message(400, "Invalid Shopify shop domain. Use your-store.myshopify.com.")
 
-        redirect_uri = f"{config['app_base_url']}/api/shopify/oauth/callback"
+        redirect_uri = f"{config['api_base_url']}/api/shopify/oauth/callback"
         state = create_shopify_oauth_state(user_id, config["api_secret"])
         auth_url = build_shopify_oauth_authorize_url(
             shop=shop,
@@ -102,7 +108,7 @@ async def shopify_oauth_start(
             redirect_uri=redirect_uri,
             state=state,
         )
-        return RedirectResponse(url=auth_url, status_code=302)
+        return ShopifyOAuthStartResponse(url=auth_url)
     except Exception:
         logger.exception("Shopify OAuth start error")
         return _message(500, "Failed to start Shopify authorization")
