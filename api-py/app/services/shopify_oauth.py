@@ -13,6 +13,7 @@ import json
 import re
 import secrets
 import time
+from collections.abc import Iterable
 from typing import Literal
 from urllib.parse import urlencode
 
@@ -125,6 +126,15 @@ def verify_shopify_hmac(query: dict, secret: str) -> bool:
     entries.sort(key=lambda pair: (pair[0], pair[1]))
     message = "&".join(f"{key}={value}" for key, value in entries)
     return timing_safe_equal_hex(provided, hmac_sha256_hex(secret, message))
+
+
+def granted_shopify_scopes(scopes: str | Iterable[str]) -> set[str]:
+    """Shopify omits `read_x` from the granted list when `write_x` is granted; restore it."""
+    raw = scopes.split(",") if isinstance(scopes, str) else scopes
+    granted = {scope.strip() for scope in raw if scope and scope.strip()}
+    return granted | {
+        f"read_{scope.removeprefix('write_')}" for scope in granted if scope.startswith("write_")
+    }
 
 
 def build_shopify_oauth_authorize_url(

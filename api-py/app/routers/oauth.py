@@ -23,6 +23,7 @@ from app.services.shopify import ShopifyGraphQLAtDep, get_shopify_shop_identity
 from app.services.shopify_oauth import (
     build_shopify_oauth_authorize_url,
     create_shopify_oauth_state,
+    granted_shopify_scopes,
     is_valid_shopify_domain,
     normalize_shopify_domain,
     shopify_oauth_config,
@@ -172,13 +173,16 @@ async def shopify_oauth_callback(
         if not access_token:
             return fail("token_exchange_failed")
 
-        granted = {
-            scope.strip()
-            for scope in (token_data.get("scope") or "").split(",")
-            if scope.strip()
-        }
+        granted = granted_shopify_scopes(token_data.get("scope") or "")
         required = [scope.strip() for scope in config["scopes"].split(",") if scope.strip()]
-        if any(scope not in granted for scope in required):
+        missing = [scope for scope in required if scope not in granted]
+        if missing:
+            logger.warning(
+                "Shopify OAuth for %s missing scopes %s (granted %r)",
+                shop,
+                missing,
+                token_data.get("scope"),
+            )
             return fail("missing_inventory_scopes")
 
         identity = await get_shopify_shop_identity(shopify_graphql_at(shop, access_token))
@@ -233,7 +237,7 @@ async def shopify_connect(
                 body.access_token, settings.connection_encryption_key or ""
             ),
             shop_name=shop_name,
-            granted_scopes=identity["granted_scopes"],
+            granted_scopes=sorted(granted_shopify_scopes(identity["granted_scopes"])),
         )
         return ShopifyConnectResponse(connected=True, shop_name=shop_name, shop_domain=full_domain)
     except Exception:
