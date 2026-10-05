@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.models.website import PublishedWebsite
+from app.models.website import PublishedWebsite, WebsitePrototypeRecord
 from app.services import connections
 from app.services import images as store
 from app.services.plan import NEED_OVERFLOW_CONFIRM
@@ -424,3 +424,81 @@ async def publish_website(
         )
         return Published(refused=refused_kind, message=landed.refused)
     return Published(storefront=landed.result, spent=landed.spent)
+
+
+@dataclass(frozen=True)
+class SavedPrototype:
+    product_ids: tuple[int, ...]
+    brief: str
+    look: None = None
+
+
+async def _eligible_by_id(session: AsyncSession, user_id: str) -> dict[int, WebsiteProduct]:
+    images = await store.list_images(session, user_id)
+    return {product.id: product for product in eligible_products(photos_from_images(images))}
+
+
+def _kept_ids(
+    product_ids: Sequence[int], eligible: Mapping[int, WebsiteProduct]
+) -> tuple[int, ...]:
+    kept: list[int] = []
+    seen: set[int] = set()
+    for product_id in product_ids:
+        if product_id in eligible and product_id not in seen:
+            kept.append(int(product_id))
+            seen.add(int(product_id))
+    return tuple(kept)
+
+
+async def _prototype_row(session: AsyncSession, user_id: str) -> WebsitePrototypeRecord | None:
+    return (
+        await session.execute(
+            select(WebsitePrototypeRecord).where(WebsitePrototypeRecord.session_id == user_id)
+        )
+    ).scalar_one_or_none()
+
+
+async def save_website_prototype(
+    session: AsyncSession,
+    _settings: Settings,
+    user_id: str,
+    *,
+    product_ids: Sequence[int],
+    brief: str,
+) -> SavedPrototype:
+    kept = _kept_ids(product_ids, await _eligible_by_id(session, user_id))
+    text = brief.strip()
+    row = await _prototype_row(session, user_id)
+    if row is None:
+        row = WebsitePrototypeRecord(
+            session_id=user_id, product_ids=list(kept), brief=text, look=None
+        )
+        session.add(row)
+    else:
+        row.product_ids = list(kept)
+        row.brief = text
+    await session.flush()
+    return SavedPrototype(product_ids=kept, brief=text)
+
+
+async def saved_website_prototype(
+    session: AsyncSession, _settings: Settings, user_id: str
+) -> SavedPrototype:
+    row = await _prototype_row(session, user_id)
+    if row is None:
+        return SavedPrototype(product_ids=(), brief="")
+    stored = row.product_ids if isinstance(row.product_ids, list) else []
+    ids = [int(item) for item in stored if isinstance(item, int)]
+    kept = _kept_ids(ids, await _eligible_by_id(session, user_id))
+    text = row.brief if isinstance(row.brief, str) else ""
+    if list(kept) != ids:
+        row.product_ids = list(kept)
+        await session.flush()
+    return SavedPrototype(product_ids=kept, brief=text)
+
+
+async def publish_saved_website(
+    session: AsyncSession, settings: Settings, user_id: str
+) -> Published:
+    await saved_website_prototype(session, settings, user_id)
+    return Published(refused="invalid", message="A look has to come back before Publish.")

@@ -28,6 +28,7 @@ EXPECTED_TABLES = {
     "inventory_notifications",
     "conversations",
     "websites",
+    "website_prototypes",
 }
 
 # Known-good literals from the live images table (not derived from SQLModel).

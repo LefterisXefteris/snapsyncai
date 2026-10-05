@@ -17,6 +17,8 @@ from app.services.website_handoff import (
     preview_website,
     publish_website,
     published_storefront,
+    save_website_prototype,
+    saved_website_prototype,
     with_channel_photos,
 )
 
@@ -34,6 +36,14 @@ class WebsitePrototypeResponse(CamelModel):
     shop_connected: bool
     shop_domain: str | None = None
     products: list[WebsiteEligibleProduct]
+    product_ids: list[int] = []
+    brief: str = ""
+    look: Any | None = None
+
+
+class WebsitePrototypeBody(CamelModel):
+    product_ids: list[int]
+    brief: str = ""
 
 
 class WebsitePreviewBody(CamelModel):
@@ -86,15 +96,15 @@ def _storefront_response(site: Storefront) -> StorefrontResponse:
     )
 
 
-@router.get("/api/website/prototype", response_model=WebsitePrototypeResponse)
-async def website_prototype(
-    user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+async def _prototype_response(
+    user_id: str, session: SessionDep, settings: SettingsDep
 ) -> WebsitePrototypeResponse:
     connection = await connections.get_shopify(session, user_id)
     images = await store.list_images(session, user_id)
     products = await with_channel_photos(
         connection, settings, eligible_products(photos_from_images(images))
     )
+    saved = await saved_website_prototype(session, settings, user_id)
     return WebsitePrototypeResponse(
         shop_connected=connection is not None,
         shop_domain=connection.shop_domain if connection is not None else None,
@@ -107,7 +117,31 @@ async def website_prototype(
             )
             for product in products
         ],
+        product_ids=list(saved.product_ids),
+        brief=saved.brief,
+        look=saved.look,
     )
+
+
+@router.get("/api/website/prototype", response_model=WebsitePrototypeResponse)
+async def website_prototype(
+    user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> WebsitePrototypeResponse:
+    return await _prototype_response(user_id, session, settings)
+
+
+@router.put("/api/website/prototype", response_model=WebsitePrototypeResponse)
+async def save_prototype(
+    body: WebsitePrototypeBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> WebsitePrototypeResponse:
+    await save_website_prototype(
+        session,
+        settings,
+        user_id,
+        product_ids=body.product_ids,
+        brief=body.brief,
+    )
+    return await _prototype_response(user_id, session, settings)
 
 
 _PUBLISH_STATUS = {

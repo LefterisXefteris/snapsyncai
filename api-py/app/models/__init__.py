@@ -9,7 +9,6 @@ from app.models.billing import AllowanceSpend, PaidSession, Subscription, UserCr
 from app.models.connections import ShopifyConnection
 from app.models.conversation import ShopConversation
 from app.models.image import Image
-from app.models.website import PublishedWebsite
 from app.models.inventory import (
     InventoryBundleComponent,
     InventoryChannelLink,
@@ -21,6 +20,7 @@ from app.models.inventory import (
     InventorySettings,
     InventoryWebhookEvent,
 )
+from app.models.website import PublishedWebsite, WebsitePrototypeRecord
 
 __all__ = [
     "AllowanceSpend",
@@ -36,6 +36,7 @@ __all__ = [
     "InventoryWebhookEvent",
     "PaidSession",
     "PublishedWebsite",
+    "WebsitePrototypeRecord",
     "ShopConversation",
     "ShopifyConnection",
     "Subscription",

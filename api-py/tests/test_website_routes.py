@@ -25,6 +25,7 @@ def _client(monkeypatch) -> TestClient:
 
 PROTECTED = [
     ("GET", "/api/website/prototype"),
+    ("PUT", "/api/website/prototype"),
     ("POST", "/api/website/preview"),
     ("POST", "/api/website/publish"),
 ]
@@ -50,7 +51,7 @@ def test_website_schemas_are_camel_case(monkeypatch) -> None:
     try:
         schemas = client.get("/openapi.json").json()["components"]["schemas"]
         proto = set(schemas["WebsitePrototypeResponse"]["properties"])
-        assert proto == {"shopConnected", "shopDomain", "products"}
+        assert proto == {"shopConnected", "shopDomain", "products", "productIds", "brief", "look"}
         item = set(schemas["WebsiteEligibleProduct"]["properties"])
         assert {"id", "title", "photoUrl", "shopifyProductId"} <= item
         assert "shopify_product_id" not in item

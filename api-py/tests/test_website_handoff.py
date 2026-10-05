@@ -14,8 +14,11 @@ from app.services.website_handoff import (
     assemble_storefront,
     eligible_products,
     preview_website,
+    publish_saved_website,
     publish_website,
     published_storefront,
+    save_website_prototype,
+    saved_website_prototype,
     snapshot_product,
 )
 from tests import seed
@@ -293,6 +296,54 @@ async def test_publish_without_a_shop_spends_nothing(db, db_settings) -> None:
     assert result.refused == "not_connected"
     assert result.storefront is None
     assert await seed.spends(db) == []
+
+
+async def test_a_product_that_is_no_longer_eligible_leaves_the_picks(db, db_settings) -> None:
+    await seed.shop(db, shop_name="Tees")
+    kept = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    dropped = await seed.product(
+        db, facts=seed.confirmed_facts(), shopify_product_id="gid://shopify/Product/100"
+    )
+    await save_website_prototype(
+        db, db_settings, seed.SELLER, product_ids=[kept, dropped], brief="Quiet type"
+    )
+    await db.execute(update(Image).where(Image.id == dropped).values(shopify_product_id=None))
+    await db.flush()
+    saved = await saved_website_prototype(db, db_settings, seed.SELLER)
+    assert saved.product_ids == (kept,)
+    assert saved.brief == "Quiet type"
+
+
+async def test_publish_without_a_look_spends_nothing(db, db_settings) -> None:
+    await seed.plan(db)
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    await save_website_prototype(
+        db, db_settings, seed.SELLER, product_ids=[pid], brief="Warm paper"
+    )
+    result = await publish_saved_website(db, db_settings, seed.SELLER)
+    assert result.refused == "invalid"
+    assert result.spent is False
+    assert result.storefront is None
+    assert await published_storefront(db, "tees") is None
+    assert await seed.spends(db) == []
+
+
+async def test_the_page_keeps_the_picks_and_the_brief(db, db_settings) -> None:
+    await seed.shop(db, shop_name="Tees")
+    first = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    second = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id="gid://shopify/Product/100")
+    await save_website_prototype(
+        db,
+        db_settings,
+        seed.SELLER,
+        product_ids=[second, first],
+        brief="Warm paper, wide margins",
+    )
+    saved = await saved_website_prototype(db, db_settings, seed.SELLER)
+    assert saved.product_ids == (second, first)
+    assert saved.brief == "Warm paper, wide margins"
+    assert saved.look is None
 
 
 async def test_publish_without_a_plan_spends_nothing(db, db_settings, channel_photos) -> None:

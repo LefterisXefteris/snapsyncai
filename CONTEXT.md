@@ -149,15 +149,23 @@ The default GPSR identity for a connected Shopify shop. A product may override i
 _Avoid_: Account compliance, store settings (as the fact itself)
 
 **Website**:
-The seller's own storefront for one Shopify shop, hosted by SnapSync at that shop's address, not the workspace and not a Channel. Words and photos are whatever the last Publish froze; the shop's price and checkout stay on the Channel.
+The seller's own storefront for one Shopify shop, hosted by SnapSync at that shop's address, not the workspace and not a Channel. Words, photos, and layout are whatever the last Publish froze; the shop's price and checkout stay on the Channel.
 _Avoid_: store, shop (when you mean this), channel, theme, Lovable, handoff
 
 **Website prototype**:
-The palette, type, and products the seller picks before a Publish. Not the live storefront. Voice is those products' listing copy, not a separate tone field.
-_Avoid_: theme, mock, preview (as the job), prompt
+The products the seller picks, in that order, among products already pushed with listing copy, an optional Website brief, and the look the Website agent last built for a home and one page per product; a product that is no longer eligible leaves the picks. Listing copy, photos, confirmed facts, price, and checkout are supplied by SnapSync for every picked product; the seller does not edit that look; the Website page stores the picks, the Website brief, and the last look, and shows them again; a later run replaces the look; a run that returns no look leaves the previous one; it is not the live storefront.
+_Avoid_: theme, mock, preview (as the job), prompt, palette
+
+**Website brief**:
+An optional instruction on a Website prototype about the look. Shoppers do not see it, and a run uses that brief and the picked products from the moment the seller started it.
+_Avoid_: prompt, tagline, story
+
+**Website agent**:
+SnapSync's own agent, inside the product, that builds one shop's Website prototype look at a time. The seller does not run their own; one run is in flight and at most one is waiting; a newer start replaces the waiting run; a run keeps going if the seller leaves the page, sees that shop's picked products and Website brief only, does not Publish, and does not invent product words, fibre, care, or GPSR.
+_Avoid_: Lovable, builder (as a separate product)
 
 **Publish**:
-The seller putting this shop's Website on its SnapSync address. The first one that lands spends one Allowance use; a later one does not. Taking the site down keeps the address. Not a Push and not Go live.
+The seller putting this shop's Website on its SnapSync address, once a Website agent run has returned a look for the picks and Website brief now on the page. The first one that lands spends one Allowance use; a later one does not; taking the site down keeps the address; it is not a Push and not Go live.
 _Avoid_: handoff, deploy, launch
 
 **Plan**:
@@ -165,7 +173,7 @@ Paid access to the workspace for one seller and one Shopify shop. Monthly and an
 _Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock
 
 **Allowance**:
-The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write lands or the first Publish lands. A later Publish does not spend. A failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check. Talk in the conversation is not a use, and there is no separate cap on it.
+The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write lands or the first Publish lands. A later Publish does not spend. A Website agent run does not spend, and there is no cap on runs. A failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check. Talk in the conversation is not a use, and there is no separate cap on it.
 _Avoid_: credits, weekly product limit, unlock, compliance check, top-up, yearly bank
 
 **Overflow**:
