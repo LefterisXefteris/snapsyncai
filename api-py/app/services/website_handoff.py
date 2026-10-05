@@ -1,16 +1,16 @@
-"""Website prototype → Lovable handoff. No Channel, no Shopify credentials."""
+"""Website prototype and Publish. SnapSync hosts the storefront. No Channel credentials."""
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
-from urllib.parse import urlencode
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.models.website import PublishedWebsite
 from app.services import connections
 from app.services import images as store
 from app.services.plan import NEED_OVERFLOW_CONFIRM
@@ -19,8 +19,9 @@ from app.services.product_facts import facts_from_stored, listing_copy_present, 
 from app.services.shopify import list_shopify_product_image_urls, shopify_graphql_for
 from app.services.supabase_storage import channel_photo_url
 
-LOVABLE_BUILD_ORIGIN = "https://lovable.dev/"
-PROMPT_CHAR_LIMIT = 50_000
+STOREFRONT_HOST = "sites.snapsyncai.co.uk"
+PALETTES = frozenset({"ground", "ink", "clay"})
+TYPE_PAIRINGS = frozenset({"sans", "serif"})
 
 SNAPSHOT_KEYS = frozenset(
     {
@@ -39,8 +40,8 @@ SNAPSHOT_KEYS = frozenset(
 )
 
 
-class HandoffError(ValueError):
-    """Seller-facing reason the website cannot be handed to Lovable."""
+class PublishError(ValueError):
+    """Seller-facing reason this Website cannot be previewed or published."""
 
 
 @dataclass(frozen=True)
@@ -75,9 +76,13 @@ class WebsiteProduct:
 
 
 @dataclass(frozen=True)
-class WebsiteHandoff:
-    lovable_url: str
-    product_count: int
+class Storefront:
+    handle: str
+    host: str
+    shop_name: str
+    palette: str
+    type_pairing: str
+    products: tuple[dict[str, Any], ...]
 
 
 def _first_text(photos: Sequence[WebsitePhoto], attr: str) -> str | None:
@@ -193,62 +198,51 @@ def snapshot_product(product: WebsiteProduct) -> dict[str, Any]:
     return snap
 
 
-def _prompt(
-    *,
-    shop_domain: str,
-    look: str,
-    snapshots: list[dict[str, Any]],
-    shop_gpsr: Mapping[str, Any] | None,
-) -> str:
-    look_line = look.strip() or "No extra look notes. Follow the listing copy voice."
-    catalogue = json.dumps(snapshots, ensure_ascii=True, separators=(",", ":"))
-    gpsr_line = ""
-    if shop_gpsr:
-        gpsr_line = (
-            "Shop GPSR identity (use when a product uses the shop default; "
-            f"do not invent): {json.dumps(shop_gpsr, ensure_ascii=True)}\n"
-        )
-    return (
-        "Build a brand website / lookbook storefront for this textile seller.\n"
-        f"Connect the existing Shopify shop at {shop_domain}. "
-        "The seller will Install the Lovable Shopify app on that shop in Lovable. "
-        "Do not ask them to paste API tokens or access tokens.\n"
-        "Use the Shopify product ids below for add-to-cart and checkout. "
-        "Checkout stays on Shopify.\n"
-        "Product words (title, description, SEO, AEO, photos, confirmed facts) come from this "
-        "SnapSync snapshot. Match that listing copy voice on homepage and about. "
-        "Do not invent fibre percentages, care instructions, or GPSR identity.\n"
-        f"{gpsr_line}"
-        f"Look: {look_line}\n"
-        f"Snapshot JSON: {catalogue}"
-    )
+def shop_handle(shop_domain: str) -> str:
+    domain = shop_domain.strip().lower()
+    suffix = ".myshopify.com"
+    if not domain.endswith(suffix):
+        raise PublishError("Shopify is not connected")
+    handle = domain[: -len(suffix)]
+    if not handle or "." in handle:
+        raise PublishError("Shopify is not connected")
+    return handle
 
 
-def build_handoff(
+def assemble_storefront(
     *,
     shop_domain: str,
-    look: str,
+    shop_name: str | None,
+    palette: str,
+    type_pairing: str,
     products: Sequence[WebsiteProduct],
-    shop_gpsr: Mapping[str, Any] | None = None,
-) -> WebsiteHandoff:
-    domain = shop_domain.strip()
-    if not domain:
-        raise HandoffError("Shopify is not connected")
-    if not products:
-        raise HandoffError("Pick products that are pushed to Shopify and have listing copy")
-    snapshots = [snapshot_product(product) for product in products]
-    prompt = _prompt(
-        shop_domain=domain, look=look, snapshots=snapshots, shop_gpsr=shop_gpsr
+    product_ids: Sequence[int],
+) -> Storefront:
+    handle = shop_handle(shop_domain)
+    if palette not in PALETTES:
+        raise PublishError("Pick a palette: Ground, Ink, or Clay")
+    if type_pairing not in TYPE_PAIRINGS:
+        raise PublishError("Pick a type: sans, or a serif for the hero and product titles")
+    by_id = {product.id: product for product in products}
+    chosen: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for product_id in product_ids:
+        product = by_id.get(product_id)
+        if product is None or product_id in seen:
+            continue
+        seen.add(product_id)
+        chosen.append(snapshot_product(product))
+    if not chosen:
+        raise PublishError("Pick products that are pushed to Shopify and have listing copy")
+    name = (shop_name or "").strip() or handle
+    return Storefront(
+        handle=handle,
+        host=f"{handle}.{STOREFRONT_HOST}",
+        shop_name=name,
+        palette=palette,
+        type_pairing=type_pairing,
+        products=tuple(chosen),
     )
-    if len(prompt) > PROMPT_CHAR_LIMIT:
-        raise HandoffError("Too many products for one website handoff. Pick fewer.")
-    query = urlencode({"autosubmit": "true"})
-    fragment = urlencode({"prompt": prompt})
-    url = f"{LOVABLE_BUILD_ORIGIN}?{query}#{fragment}"
-    lowered = url.lower()
-    if "shpat_" in lowered or "shpss_" in lowered or "access_token" in lowered:
-        raise HandoffError("Website handoff refused to include Shopify credentials")
-    return WebsiteHandoff(lovable_url=url, product_count=len(products))
 
 
 async def with_channel_photos(
@@ -267,53 +261,166 @@ async def with_channel_photos(
     return filled
 
 
-HandoffRefused = Literal["not_connected", "plan_blocked", "overflow_confirm", "invalid"]
+PublishRefused = Literal["not_connected", "plan_blocked", "overflow_confirm", "invalid"]
 
 
 @dataclass(frozen=True)
-class HandedOff:
-    handoff: WebsiteHandoff | None = None
+class Published:
+    storefront: Storefront | None = None
     spent: bool = False
-    refused: HandoffRefused | None = None
+    refused: PublishRefused | None = None
     message: str | None = None
 
 
-async def hand_off_website(
+def _storefront_from_row(row: PublishedWebsite) -> Storefront:
+    products = row.products if isinstance(row.products, list) else []
+    return Storefront(
+        handle=row.handle,
+        host=f"{row.handle}.{STOREFRONT_HOST}",
+        shop_name=row.shop_name,
+        palette=row.palette,
+        type_pairing=row.type_pairing,
+        products=tuple(products),
+    )
+
+
+async def _row_for_seller(session: AsyncSession, user_id: str) -> PublishedWebsite | None:
+    result = await session.execute(
+        select(PublishedWebsite).where(PublishedWebsite.session_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def published_storefront(session: AsyncSession, handle: str) -> Storefront | None:
+    result = await session.execute(
+        select(PublishedWebsite).where(PublishedWebsite.handle == handle)
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    return _storefront_from_row(row)
+
+
+async def _draft(
     session: AsyncSession,
     settings: Settings,
     user_id: str,
     *,
-    look: str,
+    palette: str,
+    type_pairing: str,
     product_ids: Sequence[int],
-    confirm_overflow: bool = False,
-) -> HandedOff:
-    """The website page and the conversation both hand off here; one Allowance use when it lands."""
+) -> tuple[Published, Storefront | None]:
     connection = await connections.get_shopify(session, user_id)
     if connection is None:
-        return HandedOff(refused="not_connected", message="Shopify is not connected")
+        return Published(refused="not_connected", message="Shopify is not connected"), None
     images = await store.list_images(session, user_id)
     eligible = await with_channel_photos(
         connection, settings, eligible_products(photos_from_images(images))
     )
-    wanted = set(product_ids)
-    selected = [product for product in eligible if product.id in wanted]
-    identity = connection.gpsr_identity
-
-    async def build():
-        return build_handoff(
+    try:
+        site = assemble_storefront(
             shop_domain=connection.shop_domain,
-            look=look,
-            products=selected,
-            shop_gpsr=identity if isinstance(identity, dict) else None,
+            shop_name=connection.shop_name,
+            palette=palette,
+            type_pairing=type_pairing,
+            products=eligible,
+            product_ids=product_ids,
         )
+    except PublishError as exc:
+        return Published(refused="invalid", message=str(exc)), None
+    return Published(), site
+
+
+async def preview_website(
+    session: AsyncSession,
+    settings: Settings,
+    user_id: str,
+    *,
+    palette: str,
+    type_pairing: str,
+    product_ids: Sequence[int],
+) -> Published:
+    """The page the seller is about to publish. Nothing is stored and nothing is spent."""
+    refused, site = await _draft(
+        session,
+        settings,
+        user_id,
+        palette=palette,
+        type_pairing=type_pairing,
+        product_ids=product_ids,
+    )
+    if site is None:
+        return refused
+    return Published(storefront=site, spent=False)
+
+
+async def publish_website(
+    session: AsyncSession,
+    settings: Settings,
+    user_id: str,
+    *,
+    palette: str,
+    type_pairing: str,
+    product_ids: Sequence[int],
+    confirm_overflow: bool = False,
+) -> Published:
+    """Put this shop's Website on its SnapSync address. The first landing spends one use."""
+    connection = await connections.get_shopify(session, user_id)
+    if connection is None:
+        return Published(refused="not_connected", message="Shopify is not connected")
+    existing = await _row_for_seller(session, user_id)
+    refused, site = await _draft(
+        session,
+        settings,
+        user_id,
+        palette=palette,
+        type_pairing=type_pairing,
+        product_ids=product_ids,
+    )
+    if site is None:
+        return refused
+
+    def fill(row: PublishedWebsite) -> None:
+        row.shop_domain = connection.shop_domain
+        row.handle = site.handle
+        row.shop_name = site.shop_name
+        row.palette = site.palette
+        row.type_pairing = site.type_pairing
+        row.products = list(site.products)
+
+    if existing is not None:
+        fill(existing)
+        await session.flush()
+        return Published(storefront=site, spent=False)
+
+    async def write() -> Storefront:
+        row = PublishedWebsite(
+            session_id=user_id,
+            shop_domain=connection.shop_domain,
+            handle=site.handle,
+            shop_name=site.shop_name,
+            palette=site.palette,
+            type_pairing=site.type_pairing,
+            products=list(site.products),
+        )
+        session.add(row)
+        await session.flush()
+        return site
 
     try:
         landed = await spend_when_landed(
-            session, settings, user_id, "website_handoff", build, confirm_overflow=confirm_overflow
+            session,
+            settings,
+            user_id,
+            "website_handoff",
+            write,
+            confirm_overflow=confirm_overflow,
         )
-    except HandoffError as exc:
-        return HandedOff(refused="invalid", message=str(exc))
+    except PublishError as exc:
+        return Published(refused="invalid", message=str(exc))
     if landed.refused:
-        refused = "overflow_confirm" if landed.refused == NEED_OVERFLOW_CONFIRM else "plan_blocked"
-        return HandedOff(refused=refused, message=landed.refused)
-    return HandedOff(handoff=landed.result, spent=landed.spent)
+        refused_kind = (
+            "overflow_confirm" if landed.refused == NEED_OVERFLOW_CONFIRM else "plan_blocked"
+        )
+        return Published(refused=refused_kind, message=landed.refused)
+    return Published(storefront=landed.result, spent=landed.spent)

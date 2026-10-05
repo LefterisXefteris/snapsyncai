@@ -1,4 +1,6 @@
-"""Website prototype listing and Lovable handoff."""
+"""Website prototype, preview, and Publish. The public storefront is unsigned-in."""
+
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -9,9 +11,12 @@ from app.schemas.base import CamelModel
 from app.services import connections
 from app.services import images as store
 from app.services.website_handoff import (
+    Storefront,
     eligible_products,
-    hand_off_website,
     photos_from_images,
+    preview_website,
+    publish_website,
+    published_storefront,
     with_channel_photos,
 )
 
@@ -31,15 +36,54 @@ class WebsitePrototypeResponse(CamelModel):
     products: list[WebsiteEligibleProduct]
 
 
-class WebsiteHandoffBody(CamelModel):
+class WebsitePreviewBody(CamelModel):
     product_ids: list[int]
-    look: str = ""
+    palette: str
+    type_pairing: str
+
+
+class WebsitePublishBody(WebsitePreviewBody):
     confirm_overflow: bool = False
 
 
-class WebsiteHandoffResponse(CamelModel):
-    lovable_url: str
+class StorefrontProductResponse(CamelModel):
+    id: int
+    shopify_product_id: str
+    title: str | None = None
+    description: str | None = None
+    tags: list[str] = []
+    seo_title: str | None = None
+    seo_description: str | None = None
+    aeo_snippet: str | None = None
+    aeo_faqs: Any = None
+    photo_urls: list[str] = []
+    confirmed_facts: Any = None
+
+
+class StorefrontResponse(CamelModel):
+    handle: str
+    host: str
+    shop_name: str
+    palette: str
+    type_pairing: str
+    products: list[StorefrontProductResponse]
+
+
+class WebsitePublishResponse(CamelModel):
+    host: str
+    spent: bool
     product_count: int
+
+
+def _storefront_response(site: Storefront) -> StorefrontResponse:
+    return StorefrontResponse(
+        handle=site.handle,
+        host=site.host,
+        shop_name=site.shop_name,
+        palette=site.palette,
+        type_pairing=site.type_pairing,
+        products=[StorefrontProductResponse.model_validate(product) for product in site.products],
+    )
 
 
 @router.get("/api/website/prototype", response_model=WebsitePrototypeResponse)
@@ -66,7 +110,7 @@ async def website_prototype(
     )
 
 
-_HANDOFF_STATUS = {
+_PUBLISH_STATUS = {
     "not_connected": status.HTTP_409_CONFLICT,
     "plan_blocked": status.HTTP_403_FORBIDDEN,
     "overflow_confirm": status.HTTP_403_FORBIDDEN,
@@ -74,22 +118,52 @@ _HANDOFF_STATUS = {
 }
 
 
-@router.post("/api/website/handoff", response_model=WebsiteHandoffResponse)
-async def website_handoff(
-    body: WebsiteHandoffBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
-) -> WebsiteHandoffResponse:
-    result = await hand_off_website(
+@router.post("/api/website/preview", response_model=StorefrontResponse)
+async def website_preview(
+    body: WebsitePreviewBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> StorefrontResponse:
+    result = await preview_website(
         session,
         settings,
         user_id,
-        look=body.look,
+        palette=body.palette,
+        type_pairing=body.type_pairing,
+        product_ids=body.product_ids,
+    )
+    if result.refused is not None or result.storefront is None:
+        raise HTTPException(
+            status_code=_PUBLISH_STATUS[result.refused or "invalid"], detail=result.message
+        )
+    return _storefront_response(result.storefront)
+
+
+@router.post("/api/website/publish", response_model=WebsitePublishResponse)
+async def website_publish(
+    body: WebsitePublishBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> WebsitePublishResponse:
+    result = await publish_website(
+        session,
+        settings,
+        user_id,
+        palette=body.palette,
+        type_pairing=body.type_pairing,
         product_ids=body.product_ids,
         confirm_overflow=body.confirm_overflow,
     )
-    if result.refused is not None or result.handoff is None:
+    if result.refused is not None or result.storefront is None:
         raise HTTPException(
-            status_code=_HANDOFF_STATUS[result.refused or "invalid"], detail=result.message
+            status_code=_PUBLISH_STATUS[result.refused or "invalid"], detail=result.message
         )
-    return WebsiteHandoffResponse(
-        lovable_url=result.handoff.lovable_url, product_count=result.handoff.product_count
+    return WebsitePublishResponse(
+        host=result.storefront.host,
+        spent=result.spent,
+        product_count=len(result.storefront.products),
     )
+
+
+@router.get("/api/storefronts/{handle}", response_model=StorefrontResponse)
+async def read_storefront(handle: str, session: SessionDep) -> StorefrontResponse:
+    site = await published_storefront(session, handle)
+    if site is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This website is not published")
+    return _storefront_response(site)

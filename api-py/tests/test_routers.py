@@ -231,7 +231,9 @@ class TestResponseContract:
             "/api/images/push-to-shopify",
             "/api/stripe/webhook",
             "/api/website/prototype",
-            "/api/website/handoff",
+            "/api/website/preview",
+            "/api/website/publish",
+            "/api/storefronts/{handle}",
             "/api/conversation",
         } <= paths
 

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useShopifyConnect } from "@/hooks/use-images";
 import {
   useConversation,
@@ -48,7 +47,6 @@ export default function ConversationPage() {
   const connect = useShopifyConnect();
   const overflow = useOverflowConfirm();
   const [text, setText] = useState("");
-  const [look, setLook] = useState("");
   const [shopDomain, setShopDomain] = useState("");
   const [silenceDraft, setSilenceDraft] = useState<ConversationSilence | null>(null);
 
@@ -64,24 +62,6 @@ export default function ConversationPage() {
           if (confirmOverflow) return;
           overflow.retryIfConfirmRequired(next.reply, (confirmed) => {
             if (confirmed) accept(productId, true);
-          });
-        },
-      },
-    );
-  };
-
-  const handoff = (confirmOverflow = false) => {
-    const productIds = proposal?.items.map((item) => item.productId) ?? [];
-    send.mutate(
-      { act: { kind: "handoff", look, productIds, confirmOverflow } },
-      {
-        onSuccess: (next) => {
-          if (next.reply.startsWith("https://")) {
-            window.open(next.reply, "_blank", "noopener,noreferrer");
-          }
-          if (confirmOverflow) return;
-          overflow.retryIfConfirmRequired(next.reply, (confirmed) => {
-            if (confirmed) handoff(true);
           });
         },
       },
@@ -188,18 +168,13 @@ export default function ConversationPage() {
               </div>
             ))}
             {proposal.job === "website" ? (
-              <div className="space-y-2">
-                <Label htmlFor="conversation-look">Look</Label>
-                <Textarea
-                  id="conversation-look"
-                  value={look}
-                  onChange={(event) => setLook(event.target.value)}
-                  placeholder="Write the look yourself"
-                />
-                <Button size="sm" onClick={() => handoff(false)} disabled={send.isPending || !look.trim()}>
-                  Confirm handoff
-                </Button>
-              </div>
+              <p className="text-sm">
+                Publish stays on the{" "}
+                <Link href="/website" className="underline">
+                  Website page
+                </Link>
+                .
+              </p>
             ) : null}
           </div>
         ) : null}

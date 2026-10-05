@@ -3,51 +3,67 @@ import { Link } from "wouter";
 import { Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { useWebsiteHandoff, useWebsitePrototype } from "@/hooks/use-website";
+import { StorefrontView, type StorefrontDocument } from "@/components/storefront-view";
+import { useWebsitePreview, useWebsitePrototype, useWebsitePublish } from "@/hooks/use-website";
 import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
 import { overflowNoticeText } from "@/lib/overflow-copy";
 import { workspaceNavItem } from "@/lib/workspace-nav";
-import { WEBSITE_EMPTY, WEBSITE_LOOK_HINT, WEBSITE_NEEDS_SHOPIFY } from "@/lib/website-copy";
+import {
+  WEBSITE_EMPTY,
+  WEBSITE_NEEDS_SHOPIFY,
+  WEBSITE_PALETTES,
+  WEBSITE_PREVIEW_NOTE,
+  WEBSITE_TYPES,
+} from "@/lib/website-copy";
 
 export default function WebsitePage() {
   const prototype = useWebsitePrototype();
-  const handoff = useWebsiteHandoff();
+  const preview = useWebsitePreview();
+  const publish = useWebsitePublish();
   const overflow = useOverflowConfirm();
   const settings = workspaceNavItem("settings");
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [look, setLook] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [palette, setPalette] = useState<string | null>(null);
+  const [typePairing, setTypePairing] = useState<string | null>(null);
+  const [previewSite, setPreviewSite] = useState<StorefrontDocument | null>(null);
+  const [publishedHost, setPublishedHost] = useState<string | null>(null);
+  const [openProductId, setOpenProductId] = useState<number | null>(null);
 
   const products = prototype.data?.products ?? [];
-  const allSelected = products.length > 0 && selectedIds.size === products.length;
-
-  const selectedCount = selectedIds.size;
+  const selected = new Set(selectedIds);
+  const allSelected = products.length > 0 && selected.size === products.length;
+  const ready = selectedIds.length > 0 && palette != null && typePairing != null && prototype.data?.shopConnected;
 
   const toggle = (id: number, checked: boolean) => {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
+      if (checked) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter((item) => item !== id);
     });
   };
 
-  const build = () => {
+  const draft = () => ({
+    productIds: selectedIds,
+    palette: palette ?? "",
+    typePairing: typePairing ?? "",
+  });
+
+  const showPreview = () => {
+    setOpenProductId(null);
+    preview.mutate(draft(), {
+      onSuccess: (site) => setPreviewSite(site),
+    });
+  };
+
+  const sendPublish = () => {
     const send = (confirmOverflow: boolean) => {
-      handoff.mutate(
-        { productIds: Array.from(selectedIds), look, confirmOverflow },
+      publish.mutate(
+        { ...draft(), confirmOverflow },
         {
-          onSuccess: (result) => {
-            window.open(result.lovableUrl, "_blank", "noopener,noreferrer");
-          },
+          onSuccess: (result) => setPublishedHost(result.host),
           onError: (error) => {
             if (confirmOverflow) return;
-            overflow.retryIfConfirmRequired(
-              error instanceof Error ? error.message : "",
-              send,
-            );
+            overflow.retryIfConfirmRequired(error instanceof Error ? error.message : "", send);
           },
         },
       );
@@ -60,23 +76,39 @@ export default function WebsitePage() {
       <div className="p-3 glass-chrome border-b z-10 sticky top-0">
         <div className="flex items-center justify-between gap-2">
           <h1 className="font-display text-sm font-semibold">Website</h1>
-          <Button
-            size="sm"
-            onClick={build}
-            disabled={handoff.isPending || selectedCount === 0 || !prototype.data?.shopConnected}
-            data-testid="button-website-handoff"
-          >
-            {handoff.isPending ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Globe className="w-3.5 h-3.5 mr-1.5" />
-            )}
-            Build website
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={showPreview}
+              disabled={!ready || preview.isPending}
+              data-testid="button-website-preview"
+            >
+              Preview
+            </Button>
+            <Button
+              size="sm"
+              onClick={sendPublish}
+              disabled={!ready || publish.isPending}
+              data-testid="button-website-publish"
+            >
+              {publish.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Globe className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              Publish
+            </Button>
+          </div>
         </div>
         {overflow.overflowNotice ? (
           <p className="text-xs text-muted-foreground mt-2" data-testid="text-overflow-notice">
             {overflowNoticeText(overflow.overagePence)}
+          </p>
+        ) : null}
+        {publishedHost ? (
+          <p className="text-xs text-muted-foreground mt-2" data-testid="text-published-host">
+            Shoppers open {publishedHost}
           </p>
         ) : null}
       </div>
@@ -99,38 +131,56 @@ export default function WebsitePage() {
           ) : (
             <>
               {prototype.data.shopDomain ? (
-                <p className="text-xs text-muted-foreground">
-                  Shopify shop {prototype.data.shopDomain}. Checkout stays there. Lovable will ask you to
-                  Install its app — SnapSync will not pass credentials.
-                </p>
+                <p className="text-xs text-muted-foreground">Shopify shop {prototype.data.shopDomain}.</p>
               ) : null}
-              <div className="space-y-2">
-                <Label htmlFor="website-look">Look</Label>
-                <p className="text-xs text-muted-foreground">{WEBSITE_LOOK_HINT}</p>
-                <Textarea
-                  id="website-look"
-                  value={look}
-                  onChange={(event) => setLook(event.target.value)}
-                  rows={3}
-                  data-testid="input-website-look"
-                />
-              </div>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Palette</legend>
+                <div className="flex flex-wrap gap-2">
+                  {WEBSITE_PALETTES.map((item) => (
+                    <Button
+                      key={item.id}
+                      type="button"
+                      size="sm"
+                      variant={palette === item.id ? "default" : "outline"}
+                      onClick={() => setPalette(item.id)}
+                      data-testid={`palette-${item.id}`}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Type</legend>
+                <div className="flex flex-wrap gap-2">
+                  {WEBSITE_TYPES.map((item) => (
+                    <Button
+                      key={item.id}
+                      type="button"
+                      size="sm"
+                      variant={typePairing === item.id ? "default" : "outline"}
+                      onClick={() => setTypePairing(item.id)}
+                      data-testid={`type-${item.id}`}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+              </fieldset>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{selectedCount} selected</p>
+                <p className="text-xs text-muted-foreground">{selectedIds.length} selected</p>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    setSelectedIds(allSelected ? new Set() : new Set(products.map((p) => p.id)))
-                  }
+                  onClick={() => setSelectedIds(allSelected ? [] : products.map((product) => product.id))}
                 >
                   {allSelected ? "Clear" : "Select all"}
                 </Button>
               </div>
               <ul className="space-y-2">
                 {products.map((product) => {
-                  const checked = selectedIds.has(product.id);
+                  const checked = selected.has(product.id);
                   return (
                     <li
                       key={product.id}
@@ -142,11 +192,7 @@ export default function WebsitePage() {
                         aria-label={product.title ?? `Product ${product.id}`}
                       />
                       {product.photoUrl ? (
-                        <img
-                          src={product.photoUrl}
-                          alt=""
-                          className="h-10 w-10 rounded object-cover"
-                        />
+                        <img src={product.photoUrl} alt="" className="h-10 w-10 rounded object-cover" />
                       ) : (
                         <div className="h-10 w-10 rounded bg-muted" />
                       )}
@@ -157,6 +203,19 @@ export default function WebsitePage() {
               </ul>
             </>
           )}
+          {previewSite ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">{WEBSITE_PREVIEW_NOTE}</p>
+              <div className="rounded-md overflow-hidden border border-border/60">
+                <StorefrontView
+                  storefront={previewSite}
+                  productId={openProductId}
+                  onOpenProduct={setOpenProductId}
+                  onOpenHome={() => setOpenProductId(null)}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </ScrollArea>
       {overflow.dialog}

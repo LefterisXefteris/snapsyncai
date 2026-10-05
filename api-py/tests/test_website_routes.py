@@ -1,6 +1,7 @@
 """Website HTTP contract — auth and camelCase. No database.
 
-Seam: `/api/website/prototype`, `/api/website/handoff`.
+Seam: `/api/website/prototype`, `/api/website/preview`, `/api/website/publish`.
+The public storefront does not require a sign-in.
 """
 
 from fastapi.testclient import TestClient
@@ -24,7 +25,8 @@ def _client(monkeypatch) -> TestClient:
 
 PROTECTED = [
     ("GET", "/api/website/prototype"),
-    ("POST", "/api/website/handoff"),
+    ("POST", "/api/website/preview"),
+    ("POST", "/api/website/publish"),
 ]
 
 
@@ -32,7 +34,11 @@ def test_website_routes_require_auth(monkeypatch) -> None:
     client = _client(monkeypatch)
     try:
         for method, path in PROTECTED:
-            response = client.request(method, path, json={"productIds": [1], "look": ""})
+            response = client.request(
+                method,
+                path,
+                json={"productIds": [1], "palette": "ground", "typePairing": "sans"},
+            )
             assert response.status_code == 401, path
             assert response.json() == {"detail": "Unauthenticated"}
     finally:
@@ -48,9 +54,22 @@ def test_website_schemas_are_camel_case(monkeypatch) -> None:
         item = set(schemas["WebsiteEligibleProduct"]["properties"])
         assert {"id", "title", "photoUrl", "shopifyProductId"} <= item
         assert "shopify_product_id" not in item
-        handoff = set(schemas["WebsiteHandoffResponse"]["properties"])
-        assert handoff == {"lovableUrl", "productCount"}
-        body = set(schemas["WebsiteHandoffBody"]["properties"])
-        assert body == {"productIds", "look", "confirmOverflow"}
+        published = set(schemas["WebsitePublishResponse"]["properties"])
+        assert published == {"host", "spent", "productCount"}
+        body = set(schemas["WebsitePublishBody"]["properties"])
+        assert body == {"productIds", "palette", "typePairing", "confirmOverflow"}
+        preview = set(schemas["WebsitePreviewBody"]["properties"])
+        assert preview == {"productIds", "palette", "typePairing"}
+        storefront = set(schemas["StorefrontResponse"]["properties"])
+        assert storefront == {"handle", "host", "shopName", "palette", "typePairing", "products"}
+    finally:
+        get_settings.cache_clear()
+
+
+def test_the_public_storefront_does_not_require_sign_in(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    try:
+        response = client.get("/api/storefronts/tees")
+        assert response.status_code != 401
     finally:
         get_settings.cache_clear()
