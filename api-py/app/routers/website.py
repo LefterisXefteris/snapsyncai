@@ -15,7 +15,7 @@ from app.services.website_handoff import (
     eligible_products,
     photos_from_images,
     preview_website,
-    publish_website,
+    publish_saved_website,
     published_storefront,
     save_website_prototype,
     saved_website_prototype,
@@ -173,17 +173,9 @@ async def website_preview(
 
 @router.post("/api/website/publish", response_model=WebsitePublishResponse)
 async def website_publish(
-    body: WebsitePublishBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
+    _body: WebsitePublishBody, user_id: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> WebsitePublishResponse:
-    result = await publish_website(
-        session,
-        settings,
-        user_id,
-        palette=body.palette,
-        type_pairing=body.type_pairing,
-        product_ids=body.product_ids,
-        confirm_overflow=body.confirm_overflow,
-    )
+    result = await publish_saved_website(session, settings, user_id)
     if result.refused is not None or result.storefront is None:
         raise HTTPException(
             status_code=_PUBLISH_STATUS[result.refused or "invalid"], detail=result.message
@@ -199,5 +191,7 @@ async def website_publish(
 async def read_storefront(handle: str, session: SessionDep) -> StorefrontResponse:
     site = await published_storefront(session, handle)
     if site is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This website is not published")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="This website is not published"
+        )
     return _storefront_response(site)

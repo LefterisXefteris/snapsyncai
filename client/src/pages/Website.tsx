@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWebsitePrototype, useWebsitePrototypeSave } from "@/hooks/use-website";
-import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
-import { overflowNoticeText } from "@/lib/overflow-copy";
 import { workspaceNavItem } from "@/lib/workspace-nav";
 import {
   WEBSITE_BRIEF_HINT,
@@ -19,8 +17,8 @@ import {
 export default function WebsitePage() {
   const prototype = useWebsitePrototype();
   const save = useWebsitePrototypeSave();
-  const overflow = useOverflowConfirm();
   const settings = workspaceNavItem("settings");
+  const saveSeq = useRef(0);
   const [hydrated, setHydrated] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [brief, setBrief] = useState("");
@@ -37,10 +35,12 @@ export default function WebsitePage() {
   const allSelected = products.length > 0 && selected.size === products.length;
 
   const persist = (productIds: number[], nextBrief: string) => {
+    const seq = ++saveSeq.current;
     save.mutate(
       { productIds, brief: nextBrief },
       {
         onSuccess: (saved) => {
+          if (seq !== saveSeq.current) return;
           setSelectedIds(saved.productIds);
           setBrief(saved.brief);
         },
@@ -68,11 +68,6 @@ export default function WebsitePage() {
             Publish
           </Button>
         </div>
-        {overflow.overflowNotice ? (
-          <p className="text-xs text-muted-foreground mt-2" data-testid="text-overflow-notice">
-            {overflowNoticeText(overflow.overagePence)}
-          </p>
-        ) : null}
         <p className="text-xs text-muted-foreground mt-2" data-testid="text-publish-waits">
           {WEBSITE_PUBLISH_WAITS}
         </p>
@@ -102,8 +97,11 @@ export default function WebsitePage() {
                 <span className="text-sm font-medium">{WEBSITE_BRIEF_LABEL}</span>
                 <textarea
                   value={brief}
-                  onChange={(event) => setBrief(event.target.value)}
-                  onBlur={() => persist(selectedIds, brief)}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setBrief(next);
+                    persist(selectedIds, next);
+                  }}
                   className="w-full min-h-20 rounded-md border border-border/60 bg-transparent p-2 text-sm"
                   data-testid="input-website-brief"
                 />
@@ -151,7 +149,6 @@ export default function WebsitePage() {
           )}
         </div>
       </ScrollArea>
-      {overflow.dialog}
     </div>
   );
 }
