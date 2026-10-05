@@ -31,6 +31,7 @@ from app.routers import (
     images,
     inventory,
     oauth,
+    trendyol,
     webhooks,
     website,
 )
@@ -104,4 +105,5 @@ def create_app() -> FastAPI:
     app.include_router(bulk_seo.router)
     app.include_router(conversation.router)
     app.include_router(catalogue_import.router)
+    app.include_router(trendyol.router)
     return app

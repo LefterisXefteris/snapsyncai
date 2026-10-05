@@ -9,6 +9,7 @@ from app.models.billing import AllowanceSpend, PaidSession, Subscription, UserCr
 from app.models.connections import ShopifyConnection
 from app.models.conversation import ShopConversation
 from app.models.image import Image
+from app.models.trendyol import TrendyolBarcode, TrendyolConnection, TrendyolListing
 from app.models.inventory import (
     InventoryBundleComponent,
     InventoryChannelLink,
@@ -40,5 +41,8 @@ __all__ = [
     "ShopConversation",
     "ShopifyConnection",
     "Subscription",
+    "TrendyolBarcode",
+    "TrendyolConnection",
+    "TrendyolListing",
     "UserCredits",
 ]

@@ -67,6 +67,19 @@ export const api = {
     status: { method: "GET" as const, path: "/api/import" as const },
     start: { method: "POST" as const, path: "/api/import/start" as const },
   },
+  trendyol: {
+    status: { method: "GET" as const, path: "/api/trendyol" as const },
+    connect: { method: "POST" as const, path: "/api/trendyol/connect" as const },
+    disconnect: { method: "POST" as const, path: "/api/trendyol/disconnect" as const },
+    categories: { method: "GET" as const, path: "/api/trendyol/categories" as const },
+    brands: { method: "GET" as const, path: "/api/trendyol/brands" as const },
+    attributes: {
+      method: "GET" as const,
+      path: "/api/trendyol/categories/:categoryId/attributes" as const,
+    },
+    product: { method: "GET" as const, path: "/api/trendyol/products/:id" as const },
+    push: { method: "POST" as const, path: "/api/trendyol/products/:id/push" as const },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
