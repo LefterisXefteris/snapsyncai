@@ -1,19 +1,21 @@
-"""Website handoff — eligibility, snapshot (no secrets), Lovable Build-with-URL.
+"""Website — eligibility, snapshot (no secrets), and Publish.
 
 Seam: `app.services.website_handoff`.
 """
 
-from urllib.parse import parse_qs, unquote, urlparse
-
 import pytest
+from sqlalchemy import update
 
+from app.models.image import Image
 from app.services import website_handoff
 from app.services.website_handoff import (
-    HandoffError,
+    PublishError,
     WebsitePhoto,
-    build_handoff,
+    assemble_storefront,
     eligible_products,
-    hand_off_website,
+    preview_website,
+    publish_website,
+    published_storefront,
     snapshot_product,
 )
 from tests import seed
@@ -115,51 +117,55 @@ def test_snapshot_never_carries_shopify_credentials() -> None:
     }
 
 
-def test_handoff_url_is_lovable_build_with_shop_domain_and_no_tokens() -> None:
-    result = build_handoff(
-        shop_domain="acme.myshopify.com",
-        look="Black, serif, lookbook homepage",
-        products=eligible_products([_photo()]),
+def test_publish_freezes_the_picked_order_on_the_shop_address() -> None:
+    first = eligible_products([_photo(id=1, title="First")])[0]
+    second = eligible_products([_photo(id=2, title="Second")])[0]
+    site = assemble_storefront(
+        shop_domain="Tees.myshopify.com",
+        shop_name="Tees",
+        palette="ink",
+        type_pairing="serif",
+        products=[first, second],
+        product_ids=[2, 1, 2],
     )
-    parsed = urlparse(result.lovable_url)
-    assert parsed.scheme == "https"
-    assert parsed.netloc == "lovable.dev"
-    assert parsed.path in ("", "/")
-    assert parse_qs(parsed.query)["autosubmit"] == ["true"]
-    prompt = parse_qs(parsed.fragment)["prompt"][0]
-    assert "acme.myshopify.com" in prompt
-    assert "Organic Cotton Tee" in prompt
-    assert "Black, serif, lookbook homepage" in prompt
-    assert "Install" in prompt
-    assert "do not invent" in prompt.lower() or "Do not invent" in prompt
-    assert "shpat_" not in result.lovable_url
-    assert "access_token" not in result.lovable_url
-    assert result.product_count == 1
+    assert site.handle == "tees"
+    assert site.host == "tees.sites.snapsyncai.co.uk"
+    assert site.shop_name == "Tees"
+    assert site.palette == "ink"
+    assert site.type_pairing == "serif"
+    assert [product["title"] for product in site.products] == ["Second", "First"]
+    assert site.products[0]["seoTitle"] == "Organic Cotton Tee"
+    assert site.products[0]["confirmedFacts"]["composition"] == [{"name": "cotton", "percent": 100}]
 
 
-def test_handoff_includes_shop_gpsr_identity() -> None:
-    result = build_handoff(
-        shop_domain="acme.myshopify.com",
-        look="",
-        products=eligible_products([_photo()]),
-        shop_gpsr={"manufacturerName": "Acme Ltd", "email": "hello@acme.eu"},
-    )
-    prompt = parse_qs(urlparse(result.lovable_url).fragment)["prompt"][0]
-    assert "Acme Ltd" in prompt
-    assert "hello@acme.eu" in prompt
-
-
-def test_handoff_refuses_without_a_shop() -> None:
-    with pytest.raises(HandoffError, match="Shopify is not connected"):
-        build_handoff(shop_domain="", look="", products=eligible_products([_photo()]))
-
-
-def test_handoff_refuses_without_eligible_products() -> None:
-    with pytest.raises(HandoffError, match="listing copy"):
-        build_handoff(
+def test_publish_refuses_a_palette_or_a_shop_that_is_not_ready() -> None:
+    products = eligible_products([_photo()])
+    with pytest.raises(PublishError, match="palette"):
+        assemble_storefront(
             shop_domain="acme.myshopify.com",
-            look="",
-            products=eligible_products([_photo(shopify_product_id=None)]),
+            shop_name="Acme",
+            palette="gold",
+            type_pairing="sans",
+            products=products,
+            product_ids=[1],
+        )
+    with pytest.raises(PublishError, match="Shopify is not connected"):
+        assemble_storefront(
+            shop_domain="",
+            shop_name="",
+            palette="ground",
+            type_pairing="sans",
+            products=products,
+            product_ids=[1],
+        )
+    with pytest.raises(PublishError, match="listing copy"):
+        assemble_storefront(
+            shop_domain="acme.myshopify.com",
+            shop_name="Acme",
+            palette="ground",
+            type_pairing="sans",
+            products=[],
+            product_ids=[1],
         )
 
 
@@ -174,32 +180,133 @@ def channel_photos(monkeypatch) -> None:
     monkeypatch.setattr(website_handoff, "list_shopify_product_image_urls", urls)
 
 
-async def test_hand_off_sends_channel_photos_and_spends_one_use(
+async def test_the_first_publish_spends_one_use_and_freezes_the_channel_photo(
     db, db_settings, channel_photos
 ) -> None:
     await seed.plan(db)
-    await seed.shop(db)
-    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
-    result = await hand_off_website(db, db_settings, seed.SELLER, look="", product_ids=[pid])
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(
+        db, facts=seed.confirmed_facts(textile=True), shopify_product_id=PUSHED
+    )
+    result = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
     assert result.refused is None
     assert result.spent is True
-    assert result.handoff.product_count == 1
-    assert CHANNEL_PHOTO in unquote(result.handoff.lovable_url)
+    assert result.storefront is not None
+    assert result.storefront.host == "tees.sites.snapsyncai.co.uk"
+    assert result.storefront.products[0]["photoUrls"] == [CHANNEL_PHOTO]
+    assert result.storefront.products[0]["title"] == "Cotton tee"
     assert [row.kind for row in await seed.spends(db)] == ["website_handoff"]
 
 
-async def test_hand_off_without_a_shop_spends_nothing(db, db_settings) -> None:
+async def test_a_later_publish_replaces_the_site_and_does_not_spend(
+    db, db_settings, channel_photos
+) -> None:
     await seed.plan(db)
+    await seed.shop(db, shop_name="Tees")
     pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
-    result = await hand_off_website(db, db_settings, seed.SELLER, look="", product_ids=[pid])
-    assert result.refused == "not_connected"
+    first = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
+    assert first.spent is True
+    await db.execute(update(Image).where(Image.id == pid).values(title="Linen shirt"))
+    await db.flush()
+    second = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="clay",
+        type_pairing="serif",
+        product_ids=[pid],
+    )
+    assert second.spent is False
+    assert second.storefront is not None
+    assert second.storefront.palette == "clay"
+    assert second.storefront.products[0]["title"] == "Linen shirt"
+    assert [row.kind for row in await seed.spends(db)] == ["website_handoff"]
+
+
+async def test_a_catalogue_edit_does_not_change_the_published_words(
+    db, db_settings, channel_photos
+) -> None:
+    await seed.plan(db)
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
+    await db.execute(update(Image).where(Image.id == pid).values(title="Changed in the catalogue"))
+    await db.flush()
+    site = await published_storefront(db, "tees")
+    assert site is not None
+    assert site.products[0]["title"] == "Cotton tee"
+    assert site.products[0]["photoUrls"] == [CHANNEL_PHOTO]
+    assert await published_storefront(db, "other") is None
+
+
+async def test_a_preview_does_not_publish_or_spend(db, db_settings, channel_photos) -> None:
+    await seed.plan(db)
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    result = await preview_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ink",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
+    assert result.spent is False
+    assert result.storefront is not None
+    assert result.storefront.palette == "ink"
+    assert await published_storefront(db, "tees") is None
     assert await seed.spends(db) == []
 
 
-async def test_hand_off_without_a_plan_spends_nothing(db, db_settings, channel_photos) -> None:
-    await seed.shop(db)
+async def test_publish_without_a_shop_spends_nothing(db, db_settings) -> None:
+    await seed.plan(db)
     pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
-    result = await hand_off_website(db, db_settings, seed.SELLER, look="", product_ids=[pid])
+    result = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
+    assert result.refused == "not_connected"
+    assert result.storefront is None
+    assert await seed.spends(db) == []
+
+
+async def test_publish_without_a_plan_spends_nothing(db, db_settings, channel_photos) -> None:
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    result = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
     assert result.refused == "plan_blocked"
-    assert result.handoff is None
+    assert result.storefront is None
+    assert await published_storefront(db, "tees") is None
     assert await seed.spends(db) == []

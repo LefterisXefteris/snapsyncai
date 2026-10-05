@@ -20,7 +20,7 @@ _STOCK_UNCHANGED = "Inventory in this conversation is a read. Stock on hand was 
 _DECLINED = "That offer is declined. The job is not silenced."
 _ONE_ACCEPT = "Accept one product at a time."
 _SAVED = "Listing copy for that product is saved. Nothing was pushed."
-_NEEDS_LOOK = "Write the look before the website handoff."
+_PUBLISH_ON_THE_PAGE = "Publish stays on the Website page: /website"
 _ON_THE_PRODUCT_PAGE = "That stays on the product page."
 _PAGE_INTENTS = frozenset({"go_live", "generate", "facts", "push", "new_listing"})
 _JOB_LABEL = {
@@ -131,7 +131,6 @@ class JobOutcome:
     items: tuple[ProposalItem, ...] = ()
     spent: bool = False
     needs_overflow_confirm: bool = False
-    lovable_url: str | None = None
     product_count: int = 0
 
 
@@ -162,14 +161,6 @@ class ConversationJobs(Protocol):
     ) -> JobOutcome: ...
 
     async def read_website(self) -> JobOutcome: ...
-
-    async def handoff(
-        self,
-        *,
-        look: str,
-        product_ids: tuple[int, ...],
-        confirm_overflow: bool,
-    ) -> JobOutcome: ...
 
 
 def _context(message: SellerMessage, state: ConversationState) -> ModelContext:
@@ -258,26 +249,9 @@ async def _act(
     elif act.kind == "decline":
         text = _DECLINED
     elif act.kind == "handoff":
-        if state.silence.website:
-            text = _silenced("website")
-        elif not act.look.strip():
-            text = _NEEDS_LOOK
-        else:
-            outcome = await jobs.handoff(
-                look=act.look.strip(),
-                product_ids=tuple(act.product_ids),
-                confirm_overflow=act.confirm_overflow,
-            )
-            if outcome.error:
-                text = outcome.error
-            elif outcome.lovable_url:
-                text = outcome.lovable_url
-                proposal = None
-            else:
-                text = "Website handed off."
-                proposal = None
+        text = _silenced("website") if state.silence.website else _PUBLISH_ON_THE_PAGE
     elif act.kind == "accept" and state.proposal is not None and state.proposal.job == "website":
-        text = "Confirm the website handoff. Naming products does not hand it off."
+        text = _PUBLISH_ON_THE_PAGE
     elif act.kind == "accept":
         item = _proposal_item(state.proposal, act.product_id)
         if state.proposal is None or item is None or item.proposal is None:
@@ -372,7 +346,7 @@ async def reply(
     elif decision.intent == "accept":
         text = _ONE_ACCEPT
     elif decision.intent == "handoff":
-        text = "Confirm the website handoff. Naming products does not hand it off."
+        text = _PUBLISH_ON_THE_PAGE
     elif decision.intent == "claim":
         text = "Opening a shop is not available from this conversation."
     elif decision.intent in _PAGE_INTENTS:

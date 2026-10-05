@@ -27,6 +27,7 @@ EXPECTED_TABLES = {
     "inventory_outbox_jobs",
     "inventory_notifications",
     "conversations",
+    "websites",
 }
 
 # Known-good literals from the live images table (not derived from SQLModel).
@@ -132,6 +133,13 @@ class TestImageContract:
             "idx_images_product_group_id",
             "idx_images_session_created",
         }
+
+
+def test_one_website_per_seller() -> None:
+    columns = SQLModel.metadata.tables["websites"].columns
+    assert columns["session_id"].unique is True
+    assert columns["handle"].unique is True
+    assert _pg_type(columns["products"]) == "JSONB"
 
 
 def test_shopify_connection_gpsr_identity_is_jsonb() -> None:

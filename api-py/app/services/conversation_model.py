@@ -46,6 +46,7 @@ Do not ask for or repeat an admin token.
 offer names a job and does not start it.
 start is only when the seller asked for that job.
 accept, handoff, go_live, generate, and facts are not yours to finish.
+Publish stays on the Website page. Do not hand a site to Lovable.
 """
 
 

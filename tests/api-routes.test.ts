@@ -55,11 +55,15 @@ test("Shopify connect paths stay on /api/shopify", () => {
   assert.equal(api.images.pushToShopify.path, "/api/images/push-to-shopify");
 });
 
-test("website prototype and handoff live on /api/website", () => {
+test("website prototype, preview, and publish live on /api/website", () => {
   assert.equal(api.website.prototype.path, "/api/website/prototype");
   assert.equal(api.website.prototype.method, "GET");
-  assert.equal(api.website.handoff.path, "/api/website/handoff");
-  assert.equal(api.website.handoff.method, "POST");
+  assert.equal(api.website.preview.path, "/api/website/preview");
+  assert.equal(api.website.preview.method, "POST");
+  assert.equal(api.website.publish.path, "/api/website/publish");
+  assert.equal(api.website.publish.method, "POST");
+  assert.equal(api.storefronts.read.path, "/api/storefronts/:handle");
+  assert.equal(api.storefronts.read.method, "GET");
 });
 
 test("Bulk SEO catalogue lives on /api/bulk-seo", () => {

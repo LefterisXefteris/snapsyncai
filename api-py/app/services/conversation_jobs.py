@@ -25,9 +25,6 @@ from app.services.listing_copy_trace import (
 )
 from app.services.website_handoff import (
     eligible_products,
-    hand_off_website,
-)
-from app.services.website_handoff import (
     photos_from_images as website_photos,
 )
 
@@ -150,28 +147,3 @@ class SellerJobs:
                 error="Pick products that are pushed to Shopify and have listing copy"
             )
         return JobOutcome(items=tuple(ProposalItem(product_id=product.id) for product in products))
-
-    async def handoff(
-        self,
-        *,
-        look: str,
-        product_ids: tuple[int, ...],
-        confirm_overflow: bool,
-    ) -> JobOutcome:
-        result = await hand_off_website(
-            self.session,
-            self.settings,
-            self.user_id,
-            look=look,
-            product_ids=product_ids,
-            confirm_overflow=confirm_overflow,
-        )
-        if result.refused is not None or result.handoff is None:
-            return JobOutcome(
-                error=result.message,
-                needs_overflow_confirm=result.refused == "overflow_confirm",
-            )
-        return JobOutcome(
-            lovable_url=result.handoff.lovable_url,
-            product_count=result.handoff.product_count,
-        )

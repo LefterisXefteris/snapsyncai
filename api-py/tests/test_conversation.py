@@ -51,10 +51,6 @@ class _Jobs:
         self.calls.append(("read_website",))
         return self.outcome
 
-    async def handoff(self, *, look, product_ids, confirm_overflow):
-        self.calls.append(("handoff", look, tuple(product_ids), confirm_overflow))
-        return self.outcome
-
     async def record_spend(self):
         self.calls.append(("record_spend",))
 
@@ -368,26 +364,8 @@ async def test_an_explicit_accept_passes_overflow_confirm_through() -> None:
     assert [item.product_id for item in saved.state.proposal.items] == [15]
 
 
-async def test_no_look_means_no_website_handoff() -> None:
+async def test_the_conversation_cannot_publish_a_website() -> None:
     jobs = _Jobs()
-    result = await reply(
-        SellerMessage(
-            act=SellerAct(kind="handoff", look="  ", product_ids=(14,))
-        ),
-        ConversationState(
-            proposal=OpenProposal(job="website", items=(ProposalItem(product_id=14),))
-        ),
-        shop_connected=True,
-        model=_Model(),
-        jobs=jobs,
-    )
-    assert jobs.calls == []
-    assert result.reply == "Write the look before the website handoff."
-
-
-async def test_confirming_the_handoff_passes_the_sellers_look() -> None:
-    jobs = _Jobs()
-    jobs.outcome = JobOutcome(lovable_url="https://lovable.dev/build", product_count=1)
     result = await reply(
         SellerMessage(
             act=SellerAct(
@@ -404,9 +382,9 @@ async def test_confirming_the_handoff_passes_the_sellers_look() -> None:
         model=_Model(),
         jobs=jobs,
     )
-    assert jobs.calls == [("handoff", "quiet linen", (14,), True)]
-    assert "https://lovable.dev/build" in result.reply
-    assert result.state.proposal is None
+    assert jobs.calls == []
+    assert result.reply == "Publish stays on the Website page: /website"
+    assert result.state.proposal is not None
 
 
 async def test_go_live_and_facts_stay_off_this_conversation() -> None:
@@ -496,7 +474,7 @@ async def test_accepting_a_website_proposal_does_not_accept_listing_copy() -> No
     )
     assert jobs.calls == []
     assert result.state.proposal is not None
-    assert result.reply == "Confirm the website handoff. Naming products does not hand it off."
+    assert result.reply == "Publish stays on the Website page: /website"
 
 
 async def test_naming_products_does_not_hand_off_the_website() -> None:
@@ -513,7 +491,7 @@ async def test_naming_products_does_not_hand_off_the_website() -> None:
         jobs=jobs,
     )
     assert jobs.calls == []
-    assert result.reply == "Confirm the website handoff. Naming products does not hand it off."
+    assert result.reply == "Publish stays on the Website page: /website"
 
 
 async def test_starting_a_website_reads_eligible_products_and_does_not_hand_off() -> None:

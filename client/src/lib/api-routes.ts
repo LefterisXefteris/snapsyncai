@@ -46,7 +46,11 @@ export const api = {
   },
   website: {
     prototype: { method: "GET" as const, path: "/api/website/prototype" as const },
-    handoff: { method: "POST" as const, path: "/api/website/handoff" as const },
+    preview: { method: "POST" as const, path: "/api/website/preview" as const },
+    publish: { method: "POST" as const, path: "/api/website/publish" as const },
+  },
+  storefronts: {
+    read: { method: "GET" as const, path: "/api/storefronts/:handle" as const },
   },
   bulkSeo: {
     catalogue: { method: "GET" as const, path: "/api/bulk-seo" as const },

@@ -20,6 +20,8 @@ import {
   shopifyConnectNotice,
   workspaceArrival,
 } from "@/lib/workspace-arrival";
+import { storefrontHandleFromHost } from "@/lib/storefront-host";
+import PublicStorefront from "@/pages/PublicStorefront";
 
 // Route-level code splitting: each page ships as its own chunk so the
 // initial bundle stays small and loads fast.
@@ -266,6 +268,14 @@ function AppWithClerkFallback() {
 }
 
 function App() {
+  const storefrontHandle = storefrontHandleFromHost(window.location.hostname);
+  if (storefrontHandle) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <PublicStorefront handle={storefrontHandle} />
+      </QueryClientProvider>
+    );
+  }
   return (
     <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>
