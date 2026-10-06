@@ -18,6 +18,14 @@ export type WebsitePrototype = {
   shopConnected: boolean;
   shopDomain: string | null;
   products: WebsiteEligibleProduct[];
+  productIds: number[];
+  brief: string;
+  look: null;
+};
+
+export type WebsitePrototypeSave = {
+  productIds: number[];
+  brief: string;
 };
 
 export type WebsiteDraft = {
@@ -37,6 +45,27 @@ export function useWebsitePrototype() {
       return res.json() as Promise<WebsitePrototype>;
     },
     enabled: !!userId,
+  });
+}
+
+export function useWebsitePrototypeSave() {
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (body: WebsitePrototypeSave) => {
+      const res = await apiRequest(
+        api.website.savePrototype.method,
+        api.website.savePrototype.path,
+        body,
+      );
+      return res.json() as Promise<WebsitePrototype>;
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not save the prototype",
+        description: error instanceof Error ? error.message : "Save failed",
+        variant: "destructive",
+      });
+    },
   });
 }
 

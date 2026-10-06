@@ -21,14 +21,14 @@ test("choosing Products with no Shopify Channel keeps the catalogue open", () =>
   assert.equal(arrival.chosenPath, "/");
 });
 
-test("opening the workspace with no Shopify Channel arrives in Conversation", () => {
+test("opening the workspace with no Shopify Channel lands on Products", () => {
   const arrival = workspaceArrival({
     shopConnected: false,
     pathname: "/",
     ...open,
   });
-  assert.equal(arrival.path, "/conversation");
-  assert.equal(arrival.chosenPath, "/conversation");
+  assert.equal(arrival.path, "/");
+  assert.equal(arrival.chosenPath, "/");
 });
 
 test("opening the workspace with a Shopify Channel lands on Products", () => {
@@ -41,7 +41,7 @@ test("opening the workspace with a Shopify Channel lands on Products", () => {
   assert.equal(arrival.chosenPath, "/");
 });
 
-test("a new window with no Shopify Channel arrives in Conversation", () => {
+test("a new window with no Shopify Channel lands on Products", () => {
   const arrival = workspaceArrival({
     shopConnected: false,
     pathname: "/",
@@ -49,7 +49,8 @@ test("a new window with no Shopify Channel arrives in Conversation", () => {
     chosenPath: null,
     connectFrom: null,
   });
-  assert.equal(arrival.path, "/conversation");
+  assert.equal(arrival.path, "/");
+  assert.equal(arrival.chosenPath, "/");
 });
 
 test("a product link stays on the product when there is no Shopify Channel", () => {
@@ -62,8 +63,16 @@ test("a product link stays on the product when there is no Shopify Channel", () 
   assert.equal(arrival.chosenPath, "/product/14");
 });
 
-test("Inventory, Import, New listing, the website, Bulk SEO, and Settings stay open", () => {
-  for (const pathname of ["/inventory", "/import", "/new", "/website", "/bulk-seo", "/settings"]) {
+test("Inventory, Import, New listing, the website, Bulk SEO, Settings, and the conversation stay open", () => {
+  for (const pathname of [
+    "/inventory",
+    "/import",
+    "/new",
+    "/website",
+    "/bulk-seo",
+    "/settings",
+    "/conversation",
+  ]) {
     const arrival = workspaceArrival({
       shopConnected: false,
       pathname,

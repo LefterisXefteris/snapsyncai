@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Check, Lock, Loader2, ImageIcon, Plus, ImagePlus, Store, X, UploadCloud, Search, GripVertical } from "lucide-react";
 import { AiContentPanel } from "@/components/ai-content-panel";
+import { TrendyolListing } from "@/components/trendyol-listing";
 import { GpsrIdentityFields } from "@/components/gpsr-identity-fields";
 import {
   PRODUCT_EDITOR_ALT_TEXT_LABEL,
@@ -1666,6 +1667,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 )}
               </CardContent>
             </Card>
+
+            <TrendyolListing imageId={image.id} />
 
             <details className="rounded-lg border border-border bg-card shadow-sm">
               <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground">

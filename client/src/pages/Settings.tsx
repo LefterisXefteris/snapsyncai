@@ -21,6 +21,7 @@ import { dark } from "@clerk/themes";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GpsrIdentityFields } from "@/components/gpsr-identity-fields";
 import { emptyGpsrIdentity, isCompleteGpsr, type GpsrIdentity } from "@/lib/product-facts";
+import { useTrendyolConnect, useTrendyolDisconnect, useTrendyolStatus } from "@/hooks/use-trendyol";
 
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
@@ -40,6 +41,16 @@ export default function Settings() {
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
+  const trendyol = useTrendyolStatus();
+  const trendyolConnect = useTrendyolConnect();
+  const trendyolDisconnect = useTrendyolDisconnect();
+  const [sellerId, setSellerId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
+  const [vatRate, setVatRate] = useState("");
+  const [storefrontCode, setStorefrontCode] = useState("");
+  const [storefronts, setStorefronts] = useState<{ code: string; currency: string }[]>([]);
+  const [trendyolNotice, setTrendyolNotice] = useState<string | null>(null);
 
   const isSubscribed = subscriptionStatus?.subscribed === true;
   const leftoverWeekly = subscriptionStatus?.entitlement === "leftover_weekly";
@@ -148,6 +159,125 @@ export default function Settings() {
                   </Button>
                 </div>
               )}
+            </div>
+
+            <div className="glass-panel rounded-lg p-4 space-y-4" data-testid="card-trendyol-settings">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium">Trendyol International</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {trendyol.data?.connected
+                      ? `Connected · ${trendyol.data.storefront} · ${trendyol.data.currency} · VAT ${trendyol.data.vatRate}%`
+                      : trendyol.data?.message || "Connect one origin storefront."}
+                  </p>
+                </div>
+                {trendyol.data?.connected ? (
+                  <Button
+                    data-testid="button-disconnect-trendyol"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => trendyolDisconnect.mutate()}
+                    disabled={trendyolDisconnect.isPending}
+                  >
+                    {trendyolDisconnect.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : null}
+                    Disconnect
+                  </Button>
+                ) : null}
+              </div>
+              {trendyol.data?.available && !trendyol.data.connected ? (
+                <div className="space-y-2">
+                  <Label htmlFor="trendyol-seller">Seller id</Label>
+                  <Input
+                    id="trendyol-seller"
+                    data-testid="input-trendyol-seller"
+                    value={sellerId}
+                    onChange={(event) => setSellerId(event.target.value)}
+                  />
+                  <Label htmlFor="trendyol-key">API key</Label>
+                  <Input
+                    id="trendyol-key"
+                    data-testid="input-trendyol-key"
+                    value={apiKey}
+                    onChange={(event) => setApiKey(event.target.value)}
+                    type="password"
+                    autoComplete="off"
+                  />
+                  <Label htmlFor="trendyol-secret">API secret</Label>
+                  <Input
+                    id="trendyol-secret"
+                    data-testid="input-trendyol-secret"
+                    value={apiSecret}
+                    onChange={(event) => setApiSecret(event.target.value)}
+                    type="password"
+                    autoComplete="off"
+                  />
+                  {storefronts.length > 1 ? (
+                    <div className="space-y-1.5">
+                      <Label>Origin storefront</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {storefronts.map((storefront) => (
+                          <Button
+                            key={storefront.code}
+                            type="button"
+                            size="sm"
+                            variant={storefrontCode === storefront.code ? "default" : "outline"}
+                            onClick={() => setStorefrontCode(storefront.code)}
+                          >
+                            {storefront.code} · {storefront.currency}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <Label htmlFor="trendyol-vat">VAT rate</Label>
+                  <Input
+                    id="trendyol-vat"
+                    data-testid="input-trendyol-vat"
+                    value={vatRate}
+                    onChange={(event) => setVatRate(event.target.value)}
+                    inputMode="numeric"
+                  />
+                  {trendyolNotice ? (
+                    <p className="text-xs text-muted-foreground">{trendyolNotice}</p>
+                  ) : null}
+                  <Button
+                    data-testid="button-connect-trendyol"
+                    size="sm"
+                    disabled={trendyolConnect.isPending || !sellerId.trim() || !apiKey.trim() || !apiSecret.trim()}
+                    onClick={() => {
+                      setTrendyolNotice(null);
+                      const vat = vatRate.trim() === "" ? undefined : Number(vatRate);
+                      trendyolConnect.mutate(
+                        {
+                          sellerId: sellerId.trim(),
+                          apiKey: apiKey.trim(),
+                          apiSecret: apiSecret.trim(),
+                          storefrontCode: storefrontCode || undefined,
+                          vatRate: vat != null && Number.isFinite(vat) ? vat : undefined,
+                        },
+                        {
+                          onSuccess: (link) => {
+                            if (link.connected || link.storefronts.length === 0) return;
+                            setStorefronts(link.storefronts);
+                            if (link.storefronts.length === 1) setStorefrontCode(link.storefronts[0].code);
+                            if (link.storefronts.length > 1) {
+                              setTrendyolNotice("Pick the origin storefront and set the VAT rate.");
+                            }
+                          },
+                          onError: (error) => setTrendyolNotice(error.message),
+                        },
+                      );
+                    }}
+                  >
+                    {trendyolConnect.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Connect
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             <div className="glass-panel rounded-lg p-4">

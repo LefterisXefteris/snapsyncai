@@ -58,6 +58,8 @@ test("Shopify connect paths stay on /api/shopify", () => {
 test("website prototype, preview, and publish live on /api/website", () => {
   assert.equal(api.website.prototype.path, "/api/website/prototype");
   assert.equal(api.website.prototype.method, "GET");
+  assert.equal(api.website.savePrototype.path, "/api/website/prototype");
+  assert.equal(api.website.savePrototype.method, "PUT");
   assert.equal(api.website.preview.path, "/api/website/preview");
   assert.equal(api.website.preview.method, "POST");
   assert.equal(api.website.publish.path, "/api/website/publish");

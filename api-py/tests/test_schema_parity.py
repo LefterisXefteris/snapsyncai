@@ -28,6 +28,10 @@ EXPECTED_TABLES = {
     "inventory_notifications",
     "conversations",
     "websites",
+    "website_prototypes",
+    "trendyol_connections",
+    "trendyol_listings",
+    "trendyol_barcodes",
 }
 
 # Known-good literals from the live images table (not derived from SQLModel).

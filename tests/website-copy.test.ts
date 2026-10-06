@@ -2,27 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  WEBSITE_BRIEF_HINT,
+  WEBSITE_BRIEF_LABEL,
   WEBSITE_EMPTY,
   WEBSITE_NEEDS_SHOPIFY,
-  WEBSITE_PALETTES,
-  WEBSITE_PREVIEW_NOTE,
-  WEBSITE_TYPES,
+  WEBSITE_PUBLISH_WAITS,
 } from "../client/src/lib/website-copy.ts";
 
-test("website copy asks for a palette and type, not a Lovable account", () => {
-  assert.deepEqual(
-    WEBSITE_PALETTES.map((item) => item.label),
-    ["Ground", "Ink", "Clay"],
-  );
-  assert.deepEqual(
-    WEBSITE_TYPES.map((item) => item.id),
-    ["sans", "serif"],
-  );
+test("website copy asks for a brief, and Publish waits for a look", () => {
+  assert.equal(WEBSITE_BRIEF_LABEL, "Website brief");
+  assert.match(WEBSITE_BRIEF_HINT, /Shoppers do not see it/);
+  assert.match(WEBSITE_PUBLISH_WAITS, /look comes back/);
   assert.match(WEBSITE_NEEDS_SHOPIFY, /Shopify/);
   assert.match(WEBSITE_EMPTY, /listing copy/);
-  assert.match(WEBSITE_PREVIEW_NOTE, /not the site shoppers open/i);
   assert.doesNotMatch(
-    `${WEBSITE_EMPTY} ${WEBSITE_NEEDS_SHOPIFY} ${WEBSITE_PREVIEW_NOTE}`,
-    /lovable|tone|token|api key/i,
+    `${WEBSITE_EMPTY} ${WEBSITE_NEEDS_SHOPIFY} ${WEBSITE_BRIEF_HINT} ${WEBSITE_PUBLISH_WAITS}`,
+    /lovable|palette|tone|token|api key/i,
   );
 });

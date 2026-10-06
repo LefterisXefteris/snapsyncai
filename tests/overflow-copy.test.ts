@@ -42,9 +42,7 @@ test("overflow confirm errors are the Plan module token", () => {
 
 test("overflow copy is used on the job surfaces", () => {
   const editor = readFileSync(path.join(root, "client/src/pages/ProductDetails.tsx"), "utf8");
-  const website = readFileSync(path.join(root, "client/src/pages/Website.tsx"), "utf8");
   const bulk = readFileSync(path.join(root, "client/src/pages/BulkSeo.tsx"), "utf8");
   assert.match(editor, /overflow-copy/);
-  assert.match(website, /overflow-copy|OverflowConfirmDialog|useOverflowConfirm/);
   assert.match(bulk, /overflow-copy|OverflowConfirmDialog|useOverflowConfirm/);
 });

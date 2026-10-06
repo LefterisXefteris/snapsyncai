@@ -1,74 +1,61 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Globe, Loader2 } from "lucide-react";
+import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { StorefrontView, type StorefrontDocument } from "@/components/storefront-view";
-import { useWebsitePreview, useWebsitePrototype, useWebsitePublish } from "@/hooks/use-website";
-import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
-import { overflowNoticeText } from "@/lib/overflow-copy";
+import { useWebsitePrototype, useWebsitePrototypeSave } from "@/hooks/use-website";
 import { workspaceNavItem } from "@/lib/workspace-nav";
 import {
+  WEBSITE_BRIEF_HINT,
+  WEBSITE_BRIEF_LABEL,
   WEBSITE_EMPTY,
   WEBSITE_NEEDS_SHOPIFY,
-  WEBSITE_PALETTES,
-  WEBSITE_PREVIEW_NOTE,
-  WEBSITE_TYPES,
+  WEBSITE_PUBLISH_WAITS,
 } from "@/lib/website-copy";
 
 export default function WebsitePage() {
   const prototype = useWebsitePrototype();
-  const preview = useWebsitePreview();
-  const publish = useWebsitePublish();
-  const overflow = useOverflowConfirm();
+  const save = useWebsitePrototypeSave();
   const settings = workspaceNavItem("settings");
+  const saveSeq = useRef(0);
+  const [hydrated, setHydrated] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [palette, setPalette] = useState<string | null>(null);
-  const [typePairing, setTypePairing] = useState<string | null>(null);
-  const [previewSite, setPreviewSite] = useState<StorefrontDocument | null>(null);
-  const [publishedHost, setPublishedHost] = useState<string | null>(null);
-  const [openProductId, setOpenProductId] = useState<number | null>(null);
+  const [brief, setBrief] = useState("");
+
+  useEffect(() => {
+    if (!prototype.data || hydrated) return;
+    setSelectedIds(prototype.data.productIds);
+    setBrief(prototype.data.brief);
+    setHydrated(true);
+  }, [prototype.data, hydrated]);
 
   const products = prototype.data?.products ?? [];
   const selected = new Set(selectedIds);
   const allSelected = products.length > 0 && selected.size === products.length;
-  const ready = selectedIds.length > 0 && palette != null && typePairing != null && prototype.data?.shopConnected;
+
+  const persist = (productIds: number[], nextBrief: string) => {
+    const seq = ++saveSeq.current;
+    save.mutate(
+      { productIds, brief: nextBrief },
+      {
+        onSuccess: (saved) => {
+          if (seq !== saveSeq.current) return;
+          setSelectedIds(saved.productIds);
+          setBrief(saved.brief);
+        },
+      },
+    );
+  };
 
   const toggle = (id: number, checked: boolean) => {
-    setSelectedIds((prev) => {
-      if (checked) return prev.includes(id) ? prev : [...prev, id];
-      return prev.filter((item) => item !== id);
-    });
-  };
-
-  const draft = () => ({
-    productIds: selectedIds,
-    palette: palette ?? "",
-    typePairing: typePairing ?? "",
-  });
-
-  const showPreview = () => {
-    setOpenProductId(null);
-    preview.mutate(draft(), {
-      onSuccess: (site) => setPreviewSite(site),
-    });
-  };
-
-  const sendPublish = () => {
-    const send = (confirmOverflow: boolean) => {
-      publish.mutate(
-        { ...draft(), confirmOverflow },
-        {
-          onSuccess: (result) => setPublishedHost(result.host),
-          onError: (error) => {
-            if (confirmOverflow) return;
-            overflow.retryIfConfirmRequired(error instanceof Error ? error.message : "", send);
-          },
-        },
-      );
-    };
-    overflow.run(send);
+    const next = checked
+      ? selectedIds.includes(id)
+        ? selectedIds
+        : [...selectedIds, id]
+      : selectedIds.filter((item) => item !== id);
+    setSelectedIds(next);
+    persist(next, brief);
   };
 
   return (
@@ -76,46 +63,19 @@ export default function WebsitePage() {
       <div className="p-3 glass-chrome border-b z-10 sticky top-0">
         <div className="flex items-center justify-between gap-2">
           <h1 className="font-display text-sm font-semibold">Website</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={showPreview}
-              disabled={!ready || preview.isPending}
-              data-testid="button-website-preview"
-            >
-              Preview
-            </Button>
-            <Button
-              size="sm"
-              onClick={sendPublish}
-              disabled={!ready || publish.isPending}
-              data-testid="button-website-publish"
-            >
-              {publish.isPending ? (
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Globe className="w-3.5 h-3.5 mr-1.5" />
-              )}
-              Publish
-            </Button>
-          </div>
+          <Button size="sm" disabled data-testid="button-website-publish">
+            <Globe className="w-3.5 h-3.5 mr-1.5" />
+            Publish
+          </Button>
         </div>
-        {overflow.overflowNotice ? (
-          <p className="text-xs text-muted-foreground mt-2" data-testid="text-overflow-notice">
-            {overflowNoticeText(overflow.overagePence)}
-          </p>
-        ) : null}
-        {publishedHost ? (
-          <p className="text-xs text-muted-foreground mt-2" data-testid="text-published-host">
-            Shoppers open {publishedHost}
-          </p>
-        ) : null}
+        <p className="text-xs text-muted-foreground mt-2" data-testid="text-publish-waits">
+          {WEBSITE_PUBLISH_WAITS}
+        </p>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="p-4 max-w-2xl space-y-4">
-          {prototype.isLoading ? (
+          {prototype.isLoading || (prototype.data && !hydrated) ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : prototype.error ? (
             <p className="text-sm text-destructive">Could not load website prototype.</p>
@@ -133,47 +93,31 @@ export default function WebsitePage() {
               {prototype.data.shopDomain ? (
                 <p className="text-xs text-muted-foreground">Shopify shop {prototype.data.shopDomain}.</p>
               ) : null}
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Palette</legend>
-                <div className="flex flex-wrap gap-2">
-                  {WEBSITE_PALETTES.map((item) => (
-                    <Button
-                      key={item.id}
-                      type="button"
-                      size="sm"
-                      variant={palette === item.id ? "default" : "outline"}
-                      onClick={() => setPalette(item.id)}
-                      data-testid={`palette-${item.id}`}
-                    >
-                      {item.label}
-                    </Button>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Type</legend>
-                <div className="flex flex-wrap gap-2">
-                  {WEBSITE_TYPES.map((item) => (
-                    <Button
-                      key={item.id}
-                      type="button"
-                      size="sm"
-                      variant={typePairing === item.id ? "default" : "outline"}
-                      onClick={() => setTypePairing(item.id)}
-                      data-testid={`type-${item.id}`}
-                    >
-                      {item.label}
-                    </Button>
-                  ))}
-                </div>
-              </fieldset>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">{WEBSITE_BRIEF_LABEL}</span>
+                <textarea
+                  value={brief}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setBrief(next);
+                    persist(selectedIds, next);
+                  }}
+                  className="w-full min-h-20 rounded-md border border-border/60 bg-transparent p-2 text-sm"
+                  data-testid="input-website-brief"
+                />
+                <span className="text-xs text-muted-foreground">{WEBSITE_BRIEF_HINT}</span>
+              </label>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">{selectedIds.length} selected</p>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setSelectedIds(allSelected ? [] : products.map((product) => product.id))}
+                  onClick={() => {
+                    const next = allSelected ? [] : products.map((product) => product.id);
+                    setSelectedIds(next);
+                    persist(next, brief);
+                  }}
                 >
                   {allSelected ? "Clear" : "Select all"}
                 </Button>
@@ -203,22 +147,8 @@ export default function WebsitePage() {
               </ul>
             </>
           )}
-          {previewSite ? (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">{WEBSITE_PREVIEW_NOTE}</p>
-              <div className="rounded-md overflow-hidden border border-border/60">
-                <StorefrontView
-                  storefront={previewSite}
-                  productId={openProductId}
-                  onOpenProduct={setOpenProductId}
-                  onOpenHome={() => setOpenProductId(null)}
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
       </ScrollArea>
-      {overflow.dialog}
     </div>
   );
 }

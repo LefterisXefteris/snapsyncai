@@ -1,0 +1,7 @@
+# The Website agent builds the look
+
+Supersedes the palette prototype and the rejection of a generated look in [0034](./0034-website-is-hosted-by-snapsync.md). Hosting, Publish, checkout, and the Lovable rejection in 0034 stand. The sentence below that leaves the engine undecided is superseded by [0037](./0037-website-agent-returns-html-on-openhands.md). The rest of this decision stands.
+
+A **Website prototype** is the products the seller picks, in that order, an optional short brief, and the look the **Website agent** last built for a home and one page per product. The agent runs inside SnapSync. Which engine runs it is not decided. A run sees that shop's picked products and brief only. The agent returns HTML and CSS for those pages. SnapSync strips scripts and supplies listing copy, photos, confirmed facts, price, and checkout. It does not invent fibre, care, or GPSR, and it does not add server code or packages. The Website page shows that prototype again. A later run replaces it. A run that comes back empty leaves the previous one. Publish still freezes words, photos, and layout. The first Publish spends one Allowance use. A run does not spend, and there is no cap on runs. SnapSync pays the model bill. The conversation can send the seller to the Website page. Publish stays with the seller.
+
+We rejected Lovable again, a palette page, a second design conversation, a full generated app, and new page addresses. We rejected a second meter on runs.
