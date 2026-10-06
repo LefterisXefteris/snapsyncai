@@ -51,6 +51,8 @@ class ShopifyShop:
         self.locations = locations or {}
         self.products: dict[str, Product] = {}
         self.available: dict[tuple[str, str], int] = {}
+        self.fail_next_product_set: str | None = None
+        self.fail_next_create: str | None = None
         self._new_products_published_on = new_products_published_on or set()
         self._ids = count(1)
 
@@ -135,6 +137,24 @@ class ShopifyShop:
 
     def _product_set(self, variables: dict) -> dict:
         given = variables["productSet"]
+        if self.fail_next_product_set:
+            message = self.fail_next_product_set
+            self.fail_next_product_set = None
+            return {
+                "productSet": {
+                    "product": None,
+                    "userErrors": [{"field": ["title"], "message": message}],
+                }
+            }
+        if "id" not in given and self.fail_next_create:
+            message = self.fail_next_create
+            self.fail_next_create = None
+            return {
+                "productSet": {
+                    "product": None,
+                    "userErrors": [{"field": ["title"], "message": message}],
+                }
+            }
         if given.get("variants") and not given.get("productOptions"):
             return {
                 "productSet": {
