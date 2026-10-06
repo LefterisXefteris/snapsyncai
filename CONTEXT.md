@@ -184,6 +184,10 @@ _Avoid_: Lovable, builder (as a separate product)
 The seller putting this shop's Website on its SnapSync address, once a Website agent run has returned a look for the picks and Website brief now on the page. On Leftover weekly the first Publish that lands counts as one use, and a later one does not. Taking the site down keeps the address. It is not a Push and not Go live.
 _Avoid_: handoff, deploy, launch
 
+**Seller**:
+The person a Plan is for, with one Shopify shop. On a Plan after an accept of listing copy or a Publish, and in the workspace with no Plan after a product, confirmed facts, an Import, Inventory, or a Push of listing copy they typed, are two situations. A seller is in one of them. Buying a Plan leaves the workspace situation. A Plan with no accept and no Publish is neither, and so is an empty workspace.
+_Avoid_: user, account
+
 **Plan**:
 Paid access to the workspace for one seller and one Shopify shop. Monthly and annual are how they pay; annual is cheaper for the same Plan. Listing-copy generate, listing copy refresh, Bulk SEO, and website are included, with no use count and no extra charge. Connecting a Channel does not require a Plan. Without a Plan the seller still has the workspace — catalogue, Inventory, New listing, Import, confirmed facts, and push of listing copy they typed — but not listing-copy generate, listing copy refresh, Bulk SEO, or website. Distinct from Leftover weekly.
 _Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock, Allowance, Overflow, unlimited
