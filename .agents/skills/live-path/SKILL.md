@@ -12,7 +12,7 @@ A change is **shipped** only after the **live path** is green. Push to `main` an
 
 The live path is what a seller on `www` hits after deploy — not files in the diff, not OpenAPI, not an unauthenticated 401.
 
-Read `CONTEXT.md`. Name the path in that glossary (Plan, Overflow, Allowance, listing copy, Channel).
+Read `CONTEXT.md`. Name the path in that glossary (Plan, Leftover weekly, listing copy, Channel).
 
 ## Steps
 

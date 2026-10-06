@@ -183,7 +183,7 @@ def channel_photos(monkeypatch) -> None:
     monkeypatch.setattr(website_handoff, "list_shopify_product_image_urls", urls)
 
 
-async def test_the_first_publish_spends_one_use_and_freezes_the_channel_photo(
+async def test_the_first_publish_does_not_record_a_use_and_freezes_the_channel_photo(
     db, db_settings, channel_photos
 ) -> None:
     await seed.plan(db)
@@ -200,12 +200,12 @@ async def test_the_first_publish_spends_one_use_and_freezes_the_channel_photo(
         product_ids=[pid],
     )
     assert result.refused is None
-    assert result.spent is True
+    assert result.spent is False
     assert result.storefront is not None
     assert result.storefront.host == "tees.sites.snapsyncai.co.uk"
     assert result.storefront.products[0]["photoUrls"] == [CHANNEL_PHOTO]
     assert result.storefront.products[0]["title"] == "Cotton tee"
-    assert [row.kind for row in await seed.spends(db)] == ["website_handoff"]
+    assert await seed.spends(db) == []
 
 
 async def test_a_later_publish_replaces_the_site_and_does_not_spend(
@@ -222,7 +222,7 @@ async def test_a_later_publish_replaces_the_site_and_does_not_spend(
         type_pairing="sans",
         product_ids=[pid],
     )
-    assert first.spent is True
+    assert first.spent is False
     await db.execute(update(Image).where(Image.id == pid).values(title="Linen shirt"))
     await db.flush()
     second = await publish_website(
@@ -237,7 +237,7 @@ async def test_a_later_publish_replaces_the_site_and_does_not_spend(
     assert second.storefront is not None
     assert second.storefront.palette == "clay"
     assert second.storefront.products[0]["title"] == "Linen shirt"
-    assert [row.kind for row in await seed.spends(db)] == ["website_handoff"]
+    assert await seed.spends(db) == []
 
 
 async def test_a_catalogue_edit_does_not_change_the_published_words(

@@ -4,9 +4,7 @@ from datetime import UTC, datetime
 
 from app.services.plan import (
     LEFTOVER_WEEKLY_INCLUDED,
-    NEED_OVERFLOW_CONFIRM,
     NEED_PLAN,
-    PLAN_INCLUDED,
     WEEKLY_LIMIT,
     Spend,
     decide,
@@ -27,11 +25,11 @@ def test_free_cannot_run_plan_jobs() -> None:
     assert decision.records_spend is False
 
 
-def test_plan_first_generate_persist_is_included() -> None:
+def test_plan_generate_is_allowed_and_not_counted() -> None:
     decision = decide("plan", (), JAN, "generate_persist")
     assert decision.allowed is True
     assert decision.blocked_reason is None
-    assert decision.records_spend is True
+    assert decision.records_spend is False
     assert decision.as_overage is False
 
 
@@ -48,85 +46,31 @@ def test_uncompleted_generate_does_not_spend() -> None:
     assert decision.overflow_confirm_required is False
 
 
-def test_refresh_accept_spends() -> None:
+def test_plan_refresh_is_allowed_and_not_counted() -> None:
     decision = decide("plan", (), JAN, "refresh_accept")
     assert decision.allowed is True
-    assert decision.records_spend is True
-
-
-def test_twenty_first_plan_use_needs_overflow_confirm() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide("plan", spends, JAN, "generate_persist")
-    assert decision.allowed is False
-    assert decision.blocked_reason == NEED_OVERFLOW_CONFIRM
     assert decision.records_spend is False
-    assert decision.overflow_notice is True
-    assert decision.overflow_confirm_required is True
-
-
-def test_twenty_first_plan_use_with_confirm_is_overage() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide("plan", spends, JAN, "generate_persist", confirm_overflow=True)
-    assert decision.allowed is True
-    assert decision.as_overage is True
-    assert decision.records_spend is True
-    assert decision.overflow_notice is True
-
-
-def test_stream_at_overflow_does_not_block() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide("plan", spends, JAN, "generate_persist", completed=False)
-    assert decision.allowed is True
-    assert decision.records_spend is False
-    assert decision.overflow_notice is True
-    assert decision.overflow_confirm_required is True
-
-
-def test_stale_generate_at_overflow_does_not_confirm_or_spend() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide(
-        "plan", spends, JAN, "generate_persist", listing_copy_was_stale=True
-    )
-    assert decision.allowed is True
-    assert decision.records_spend is False
-    assert decision.overflow_notice is False
-    assert decision.overflow_confirm_required is False
-
-
-def test_later_overflow_this_month_is_silent_after_ack() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(21))
-    decision = decide(
-        "plan", spends, JAN, "generate_persist", overflow_confirmed_month="2026-01"
-    )
-    assert decision.allowed is True
-    assert decision.as_overage is True
-    assert decision.overflow_notice is True
-    assert decision.overflow_confirm_required is False
-
-
-def test_next_month_needs_overflow_confirm_again() -> None:
-    february = tuple(Spend(at=FEB, kind="generate_persist") for _ in range(20))
-    decision = decide(
-        "plan", february, FEB, "generate_persist", overflow_confirmed_month="2026-01"
-    )
-    assert decision.allowed is False
-    assert decision.blocked_reason == NEED_OVERFLOW_CONFIRM
-    assert decision.overflow_confirm_required is True
-
-
-def test_unused_included_does_not_carry_into_the_next_month() -> None:
-    january_spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(5))
-    assert view("plan", january_spends, JAN_31).used == 5
-    assert view("plan", january_spends, FEB).used == 0
-    decision = decide("plan", january_spends, FEB, "generate_persist")
     assert decision.as_overage is False
 
 
-def test_annual_plan_still_refills_twenty_each_calendar_month() -> None:
-    """Entitlement is still 'plan'; billing interval is not a bigger bucket."""
+def test_plan_past_twenty_uses_is_allowed_without_a_charge() -> None:
     spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    assert view("plan", spends, FEB).used == 0
-    assert view("plan", spends, FEB).included == PLAN_INCLUDED
+    decision = decide("plan", spends, JAN, "generate_persist")
+    assert decision.allowed is True
+    assert decision.blocked_reason is None
+    assert decision.as_overage is False
+    assert decision.overflow_notice is False
+    assert decision.overflow_confirm_required is False
+    assert decision.records_spend is False
+
+
+def test_plan_has_no_use_count() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
+    assert view("plan", spends, JAN_31).included is None
+    assert view("plan", spends, JAN_31).used == 0
+    assert view("plan", spends, JAN_31).overage == 0
+    assert view("plan", spends, FEB).included is None
+    assert view("plan", spends, FEB).overage == 0
 
 
 def test_workspace_origin_is_the_app_base_url() -> None:
@@ -159,14 +103,12 @@ def test_local_bypass_is_unlimited_and_unbilled() -> None:
     assert view("local_bypass", spends, JAN).included is None
 
 
-def test_website_handoff_counts_in_the_same_twenty() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(19))
+def test_plan_website_publish_is_allowed_and_not_counted() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
     decision = decide("plan", spends, JAN, "website_handoff")
-    assert decision.records_spend is True
+    assert decision.allowed is True
+    assert decision.records_spend is False
     assert decision.as_overage is False
-    after = (*spends, Spend(at=JAN, kind="website_handoff"))
-    assert decide("plan", after, JAN, "website_handoff").blocked_reason == NEED_OVERFLOW_CONFIRM
-    assert decide("plan", after, JAN, "website_handoff", confirm_overflow=True).as_overage is True
 
 
 def test_entitlement_prefers_local_bypass_then_plan_then_free() -> None:

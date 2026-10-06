@@ -207,8 +207,8 @@ export default function Landing() {
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
     "offers": [
-      { "@type": "Offer", "price": "19.00", "priceCurrency": "GBP", "name": "Plan — 20 listing-copy writes per month", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "19.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "MON" } },
-      { "@type": "Offer", "price": "190.00", "priceCurrency": "GBP", "name": "Annual Plan — 20 listing-copy writes per month", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "190.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "ANN" } },
+      { "@type": "Offer", "price": "19.00", "priceCurrency": "GBP", "name": "Plan monthly", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "19.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "MON" } },
+      { "@type": "Offer", "price": "190.00", "priceCurrency": "GBP", "name": "Plan annual", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "190.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "ANN" } },
     ],
     "featureList": [
       "New listing from photos",
@@ -392,7 +392,7 @@ export default function Landing() {
               </p>
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary font-medium bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                20 listing-copy writes/month · Extra £0.70 · Cancel anytime
+                Listing-copy writes included · Cancel anytime
               </div>
             </div>
 
@@ -403,7 +403,7 @@ export default function Landing() {
                     <Crown className="w-4 h-4 text-primary" />
                     <CardTitle className="text-xl">Plan monthly</CardTitle>
                   </div>
-                  <CardDescription>20 listing-copy writes each calendar month</CardDescription>
+                  <CardDescription>Listing-copy writes and website included</CardDescription>
                   <div className="pt-3">
                     <span className="text-4xl font-display font-bold">£19</span>
                     <span className="text-muted-foreground text-sm ml-2">/month</span>
@@ -436,12 +436,12 @@ export default function Landing() {
                       Save £38 · Best Value
                     </Badge>
                   </div>
-                  <CardDescription>Same Allowance, two months free vs monthly</CardDescription>
+                  <CardDescription>Same Plan, two months free vs monthly</CardDescription>
                   <div className="pt-3">
                     <span className="text-4xl font-display font-bold">£190</span>
                     <span className="text-muted-foreground text-sm ml-2">/year</span>
                   </div>
-                  <p className="text-xs text-primary mt-1 font-medium">= £15.83/mo · 20 writes each month</p>
+                  <p className="text-xs text-primary mt-1 font-medium">= £15.83/mo</p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
                   <Separator className="mb-5" />

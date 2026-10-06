@@ -58,7 +58,7 @@ export default function Settings() {
   const annualPrice = (paymentConfig?.planAnnualPricePence ?? 19000) / 100;
   const allowanceUsed = subscriptionStatus?.allowanceUsed ?? 0;
   const allowanceIncluded = subscriptionStatus?.allowanceIncluded;
-  const overageThisMonth = subscriptionStatus?.overageThisMonth ?? 0;
+  const onPlan = subscriptionStatus?.entitlement === "plan";
 
   useEffect(() => {
     const identity = shopifyStatus?.gpsrIdentity as GpsrIdentity | undefined;
@@ -329,11 +329,11 @@ export default function Settings() {
                 <h3 className="text-sm font-medium">Plan</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {leftoverWeekly
-                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. Switch to a Plan for 20/month and £0.70 extra uses.`
+                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. Switch to a Plan. Listing-copy writes and website are included.`
+                    : onPlan
+                    ? "Listing-copy writes and website are included."
                     : isSubscribed
-                    ? allowanceIncluded == null
-                      ? "Local workspace — Allowance is not billed."
-                      : `${allowanceUsed} of ${allowanceIncluded} Allowance uses this month${overageThisMonth ? ` · ${overageThisMonth} extra` : ""}.`
+                    ? "Local workspace. Listing copy is not billed."
                     : "Subscribe for listing copy generate, listing copy refresh, and website."}
                 </p>
               </div>
@@ -396,7 +396,7 @@ export default function Settings() {
               Plan
             </DialogTitle>
             <DialogDescription>
-              20 listing-copy writes and website handoffs each calendar month. Extra uses £{((paymentConfig?.overagePence ?? 70) / 100).toFixed(2)} each.
+              Listing-copy writes and website are included. £{monthlyPrice}/month or £{annualPrice}/year.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -418,9 +418,8 @@ export default function Settings() {
             </div>
             <Separator />
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> 20 listing-copy writes per month</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Listing copy refresh and website</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Extra uses billed, not a hard stop</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Listing-copy writes included</li>
+              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Listing copy refresh, Bulk SEO, and website</li>
               <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Push listing copy you typed or generated</li>
             </ul>
           </div>
