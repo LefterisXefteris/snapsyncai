@@ -1,4 +1,4 @@
-import { CONVERSATION_PATH, WORKSPACE_HOME_PATH } from "./workspace-nav";
+import { WORKSPACE_HOME_PATH } from "./workspace-nav";
 
 const CHOSEN_KEY = "snapsync.workspaceChosen";
 const CONNECT_FROM_KEY = "snapsync.connectFrom";
@@ -74,14 +74,6 @@ export function workspaceArrival(input: WorkspaceArrivalInput): WorkspaceArrival
     return {
       path: input.pathname,
       chosenPath: input.pathname,
-      clearConnectFrom: false,
-    };
-  }
-
-  if (input.chosenPath === null && !input.shopConnected) {
-    return {
-      path: CONVERSATION_PATH,
-      chosenPath: CONVERSATION_PATH,
       clearConnectFrom: false,
     };
   }
