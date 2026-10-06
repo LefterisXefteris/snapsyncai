@@ -185,8 +185,16 @@ The seller putting this shop's Website on its SnapSync address, once a Website a
 _Avoid_: handoff, deploy, launch
 
 **Seller**:
-The person a Plan is for, with one Shopify shop. On a Plan after an accept of listing copy or a Publish, and in the workspace with no Plan after a product, confirmed facts, an Import, Inventory, or a Push of listing copy they typed, are two situations. A seller is in one of them. Buying a Plan leaves the workspace situation. A Plan with no accept and no Publish is neither, and so is an empty workspace.
+The person a Plan is for, with one Shopify shop. A Plan with no accept and no Publish, and an empty workspace, are neither the Plan situation nor the workspace situation.
 _Avoid_: user, account
+
+**Plan situation**:
+A seller on a Plan who has accepted listing copy or Published a website.
+_Avoid_: paid user, subscriber
+
+**Workspace situation**:
+A seller with no Plan who has a product, confirmed facts, an Import, Inventory, or a Push of listing copy they typed. Buying a Plan leaves this situation.
+_Avoid_: free user, trial
 
 **Plan**:
 Paid access to the workspace for one seller and one Shopify shop. Monthly and annual are how they pay; annual is cheaper for the same Plan. Listing-copy generate, listing copy refresh, Bulk SEO, and website are included, with no use count and no extra charge. Connecting a Channel does not require a Plan. Without a Plan the seller still has the workspace — catalogue, Inventory, New listing, Import, confirmed facts, and push of listing copy they typed — but not listing-copy generate, listing copy refresh, Bulk SEO, or website. Distinct from Leftover weekly.

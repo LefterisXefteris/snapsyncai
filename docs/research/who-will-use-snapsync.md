@@ -30,9 +30,9 @@ SnapSync is a textile-first seller workspace. Listing from photos is one job ins
 
 **Price.** Plan £19/month or £190/year for one seller and one Shopify shop. Listing-copy generate, listing copy refresh, Bulk SEO, and the website are included, with no use count and no extra charge (`CONTEXT.md`, Plan; `docs/adr/0039-the-plan-has-no-use-count.md`; `client/src/lib/landing-copy.ts`). Annual is the same Plan for a cheaper fee. No card is required to start. Confirming facts is free and is not a compliance check. Without a Plan the seller still has the catalogue, Inventory, New listing, Import, confirmed facts, and Push of listing copy they typed. Generate, refresh, Bulk SEO, and the website need a Plan. Leftover weekly stays £4/week with a 30-use hard stop until that seller cancels or switches. New checkouts are the Plan.
 
-ADR 0039 superseded the 20-use Allowance and the £0.70 Overflow in ADR 0020.
+ADR 0039 is the current Plan. It supersedes the Allowance meter in ADR 0014, and it supersedes ADR 0020 and ADR 0021. ADR 0016, ADR 0029, ADR 0035, and ADR 0037 still say an accept or a first Publish spends an Allowance use. Those sentences conflict with ADR 0039. This note follows the Plan entry and ADR 0039.
 
-**Two situations.** A seller on a Plan who has accepted listing copy or Published a website is in the Plan situation. A seller with no Plan who has a product, confirmed facts, an Import, Inventory, or a Push of listing copy they typed is in the workspace situation. A seller is in one of them. Buying a Plan leaves the workspace situation. A Plan with no accept and no Publish is neither, and so is an empty workspace (`CONTEXT.md`, Seller). The Plan situation is the result that answers whether the product will have sellers.
+**Two situations.** The Plan situation and the workspace situation are defined on Seller (`CONTEXT.md`). The Plan situation is the result that answers whether the product will have sellers. A Plan with no accept and no Publish is neither, and so is an empty workspace.
 
 **Bad fit.** A seller who will not type fibre percentages. An enterprise PIM across many shops. A peer-to-peer closet clear-out. Anyone whose only channel is Wix or Vinted.
 
@@ -44,7 +44,7 @@ Fit below is a judgment from the product and the legal duties in section 3. It i
 
 **Fit: strong.**
 
-They write their own listings, the catalogue is dozens of products rather than thousands, and they know the cloth. The pain SnapSync removes is grouping photos, holding listing copy until fibre composition is confirmed, then writing the Shopify listing and, if they want it, refreshing tags and SEO from search demand. Home textiles are in scope: the glossary treats a textile product as wider than apparel (`CONTEXT.md`, Textile product).
+They write their own product pages, the catalogue is dozens of products rather than thousands, and they know the cloth. The pain SnapSync removes is grouping photos, holding listing copy until fibre composition is confirmed, then writing that listing copy and, if they want it, listing copy refresh from search demand. Home textiles are in scope: the glossary treats a textile product as wider than apparel (`CONTEXT.md`, Textile product).
 
 **Why £19.** The Plan is one shop, and the writes are included. Facts, the catalogue, and typed copy cost £0, so they can put the legal lines in before they pay for generation. Generate does not run without a Plan, so the five in section 5 read listing copy on a workspace that already has a Plan, and the £19 question comes after they have read it. A UK-only shop still has the fibre-content duty in section 3. The EU responsible-person duty is about products placed on the Union market, so it bites when the offer is aimed at consumers in the Union.
 
@@ -88,13 +88,13 @@ The Plan is one seller and one Shopify shop (`CONTEXT.md`). An enterprise PIM al
 
 **Fit: weak.**
 
-Vinted’s own Pro page separates the two kinds of seller. A standard account is for clearing out a closet. “If you want to sell a high volume of items on Vinted (more than just clearing out your closet!), you need to sign up as a professional seller.” Vinted Pro is for registered businesses (sole traders, non-profits, and companies), it is free, and it is for listing second-hand items, including clothing and home textiles ([Vinted Pro](https://www.vinted.co.uk/pro)). SnapSync’s job is new textile listings on Shopify, with fibre percentages the seller knows. Vinted is not connected. A closet clear-out and a free second-hand Pro account are both outside the wedge.
+Vinted’s own Pro page separates the two kinds of seller. A standard account is for clearing out a closet. “If you want to sell a high volume of items on Vinted (more than just clearing out your closet!), you need to sign up as a professional seller.” Vinted Pro is for registered businesses (sole traders, non-profits, and companies), it is free, and it is for listing second-hand items, including clothing and home textiles ([Vinted Pro](https://www.vinted.co.uk/pro)). SnapSync’s job is new textile products on Shopify, with fibre percentages the seller knows. Vinted is not connected. A closet clear-out and a free second-hand Pro account are both outside the wedge.
 
 ## 3. Why a textile seller cannot skip the facts
 
 SnapSync records facts the seller confirms. Confirming them is free, and it is not a compliance check (`CONTEXT.md`, Plan). The product is not a compliance certificate. A seller can explicitly skip care instructions and GPSR identity, and listing copy is then written without those blocks. Fibre composition is the block the product requires before a textile’s listing copy is generated.
 
-The legal duties below are why skipping the facts is the seller’s problem. They are not a claim that a SnapSync push makes a listing lawful.
+The legal duties below are why skipping the facts is the seller’s problem. They are not a claim that a SnapSync Push makes the offer meet those duties.
 
 ### Fibre composition in the EU
 
@@ -223,13 +223,13 @@ The European Commission network describes itself as “the world’s largest sup
 
 https://een.ec.europa.eu/
 
-The audience is SMEs, not Shopify fashion brands. Useful once the first Shopify and UKFT conversations exist. It is not the first door.
+The audience is SMEs, not Shopify fashion brands. Useful once the first Shopify and UKFT meetings exist. It is not the first door.
 
 ## 5. The five-brand test
 
 Willingness to pay is this test. It has not been run.
 
-Five brands, in the UK or the EU. One Shopify shop. Clothing or home textile. Fibre percentages already on a label, a tech pack, or a mill sheet. UKFT is the UK door. The other conversations are opened directly. Enterprise Europe Network is the wrong room for this filter.
+Five brands, in the UK or the EU. One Shopify shop. Clothing or home textile. Fibre percentages already on a label, a tech pack, or a mill sheet. UKFT is the UK door. The others are approached directly. Enterprise Europe Network is the wrong room for this filter.
 
 Each brand types those percentages on a workspace that already has a Plan, from photos or a product of their own, and reads the listing copy. The £19 question comes after that. The session leaves them outside the Plan situation. Their shop enters it when they later accept listing copy or Publish on their own Plan.
 
