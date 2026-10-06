@@ -139,19 +139,45 @@ def rewrite_constraints(
 ) -> str:
     from app.services.product_facts import description_blocks, listing_copy_constraints
 
+    general = listing_copy_constraints(facts, shop_gpsr)
+    confirmed = facts.confirmed
+    if confirmed is not None and confirmed.is_textile and confirmed.composition:
+        names = ", ".join(row.name for row in confirmed.composition)
+        general = general.replace(
+            f"Tags and AEO may use only these confirmed fibre names: {names}. ",
+            f"Fibre tags use only these confirmed fibre names: {names}. ",
+        )
+    lead = queries[0] if queries else ""
+    support = ", ".join(query for query in queries[1:] if query)
     parts = [
-        listing_copy_constraints(facts, shop_gpsr),
-        "Aim listing copy at these search queries: " + ", ".join(queries) + ".",
+        general,
+        (
+            "Lead the SEO title and the meta description with this search query: "
+            f"{lead}."
+        ),
+        *(
+            [f"Keep these search queries in the copy as support: {support}."]
+            if support
+            else []
+        ),
+        f"Open the description by answering: {lead}.",
+        (
+            f"The meta description names {lead}, names a benefit taken "
+            "from the confirmed facts, includes a short call to action, and leaves price out."
+        ),
         (
             "Rewrite only tags, description, SEO title (max 70 characters), "
             "and meta description (max 320 characters)."
         ),
+        "Other tags come from the search queries.",
+        "Remove generic filler phrasing.",
         (
             "Do not change the product title. Do not write AEO. "
             "Do not invent claims that are not confirmed facts."
         ),
         "Drop rising or season words that are not true of the confirmed facts.",
         "Do not scrape, name, or imitate competitor listings.",
+        "Do not add schema, images, links, reviews, or Shopping checks.",
     ]
     blocks = description_blocks(facts, shop_gpsr)
     if blocks:
@@ -170,12 +196,18 @@ Output ONLY valid JSON with this exact structure (no markdown, no code fences):
 {"tags": ["keyword"], "description": "HTML description",
  "seoTitle": "page title", "seoDescription": "meta description"}
 Rules:
-- tags: Shopify tags; use only confirmed fibre names for materials
-- seoTitle: max 70 characters
-- seoDescription: max 320 characters
-- description must keep the English facts block unchanged when one is provided
+- fibre tags use only confirmed fibre names
+- other tags come from the search queries
+- seoTitle: max 70 characters and leads with the first search query
+- seoDescription: max 320 characters; names the first search query
+- names a benefit from confirmed facts; includes a short call to action
+- leaves price out
+- description opens by answering the first search query
+- then keep the English facts block unchanged
+- remove generic filler phrasing
 - do not invent product facts, competitor names, or AEO
 - do not change the product title
+- do not add schema, images, links, reviews, or Shopping checks
 """
 
 

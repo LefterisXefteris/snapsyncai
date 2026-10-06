@@ -10,6 +10,7 @@ import pytest
 from app.config import get_settings
 from app.services import listing_copy_propose
 from app.services.listing_copy_refresh import (
+    REFRESH_PROPOSAL_SYSTEM,
     accept_listing_copy_refresh,
     parse_refresh_proposal,
     refresh_blocked_reason,
@@ -215,6 +216,41 @@ def test_rewrite_constraints_keep_the_facts_block_and_name_the_queries() -> None
     assert "competitor" in text.lower()
     assert "70" in text
     assert "320" in text
+
+
+def test_refresh_instructions_lead_with_the_first_search_query() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({"isTextile": True, "fibreNames": ["cotton"]}).facts,
+        is_textile=True,
+        composition=[{"name": "cotton", "percent": 100}],
+        gpsr_choice="skip",
+        care_choice="skip",
+    ).facts
+    text = rewrite_constraints(
+        facts,
+        ["organic cotton tee", "crew neck tee"],
+        {"title": "Cotton tee", "description": "<p>A soft tee.</p>"},
+    )
+    instructions = REFRESH_PROPOSAL_SYSTEM + "\n" + text
+    assert (
+        "Lead the SEO title and the meta description with this search query: "
+        "organic cotton tee."
+    ) in instructions
+    assert "Keep these search queries in the copy as support: crew neck tee." in instructions
+    assert "Open the description by answering: organic cotton tee." in instructions
+    assert (
+        "The meta description names organic cotton tee, names a benefit taken "
+        "from the confirmed facts, includes a short call to action, and leaves price out."
+    ) in instructions
+    assert description_blocks(facts) in instructions
+    assert "70" in instructions
+    assert "320" in instructions
+    assert "Fibre tags use only these confirmed fibre names: cotton." in instructions
+    assert "Other tags come from the search queries." in instructions
+    assert "Remove generic filler phrasing." in instructions
+    assert "Do not write AEO." in instructions
+    assert "Do not add schema, images, links, reviews, or Shopping checks." in instructions
+    assert "Tags and AEO may use only" not in instructions
 
 
 def test_parse_refresh_proposal_reads_the_four_fields() -> None:
