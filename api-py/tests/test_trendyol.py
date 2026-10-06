@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.config import Settings
 from app.models.inventory import InventoryItem
+from app.services import connections
 from app.services import images as store
 from app.services import product as product_module
 from app.services.trendyol import (
@@ -15,7 +16,6 @@ from app.services.trendyol import (
     NEED_DESCRIPTION,
     NEED_LIST,
     NEED_SALE,
-    NEED_SHOPIFY,
     NEED_SKU,
     NEED_TITLE,
     REJECTED_ACCOUNT,
@@ -85,10 +85,44 @@ async def _connect(db, settings, port, **overrides):
     return await connect(db, settings, port, seed.SELLER, **body)
 
 
-async def test_connect_is_refused_without_a_shopify_channel(db, db_settings) -> None:
-    result = await _connect(db, _settings(db_settings), MemoryTrendyol())
-    assert result.connected is False
-    assert result.message == NEED_SHOPIFY
+async def test_connect_and_push_without_a_shopify_channel(db, db_settings) -> None:
+    settings = _settings(db_settings)
+    pid = await seed.product(
+        db,
+        barcode=BARCODE,
+        sku=SKU,
+        price=Decimal("24.00"),
+        storage_url="https://cdn.example/front.jpg",
+    )
+    port = MemoryTrendyol()
+    result = await _connect(db, settings, port)
+    assert result.connected is True
+    assert result.storefront == "DE"
+    assert result.currency == "EUR"
+    sent = await push(db, settings, port, seed.SELLER, pid, _draft())
+    assert sent is not None
+    assert sent.push_wait is None
+    assert port.product(BARCODE).barcode == BARCODE
+    loaded = await product_module.load(db, seed.SELLER, pid)
+    assert loaded is not None
+    assert loaded.photo.shopify_product_id is None
+    assert await seed.spends(db) == []
+
+
+async def test_disconnecting_shopify_leaves_the_trendyol_connection(db, db_settings) -> None:
+    settings = _settings(db_settings)
+    pid = await _shop_and_product(db)
+    port = MemoryTrendyol()
+    await _connect(db, settings, port)
+    await connections.delete_shopify(db, seed.SELLER)
+    assert (await connection(db, seed.SELLER)).connected is True
+    sent = await push(db, settings, port, seed.SELLER, pid, _draft())
+    assert sent is not None
+    assert sent.push_wait is None
+    assert port.product(BARCODE).barcode == BARCODE
+    loaded = await product_module.load(db, seed.SELLER, pid)
+    assert loaded is not None
+    assert loaded.photo.shopify_product_id is None
 
 
 async def test_a_turkey_storefront_is_refused(db, db_settings) -> None:

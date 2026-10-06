@@ -17,14 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.models.inventory import InventoryItem, InventorySettings
 from app.models.trendyol import TrendyolBarcode, TrendyolConnection, TrendyolListing
-from app.services import connections, product
+from app.services import product
 from app.services.crypto import decrypt_shopify_token, encrypt_shopify_token
 from app.services.inventory.core import calculate_sellable_quantity
 from app.services.listing_copy_refresh import listing_copy_from_image
 from app.services.product_facts import listing_copy_present
 from app.services.supabase_storage import media_original_source
 
-NEED_SHOPIFY = "Connect Shopify before Trendyol International."
 TURKEY = "This Channel is not the Turkey marketplace."
 REJECTED_ACCOUNT = "Trendyol refused these credentials."
 NEED_CREDENTIALS = "Enter the seller id, API key, and API secret."
@@ -212,10 +211,6 @@ def _origin(storefronts: tuple[Storefront, ...]) -> tuple[Storefront, ...]:
     return tuple(item for item in storefronts if item.code.upper() != TURKEY_CODE)
 
 
-async def _shopify(session: AsyncSession, user_id: str) -> bool:
-    return await connections.get_shopify(session, user_id) is not None
-
-
 async def _connection(session: AsyncSession, user_id: str) -> TrendyolConnection | None:
     return (
         await session.execute(
@@ -282,8 +277,6 @@ def _dump(values: tuple[AttributeValue, ...]) -> list[dict[str, str | None]]:
 
 async def connection(session: AsyncSession, user_id: str) -> Link:
     """Settings reads this. It does not call Trendyol."""
-    if not await _shopify(session, user_id):
-        return Link(available=False, connected=False, message=NEED_SHOPIFY)
     row = await _connection(session, user_id)
     if row is None:
         return Link(available=True, connected=False)
@@ -308,8 +301,6 @@ async def connect(
     storefront_code: str | None,
     vat_rate: int | None,
 ) -> Link:
-    if not await _shopify(session, user_id):
-        return Link(available=False, connected=False, message=NEED_SHOPIFY)
     seller_id = seller_id.strip()
     api_key = api_key.strip()
     api_secret = api_secret.strip()
