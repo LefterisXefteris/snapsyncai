@@ -85,7 +85,7 @@ The job of proposing new tags, description, SEO title, and meta description for 
 _Avoid_: Agentic SEO, SEO agent, trend rewrite, competitor SEO
 
 **Accept**:
-The seller's explicit choice to keep proposed listing copy for one product. It saves that copy, spends one Allowance use when the write lands (not when stale listing copy is regenerated), and does not Push. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page, the Bulk SEO page, or the conversation.
+The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. On Leftover weekly it counts as one use when the write lands, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page, the Bulk SEO page, or the conversation.
 _Avoid_: approve, apply, save (as the seller act)
 
 **Search demand**:
@@ -181,17 +181,13 @@ SnapSync's own agent, inside the product, that builds one shop's Website prototy
 _Avoid_: Lovable, builder (as a separate product)
 
 **Publish**:
-The seller putting this shop's Website on its SnapSync address, once a Website agent run has returned a look for the picks and Website brief now on the page. The first one that lands spends one Allowance use; a later one does not; taking the site down keeps the address; it is not a Push and not Go live.
+The seller putting this shop's Website on its SnapSync address, once a Website agent run has returned a look for the picks and Website brief now on the page. On Leftover weekly the first Publish that lands counts as one use, and a later one does not. Taking the site down keeps the address. It is not a Push and not Go live.
 _Avoid_: handoff, deploy, launch
 
 **Plan**:
-Paid access to the workspace for one seller and one Shopify shop. Monthly and annual are how they pay; annual is cheaper for the same Plan, not a bigger Allowance. It includes an Allowance. Connecting a Channel does not require a Plan. Without a Plan the seller still has the workspace — catalogue, Inventory, New listing, Import, confirmed facts, and push of listing copy they typed — but not listing-copy generate, listing copy refresh, Bulk SEO, or website.
-_Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock
+Paid access to the workspace for one seller and one Shopify shop. Monthly and annual are how they pay; annual is cheaper for the same Plan. Listing-copy generate, listing copy refresh, Bulk SEO, and website are included, with no use count and no extra charge. Connecting a Channel does not require a Plan. Without a Plan the seller still has the workspace — catalogue, Inventory, New listing, Import, confirmed facts, and push of listing copy they typed — but not listing-copy generate, listing copy refresh, Bulk SEO, or website. Distinct from Leftover weekly.
+_Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock, Allowance, Overflow, unlimited
 
-**Allowance**:
-The listing-copy jobs and website included in a Plan before overflow. One use is one product's listing-copy write (first generate or listing copy refresh) or one website. Bulk SEO spends one per product whose accepted listing copy lands. Twenty uses refill each calendar month on both monthly and annual Plans; unused uses expire at month end. A use spends only when the write lands or the first Publish lands. A later Publish does not spend. A Website agent run does not spend, and there is no cap on runs. A failed generate does not. Regenerating stale listing copy does not spend. Overflow is billed per extra use on the Plan, not a pack and not a hard stop. Confirming legal facts is not an Allowance use and not a paid compliance check. Talk in the conversation is not a use, and there is no separate cap on it.
-_Avoid_: credits, weekly product limit, unlock, compliance check, top-up, yearly bank
-
-**Overflow**:
-A £0.70 charge on the Plan invoice for one Allowance use after the included 20 in the UTC calendar month. Not a pack, not a prepaid balance, not a purchase of a write. Leftover weekly has none.
-_Avoid_: top-up, credit, extra pack, overage (as seller-facing language)
+**Leftover weekly**:
+The old £4/week checkout, kept until the seller cancels or switches to the Plan. Thirty listing-copy writes or first website Publishes each UTC week, then those jobs stop, with no extra charge. A failed generate, a stale regenerate, a later Publish, a Website agent run, confirming facts, and talk do not count. New checkouts are the Plan.
+_Avoid_: weekly Plan, Allowance, Overflow, credits

@@ -272,7 +272,9 @@ class TestPlanStatus:
         assert result.subscribed is True
         assert result.entitlement == "plan"
         assert result.allowance_used == 0
-        assert result.allowance_included == 20
+        assert result.allowance_included is None
+        assert result.overage_this_month == 0
+        assert result.overflow_notice is False
         payload = result.model_dump(by_alias=True, exclude_none=True)
         assert payload["subscribed"] is True
         assert payload["entitlement"] == "plan"

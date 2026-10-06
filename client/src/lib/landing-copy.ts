@@ -21,7 +21,7 @@ export const LANDING_MICRO = "No card required · catalogue, facts, and typed li
 export const LANDING_PRIMARY_CTA = "Start free";
 export const LANDING_SECONDARY_CTA = "How it works";
 
-export const LANDING_FINE_PRINT = "Plan from £19/month · £190/year · Extra uses £0.70 · Cancel anytime";
+export const LANDING_FINE_PRINT = "Plan £19/month · £190/year · Cancel anytime";
 
 export const JOBS = [
   {
@@ -90,17 +90,16 @@ export const STEPS = [
 ] as const;
 
 export const WEEKLY_BULLETS = [
-  "20 listing-copy writes per calendar month",
+  "Listing-copy writes included",
   "New listing from photos (up to 200)",
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
   "Import, inventory, Bulk SEO, and a website",
-  "Extra uses £0.70 — not a hard stop",
 ] as const;
 
 export const ANNUAL_BULLETS = [
-  "20 listing-copy writes per calendar month",
+  "Listing-copy writes included",
   "New listing from photos (up to 200)",
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
@@ -121,9 +120,9 @@ export const FAQ_DATA = [
       "Listing copy must not invent product facts a photo cannot establish. You confirm fibre composition, care instructions, and GPSR identity — or skip the blocks you do not have. Only then is listing copy written.",
   },
   {
-    question: "How does the Plan Allowance work?",
+    question: "What does the Plan include?",
     answer:
-      "Each calendar month a Plan includes 20 listing-copy writes (first generate or listing copy refresh) and website handoffs. Extra uses are £0.70 on the invoice. Unused uses expire at month end. Confirming facts does not spend. No card is required to start.",
+      "A Plan is £19/month or £190/year. Listing-copy generate, listing copy refresh, Bulk SEO, and website are included, with no use count and no extra charge. Confirming facts does not require a Plan. No card is required to start.",
   },
   {
     question: "How do I create a product from photos?",
@@ -138,7 +137,7 @@ export const FAQ_DATA = [
   {
     question: "How much does SnapSync cost?",
     answer:
-      "No card to start. A Plan is £19/month or £190/year for 20 listing-copy writes each calendar month — listing copy, listing copy refresh, Bulk SEO, a website, push to Shopify, and inventory. Extra uses £0.70. Cancel anytime.",
+      "No card to start. A Plan is £19/month or £190/year. Listing copy, listing copy refresh, Bulk SEO, and a website are included, with no extra charge. Push to Shopify and inventory stay available. Cancel anytime.",
   },
   {
     question: "Can I edit listing copy before I push to Shopify?",

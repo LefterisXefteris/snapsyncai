@@ -1,10 +1,9 @@
-"""Accept — saves listing copy and spends one Allowance use only when the write lands.
+"""Accept — saves listing copy. A Plan does not record a use. Leftover weekly still counts.
 
 Seam: `app.services.listing_copy_accept`, on a real Postgres (`db`).
 """
 
 import asyncio
-from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -15,8 +14,9 @@ from app.db import build_engine_url, run_after_commit
 from app.services import billing
 from app.services import images as store
 from app.services.listing_copy_accept import accept_generated, accept_refresh
-from app.services.plan import NEED_OVERFLOW_CONFIRM, NEED_PLAN, PLAN_INCLUDED, month_key_utc
+from app.services.plan import NEED_PLAN
 from app.services.plan_charge import report_unreported_overage
+from app.services.plan_ledger import record_spend
 from app.services.product_facts import facts_from_stored
 from tests.seed import (
     OTHER_SELLER,
@@ -50,25 +50,24 @@ async def _description(db, product_id: int) -> str | None:
     return (await store.get_image(db, product_id, SELLER)).description
 
 
-async def test_refresh_accept_saves_the_copy_and_spends_one_use(db, db_settings) -> None:
+async def test_refresh_accept_saves_the_copy_and_does_not_record_a_use(db, db_settings) -> None:
     await plan(db)
     pid = await product(db, facts=confirmed_facts())
     result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
     assert result.refused is None
-    assert result.spent is True
+    assert result.spent is False
     assert result.product.seo_title == "Cotton tee"
     assert result.product.tags == ["cotton", "tee"]
-    assert [(row.kind, row.product_id, row.as_overage) for row in await spends(db)] == [
-        ("refresh_accept", pid, False)
-    ]
+    assert await spends(db) == []
 
 
-async def test_bulk_seo_accept_spends_a_bulk_seo_use(db, db_settings) -> None:
+async def test_bulk_seo_accept_does_not_record_a_use(db, db_settings) -> None:
     await plan(db)
     pid = await product(db, facts=confirmed_facts())
     result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="bulk_seo")
-    assert result.spent is True
-    assert [row.kind for row in await spends(db)] == ["bulk_seo_persist"]
+    assert result.spent is False
+    assert result.product.seo_title == "Cotton tee"
+    assert await spends(db) == []
 
 
 async def test_a_proposal_that_drops_the_facts_block_saves_nothing(db, db_settings) -> None:
@@ -97,54 +96,53 @@ async def test_without_a_plan_nothing_is_saved(db, db_settings) -> None:
     assert await spends(db) == []
 
 
-async def test_the_first_extra_use_waits_for_overflow_confirm(db, db_settings, stripe) -> None:
-    await plan(db)
-    await use_allowance(db, PLAN_INCLUDED)
-    pid = await product(db, facts=confirmed_facts())
-    result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
-    assert (result.refused, result.message) == ("overflow_confirm", NEED_OVERFLOW_CONFIRM)
-    assert await _description(db, pid) == "<p>Old.</p>"
-    assert len(await spends(db)) == PLAN_INCLUDED
-    assert stripe == []
-
-
-async def test_a_confirmed_extra_use_is_overflow_and_reported_once(
+async def test_a_plan_accept_after_recorded_uses_saves_and_does_not_charge(
     db, db_settings, stripe
 ) -> None:
-    sub = await plan(db)
-    await use_allowance(db, PLAN_INCLUDED)
+    await plan(db)
+    await use_allowance(db, 20)
     pid = await product(db, facts=confirmed_facts())
-    result = await accept_refresh(
-        db, db_settings, SELLER, pid, PROPOSAL, job="refresh", confirm_overflow=True
-    )
-    assert result.spent is True
-    extra = (await spends(db))[-1]
-    assert (extra.product_id, extra.as_overage, extra.overage_reported) == (pid, True, False)
+    result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
+    assert result.refused is None
+    assert result.spent is False
+    assert await _description(db, pid) == "<p>A cotton tee.</p>"
+    assert len(await spends(db)) == 20
+    await run_after_commit(db)
     assert stripe == []
-    assert sub.overflow_confirmed_month == month_key_utc(datetime.now(UTC))
+
+
+async def test_a_queued_overage_line_is_still_reported_once(db, db_settings, stripe) -> None:
+    await plan(db)
+    queued = await record_spend(
+        db, SELLER, "refresh_accept", as_overage=True, overage_reported=False
+    )
+    pid = await product(db, facts=confirmed_facts())
+    result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
+    assert result.spent is False
+    assert [row.id for row in await spends(db)] == [queued.id]
+    assert stripe == []
     await run_after_commit(db)
     assert stripe == [STRIPE_CUSTOMER]
-    assert extra.overage_reported is True
+    assert queued.overage_reported is True
+    await report_unreported_overage(db, SELLER)
+    assert stripe == [STRIPE_CUSTOMER]
 
 
 async def test_a_failed_overage_report_is_billed_once_on_the_next_run(
     db, db_settings, monkeypatch
 ) -> None:
     await plan(db)
-    await use_allowance(db, PLAN_INCLUDED)
-    pid = await product(db, facts=confirmed_facts())
+    queued = await record_spend(
+        db, SELLER, "refresh_accept", as_overage=True, overage_reported=False
+    )
     keys: list[str] = []
 
     def stripe_down(customer: str, *, idempotency_key: str) -> None:
         raise RuntimeError("stripe down")
 
     monkeypatch.setattr(billing, "report_overage", stripe_down)
-    await accept_refresh(
-        db, db_settings, SELLER, pid, PROPOSAL, job="refresh", confirm_overflow=True
-    )
-    await run_after_commit(db)
-    extra = (await spends(db))[-1]
-    assert extra.overage_reported is False
+    await report_unreported_overage(db, SELLER)
+    assert queued.overage_reported is False
 
     monkeypatch.setattr(
         billing,
@@ -153,11 +151,11 @@ async def test_a_failed_overage_report_is_billed_once_on_the_next_run(
     )
     await report_unreported_overage(db, SELLER)
     await report_unreported_overage(db, SELLER)
-    assert keys == [f"allowance-spend-{extra.id}"]
-    assert extra.overage_reported is True
+    assert keys == [f"allowance-spend-{queued.id}"]
+    assert queued.overage_reported is True
 
 
-async def test_two_accepts_at_the_last_included_use_do_not_both_land_included(
+async def test_two_plan_accepts_both_save(
     test_database_url, db_settings
 ) -> None:
     racer = "user_racer"
@@ -165,7 +163,6 @@ async def test_two_accepts_at_the_last_included_use_do_not_both_land_included(
     try:
         async with AsyncSession(engine, expire_on_commit=False) as setup:
             await plan(setup, racer)
-            await use_allowance(setup, PLAN_INCLUDED - 1, racer)
             first = await product(setup, owner=racer, facts=confirmed_facts())
             second = await product(setup, owner=racer, facts=confirmed_facts())
             await setup.commit()
@@ -178,8 +175,10 @@ async def test_two_accepts_at_the_last_included_use_do_not_both_land_included(
             await a.commit()
             late = await asyncio.wait_for(racing, timeout=5)
             await b.commit()
-        assert landed.spent is True
-        assert (late.refused, late.message) == ("overflow_confirm", NEED_OVERFLOW_CONFIRM)
+        assert landed.refused is None
+        assert landed.spent is False
+        assert late.refused is None
+        assert late.spent is False
     finally:
         async with engine.begin() as cleanup:
             for statement in (
@@ -210,15 +209,15 @@ async def test_another_sellers_product_is_not_found(db, db_settings) -> None:
     assert await spends(db) == []
 
 
-async def test_first_generate_accept_spends_one_use(db, db_settings) -> None:
+async def test_first_generate_accept_saves_and_does_not_record_a_use(db, db_settings) -> None:
     await plan(db)
     pid = await product(db, facts=confirmed_facts(), listed=False)
     result = await accept_generated(
         db, db_settings, SELLER, pid, {"title": "Cotton tee", "description": "<p>A tee.</p>"}
     )
-    assert result.spent is True
+    assert result.spent is False
     assert result.product.title == "Cotton tee"
-    assert [(row.kind, row.product_id) for row in await spends(db)] == [("generate_persist", pid)]
+    assert await spends(db) == []
 
 
 async def test_regenerating_stale_listing_copy_does_not_spend(db, db_settings) -> None:

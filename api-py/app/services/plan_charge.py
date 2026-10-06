@@ -117,7 +117,7 @@ async def spend_when_landed[T](
     confirm_overflow: bool = False,
     product_id: int | None = None,
 ) -> Landed[T]:
-    """Run `write` if the Plan allows this job, and spend one Allowance use when it lands.
+    """Run `write` if the Plan allows this job. A Plan does not record a use.
 
     The seller's subscription row stays locked until the request commits, so a concurrent
     job decides after this one's spend is visible. Overflow reaches Stripe only after commit.
@@ -137,25 +137,27 @@ async def spend_when_landed[T](
     if not decision.allowed:
         return Landed(refused=decision.blocked_reason)
     result = await write()
-    if result is None or not decision.records_spend:
-        return Landed(result=result)
-    await record_spend(
-        session,
-        user_id,
-        job,
-        as_overage=decision.as_overage,
-        product_id=product_id,
-        overage_reported=not decision.as_overage,
-    )
-    if decision.as_overage and sub is not None:
-        sub.overflow_confirmed_month = month_key_utc(now)
-        await session.flush()
-    after_commit(
-        session,
-        f"overage:{user_id}",
-        lambda committed: report_unreported_overage(committed, user_id),
-    )
-    return Landed(result=result, spent=True)
+    if result is None:
+        return Landed(result=None)
+    if decision.records_spend:
+        await record_spend(
+            session,
+            user_id,
+            job,
+            as_overage=decision.as_overage,
+            product_id=product_id,
+            overage_reported=not decision.as_overage,
+        )
+        if decision.as_overage and sub is not None:
+            sub.overflow_confirmed_month = month_key_utc(now)
+            await session.flush()
+    if decision.records_spend or entitlement == "plan":
+        after_commit(
+            session,
+            f"overage:{user_id}",
+            lambda committed: report_unreported_overage(committed, user_id),
+        )
+    return Landed(result=result, spent=decision.records_spend)
 
 
 async def report_unreported_overage(session: AsyncSession, user_id: str) -> None:

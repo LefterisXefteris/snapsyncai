@@ -91,11 +91,11 @@ test("copy does not sell unshipped jobs, fake proof, or the old generator story"
   }
 });
 
-test("pricing is Plan Allowance, not weekly £4 or a 30-product cap", () => {
+test("pricing is £19 or £190, with no extra-use charge and no weekly cap", () => {
   const text = landingVisibleText().toLowerCase();
   assert.match(text, /£19/);
   assert.match(text, /£190/);
-  assert.match(text, /£0\.70/);
+  assert.equal(text.includes("£0.70"), false);
   assert.equal(text.includes("£4"), false);
   assert.equal(text.includes("30 product"), false);
   assert.equal(text.includes("unlock"), false);

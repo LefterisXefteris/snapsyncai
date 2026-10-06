@@ -122,7 +122,7 @@ export function useVerifySubscription() {
       if (data.alreadyActive) {
         toast({ title: "Already Subscribed", description: "Your subscription is already active." });
       } else {
-        toast({ title: "Plan active", description: "You have 20 listing-copy writes this calendar month." });
+        toast({ title: "Plan active", description: "Listing-copy writes and website are included." });
       }
     },
     onError: (error) => {

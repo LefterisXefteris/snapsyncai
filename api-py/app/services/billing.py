@@ -287,6 +287,15 @@ async def claim_paid_session(session: AsyncSession, checkout_session_id: str) ->
     return True
 
 
+PLAN_PRODUCT_DESCRIPTION = "Listing-copy writes and website included"
+
+
+def _ensure_plan_product_description(product) -> None:
+    if (getattr(product, "description", None) or "") == PLAN_PRODUCT_DESCRIPTION:
+        return
+    stripe.Product.modify(product.id, description=PLAN_PRODUCT_DESCRIPTION)
+
+
 async def get_or_create_weekly_subscription_price_id() -> str:
     """Plan monthly price. Name kept so checkout callers stay stable."""
     global _cached_weekly_price_id
@@ -299,6 +308,7 @@ async def get_or_create_weekly_subscription_price_id() -> str:
         None,
     )
     if existing:
+        _ensure_plan_product_description(existing)
         prices = stripe.Price.list(product=existing.id, active=True, limit=10)
         match = next(
             (
@@ -317,7 +327,7 @@ async def get_or_create_weekly_subscription_price_id() -> str:
     else:
         product = stripe.Product.create(
             name="SnapSync Plan",
-            description="20 listing-copy writes and website handoffs per calendar month",
+            description=PLAN_PRODUCT_DESCRIPTION,
             metadata={"type": "plan_subscription"},
         )
         product_id = product.id
@@ -343,6 +353,7 @@ async def get_or_create_annual_subscription_price_id() -> str:
         None,
     )
     if existing:
+        _ensure_plan_product_description(existing)
         prices = stripe.Price.list(product=existing.id, active=True, limit=20)
         match = next(
             (
@@ -361,7 +372,7 @@ async def get_or_create_annual_subscription_price_id() -> str:
     else:
         product = stripe.Product.create(
             name="SnapSync Plan",
-            description="20 listing-copy writes and website handoffs per calendar month",
+            description=PLAN_PRODUCT_DESCRIPTION,
             metadata={"type": "plan_subscription"},
         )
         product_id = product.id

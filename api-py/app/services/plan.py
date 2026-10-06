@@ -1,4 +1,4 @@
-"""Plan and Allowance — entitlement and spend decisions. Stripe is an adapter, not this module."""
+"""Plan entitlement and spend decisions. Stripe is an adapter, not this module."""
 
 from __future__ import annotations
 
@@ -61,11 +61,6 @@ def _aware(value: datetime) -> datetime:
     return value
 
 
-def month_start_utc(now: datetime) -> datetime:
-    now = _aware(now).astimezone(UTC)
-    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-
 def month_key_utc(now: datetime) -> str:
     now = _aware(now).astimezone(UTC)
     return f"{now.year:04d}-{now.month:02d}"
@@ -94,16 +89,7 @@ def view(entitlement: Entitlement, spends: Sequence[Spend], now: datetime) -> Al
             used=used,
             overage=0,
         )
-    start = month_start_utc(now)
-    count = sum(1 for item in spends if item.kind in _SPENDING_JOBS and _in_period(item, start))
-    used = min(count, PLAN_INCLUDED)
-    overage = max(0, count - PLAN_INCLUDED)
-    return AllowanceView(
-        entitlement=entitlement,
-        included=PLAN_INCLUDED,
-        used=used,
-        overage=overage,
-    )
+    return AllowanceView(entitlement=entitlement, included=None, used=0, overage=0)
 
 
 def decide(
@@ -148,29 +134,11 @@ def decide(
             as_overage=False,
         )
 
-    would_spend = not listing_copy_was_stale and job in _SPENDING_JOBS
-    snapshot = view(entitlement, spends, now)
-    overflow_notice = would_spend and snapshot.used >= PLAN_INCLUDED
-    overflow_confirm_required = overflow_notice and overflow_confirmed_month != month_key_utc(
-        now
-    )
-    if completed and overflow_confirm_required and not confirm_overflow:
-        return SpendDecision(
-            allowed=False,
-            blocked_reason=NEED_OVERFLOW_CONFIRM,
-            records_spend=False,
-            as_overage=False,
-            overflow_notice=True,
-            overflow_confirm_required=True,
-        )
-    records = completed and would_spend
     return SpendDecision(
         allowed=True,
         blocked_reason=None,
-        records_spend=records,
-        as_overage=records and overflow_notice,
-        overflow_notice=overflow_notice,
-        overflow_confirm_required=overflow_confirm_required,
+        records_spend=False,
+        as_overage=False,
     )
 
 
