@@ -306,6 +306,33 @@ async def apply_shopify_publications(
             raise RuntimeError("; ".join(e.get("message") or "" for e in errors))
 
 
+_PRODUCT_SET = """
+    mutation CreateSnapSyncProduct($productSet: ProductSetInput!) {
+      productSet(synchronous: true, input: $productSet) {
+        product {
+          id
+          variants(first: 250) {
+            nodes { id sku inventoryItem { id tracked } }
+          }
+        }
+        userErrors { field message }
+      }
+    }
+"""
+
+
+def _shopify_product_is_gone(data: dict[str, Any]) -> bool:
+    payload = data.get("productSet") or {}
+    if payload.get("product"):
+        return False
+    return [error.get("message") for error in payload.get("userErrors") or []] == [
+        "Product does not exist"
+    ]
+
+
+async def _product_set(graphql: ShopifyGraphQL, product_set: dict[str, Any]) -> dict[str, Any]:
+    return await graphql(_PRODUCT_SET, {"productSet": product_set})
+
 
 async def create_shopify_product(
     graphql: ShopifyGraphQL,
@@ -395,22 +422,11 @@ async def create_shopify_product(
         ],
     })
 
-    data = await graphql(
-        """
-        mutation CreateSnapSyncProduct($productSet: ProductSetInput!) {
-          productSet(synchronous: true, input: $productSet) {
-            product {
-              id
-              variants(first: 250) {
-                nodes { id sku inventoryItem { id tracked } }
-              }
-            }
-            userErrors { field message }
-          }
-        }
-        """,
-        {"productSet": product_set},
-    )
+    data = await _product_set(graphql, product_set)
+    # The seller deleted this product on Shopify. Create it again in this same Push.
+    if _shopify_product_is_gone(data) and product_set.get("id"):
+        product_set.pop("id")
+        data = await _product_set(graphql, product_set)
     errors = data["productSet"]["userErrors"]
     product = data["productSet"].get("product")
     if errors or not product:

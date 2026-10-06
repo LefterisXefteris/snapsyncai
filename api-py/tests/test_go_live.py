@@ -4,7 +4,12 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.models.inventory import InventoryItem, InventoryOutboxJob, InventorySettings
+from app.models.inventory import (
+    InventoryChannelLink,
+    InventoryItem,
+    InventoryOutboxJob,
+    InventorySettings,
+)
 from app.services import images as store
 from tests import seed
 from tests.seed import SELLER
@@ -41,6 +46,32 @@ async def _inventory_on(db, location_id: str) -> None:
         )
     )
     await db.flush()
+
+
+async def _link(db, user_id: str, product_id: str, inventory_item_gid: str) -> int:
+    item = InventoryItem(user_id=user_id, title="Tee", state="active", ledger_quantity=4)
+    db.add(item)
+    await db.flush()
+    db.add(
+        InventoryChannelLink(
+            user_id=user_id,
+            inventory_item_id=item.id,
+            external_product_id=product_id,
+            external_variant_id=f"gid://shopify/ProductVariant/{item.id}",
+            external_inventory_item_id=inventory_item_gid,
+            external_location_id=WAREHOUSE,
+            sync_state="synced",
+        )
+    )
+    await db.flush()
+    return item.id
+
+
+async def _links(db, user_id: str) -> dict[str, str]:
+    rows = await db.execute(
+        select(InventoryChannelLink).where(InventoryChannelLink.user_id == user_id)
+    )
+    return {link.external_product_id: link.external_inventory_item_id for link in rows.scalars()}
 
 
 async def test_storefront_write_with_listing_copy_and_a_price_is_active_on_the_online_store(
@@ -122,19 +153,92 @@ async def test_storefront_write_without_listing_copy_names_listing_copy_not_a_pl
     assert shop.products == {}
 
 
-async def test_a_failed_shopify_write_does_not_mark_the_product_live(db, push) -> None:
-    """The stored Shopify product is gone from the shop, so the write is refused."""
-    pid = await _product(db, shopify_product_id="gid://shopify/Product/404")
+async def test_another_shopify_error_keeps_the_stored_product(db, push) -> None:
+    """A refusal other than a missing product leaves the stored id and creates nothing."""
     shop = ShopifyShop()
+    existing = shop.add_product(status="DRAFT")
+    pid = await _product(db, shopify_product_id=existing.id, shopify_product_status="DRAFT")
+    shop.fail_next_product_set = "Title is too long"
     pushed = await push(shop, [pid], **STOREFRONT)
-    assert pushed.refused is None
     assert pushed.success == 0
     assert pushed.failed == 1
-    assert shop.products == {}
+    assert pushed.results[0].error == "Title is too long"
+    assert list(shop.products) == [existing.id]
+    assert existing.status == "DRAFT"
     row = await store.get_image(db, pid, SELLER)
+    assert row.shopify_product_id == existing.id
     assert row.shopify_status == "failed"
     assert row.shopify_product_status == "DRAFT"
     assert row.shopify_publication_ids is None
+
+
+async def test_a_failed_replacement_keeps_the_stored_product(db, push) -> None:
+    """The deleted product stays linked when the new create itself is refused."""
+    gone = "gid://shopify/Product/404"
+    pid = await _product(db, shopify_product_id=gone)
+    shop = ShopifyShop()
+    shop.fail_next_create = "Title is too long"
+    pushed = await push(shop, [pid], **STOREFRONT)
+    assert pushed.success == 0
+    assert pushed.failed == 1
+    assert pushed.results[0].error == "Title is too long"
+    assert shop.products == {}
+    row = await store.get_image(db, pid, SELLER)
+    assert row.shopify_product_id == gone
+    assert row.shopify_status == "failed"
+
+
+async def test_a_deleted_shopify_product_is_created_again_by_the_same_push(db, push) -> None:
+    """A deleted Shopify product is created again. The catalogue product stays."""
+    gone = "gid://shopify/Product/404"
+    pid = await _product(db, shopify_product_id=gone, product_group_id="tee")
+    back = await seed.product(db, shopify_product_id=gone, product_group_id="tee", listed=False)
+    shop = ShopifyShop()
+    pushed = await push(shop, [pid], **STOREFRONT)
+    assert pushed.refused is None
+    assert pushed.success == 1
+    assert pushed.failed == 0
+    product = shop.only_product()
+    assert product.id != gone
+    assert product.status == "ACTIVE"
+    assert product.publications == {ONLINE_STORE}
+    for image_id in (pid, back):
+        row = await store.get_image(db, image_id, SELLER)
+        assert row.shopify_product_id == product.id
+        assert row.shopify_status == "synced"
+        assert row.shopify_product_status == "ACTIVE"
+        assert row.shopify_publication_ids == [ONLINE_STORE]
+
+
+async def test_replacing_a_deleted_shopify_product_drops_its_inventory_links(
+    db, db_settings, push
+) -> None:
+    """Links to the deleted Shopify product go. A different product, and another seller, stay."""
+    gone = "gid://shopify/Product/404"
+    kept = "gid://shopify/Product/9"
+    await _inventory_on(db, WAREHOUSE)
+    pid = await _product(db, shopify_product_id=gone, inventory_quantity=4, track_quantity="true")
+    old = await _link(db, SELLER, gone, "gid://shopify/InventoryItem/901")
+    await _link(db, SELLER, kept, "gid://shopify/InventoryItem/902")
+    await _link(db, seed.OTHER_SELLER, gone, "gid://shopify/InventoryItem/903")
+    shop = _warehouse()
+    pushed = await push(
+        shop,
+        [pid],
+        **STOREFRONT,
+        settings=db_settings.model_copy(update={"inventory_autopilot_enabled": True}),
+    )
+    assert pushed.success == 1
+    product = shop.only_product()
+    db.expire_all()
+    seller_links = await _links(db, SELLER)
+    assert gone not in seller_links
+    assert seller_links[kept] == "gid://shopify/InventoryItem/902"
+    assert seller_links[product.id]
+    assert (await _links(db, seed.OTHER_SELLER))[gone] == "gid://shopify/InventoryItem/903"
+    item = await db.get(InventoryItem, old)
+    assert item is not None
+    assert item.state == "archived"
 
 
 async def test_catalogue_bulk_push_of_a_draft_does_not_ask_for_a_price(db, push) -> None:

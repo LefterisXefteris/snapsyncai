@@ -259,6 +259,7 @@ async def push_products(
         view_images = [full_map.get(view.id) or view for view in views]
         desired_ids = _push_publication_ids(publication_ids, full_primary)
         desired_status = _push_status(product_status, full_primary)
+        stored_id = getattr(full_primary, "shopify_product_id", None)
         # Read Shopify before the write. Afterwards the product is already on the store.
         previous = None
         landing = bool(
@@ -276,7 +277,17 @@ async def push_products(
             product_status=product_status,
         )
         if result.get("shopify_product_id"):
-            from app.services.inventory.service import register_published_shopify_product
+            from app.services.inventory.service import (
+                drop_shopify_product_links,
+                register_published_shopify_product,
+            )
+
+            if (
+                isinstance(stored_id, str)
+                and stored_id
+                and stored_id != result["shopify_product_id"]
+            ):
+                await drop_shopify_product_links(session, user_id, stored_id)
 
             error = result.get("error")
             written: int | None = None

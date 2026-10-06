@@ -1014,6 +1014,34 @@ async def disable_inventory_for_user(
     )
 
 
+async def drop_shopify_product_links(session: AsyncSession, user_id: str, product_id: str) -> None:
+    """The Shopify product is gone. Stop syncing it and archive its inventory items."""
+    links = list(
+        (
+            await session.execute(
+                select(InventoryChannelLink).where(
+                    InventoryChannelLink.user_id == user_id,
+                    InventoryChannelLink.external_product_id == product_id,
+                )
+            )
+        ).scalars()
+    )
+    if not links:
+        return
+    now = _now()
+    await session.execute(
+        update(InventoryItem)
+        .where(InventoryItem.id.in_([link.inventory_item_id for link in links]))
+        .values(state="archived", tracking_enabled=False, updated_at=now)
+    )
+    await session.execute(
+        delete(InventoryChannelLink).where(
+            InventoryChannelLink.user_id == user_id,
+            InventoryChannelLink.external_product_id == product_id,
+        )
+    )
+
+
 async def register_published_shopify_product(
     session: AsyncSession,
     settings: Settings,
