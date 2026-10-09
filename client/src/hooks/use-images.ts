@@ -492,6 +492,8 @@ export function useShopifyDisconnect() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.shopify.status.path] });
+      queryClient.invalidateQueries({ queryKey: [api.images.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/images/group"] });
       toast({ title: "Disconnected", description: "Your Shopify store has been disconnected." });
     },
     onError: (error) => {

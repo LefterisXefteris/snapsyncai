@@ -20,7 +20,7 @@ from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.schemas.gpsr import GpsrIdentityIn
-from app.services import connections, product
+from app.services import catalogue_cache, connections, product
 from app.services import images as store
 from app.services.product_facts import parse_gpsr_identity, stored_gpsr_identity
 from app.services.shopify import ShopifyGraphQLForDep
@@ -187,6 +187,7 @@ async def shopify_disconnect(
 
         await disable_inventory_for_user(session, settings, user_id)
         await connections.delete_shopify(session, user_id)
+        await catalogue_cache.invalidate(user_id)
         return DisconnectResponse(disconnected=True)
     except Exception:
         logger.exception("Shopify disconnect failed for user %s", user_id)

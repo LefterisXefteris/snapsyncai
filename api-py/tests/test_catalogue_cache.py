@@ -14,6 +14,7 @@ from app.main import create_app
 from app.models.image import Image
 from app.services import catalogue_cache as cache
 from app.services import images as store
+from app.services import product
 
 
 class FakeRedis:
@@ -137,7 +138,11 @@ def test_list_images_miss_fills_cache_and_invalidate_refreshes(monkeypatch) -> N
     async def fake_list(*_args, **_kwargs):
         return [_row(next(titles))]
 
+    async def no_shop_gpsr(*_args, **_kwargs):
+        return None
+
     monkeypatch.setattr(store, "list_images", fake_list)
+    monkeypatch.setattr(product, "shop_gpsr", no_shop_gpsr)
     client = _list_client(monkeypatch)
     try:
         first = client.get("/api/images")

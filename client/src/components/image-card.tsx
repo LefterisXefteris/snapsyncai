@@ -89,8 +89,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
   const missingCopy = image.listingCopyPresent !== true;
   const factsPhrases = image.factsSentencePhrases ?? [];
   const factsSentence = factsPhrases.length > 0 ? factsPhrases.join(" · ") : "";
-  const showConfirmFacts =
-    missingCopy && (factsSentence === "" || factsSentence === "Facts unconfirmed");
+  const showConfirmFacts = missingCopy && factsSentence === "Facts unconfirmed";
   const isSynced = image.shopifyStatus === "synced";
   const statusColor = missingCopy
     ? "text-amber-400 bg-amber-400/10 border-amber-400/20"
