@@ -48,4 +48,6 @@ export type Image = {
   mayRefreshListingCopy?: boolean;
   refreshBlockedReason?: string | null;
   descriptionBlocks?: string | null;
+  factsSentencePhrases?: string[];
+  factsSentenceTone?: string;
 };

@@ -1,7 +1,8 @@
 """Product facts — the seam that keeps listing copy from inventing legal facts.
 
 Upload, Generate, regenerate, Accept generated listing copy, Shop GPSR save,
-and description-block assembly call this module. Vision and HTTP do not own these rules.
+description-block assembly, and the catalogue facts sentence call this module.
+Vision and HTTP do not own these rules.
 """
 
 from __future__ import annotations
@@ -136,6 +137,12 @@ class ProductFacts:
     suggested: SuggestedFacts | None = None
     confirmed: ConfirmedFacts | None = None
     listing_copy_stale: bool = False
+
+
+@dataclass(frozen=True)
+class FactsSentence:
+    phrases: tuple[str, ...]
+    tone: str
 
 
 @dataclass(frozen=True)
@@ -359,6 +366,39 @@ def confirm_facts(
     )
 
 
+_PHRASE_NOT_TEXTILE = "Not a textile"
+_PHRASE_READY = "Facts ready"
+_PHRASE_GPSR_IDENTITY = "GPSR identity"
+_PHRASE_CARE_SKIPPED = "Care skipped"
+_PHRASE_GPSR_SKIPPED = "GPSR skipped"
+_PHRASE_UNCONFIRMED = "Facts unconfirmed"
+_TONE_CALM = "calm"
+_TONE_AMBER = "amber"
+
+
+def facts_sentence(
+    facts: ProductFacts, shop_gpsr: Mapping[str, Any] | None = None
+) -> FactsSentence:
+    """Ordered phrases and a tone. Listing copy and its stale mark are not inputs."""
+    confirmed = facts.confirmed
+    if confirmed is None:
+        return FactsSentence(phrases=(_PHRASE_UNCONFIRMED,), tone=_TONE_AMBER)
+    phrases: list[str] = []
+    if confirmed.is_textile is False:
+        phrases.append(_PHRASE_NOT_TEXTILE)
+    if confirmed.gpsr_choice == _GPSR_SHOP_DEFAULT and effective_gpsr(facts, shop_gpsr) is None:
+        phrases.append(_PHRASE_GPSR_IDENTITY)
+        tone = _TONE_AMBER
+    else:
+        phrases.append(_PHRASE_READY)
+        tone = _TONE_CALM
+    if confirmed.is_textile and confirmed.care_choice == _CARE_SKIP:
+        phrases.append(_PHRASE_CARE_SKIPPED)
+    if confirmed.gpsr_choice == _GPSR_SKIP:
+        phrases.append(_PHRASE_GPSR_SKIPPED)
+    return FactsSentence(phrases=tuple(phrases), tone=tone)
+
+
 def may_generate_listing_copy(facts: ProductFacts) -> bool:
     confirmed = facts.confirmed
     if confirmed is None:
@@ -563,10 +603,13 @@ def payload_outcomes(
     facts: ProductFacts, shop_gpsr: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
     """Outcomes HTTP copies onto the product payload. Adapters must not re-encode these."""
+    sentence = facts_sentence(facts, shop_gpsr)
     return {
         "may_generate_listing_copy": may_generate_listing_copy(facts),
         "listing_copy_stale": facts.listing_copy_stale,
         "description_blocks": description_blocks(facts, shop_gpsr),
+        "facts_sentence_phrases": list(sentence.phrases),
+        "facts_sentence_tone": sentence.tone,
     }
 
 

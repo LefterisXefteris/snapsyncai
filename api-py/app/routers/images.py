@@ -84,8 +84,15 @@ async def list_images(
     for row in rows:
         if row.product_group_id:
             groups.setdefault(row.product_group_id, []).append(row)
+    shop_gpsr = await product.shop_gpsr(session, user_id) if session is not None else None
     items = [
-        _image_out(row, settings, list_item=True, photos=groups.get(row.product_group_id, ()))
+        _image_out(
+            row,
+            settings,
+            shop_gpsr,
+            list_item=True,
+            photos=groups.get(row.product_group_id, ()),
+        )
         for row in rows
     ]
     await catalogue_cache.put(user_id, _catalogue_payload(items))
@@ -104,7 +111,10 @@ async def get_group(
         rows = await store.get_image_group(session, image_id, user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch product group") from None
-    return [_image_out(row, settings, list_item=True, photos=rows) for row in rows]
+    shop_gpsr = await product.shop_gpsr(session, user_id) if session is not None else None
+    return [
+        _image_out(row, settings, shop_gpsr, list_item=True, photos=rows) for row in rows
+    ]
 
 
 @router.post("/api/images/{image_id}/unlink-from-group", response_model=OkResponse)

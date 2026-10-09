@@ -67,6 +67,8 @@ class ImageOut(CamelModel):
     may_refresh_listing_copy: bool = False
     refresh_blocked_reason: str | None = None
     description_blocks: str = ""
+    facts_sentence_phrases: list[str] = Field(default_factory=list)
+    facts_sentence_tone: str = "calm"
 
     @field_serializer("price", "compare_at_price", "cost_per_item")
     def _decimal_as_string(self, value: Decimal | str | None) -> str | None:

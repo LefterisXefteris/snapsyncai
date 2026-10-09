@@ -87,6 +87,10 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
 
   // ── Status ────────────────────────────────────────────────────────────────
   const missingCopy = image.listingCopyPresent !== true;
+  const factsPhrases = image.factsSentencePhrases ?? [];
+  const factsSentence = factsPhrases.length > 0 ? factsPhrases.join(" · ") : "";
+  const showConfirmFacts =
+    missingCopy && (factsSentence === "" || factsSentence === "Facts unconfirmed");
   const isSynced = image.shopifyStatus === "synced";
   const statusColor = missingCopy
     ? "text-amber-400 bg-amber-400/10 border-amber-400/20"
@@ -208,6 +212,17 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
               {image.title || image.originalName}
             </h3>
 
+            {factsSentence && (
+              <p
+                className={cn(
+                  "text-[10px] leading-snug",
+                  image.factsSentenceTone === "amber" ? "text-amber-500" : "text-muted-foreground",
+                )}
+              >
+                {factsSentence}
+              </p>
+            )}
+
             {image.category && (
               <p className="text-[10px] text-muted-foreground truncate" title={image.category}>
                 {image.category}
@@ -216,7 +231,7 @@ export const ImageCard = memo(function ImageCard({ image, views = [], index, sel
           </>
         )}
 
-        {missingCopy && !analyzing && (
+        {showConfirmFacts && !analyzing && (
           <div className="p-1.5 rounded-md bg-amber-500/5 text-[10px] text-amber-500 flex items-center gap-1 shadow-[inset_0_0_0_1px_hsl(38_92%_50%/0.2)]">
             <Lock className="w-2.5 h-2.5 shrink-0" />
             Confirm facts, then listing copy

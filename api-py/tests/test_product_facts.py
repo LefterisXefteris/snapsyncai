@@ -7,7 +7,9 @@ from app.services.product_facts import (
     confirm_facts,
     description_blocks,
     effective_gpsr,
+    ProductFacts,
     facts_from_stored,
+    facts_sentence,
     generation_blocked_reason,
     listing_copy_constraints,
     may_generate_listing_copy,
@@ -894,3 +896,135 @@ def test_shop_gpsr_save_does_not_stale_override_skip_or_empty_copy() -> None:
         assert (
             stale_for_shop_gpsr_save(shop_default, empty).listing_copy_stale is False
         ), empty
+
+
+INCOMPLETE_SHOP_GPSR = {
+    "manufacturer": {"name": "Acme Ltd", "postalAddress": "", "email": ""},
+    "manufacturerInEu": True,
+}
+
+
+def _pack(
+    *,
+    is_textile: bool = True,
+    care_choice: str = "fill",
+    gpsr_choice: str = "override",
+    shop_gpsr: dict | None = COMPLETE_GPSR,
+) -> ProductFacts:
+    confirmed = confirm_facts(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": is_textile}).facts,
+        is_textile=is_textile,
+        composition=COTTON_POLYESTER if is_textile else None,
+        care_choice=care_choice if is_textile else None,
+        care=COMPLETE_CARE if is_textile and care_choice == "fill" else None,
+        gpsr_choice=gpsr_choice,
+        gpsr_identity=COMPLETE_GPSR if gpsr_choice == "override" else None,
+        shop_gpsr=shop_gpsr,
+    )
+    assert confirmed.ok is True
+    return confirmed.facts
+
+
+def test_facts_sentence_reads_the_pack() -> None:
+    """Phrases and tone from confirmed facts and Shop GPSR identity. Generate stays as it is."""
+    suggestions = (
+        facts_from_stored(None),
+        persistable_from_vision(
+            {**VISION_WITH_LISTING_COPY, "isTextile": True, "fibreNames": ["cotton"]}
+        ).facts,
+        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
+    )
+    for facts in suggestions:
+        sentence = facts_sentence(facts, COMPLETE_GPSR)
+        assert sentence.phrases == ("Facts unconfirmed",)
+        assert sentence.tone == "amber"
+        assert may_generate_listing_copy(facts) is False
+
+    readings = (
+        (_pack(), None, ("Facts ready",), "calm", True),
+        (
+            _pack(gpsr_choice="shop_default", shop_gpsr=COMPLETE_GPSR),
+            COMPLETE_GPSR,
+            ("Facts ready",),
+            "calm",
+            True,
+        ),
+        (_pack(care_choice="skip"), None, ("Facts ready", "Care skipped"), "calm", True),
+        (
+            _pack(gpsr_choice="skip"),
+            None,
+            ("Facts ready", "GPSR skipped"),
+            "calm",
+            True,
+        ),
+        (
+            _pack(care_choice="skip", gpsr_choice="skip"),
+            None,
+            ("Facts ready", "Care skipped", "GPSR skipped"),
+            "calm",
+            True,
+        ),
+        (
+            _pack(is_textile=False, gpsr_choice="override"),
+            None,
+            ("Not a textile", "Facts ready"),
+            "calm",
+            True,
+        ),
+        (
+            _pack(is_textile=False, gpsr_choice="skip"),
+            None,
+            ("Not a textile", "Facts ready", "GPSR skipped"),
+            "calm",
+            True,
+        ),
+        (
+            _pack(gpsr_choice="shop_default", shop_gpsr=COMPLETE_GPSR),
+            None,
+            ("GPSR identity",),
+            "amber",
+            True,
+        ),
+        (
+            _pack(gpsr_choice="shop_default", shop_gpsr=COMPLETE_GPSR),
+            INCOMPLETE_SHOP_GPSR,
+            ("GPSR identity",),
+            "amber",
+            True,
+        ),
+        (
+            _pack(care_choice="skip", gpsr_choice="shop_default", shop_gpsr=COMPLETE_GPSR),
+            None,
+            ("GPSR identity", "Care skipped"),
+            "amber",
+            True,
+        ),
+        (
+            _pack(is_textile=False, gpsr_choice="shop_default", shop_gpsr=COMPLETE_GPSR),
+            None,
+            ("Not a textile", "GPSR identity"),
+            "amber",
+            True,
+        ),
+    )
+    for facts, shop_gpsr, phrases, tone, may_generate in readings:
+        sentence = facts_sentence(facts, shop_gpsr)
+        assert sentence.phrases == phrases
+        assert sentence.tone == tone
+        assert may_generate_listing_copy(facts) is may_generate
+        spoken = " ".join(sentence.phrases).lower()
+        assert "compliant" not in spoken
+        assert "lawful" not in spoken
+        stored = stored_from_facts(facts)
+        assert "factsSentencePhrases" not in stored
+        assert "factsSentenceTone" not in stored
+
+    ready = _pack()
+    stale = ProductFacts(
+        suggested=ready.suggested,
+        confirmed=ready.confirmed,
+        listing_copy_stale=True,
+    )
+    assert facts_sentence(stale, None).phrases == ("Facts ready",)
+    assert facts_sentence(stale, None).tone == "calm"
+    assert may_generate_listing_copy(stale) is True
