@@ -120,6 +120,18 @@ _Avoid_: Compliance field, EU data
 Product facts the seller has accepted. Listing copy does not generate until these exist.
 _Avoid_: Approved data, validated spec
 
+**Facts ready**:
+Confirmed facts are complete for this product: a textile product has fibre composition summing to 100, with care instructions and GPSR identity each filled or an explicit skip; a product confirmed as not a textile has no fibre pack, and the same GPSR rule. GPSR identity filled on the product counts, and Shop GPSR identity counts only while that identity is complete.
+_Avoid_: Compliant, lawful, EU compliant, compliance badge
+
+**Facts unconfirmed**:
+Confirmed facts do not exist on this product. Suggested facts may. It is one state, not a list of which legal fact is missing.
+_Avoid_: Incomplete, missing fibre, not compliant
+
+**Unfilled GPSR identity**:
+Confirmed facts use Shop GPSR identity, and that identity is no longer a GPSR identity. The product is not Facts ready and not Facts unconfirmed.
+_Avoid_: Facts unconfirmed, skipped GPSR, missing compliance
+
 **Suggested facts**:
 Visible attributes proposed from a photo, not yet accepted by the seller.
 _Avoid_: Draft facts, AI facts
@@ -153,7 +165,7 @@ Category and product type inferred from a photo. Not listing copy. May run befor
 _Avoid_: Analysis, preview, unlock
 
 **Explicit skip**:
-The seller states they do not have care instructions or GPSR identity. Those blocks are omitted from listing copy and must not be invented.
+The seller states they do not have care instructions or GPSR identity, and that skip stays named when the product is Facts ready or has unfilled GPSR identity. Those blocks are omitted from listing copy and must not be invented.
 _Avoid_: Optional field, empty field (an empty field is not a skip)
 
 **Stale listing copy**:
