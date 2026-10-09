@@ -169,6 +169,12 @@
       "skillPath": "skills/engineering/triage/SKILL.md",
       "computedHash": "ad1b4d93e5995ffbc0f143fc716c8c3afb45cd13c8a1fd027a43852eb59544c7"
     },
+    "video-editing": {
+      "source": "affaan-m/ECC",
+      "sourceType": "github",
+      "skillPath": "skills/video-editing/SKILL.md",
+      "computedHash": "021c5b9207697949a1a40c936617793e3db0cb03904f3c3388e153337c290da1"
+    },
     "wait-what": {
       "source": "mattpocock/skills",
       "sourceType": "github",
