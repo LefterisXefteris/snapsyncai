@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import {
   Boxes,
-  Crown,
   Download,
   Globe,
   ImagePlus,
@@ -13,8 +12,6 @@ import {
 import { UserButton } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
-import { useSubscriptionStatus } from "@/hooks/use-images";
-import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +25,7 @@ import {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   WORKSPACE_NAV,
@@ -51,8 +49,7 @@ const NAV_ICONS: Record<WorkspaceNavId, typeof Package> = {
 export function AppSidebar() {
   const [pathname] = useLocation();
   const activeId = activeWorkspaceNavId(pathname);
-  const { data: subscriptionStatus } = useSubscriptionStatus();
-  const isSubscribed = subscriptionStatus?.subscribed === true;
+  const { toggleSidebar } = useSidebar();
   const primary = WORKSPACE_NAV.filter((item) => item.id !== "settings");
   const settings = WORKSPACE_NAV.find((item) => item.id === "settings");
 
@@ -65,13 +62,18 @@ export function AppSidebar() {
             alt="SnapSync AI"
             className="w-7 h-7 rounded-md shrink-0 group-data-[collapsible=icon]:hidden"
           />
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <div className="font-display text-sm font-bold tracking-tight truncate">SnapSync AI</div>
-            <div className="text-xs text-muted-foreground">
-              workspace
-            </div>
+          <button
+            type="button"
+            className="hidden h-7 w-7 shrink-0 rounded-md group-data-[collapsible=icon]:inline-flex"
+            onClick={toggleSidebar}
+            aria-label="Toggle Sidebar"
+          >
+            <img src={snapsyncaiLogo} alt="" className="h-7 w-7 rounded-md" />
+          </button>
+          <div className="min-w-0 flex-1 truncate font-display text-sm font-bold tracking-tight group-data-[collapsible=icon]:hidden">
+            SnapSync AI
           </div>
-          <SidebarTrigger />
+          <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -122,16 +124,6 @@ export function AppSidebar() {
             <div className="w-6 h-6 rounded-full bg-muted" title="Local dev user" />
           ) : (
             <UserButton appearance={{ baseTheme: dark, elements: { avatarBox: "w-6 h-6" } }} />
-          )}
-          {isSubscribed && (
-            <Badge
-              variant="outline"
-              className="no-default-active-elevate text-[10px] h-5 py-0 px-1.5 border-primary/30 text-primary group-data-[collapsible=icon]:hidden"
-              data-testid="badge-pro"
-            >
-              <Crown className="w-2.5 h-2.5 mr-0.5" />
-              Plan
-            </Badge>
           )}
         </div>
       </SidebarFooter>
