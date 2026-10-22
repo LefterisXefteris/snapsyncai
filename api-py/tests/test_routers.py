@@ -248,13 +248,13 @@ class TestPlanStatus:
 
         from app.routers import billing as routes
 
-        async def no_spends(_session, _user_id):
+        async def no_spends(_session, _user_id, _entitlement, **_kwargs):
             return []
 
         async def no_overflow(_session, _settings, _user_id):
             return False, False
 
-        monkeypatch.setattr(routes, "list_spends", no_spends)
+        monkeypatch.setattr(routes, "list_spends_for_entitlement", no_spends)
         monkeypatch.setattr(routes, "overflow_view", no_overflow)
         monkeypatch.setattr(routes.billing, "is_local_pro", lambda _s: False)
 

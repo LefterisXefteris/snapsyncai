@@ -20,6 +20,16 @@ logger = logging.getLogger(__name__)
 
 SHOPIFY_API_VERSION = "2026-07"
 
+# One pooled client for Admin GraphQL — avoids a new TLS handshake per call.
+_http_client: httpx.AsyncClient | None = None
+
+
+def _shared_http() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=60.0)
+    return _http_client
+
 
 def _token(access_token: str, settings: Settings) -> str:
     secret = settings.connection_encryption_key
@@ -45,37 +55,37 @@ def shopify_graphql_at(shop_domain: str, access_token: str, settings: Settings) 
         token = _token(access_token, settings)
         endpoint = f"https://{shop_domain}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
         payload = {"query": query, "variables": variables or {}}
+        client = _shared_http()
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            for attempt in range(3):
-                response = await client.post(
-                    endpoint,
-                    headers={
-                        "Content-Type": "application/json",
-                        "X-Shopify-Access-Token": token,
-                    },
-                    json=payload,
-                )
-                if response.status_code == 429 or response.status_code >= 500:
-                    if attempt == 2:
-                        raise RuntimeError(
-                            f"Shopify GraphQL request failed with {response.status_code}"
-                        )
-                    retry_after = float(response.headers.get("retry-after") or 0)
-                    await asyncio.sleep(retry_after if retry_after > 0 else 0.25 * (2**attempt))
-                    continue
-
-                body = response.json()
-                errors = body.get("errors") or []
-                if not response.is_success or errors:
-                    message = "; ".join(e.get("message", "") for e in errors if e.get("message"))
+        for attempt in range(3):
+            response = await client.post(
+                endpoint,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Shopify-Access-Token": token,
+                },
+                json=payload,
+            )
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt == 2:
                     raise RuntimeError(
-                        message or f"Shopify GraphQL request failed with {response.status_code}"
+                        f"Shopify GraphQL request failed with {response.status_code}"
                     )
-                data = body.get("data")
-                if not data:
-                    raise RuntimeError("Shopify returned an empty GraphQL response")
-                return data
+                retry_after = float(response.headers.get("retry-after") or 0)
+                await asyncio.sleep(retry_after if retry_after > 0 else 0.25 * (2**attempt))
+                continue
+
+            body = response.json()
+            errors = body.get("errors") or []
+            if not response.is_success or errors:
+                message = "; ".join(e.get("message", "") for e in errors if e.get("message"))
+                raise RuntimeError(
+                    message or f"Shopify GraphQL request failed with {response.status_code}"
+                )
+            data = body.get("data")
+            if not data:
+                raise RuntimeError("Shopify returned an empty GraphQL response")
+            return data
 
         raise RuntimeError("Shopify GraphQL request exhausted retries")
 

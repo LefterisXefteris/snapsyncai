@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
@@ -329,14 +330,20 @@ async def with_channel_photos(
     if connection is None:
         return products
     graphql = shopify_graphql_for(connection, settings)
-    filled: list[WebsiteProduct] = []
-    for product in products:
-        try:
-            urls = await list_shopify_product_image_urls(graphql, product.shopify_product_id)
-        except Exception:
-            urls = ()
-        filled.append(replace(product, photo_urls=urls) if urls else product)
-    return filled
+    # Bound concurrency so a large prototype does not stampede Shopify.
+    gate = asyncio.Semaphore(8)
+
+    async def _photos(product: WebsiteProduct) -> WebsiteProduct:
+        async with gate:
+            try:
+                urls = await list_shopify_product_image_urls(
+                    graphql, product.shopify_product_id
+                )
+            except Exception:
+                urls = ()
+        return replace(product, photo_urls=urls) if urls else product
+
+    return list(await asyncio.gather(*(_photos(product) for product in products)))
 
 
 PublishRefused = Literal["not_connected", "plan_blocked", "overflow_confirm", "invalid"]
@@ -395,19 +402,21 @@ async def _with_live_selling(
             products=tuple(_without_buy(product) for product in site.products),
             shop_domain=connection.shop_domain,
         )
-    enriched: list[dict[str, Any]] = []
-    for product in site.products:
+    gate = asyncio.Semaphore(8)
+
+    async def _enrich(product: Mapping[str, Any]) -> dict[str, Any]:
         shopify_id = product.get("shopifyProductId")
         if not isinstance(shopify_id, str) or not shopify_id:
-            enriched.append(_without_buy(product))
-            continue
-        try:
-            node = await storefront_product(graphql, shopify_id)
-            selling = selling_for_storefront(node, online_store_id=online_store_id)
-        except Exception:
-            enriched.append(_without_buy(product))
-            continue
-        enriched.append({**dict(product), **selling})
+            return _without_buy(product)
+        async with gate:
+            try:
+                node = await storefront_product(graphql, shopify_id)
+                selling = selling_for_storefront(node, online_store_id=online_store_id)
+            except Exception:
+                return _without_buy(product)
+        return {**dict(product), **selling}
+
+    enriched = list(await asyncio.gather(*(_enrich(product) for product in site.products)))
     return replace(site, products=tuple(enriched), shop_domain=connection.shop_domain)
 
 

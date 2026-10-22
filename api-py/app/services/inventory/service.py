@@ -659,24 +659,71 @@ async def get_inventory_bundle(
 
 
 async def list_inventory_bundles(session: AsyncSession, user_id: str) -> list[dict[str, Any]]:
-    bundles = (
+    bundles = list(
+        (
+            await session.execute(
+                select(InventoryItem)
+                .where(InventoryItem.user_id == user_id, InventoryItem.kind == "bundle")
+                .order_by(asc(InventoryItem.title))
+            )
+        ).scalars()
+    )
+    if not bundles:
+        return []
+    default_buffer = effective_safety_buffer(
+        {"safety_buffer": (
+            await session.execute(
+                select(InventorySettings.default_safety_buffer).where(
+                    InventorySettings.user_id == user_id
+                )
+            )
+        ).scalar_one_or_none()}
+    )
+    bundle_ids = [bundle.id for bundle in bundles]
+    rows = (
         await session.execute(
-            select(InventoryItem)
-            .where(InventoryItem.user_id == user_id, InventoryItem.kind == "bundle")
-            .order_by(asc(InventoryItem.title))
+            select(InventoryBundleComponent, InventoryItem)
+            .join(InventoryItem, InventoryItem.id == InventoryBundleComponent.component_item_id)
+            .where(
+                InventoryBundleComponent.user_id == user_id,
+                InventoryBundleComponent.bundle_item_id.in_(bundle_ids),
+            )
         )
-    ).scalars()
+    ).all()
+    by_bundle: dict[int, list[tuple[InventoryBundleComponent, InventoryItem]]] = {
+        bundle_id: [] for bundle_id in bundle_ids
+    }
+    for component, item in rows:
+        by_bundle.setdefault(component.bundle_item_id, []).append((component, item))
     result = []
     for bundle in bundles:
-        detail = await get_inventory_bundle(session, user_id, bundle.id)
+        mapped = []
+        availability: list[int] = []
+        for component, item in by_bundle.get(bundle.id, []):
+            mapped.append(
+                {
+                    "id": component.id,
+                    "item_id": component.component_item_id,
+                    "units": component.units,
+                    "title": item.title,
+                    "sku": item.sku,
+                    "quantity": item.ledger_quantity,
+                    "safety_buffer": item.safety_buffer,
+                }
+            )
+            sellable = calculate_sellable_quantity(
+                item.ledger_quantity,
+                item.safety_buffer if item.safety_buffer is not None else default_buffer,
+            )
+            availability.append(math.floor(sellable / component.units))
         result.append(
             {
                 "id": bundle.id,
                 "title": bundle.title,
                 "sku": bundle.sku,
                 "kind": bundle.kind,
-                "components": detail["components"],
-                "computed_availability": detail["computed_availability"],
+                "components": mapped,
+                "computed_availability": min(availability) if availability else 0,
             }
         )
     return result

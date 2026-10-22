@@ -24,7 +24,11 @@ from app.services.plan import (
     leftover_weekly_from_interval,
     month_key_utc,
 )
-from app.services.plan_ledger import list_spends, record_spend, unreported_overage_spends
+from app.services.plan_ledger import (
+    list_spends_for_entitlement,
+    record_spend,
+    unreported_overage_spends,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +68,7 @@ async def _context(
     else:
         sub = await billing.get_subscription(session, user_id)
     entitlement = entitlement_for(sub, local=False)
-    spends = await list_spends(session, user_id)
+    spends = await list_spends_for_entitlement(session, user_id, entitlement)
     return entitlement, spends, sub
 
 
