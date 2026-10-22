@@ -11,13 +11,18 @@ in `server/routes.ts:309-384`.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import TypeVar
 
 import stripe
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+
+_T = TypeVar("_T")
 
 from app.auth.clerk import _client
 from app.config import Settings, get_settings
@@ -97,6 +102,11 @@ def configure_stripe() -> None:
         )
     stripe.api_key = settings.stripe_secret_key
     stripe.api_version = STRIPE_API_VERSION  # type: ignore[assignment]
+
+
+async def stripe_call(fn: Callable[..., _T], /, *args, **kwargs) -> _T:
+    """Run a sync Stripe SDK call off the event loop so request handlers stay responsive."""
+    return await asyncio.to_thread(fn, *args, **kwargs)
 
 
 def stripe_id(value: object) -> str:
@@ -305,11 +315,7 @@ def _ensure_plan_product_description(product) -> None:
     stripe.Product.modify(product.id, description=PLAN_PRODUCT_DESCRIPTION)
 
 
-async def get_or_create_weekly_subscription_price_id() -> str:
-    """Plan monthly price. Name kept so checkout callers stay stable."""
-    global _cached_weekly_price_id
-    if _cached_weekly_price_id:
-        return _cached_weekly_price_id
+def _get_or_create_weekly_subscription_price_id_sync() -> str:
     configure_stripe()
     products = stripe.Product.list(active=True, limit=100)
     existing = next(
@@ -330,7 +336,6 @@ async def get_or_create_weekly_subscription_price_id() -> str:
             None,
         )
         if match:
-            _cached_weekly_price_id = match.id
             return match.id
         product_id = existing.id
     else:
@@ -347,14 +352,20 @@ async def get_or_create_weekly_subscription_price_id() -> str:
         currency="gbp",
         recurring={"interval": "month"},
     )
-    _cached_weekly_price_id = price.id
     return price.id
 
 
-async def get_or_create_annual_subscription_price_id() -> str:
-    global _cached_annual_price_id
-    if _cached_annual_price_id:
-        return _cached_annual_price_id
+async def get_or_create_weekly_subscription_price_id() -> str:
+    """Plan monthly price. Name kept so checkout callers stay stable."""
+    global _cached_weekly_price_id
+    if _cached_weekly_price_id:
+        return _cached_weekly_price_id
+    price_id = await stripe_call(_get_or_create_weekly_subscription_price_id_sync)
+    _cached_weekly_price_id = price_id
+    return price_id
+
+
+def _get_or_create_annual_subscription_price_id_sync() -> str:
     configure_stripe()
     products = stripe.Product.list(active=True, limit=100)
     existing = next(
@@ -375,7 +386,6 @@ async def get_or_create_annual_subscription_price_id() -> str:
             None,
         )
         if match:
-            _cached_annual_price_id = match.id
             return match.id
         product_id = existing.id
     else:
@@ -392,12 +402,21 @@ async def get_or_create_annual_subscription_price_id() -> str:
         currency="gbp",
         recurring={"interval": "year"},
     )
-    _cached_annual_price_id = price.id
     return price.id
 
 
-async def find_active_stripe_subscription(email: str, customer_limit: int = 5, sub_limit: int = 3):
-    """Return (customer, subscription) for the first active/trialing sub on this email."""
+async def get_or_create_annual_subscription_price_id() -> str:
+    global _cached_annual_price_id
+    if _cached_annual_price_id:
+        return _cached_annual_price_id
+    price_id = await stripe_call(_get_or_create_annual_subscription_price_id_sync)
+    _cached_annual_price_id = price_id
+    return price_id
+
+
+def _find_active_stripe_subscription_sync(
+    email: str, customer_limit: int = 5, sub_limit: int = 3
+):
     configure_stripe()
     customers = stripe.Customer.list(email=email, limit=customer_limit)
     for customer in customers.data:
@@ -406,6 +425,13 @@ async def find_active_stripe_subscription(email: str, customer_limit: int = 5, s
         if active:
             return customer, active
     return None, None
+
+
+async def find_active_stripe_subscription(email: str, customer_limit: int = 5, sub_limit: int = 3):
+    """Return (customer, subscription) for the first active/trialing sub on this email."""
+    return await stripe_call(
+        _find_active_stripe_subscription_sync, email, customer_limit, sub_limit
+    )
 
 
 async def relink_stripe_subscription(
@@ -512,7 +538,8 @@ async def ensure_payg_customer(
         return sub
     configure_stripe()
     email = await clerk_primary_email(user_id, settings)
-    customer = stripe.Customer.create(
+    customer = await stripe_call(
+        stripe.Customer.create,
         email=email or None,
         metadata={"userId": user_id},
     )
@@ -533,12 +560,14 @@ async def ensure_payg_customer(
     return sub
 
 
-def schedule_plan_period_end(stripe_subscription_id: str) -> None:
+async def schedule_plan_period_end(stripe_subscription_id: str) -> None:
     """Stop Plan / Leftover weekly renewing; inclusion runs until period end."""
     if not stripe_subscription_id or stripe_subscription_id == PAYG_SUBSCRIPTION_ID:
         return
     configure_stripe()
-    stripe.Subscription.modify(stripe_subscription_id, cancel_at_period_end=True)
+    await stripe_call(
+        stripe.Subscription.modify, stripe_subscription_id, cancel_at_period_end=True
+    )
 
 
 __all__ = [
@@ -576,6 +605,7 @@ __all__ = [
     "relink_stripe_subscription",
     "report_overage",
     "schedule_plan_period_end",
+    "stripe_call",
     "stripe_id",
     "update_subscription_status",
     "upsert_subscription",

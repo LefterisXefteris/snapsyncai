@@ -17,13 +17,13 @@ from app.services.plan import NEED_OVERFLOW_CONFIRM
 from app.services.plan_charge import spend_when_landed
 from app.services.product_facts import facts_from_stored, listing_copy_present, stored_from_facts
 from app.services.shopify import (
-    list_shopify_product_image_urls,
+    list_shopify_product_image_urls_by_id,
     list_shopify_publications,
     online_store_publication_id,
     price_greater_than_zero,
     shopify_graphql_for,
     shopify_product_status,
-    storefront_product,
+    storefront_products,
 )
 from app.services.supabase_storage import channel_photo_url
 
@@ -329,12 +329,14 @@ async def with_channel_photos(
     if connection is None:
         return products
     graphql = shopify_graphql_for(connection, settings)
+    ids = [product.shopify_product_id for product in products if product.shopify_product_id]
+    try:
+        by_id = await list_shopify_product_image_urls_by_id(graphql, ids)
+    except Exception:
+        by_id = {}
     filled: list[WebsiteProduct] = []
     for product in products:
-        try:
-            urls = await list_shopify_product_image_urls(graphql, product.shopify_product_id)
-        except Exception:
-            urls = ()
+        urls = by_id.get(product.shopify_product_id, ()) if product.shopify_product_id else ()
         filled.append(replace(product, photo_urls=urls) if urls else product)
     return filled
 
@@ -395,14 +397,28 @@ async def _with_live_selling(
             products=tuple(_without_buy(product) for product in site.products),
             shop_domain=connection.shop_domain,
         )
+    shopify_ids = [
+        product.get("shopifyProductId")
+        for product in site.products
+        if isinstance(product.get("shopifyProductId"), str) and product.get("shopifyProductId")
+    ]
+    try:
+        nodes = await storefront_products(
+            graphql, [sid for sid in shopify_ids if isinstance(sid, str)]
+        )
+    except Exception:
+        nodes = {}
     enriched: list[dict[str, Any]] = []
     for product in site.products:
         shopify_id = product.get("shopifyProductId")
         if not isinstance(shopify_id, str) or not shopify_id:
             enriched.append(_without_buy(product))
             continue
+        node = nodes.get(shopify_id)
+        if node is None:
+            enriched.append(_without_buy(product))
+            continue
         try:
-            node = await storefront_product(graphql, shopify_id)
             selling = selling_for_storefront(node, online_store_id=online_store_id)
         except Exception:
             enriched.append(_without_buy(product))

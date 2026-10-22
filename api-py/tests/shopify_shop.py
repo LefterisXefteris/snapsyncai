@@ -105,6 +105,8 @@ class ShopifyShop:
             "SnapSyncPublications": self._publications,
             "SnapSyncProductPublishing": self._product_publishing,
             "SnapSyncStorefrontProduct": self._storefront_product,
+            "SnapSyncStorefrontProducts": self._storefront_products,
+            "SnapSyncProductMediaNodes": self._product_media_nodes,
             "CreateSnapSyncProduct": self._product_set,
             "AddSnapSyncProductMedia": self._create_media,
             "SnapSyncPublish": self._publish,
@@ -136,33 +138,68 @@ class ShopifyShop:
             title=title,
         )
 
-    def _storefront_product(self, variables: dict) -> dict:
-        product = self.products.get(variables["id"])
+    def _storefront_product_payload(self, product_id: str) -> dict | None:
+        product = self.products.get(product_id)
         if product is None:
-            return {"product": None}
+            return None
         return {
-            "product": {
-                "status": product.status,
-                "resourcePublicationsV2": {
-                    "nodes": [
-                        {"isPublished": True, "publication": {"id": publication_id}}
-                        for publication_id in sorted(product.publications)
-                    ]
-                },
-                "variants": {
-                    "nodes": [
-                        {
-                            "id": variant.id,
-                            "legacyResourceId": variant.id.rsplit("/", 1)[-1],
-                            "title": variant.title,
-                            "price": variant.price,
-                            "compareAtPrice": variant.compare_at_price,
-                        }
-                        for variant in product.variants
-                    ]
-                },
-            }
+            "id": product_id,
+            "status": product.status,
+            "resourcePublicationsV2": {
+                "nodes": [
+                    {"isPublished": True, "publication": {"id": publication_id}}
+                    for publication_id in sorted(product.publications)
+                ]
+            },
+            "variants": {
+                "nodes": [
+                    {
+                        "id": variant.id,
+                        "legacyResourceId": variant.id.rsplit("/", 1)[-1],
+                        "title": variant.title,
+                        "price": variant.price,
+                        "compareAtPrice": variant.compare_at_price,
+                    }
+                    for variant in product.variants
+                ]
+            },
         }
+
+    def _storefront_product(self, variables: dict) -> dict:
+        payload = self._storefront_product_payload(variables["id"])
+        if payload is None:
+            return {"product": None}
+        return {"product": {k: v for k, v in payload.items() if k != "id"}}
+
+    def _storefront_products(self, variables: dict) -> dict:
+        return {
+            "nodes": [
+                self._storefront_product_payload(product_id)
+                for product_id in variables.get("ids") or []
+            ]
+        }
+
+    def _product_media_nodes(self, variables: dict) -> dict:
+        nodes = []
+        for product_id in variables.get("ids") or []:
+            product = self.products.get(product_id)
+            if product is None:
+                nodes.append(None)
+                continue
+            urls = getattr(product, "media_urls", ()) or ()
+            nodes.append(
+                {
+                    "id": product_id,
+                    "media": {
+                        "nodes": [
+                            {"image": {"url": url}}
+                            for url in urls
+                            if isinstance(url, str)
+                        ]
+                    },
+                }
+            )
+        return {"nodes": nodes}
 
     def _publications(self, _variables: dict) -> dict:
         return {

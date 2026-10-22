@@ -50,7 +50,7 @@ async def handle_subscription_events(
                 if not settings.stripe_secret_key:
                     raise RuntimeError("STRIPE_SECRET_KEY is not set")
                 stripe.api_key = settings.stripe_secret_key
-                sub = stripe.Subscription.retrieve(subscription_id)
+                sub = await billing.stripe_call(stripe.Subscription.retrieve, subscription_id)
                 period_end = billing.from_unix(getattr(sub, "current_period_end", None))
                 previous = await billing.get_subscription(session, user_id)
                 interval = billing.recurring_interval_of(sub) or metadata.get("planInterval")
@@ -69,7 +69,9 @@ async def handle_subscription_events(
                     and leftover_weekly_from_interval(previous.billing_interval)
                 ):
                     try:
-                        stripe.Subscription.delete(previous.stripe_subscription_id)
+                        await billing.stripe_call(
+                            stripe.Subscription.delete, previous.stripe_subscription_id
+                        )
                     except Exception:
                         logger.warning(
                             "Webhook: could not cancel leftover weekly %s",

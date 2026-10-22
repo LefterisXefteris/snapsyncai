@@ -289,10 +289,10 @@ CHANNEL_PHOTO = "https://cdn.shopify.com/tee-front.jpg"
 
 @pytest.fixture
 def channel_photos(monkeypatch) -> None:
-    async def urls(_graphql, _product_id):
-        return (CHANNEL_PHOTO,)
+    async def urls_by_id(_graphql, product_ids):
+        return {product_id: (CHANNEL_PHOTO,) for product_id in product_ids}
 
-    monkeypatch.setattr(website_handoff, "list_shopify_product_image_urls", urls)
+    monkeypatch.setattr(website_handoff, "list_shopify_product_image_urls_by_id", urls_by_id)
 
 
 async def test_the_first_publish_does_not_record_a_use_and_freezes_the_channel_photo(
