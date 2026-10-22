@@ -41,7 +41,6 @@ test("chrome frost separates from products and the current Destination shows a g
   assert.equal(menu.includes("data-[active=true]:bg-sidebar-accent"), false);
   assert.match(menu, /data-\[active=true\]:hover:bg-transparent/);
 
-  const conversation = read("client/src/pages/Conversation.tsx");
-  assert.match(conversation, /glass-chrome/);
-  assert.equal(conversation.includes("bg-background border-b border-border"), false);
+  const products = read("client/src/pages/Products.tsx");
+  assert.match(products, /glass-chrome/);
 });

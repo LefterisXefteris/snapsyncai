@@ -20,18 +20,13 @@ import {
   shopifyConnectNotice,
   workspaceArrival,
 } from "@/lib/workspace-arrival";
-import { storefrontHandleFromHost } from "@/lib/storefront-host";
-import PublicStorefront from "@/pages/PublicStorefront";
-
 // Route-level code splitting: each page ships as its own chunk so the
 // initial bundle stays small and loads fast.
 const Products = lazy(() => import("@/pages/Products"));
 const NewListing = lazy(() => import("@/pages/NewListing"));
 const ImportPage = lazy(() => import("@/pages/Import"));
 const InventoryPage = lazy(() => import("@/pages/Inventory"));
-const WebsitePage = lazy(() => import("@/pages/Website"));
 const BulkSeoPage = lazy(() => import("@/pages/BulkSeo"));
-const ConversationPage = lazy(() => import("@/pages/Conversation"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Landing = lazy(() => import("@/pages/Landing"));
 const ProductDetails = lazy(() => import("@/pages/ProductDetails"));
@@ -82,9 +77,7 @@ function AuthenticatedRouter() {
       <Route path="/new" component={NewListing} />
       <Route path="/import" component={ImportPage} />
       <Route path="/inventory" component={InventoryPage} />
-      <Route path="/website" component={WebsitePage} />
       <Route path="/bulk-seo" component={BulkSeoPage} />
-      <Route path="/conversation" component={ConversationPage} />
       <Route path="/settings" component={Settings} />
       <Route path="/product/:id" component={ProductDetails} />
       <Route component={NotFound} />
@@ -268,14 +261,6 @@ function AppWithClerkFallback() {
 }
 
 function App() {
-  const storefrontHandle = storefrontHandleFromHost(window.location.hostname);
-  if (storefrontHandle) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <PublicStorefront handle={storefrontHandle} />
-      </QueryClientProvider>
-    );
-  }
   return (
     <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="snapsyncai-theme">
       <QueryClientProvider client={queryClient}>

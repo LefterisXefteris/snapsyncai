@@ -190,7 +190,7 @@ async def test_import_does_not_spend_and_is_not_a_plan_job() -> None:
     )
     assert result.created == 1
     assert "import" not in JobKind.__args__
-    spending = {"generate_persist", "refresh_accept", "website_handoff", "bulk_seo_persist"}
+    spending = {"generate_persist", "refresh_accept", "bulk_seo_persist"}
     assert set(JobKind.__args__) == spending
 
 

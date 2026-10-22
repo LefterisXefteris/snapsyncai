@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 Entitlement = Literal["free", "plan", "leftover_weekly", "local_bypass"]
-JobKind = Literal["generate_persist", "refresh_accept", "website_handoff", "bulk_seo_persist"]
+JobKind = Literal["generate_persist", "refresh_accept", "bulk_seo_persist"]
 
 PLAN_INCLUDED = 20
 LEFTOVER_WEEKLY_INCLUDED = 30
@@ -20,7 +20,7 @@ WRITE_PENCE = OVERAGE_PENCE
 
 NEED_PLAN = (
     "Subscribe to a Plan to generate listing copy, refresh from search demand, "
-    "run Bulk SEO, or build a website."
+    "or run Bulk SEO."
 )
 WEEKLY_LIMIT = (
     "You've used all 30 listing-copy writes this week. "
@@ -31,7 +31,7 @@ NEED_OVERFLOW_CONFIRM = "overflow_confirm_required"
 _LISTING_COPY_WRITE_JOBS = frozenset(
     {"generate_persist", "refresh_accept", "bulk_seo_persist"}
 )
-_SPENDING_JOBS = frozenset({*_LISTING_COPY_WRITE_JOBS, "website_handoff"})
+_SPENDING_JOBS = _LISTING_COPY_WRITE_JOBS
 
 
 @dataclass(frozen=True)
@@ -124,13 +124,6 @@ def decide(
     paid_write_confirmed: bool = False,
 ) -> SpendDecision:
     if entitlement == "free":
-        if job == "website_handoff":
-            return SpendDecision(
-                allowed=True,
-                blocked_reason=None,
-                records_spend=False,
-                as_overage=False,
-            )
         if job not in _LISTING_COPY_WRITE_JOBS:
             return SpendDecision(
                 allowed=True,

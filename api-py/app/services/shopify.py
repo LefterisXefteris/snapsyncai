@@ -139,26 +139,6 @@ async def get_shopify_shop_identity(graphql: ShopifyGraphQL) -> dict[str, Any]:
 
 _NODES_CHUNK = 50
 
-_STOREFRONT_PRODUCT_FIELDS = """
-  id
-  status
-  resourcePublicationsV2(first: 50) {
-    nodes {
-      isPublished
-      publication { id }
-    }
-  }
-  variants(first: 250) {
-    nodes {
-      id
-      legacyResourceId
-      title
-      price
-      compareAtPrice
-    }
-  }
-"""
-
 _PRODUCT_MEDIA_FIELDS = """
   id
   media(first: 50) {
@@ -322,40 +302,6 @@ async def product_publishing(graphql: ShopifyGraphQL, product_id: str) -> tuple[
         if isinstance(publication_id, str) and publication_id:
             published.add(publication_id)
     return status, published
-
-
-async def storefront_products(
-    graphql: ShopifyGraphQL, product_ids: Sequence[str]
-) -> dict[str, dict[str, Any] | None]:
-    """Live status, publications, and variants keyed by product GID. Chunks of 50."""
-    unique = list(dict.fromkeys(pid for pid in product_ids if pid))
-    out: dict[str, dict[str, Any] | None] = {pid: None for pid in unique}
-    for start in range(0, len(unique), _NODES_CHUNK):
-        chunk = unique[start : start + _NODES_CHUNK]
-        data = await graphql(
-            f"""
-            query SnapSyncStorefrontProducts($ids: [ID!]!) {{
-              nodes(ids: $ids) {{
-                ... on Product {{
-                  {_STOREFRONT_PRODUCT_FIELDS}
-                }}
-              }}
-            }}
-            """,
-            {"ids": chunk},
-        )
-        for node in data.get("nodes") or []:
-            if not isinstance(node, dict):
-                continue
-            product_id = node.get("id")
-            if isinstance(product_id, str) and product_id:
-                out[product_id] = node
-    return out
-
-
-async def storefront_product(graphql: ShopifyGraphQL, product_id: str) -> dict[str, Any] | None:
-    """Live status, Online Store publications, and variants for a public Website page."""
-    return (await storefront_products(graphql, [product_id])).get(product_id)
 
 
 async def apply_shopify_publications(

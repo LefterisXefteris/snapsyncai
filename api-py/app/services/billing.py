@@ -306,7 +306,7 @@ async def claim_paid_session(session: AsyncSession, checkout_session_id: str) ->
     return True
 
 
-PLAN_PRODUCT_DESCRIPTION = "Listing-copy writes and website included"
+PLAN_PRODUCT_DESCRIPTION = "Listing-copy writes included"
 
 
 def _ensure_plan_product_description(product) -> None:

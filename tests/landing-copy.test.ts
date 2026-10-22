@@ -51,7 +51,6 @@ test("jobs are the live ones, listing-first", () => {
       "Import",
       "Inventory",
       "Bulk SEO",
-      "Website",
       "Settings",
     ],
   );

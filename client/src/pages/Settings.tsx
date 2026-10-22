@@ -311,12 +311,12 @@ export default function Settings() {
                   {leftoverWeekly
                     ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. This leftover weekly period ends without renewal; then three free writes and £0.70 each.`
                     : onPlan
-                    ? "Listing-copy writes and website are included until this paid period ends. It will not renew."
+                    ? "Listing-copy writes are included until this paid period ends. It will not renew."
                     : isSubscribed
                     ? "Local workspace. Listing copy is not billed."
                     : allowanceIncluded != null
-                    ? `${Math.max(0, (allowanceIncluded ?? 0) - allowanceUsed)} of ${allowanceIncluded} free AI listing-copy writes left. Then £0.70 each. Website is free.`
-                    : "Three free AI listing-copy writes, then £0.70 each. Website is free."}
+                    ? `${Math.max(0, (allowanceIncluded ?? 0) - allowanceUsed)} of ${allowanceIncluded} free AI listing-copy writes left. Then £0.70 each.`
+                    : "Three free AI listing-copy writes, then £0.70 each."}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

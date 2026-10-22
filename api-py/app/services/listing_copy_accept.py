@@ -1,6 +1,6 @@
 """Accept — the seller keeps proposed listing copy for one product.
 
-The product page, the Bulk SEO page, and the conversation all call this. It loads the
+The product page and the Bulk SEO page call this. It loads the
 product, checks the Plan, saves the copy, spends one Allowance use only when that write
 lands, and records the trace. Callers map the result to HTTP or to the dialogue.
 """

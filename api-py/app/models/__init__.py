@@ -7,7 +7,6 @@ it and will propose dropping the table.
 
 from app.models.billing import AllowanceSpend, PaidSession, Subscription, UserCredits
 from app.models.connections import ShopifyConnection
-from app.models.conversation import ShopConversation
 from app.models.image import Image
 from app.models.trendyol import TrendyolBarcode, TrendyolConnection, TrendyolListing
 from app.models.inventory import (
@@ -21,7 +20,6 @@ from app.models.inventory import (
     InventorySettings,
     InventoryWebhookEvent,
 )
-from app.models.website import PublishedWebsite, WebsitePrototypeRecord
 
 __all__ = [
     "AllowanceSpend",
@@ -36,9 +34,6 @@ __all__ = [
     "InventorySettings",
     "InventoryWebhookEvent",
     "PaidSession",
-    "PublishedWebsite",
-    "WebsitePrototypeRecord",
-    "ShopConversation",
     "ShopifyConnection",
     "Subscription",
     "TrendyolBarcode",

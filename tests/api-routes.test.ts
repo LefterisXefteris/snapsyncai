@@ -55,21 +55,6 @@ test("Shopify connect paths stay on /api/shopify", () => {
   assert.equal(api.images.pushToShopify.path, "/api/images/push-to-shopify");
 });
 
-test("website prototype, preview, and publish live on /api/website", () => {
-  assert.equal(api.website.prototype.path, "/api/website/prototype");
-  assert.equal(api.website.prototype.method, "GET");
-  assert.equal(api.website.savePrototype.path, "/api/website/prototype");
-  assert.equal(api.website.savePrototype.method, "PUT");
-  assert.equal(api.website.preview.path, "/api/website/preview");
-  assert.equal(api.website.preview.method, "POST");
-  assert.equal(api.website.publish.path, "/api/website/publish");
-  assert.equal(api.website.publish.method, "POST");
-  assert.equal(api.website.unpublish.path, "/api/website/unpublish");
-  assert.equal(api.website.unpublish.method, "POST");
-  assert.equal(api.storefronts.read.path, "/api/storefronts/:handle");
-  assert.equal(api.storefronts.read.method, "GET");
-});
-
 test("Bulk SEO catalogue lives on /api/bulk-seo", () => {
   assert.equal(api.bulkSeo.catalogue.path, "/api/bulk-seo");
   assert.equal(api.bulkSeo.catalogue.method, "GET");
@@ -79,13 +64,6 @@ test("Bulk SEO catalogue lives on /api/bulk-seo", () => {
   assert.equal(api.bulkSeo.regenerate.method, "POST");
   assert.equal(api.bulkSeo.accept.path, "/api/bulk-seo/accept");
   assert.equal(api.bulkSeo.accept.method, "POST");
-});
-
-test("Conversation lives on /api/conversation", () => {
-  assert.equal(api.conversation.read.path, "/api/conversation");
-  assert.equal(api.conversation.read.method, "GET");
-  assert.equal(api.conversation.post.path, "/api/conversation");
-  assert.equal(api.conversation.post.method, "POST");
 });
 
 test("Import lives on /api/import", () => {

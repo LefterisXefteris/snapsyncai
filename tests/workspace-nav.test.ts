@@ -9,11 +9,6 @@ import {
   workspaceStubCopy,
 } from "../client/src/lib/workspace-nav.ts";
 
-test("Conversation sits beside the catalogue", () => {
-  assert.equal(workspaceNavItem("conversation").path, "/conversation");
-  assert.equal(workspaceNavItem("conversation").stub, false);
-});
-
 test("Products is the home path", () => {
   assert.equal(WORKSPACE_HOME_PATH, "/");
   assert.equal(workspaceNavItem("products").path, "/");
@@ -25,11 +20,9 @@ test("nav order is catalogue, then entry jobs, then Settings", () => {
     WORKSPACE_NAV.map((item) => item.label),
     [
       "Products",
-      "Conversation",
       "New listing",
       "Import",
       "Inventory",
-      "Website",
       "Bulk SEO",
       "Settings",
     ],
@@ -42,11 +35,9 @@ test("New listing is a photo-entry destination, not a stub", () => {
   assert.equal(item.stub, false);
 });
 
-test("Import, Inventory, Website, and Bulk SEO are live", () => {
+test("Import, Inventory, and Bulk SEO are live", () => {
   assert.equal(workspaceNavItem("import").stub, false);
   assert.equal(workspaceNavItem("inventory").stub, false);
-  assert.equal(workspaceNavItem("website").stub, false);
-  assert.equal(workspaceNavItem("website").path, "/website");
   assert.equal(workspaceNavItem("bulk-seo").stub, false);
   assert.equal(workspaceNavItem("import").path, "/import");
   assert.equal(workspaceNavItem("inventory").path, "/inventory");
@@ -65,11 +56,9 @@ test("the catalogue and a product drill-in both activate Products", () => {
 });
 
 test("each destination path activates its own nav item", () => {
-  assert.equal(activeWorkspaceNavId("/conversation"), "conversation");
   assert.equal(activeWorkspaceNavId("/new"), "new-listing");
   assert.equal(activeWorkspaceNavId("/import"), "import");
   assert.equal(activeWorkspaceNavId("/inventory"), "inventory");
-  assert.equal(activeWorkspaceNavId("/website"), "website");
   assert.equal(activeWorkspaceNavId("/bulk-seo"), "bulk-seo");
   assert.equal(activeWorkspaceNavId("/settings"), "settings");
 });

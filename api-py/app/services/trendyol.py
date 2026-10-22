@@ -1,7 +1,7 @@
 """Trendyol International — connect, the listing, Push, and approval.
 
 One adapter for this Channel. Publications, Go live, Inventory Autopilot, Shop
-GPSR, and the website stay Shopify-shaped. Callers pass a Trendyol account
+and GPSR stay Shopify-shaped. Callers pass a Trendyol account
 (the live API, or an in-memory one in tests) and map the result to HTTP.
 """
 
