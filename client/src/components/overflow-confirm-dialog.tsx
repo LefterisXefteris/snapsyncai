@@ -24,7 +24,7 @@ export function OverflowConfirmDialog({
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
       <DialogContent className="sm:max-w-md" data-testid="dialog-overflow-confirm">
         <DialogHeader>
-          <DialogTitle>Extra Allowance use</DialogTitle>
+          <DialogTitle>Paid AI listing-copy write</DialogTitle>
           <DialogDescription>{overflowConfirmBody(overagePence)}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -32,7 +32,7 @@ export function OverflowConfirmDialog({
             Cancel
           </Button>
           <Button onClick={onContinue} data-testid="button-overflow-continue">
-            Continue
+            Charge and continue
           </Button>
         </DialogFooter>
       </DialogContent>

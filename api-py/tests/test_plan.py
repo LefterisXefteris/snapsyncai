@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 
 from app.services.plan import (
     LEFTOVER_WEEKLY_INCLUDED,
-    NEED_PLAN,
     WEEKLY_LIMIT,
     Spend,
     decide,
@@ -18,10 +17,28 @@ MONDAY = datetime(2026, 1, 12, 10, 0, tzinfo=UTC)  # Monday
 NEXT_MONDAY = datetime(2026, 1, 19, 0, 0, tzinfo=UTC)
 
 
-def test_free_cannot_run_plan_jobs() -> None:
+def test_free_listing_copy_write_is_allowed_within_three() -> None:
     decision = decide("free", (), JAN, "generate_persist")
+    assert decision.allowed is True
+    assert decision.blocked_reason is None
+    assert decision.records_spend is True
+    assert decision.as_overage is False
+
+
+def test_free_fourth_write_needs_paid_confirm() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
+    decision = decide("free", spends, JAN, "generate_persist")
     assert decision.allowed is False
-    assert decision.blocked_reason == NEED_PLAN
+    assert decision.blocked_reason == "overflow_confirm_required"
+    assert decision.overflow_confirm_required is True
+    assert decision.records_spend is False
+
+
+def test_free_fourth_write_may_start_before_accept_confirm() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
+    decision = decide("free", spends, JAN, "generate_persist", completed=False)
+    assert decision.allowed is True
+    assert decision.overflow_confirm_required is True
     assert decision.records_spend is False
 
 
@@ -132,11 +149,56 @@ def test_week_interval_is_leftover_weekly_and_new_plans_are_not() -> None:
     assert leftover_weekly_from_interval("year") is False
 
 
-def test_leftover_weekly_may_start_a_plan_checkout_and_plan_may_not() -> None:
+def test_no_entitlement_starts_a_plan_checkout() -> None:
     from app.services.plan import may_start_checkout
 
-    assert may_start_checkout("free") is True
-    assert may_start_checkout("leftover_weekly") is True
+    assert may_start_checkout("free") is False
+    assert may_start_checkout("leftover_weekly") is False
     assert may_start_checkout("plan") is False
     assert may_start_checkout("local_bypass") is False
+
+
+def test_free_website_publish_is_allowed_and_not_a_write() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
+    decision = decide("free", spends, JAN, "website_handoff")
+    assert decision.allowed is True
+    assert decision.records_spend is False
+    assert decision.as_overage is False
+
+
+def test_free_view_counts_lifetime_listing_copy_writes() -> None:
+    from app.services.plan import FREE_WRITES_INCLUDED
+
+    spends = (
+        Spend(at=JAN, kind="generate_persist"),
+        Spend(at=JAN, kind="website_handoff"),
+        Spend(at=JAN, kind="refresh_accept"),
+    )
+    snapshot = view("free", spends, JAN)
+    assert snapshot.included == FREE_WRITES_INCLUDED
+    assert snapshot.used == 2
+    assert snapshot.overage == 0
+
+
+def test_free_paid_write_after_confirm_records_overage() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
+    decision = decide(
+        "free",
+        spends,
+        JAN,
+        "generate_persist",
+        paid_write_confirmed=True,
+    )
+    assert decision.allowed is True
+    assert decision.records_spend is True
+    assert decision.as_overage is True
+    assert decision.overflow_confirm_required is False
+
+
+def test_free_stale_regenerate_does_not_spend() -> None:
+    decision = decide(
+        "free", (), JAN, "generate_persist", listing_copy_was_stale=True
+    )
+    assert decision.allowed is True
+    assert decision.records_spend is False
 

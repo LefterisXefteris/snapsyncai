@@ -5,11 +5,11 @@ export function overflowPounds(overagePence: number): string {
 }
 
 export function overflowConfirmBody(overagePence: number): string {
-  return `This write is an extra Allowance use. £${overflowPounds(overagePence)} on this month's Plan invoice.`;
+  return `This AI listing-copy write is £${overflowPounds(overagePence)}. A card on file is charged when the write lands.`;
 }
 
 export function overflowNoticeText(overagePence: number): string {
-  return `The next write that lands is an extra Allowance use at £${overflowPounds(overagePence)} on this month's Plan invoice.`;
+  return `The next AI listing-copy write that lands is £${overflowPounds(overagePence)}.`;
 }
 
 export function showGenerateOverflowNotice(

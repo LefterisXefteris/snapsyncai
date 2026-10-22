@@ -12,9 +12,11 @@ JobKind = Literal["generate_persist", "refresh_accept", "website_handoff", "bulk
 
 PLAN_INCLUDED = 20
 LEFTOVER_WEEKLY_INCLUDED = 30
+FREE_WRITES_INCLUDED = 3
 PLAN_MONTHLY_PENCE = 1900
 PLAN_ANNUAL_PENCE = 19_000
 OVERAGE_PENCE = 70
+WRITE_PENCE = OVERAGE_PENCE
 
 NEED_PLAN = (
     "Subscribe to a Plan to generate listing copy, refresh from search demand, "
@@ -26,9 +28,10 @@ WEEKLY_LIMIT = (
 )
 NEED_OVERFLOW_CONFIRM = "overflow_confirm_required"
 
-_SPENDING_JOBS = frozenset(
-    {"generate_persist", "refresh_accept", "website_handoff", "bulk_seo_persist"}
+_LISTING_COPY_WRITE_JOBS = frozenset(
+    {"generate_persist", "refresh_accept", "bulk_seo_persist"}
 )
+_SPENDING_JOBS = frozenset({*_LISTING_COPY_WRITE_JOBS, "website_handoff"})
 
 
 @dataclass(frozen=True)
@@ -75,11 +78,21 @@ def _in_period(spend: Spend, start: datetime) -> bool:
     return _aware(spend.at) >= start
 
 
+def _listing_copy_writes(spends: Sequence[Spend]) -> int:
+    return sum(1 for item in spends if item.kind in _LISTING_COPY_WRITE_JOBS)
+
+
 def view(entitlement: Entitlement, spends: Sequence[Spend], now: datetime) -> AllowanceView:
     if entitlement == "local_bypass":
         return AllowanceView(entitlement=entitlement, included=None, used=0, overage=0)
     if entitlement == "free":
-        return AllowanceView(entitlement=entitlement, included=0, used=0, overage=0)
+        used = _listing_copy_writes(spends)
+        return AllowanceView(
+            entitlement=entitlement,
+            included=FREE_WRITES_INCLUDED,
+            used=used,
+            overage=max(0, used - FREE_WRITES_INCLUDED),
+        )
     if entitlement == "leftover_weekly":
         start = week_start_utc(now)
         used = sum(1 for item in spends if item.kind in _SPENDING_JOBS and _in_period(item, start))
@@ -92,6 +105,12 @@ def view(entitlement: Entitlement, spends: Sequence[Spend], now: datetime) -> Al
     return AllowanceView(entitlement=entitlement, included=None, used=0, overage=0)
 
 
+def _records_listing_copy_write(
+    job: JobKind, *, completed: bool, listing_copy_was_stale: bool
+) -> bool:
+    return completed and not listing_copy_was_stale and job in _LISTING_COPY_WRITE_JOBS
+
+
 def decide(
     entitlement: Entitlement,
     spends: Sequence[Spend],
@@ -102,13 +121,57 @@ def decide(
     completed: bool = True,
     overflow_confirmed_month: str | None = None,
     confirm_overflow: bool = False,
+    paid_write_confirmed: bool = False,
 ) -> SpendDecision:
     if entitlement == "free":
+        if job == "website_handoff":
+            return SpendDecision(
+                allowed=True,
+                blocked_reason=None,
+                records_spend=False,
+                as_overage=False,
+            )
+        if job not in _LISTING_COPY_WRITE_JOBS:
+            return SpendDecision(
+                allowed=True,
+                blocked_reason=None,
+                records_spend=False,
+                as_overage=False,
+            )
+        used = _listing_copy_writes(spends)
+        records = _records_listing_copy_write(
+            job, completed=completed, listing_copy_was_stale=listing_copy_was_stale
+        )
+        if used < FREE_WRITES_INCLUDED:
+            return SpendDecision(
+                allowed=True,
+                blocked_reason=None,
+                records_spend=records,
+                as_overage=False,
+            )
+        confirmed = paid_write_confirmed or bool(overflow_confirmed_month)
+        if not (confirm_overflow or confirmed):
+            if not completed:
+                return SpendDecision(
+                    allowed=True,
+                    blocked_reason=None,
+                    records_spend=False,
+                    as_overage=True,
+                    overflow_notice=True,
+                    overflow_confirm_required=True,
+                )
+            return SpendDecision(
+                allowed=False,
+                blocked_reason=NEED_OVERFLOW_CONFIRM,
+                records_spend=False,
+                as_overage=True,
+                overflow_confirm_required=True,
+            )
         return SpendDecision(
-            allowed=False,
-            blocked_reason=NEED_PLAN,
-            records_spend=False,
-            as_overage=False,
+            allowed=True,
+            blocked_reason=None,
+            records_spend=records,
+            as_overage=True,
         )
     if entitlement == "local_bypass":
         return SpendDecision(
@@ -163,7 +226,8 @@ def leftover_weekly_from_interval(interval: str | None) -> bool:
 
 
 def may_start_checkout(entitlement: Entitlement) -> bool:
-    return entitlement in ("free", "leftover_weekly")
+    """Plan is not sold. No entitlement starts a Plan checkout."""
+    return False
 
 
 def workspace_origin(app_base_url: str) -> str:

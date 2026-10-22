@@ -4,7 +4,11 @@
 
 **Blocked by:** 01 — Publish the storefront
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Unpublish keeps the address and shoppers no longer see the site
-- [ ] Publishing again does not spend another Allowance use
+- [x] Unpublish keeps the address and shoppers no longer see the site
+- [x] Publishing again does not spend another Allowance use
+
+## Comments
+
+- Done: `live` on `websites`, `POST /api/website/unpublish`, Take down on the Website page. Address row kept; shoppers hidden; republish does not spend.

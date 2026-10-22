@@ -24,11 +24,7 @@ test("Select all means eligible catalogue rows only", () => {
   assert.deepEqual(bulkSeoEligibleIds(rows), [1, 3]);
 });
 
-test("Start is disabled without a Plan, without demand, or with no eligible ticks", () => {
-  assert.equal(
-    bulkSeoStartEnabled({ startBlockedReason: "Subscribe to a Plan", eligibleTickCount: 2 }),
-    false,
-  );
+test("Start is disabled when blocked, without demand, or with no eligible ticks", () => {
   assert.equal(
     bulkSeoStartEnabled({
       startBlockedReason: "Search demand is not configured.",

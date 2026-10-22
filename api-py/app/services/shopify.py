@@ -263,6 +263,37 @@ async def product_publishing(graphql: ShopifyGraphQL, product_id: str) -> tuple[
     return status, published
 
 
+async def storefront_product(graphql: ShopifyGraphQL, product_id: str) -> dict[str, Any] | None:
+    """Live status, Online Store publications, and variants for a public Website page."""
+    data = await graphql(
+        """
+        query SnapSyncStorefrontProduct($id: ID!) {
+          product(id: $id) {
+            status
+            resourcePublicationsV2(first: 50) {
+              nodes {
+                isPublished
+                publication { id }
+              }
+            }
+            variants(first: 250) {
+              nodes {
+                id
+                legacyResourceId
+                title
+                price
+                compareAtPrice
+              }
+            }
+          }
+        }
+        """,
+        {"id": product_id},
+    )
+    product = data.get("product")
+    return product if isinstance(product, dict) else None
+
+
 async def apply_shopify_publications(
     graphql: ShopifyGraphQL,
     product_id: str,

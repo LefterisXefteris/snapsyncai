@@ -4,7 +4,11 @@
 
 **Blocked by:** 02 — Price and Buy from the shop
 
-**Status:** ready-for-agent
+**Status:** claimed
+
+## Comments
+
+- Claimed together with 02 (blocker cleared by implementing both).
 
 - [ ] One variant does not ask for a pick; several do
 - [ ] Quantity starts at 1

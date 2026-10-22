@@ -18,7 +18,6 @@ from app.services.listing_copy_refresh import (
     seed_search_demand,
     start_listing_copy_refresh,
 )
-from app.services.plan import NEED_PLAN
 from app.services.product_facts import (
     ProductFacts,
     confirm_facts,
@@ -515,13 +514,13 @@ async def test_refresh_accept_http_is_a_conflict_when_the_proposal_drops_the_fac
     }
 
 
-async def test_refresh_accept_http_without_a_plan_is_forbidden(db, api) -> None:
+async def test_refresh_accept_http_without_a_plan_saves_a_free_write(db, api) -> None:
     tee = await seed.product(db, facts=seed.confirmed_facts())
 
     response = await api(f"/api/images/{tee}/listing-copy/refresh/accept", PROPOSAL)
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": NEED_PLAN}
+    assert response.status_code == 200
+    assert response.json()["seoTitle"] == "Cotton tee"
 
 
 async def test_refresh_accept_http_of_another_sellers_product_is_not_found(db, api) -> None:

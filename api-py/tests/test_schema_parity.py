@@ -144,6 +144,7 @@ def test_one_website_per_seller() -> None:
     assert columns["session_id"].unique is True
     assert columns["handle"].unique is True
     assert _pg_type(columns["products"]) == "JSONB"
+    assert _pg_type(columns["live"]) == "BOOLEAN"
 
 
 def test_shopify_connection_gpsr_identity_is_jsonb() -> None:

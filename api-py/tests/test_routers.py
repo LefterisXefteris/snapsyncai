@@ -38,13 +38,13 @@ class TestPublicConfig:
         assert response.status_code == 200
         assert response.json() == {"publishableKey": "pk_test_clerk"}
 
-    def test_payments_config_matches_express_constants(self, client: TestClient) -> None:
-        """Values from server/routes.ts:302-304 — changing them changes what users pay."""
+    def test_payments_config_matches_free_write_constants(self, client: TestClient) -> None:
+        """Three free listing-copy writes, then £0.70 — ADR 0040."""
         assert client.get("/api/payments/config").json() == {
             "publishableKey": "pk_test_stripe",
             "planMonthlyPricePence": 1900,
             "planAnnualPricePence": 19_000,
-            "allowanceMonthly": 20,
+            "allowanceMonthly": 3,
             "overagePence": 70,
         }
 
@@ -233,6 +233,7 @@ class TestResponseContract:
             "/api/website/prototype",
             "/api/website/preview",
             "/api/website/publish",
+            "/api/website/unpublish",
             "/api/storefronts/{handle}",
             "/api/conversation",
         } <= paths

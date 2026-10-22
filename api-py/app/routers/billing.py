@@ -112,6 +112,22 @@ async def subscription_status(
                         "Auto-recover subscription failed (non-fatal): %s", recover_err
                     )
 
+        if (
+            sub is not None
+            and sub.status in ("active", "trialing")
+            and sub.stripe_subscription_id
+            and sub.stripe_subscription_id != billing.PAYG_SUBSCRIPTION_ID
+        ):
+            try:
+                billing.schedule_plan_period_end(sub.stripe_subscription_id)
+                sub.status = "canceling"
+                await session.flush()
+            except Exception:
+                logger.warning(
+                    "Could not set cancel_at_period_end for %s",
+                    sub.stripe_subscription_id,
+                    exc_info=True,
+                )
         return await _plan_status(session, user_id, settings, sub)
     except HTTPException:
         raise
@@ -244,6 +260,34 @@ async def recover_by_email(
         raise _http_error(500, "Failed to recover subscription") from None
 
 
+@router.post("/api/subscription/setup-write-card", response_model=CheckoutResponse)
+async def setup_write_card(
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CheckoutResponse:
+    """Save a card for £0.70 listing-copy writes after the three free ones."""
+    try:
+        billing.configure_stripe()
+        existing = await billing.get_subscription(session, user_id)
+        sub = await billing.ensure_payg_customer(session, settings, user_id, existing)
+        origin = workspace_origin(settings.app_base_url)
+        checkout = stripe.checkout.Session.create(
+            mode="setup",
+            customer=sub.stripe_customer_id,
+            success_url=f"{origin}/settings?write_card=saved",
+            cancel_url=f"{origin}/settings?write_card=cancelled",
+            payment_method_types=["card"],
+            metadata={"userId": user_id, "purpose": "listing_copy_write"},
+        )
+        return CheckoutResponse(checkout_url=checkout.url, session_id=checkout.id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("setup-write-card error")
+        raise _http_error(500, "Failed to start card setup") from None
+
+
 @router.post("/api/subscription/create-checkout", response_model=CheckoutResponse)
 async def create_checkout(
     request: Request,
@@ -253,6 +297,11 @@ async def create_checkout(
     body: CreateCheckoutBody | None = None,
 ) -> CheckoutResponse | JSONResponse:
     try:
+        if not may_start_checkout("free"):
+            raise _http_error(
+                400,
+                "The Plan is not sold. AI listing-copy writes are three free, then £0.70 each.",
+            )
         existing = await billing.get_subscription(session, user_id)
         local = billing.is_local_pro(settings) or await billing.is_dev_free_user(
             user_id, settings

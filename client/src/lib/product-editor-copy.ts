@@ -22,7 +22,7 @@ export const UNPAID_PREVIEW_TITLE = "This product has no listing copy yet.";
 export const UNPAID_PREVIEW_DETAIL =
   "Confirm product facts, then generate listing copy — or type it yourself and push.";
 export const NEED_PLAN =
-  "Subscribe to a Plan to generate listing copy, refresh from search demand, run Bulk SEO, or build a website.";
+  "Add a card to pay £0.70 per AI listing-copy write after your three free writes.";
 export const PRODUCT_EDITOR_ALT_TEXT_LABEL = "Alt text";
 
 export function productEditorShowsVariants(variantCount: number): boolean {

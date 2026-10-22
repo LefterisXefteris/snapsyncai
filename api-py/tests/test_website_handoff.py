@@ -9,6 +9,7 @@ from sqlalchemy import update
 from app.models.image import Image
 from app.services import website_handoff
 from app.services.website_handoff import (
+    SNAPSHOT_KEYS,
     PublishError,
     WebsitePhoto,
     assemble_storefront,
@@ -20,6 +21,7 @@ from app.services.website_handoff import (
     save_website_prototype,
     saved_website_prototype,
     snapshot_product,
+    unpublish_website,
 )
 from tests import seed
 
@@ -89,6 +91,116 @@ def test_snapshot_is_listing_copy_facts_photos_and_shopify_id() -> None:
     assert snap["aeoFaqs"] == [{"q": "Is it cotton?", "a": "Yes."}]
     assert snap["confirmedFacts"]["isTextile"] is True
     assert snap["confirmedFacts"]["composition"] == [{"name": "cotton", "percent": 100}]
+
+
+def test_active_online_store_product_with_a_price_can_be_bought() -> None:
+    from app.services.website_handoff import selling_for_storefront
+    from tests.shopify_shop import ONLINE_STORE
+
+    selling = selling_for_storefront(
+        {
+            "status": "ACTIVE",
+            "resourcePublicationsV2": {
+                "nodes": [{"isPublished": True, "publication": {"id": ONLINE_STORE}}]
+            },
+            "variants": {
+                "nodes": [
+                    {
+                        "id": "gid://shopify/ProductVariant/11",
+                        "legacyResourceId": "11",
+                        "title": "Default Title",
+                        "price": "24.00",
+                        "compareAtPrice": "30.00",
+                    }
+                ]
+            },
+        },
+        online_store_id=ONLINE_STORE,
+    )
+    assert selling["canBuy"] is True
+    assert selling["price"] == "24.00"
+    assert selling["compareAtPrice"] == "30.00"
+    assert selling["variants"] == [
+        {
+            "id": "11",
+            "title": "Default Title",
+            "price": "24.00",
+            "compareAtPrice": "30.00",
+        }
+    ]
+
+
+def test_draft_or_unlisted_or_zero_price_keeps_the_product_without_buy() -> None:
+    from app.services.website_handoff import selling_for_storefront
+    from tests.shopify_shop import ONLINE_STORE, POINT_OF_SALE
+
+    draft = selling_for_storefront(
+        {
+            "status": "DRAFT",
+            "resourcePublicationsV2": {
+                "nodes": [{"isPublished": True, "publication": {"id": ONLINE_STORE}}]
+            },
+            "variants": {
+                "nodes": [
+                    {
+                        "id": "gid://shopify/ProductVariant/1",
+                        "legacyResourceId": "1",
+                        "title": "Default Title",
+                        "price": "10.00",
+                        "compareAtPrice": None,
+                    }
+                ]
+            },
+        },
+        online_store_id=ONLINE_STORE,
+    )
+    assert draft["canBuy"] is False
+    assert draft["price"] == "10.00"
+
+    off_store = selling_for_storefront(
+        {
+            "status": "ACTIVE",
+            "resourcePublicationsV2": {
+                "nodes": [{"isPublished": True, "publication": {"id": POINT_OF_SALE}}]
+            },
+            "variants": {
+                "nodes": [
+                    {
+                        "id": "gid://shopify/ProductVariant/2",
+                        "legacyResourceId": "2",
+                        "title": "Default Title",
+                        "price": "10.00",
+                        "compareAtPrice": None,
+                    }
+                ]
+            },
+        },
+        online_store_id=ONLINE_STORE,
+    )
+    assert off_store["canBuy"] is False
+
+    free = selling_for_storefront(
+        {
+            "status": "ACTIVE",
+            "resourcePublicationsV2": {
+                "nodes": [{"isPublished": True, "publication": {"id": ONLINE_STORE}}]
+            },
+            "variants": {
+                "nodes": [
+                    {
+                        "id": "gid://shopify/ProductVariant/3",
+                        "legacyResourceId": "3",
+                        "title": "Default Title",
+                        "price": "0.00",
+                        "compareAtPrice": None,
+                    }
+                ]
+            },
+        },
+        online_store_id=ONLINE_STORE,
+    )
+    assert free["canBuy"] is False
+    assert free["price"] == "0.00"
 
 
 def test_snapshot_never_carries_shopify_credentials() -> None:
@@ -240,6 +352,72 @@ async def test_a_later_publish_replaces_the_site_and_does_not_spend(
     assert await seed.spends(db) == []
 
 
+def test_shoppers_do_not_see_a_site_that_is_not_live() -> None:
+    from app.models.website import PublishedWebsite
+    from app.services.website_handoff import public_website_row
+
+    live = PublishedWebsite(
+        session_id="seller",
+        shop_domain="tees.myshopify.com",
+        handle="tees",
+        shop_name="Tees",
+        palette="ground",
+        type_pairing="sans",
+        products=[],
+        live=True,
+    )
+    down = PublishedWebsite(
+        session_id="seller",
+        shop_domain="tees.myshopify.com",
+        handle="tees",
+        shop_name="Tees",
+        palette="ground",
+        type_pairing="sans",
+        products=[],
+        live=False,
+    )
+    assert public_website_row(live) is live
+    assert public_website_row(down) is None
+    assert public_website_row(None) is None
+
+
+async def test_unpublish_keeps_the_address_and_hides_the_site_from_shoppers(
+    db, db_settings, channel_photos
+) -> None:
+    await seed.plan(db)
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    published = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
+    assert published.storefront is not None
+    assert await published_storefront(db, db_settings, "tees") is not None
+
+    down = await unpublish_website(db, seed.SELLER)
+    assert down.handle == "tees"
+    assert down.host == "tees.sites.snapsyncai.co.uk"
+    assert await published_storefront(db, db_settings, "tees") is None
+
+    again = await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ink",
+        type_pairing="serif",
+        product_ids=[pid],
+    )
+    assert again.spent is False
+    assert again.storefront is not None
+    assert again.storefront.palette == "ink"
+    assert await published_storefront(db, db_settings, "tees") is not None
+    assert await seed.spends(db) == []
+
+
 async def test_a_catalogue_edit_does_not_change_the_published_words(
     db, db_settings, channel_photos
 ) -> None:
@@ -256,11 +434,57 @@ async def test_a_catalogue_edit_does_not_change_the_published_words(
     )
     await db.execute(update(Image).where(Image.id == pid).values(title="Changed in the catalogue"))
     await db.flush()
-    site = await published_storefront(db, "tees")
+    site = await published_storefront(db, db_settings, "tees")
     assert site is not None
     assert site.products[0]["title"] == "Cotton tee"
     assert site.products[0]["photoUrls"] == [CHANNEL_PHOTO]
-    assert await published_storefront(db, "other") is None
+    assert await published_storefront(db, db_settings, "other") is None
+
+
+async def test_published_price_and_buy_come_from_the_shop_at_view_time(
+    db, db_settings, channel_photos, monkeypatch
+) -> None:
+    from tests.shopify_shop import ONLINE_STORE, ShopifyShop
+
+    await seed.plan(db)
+    await seed.shop(db, shop_name="Tees")
+    pid = await seed.product(db, facts=seed.confirmed_facts(), shopify_product_id=PUSHED)
+    await publish_website(
+        db,
+        db_settings,
+        seed.SELLER,
+        palette="ground",
+        type_pairing="sans",
+        product_ids=[pid],
+    )
+    shop = ShopifyShop()
+    listed = shop.add_product(
+        status="ACTIVE",
+        publications={ONLINE_STORE},
+        price="24.00",
+        compare_at_price="30.00",
+    )
+    # Match the frozen Shopify product id from Publish.
+    shop.products.pop(listed.id)
+    listed.id = PUSHED
+    shop.products[PUSHED] = listed
+
+    monkeypatch.setattr(
+        website_handoff,
+        "shopify_graphql_for",
+        lambda _connection, _settings: shop,
+    )
+    site = await published_storefront(db, db_settings, "tees")
+    assert site is not None
+    assert site.shop_domain == "tees.myshopify.com"
+    product = site.products[0]
+    assert product["title"] == "Cotton tee"
+    assert product["price"] == "24.00"
+    assert product["compareAtPrice"] == "30.00"
+    assert product["canBuy"] is True
+    assert product["variants"][0]["price"] == "24.00"
+    assert "price" not in SNAPSHOT_KEYS
+    assert "canBuy" not in SNAPSHOT_KEYS
 
 
 async def test_a_preview_does_not_publish_or_spend(db, db_settings, channel_photos) -> None:
@@ -278,7 +502,7 @@ async def test_a_preview_does_not_publish_or_spend(db, db_settings, channel_phot
     assert result.spent is False
     assert result.storefront is not None
     assert result.storefront.palette == "ink"
-    assert await published_storefront(db, "tees") is None
+    assert await published_storefront(db, db_settings, "tees") is None
     assert await seed.spends(db) == []
 
 
@@ -325,7 +549,7 @@ async def test_publish_without_a_look_spends_nothing(db, db_settings) -> None:
     assert result.refused == "invalid"
     assert result.spent is False
     assert result.storefront is None
-    assert await published_storefront(db, "tees") is None
+    assert await published_storefront(db, db_settings, "tees") is None
     assert await seed.spends(db) == []
 
 
@@ -359,5 +583,5 @@ async def test_publish_without_a_plan_spends_nothing(db, db_settings, channel_ph
     )
     assert result.refused == "plan_blocked"
     assert result.storefront is None
-    assert await published_storefront(db, "tees") is None
+    assert await published_storefront(db, db_settings, "tees") is None
     assert await seed.spends(db) == []

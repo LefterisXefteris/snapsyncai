@@ -4,19 +4,23 @@ import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useWebsitePrototype, useWebsitePrototypeSave } from "@/hooks/use-website";
+import { useWebsitePrototype, useWebsitePrototypeSave, useWebsiteUnpublish } from "@/hooks/use-website";
 import { workspaceNavItem } from "@/lib/workspace-nav";
 import {
+  WEBSITE_ADDRESS_KEPT,
   WEBSITE_BRIEF_HINT,
   WEBSITE_BRIEF_LABEL,
   WEBSITE_EMPTY,
+  WEBSITE_LIVE,
   WEBSITE_NEEDS_SHOPIFY,
   WEBSITE_PUBLISH_WAITS,
+  WEBSITE_TAKE_DOWN,
 } from "@/lib/website-copy";
 
 export default function WebsitePage() {
   const prototype = useWebsitePrototype();
   const save = useWebsitePrototypeSave();
+  const unpublish = useWebsiteUnpublish();
   const settings = workspaceNavItem("settings");
   const saveSeq = useRef(0);
   const [hydrated, setHydrated] = useState(false);
@@ -63,14 +67,37 @@ export default function WebsitePage() {
       <div className="p-3 glass-chrome border-b z-10 sticky top-0">
         <div className="flex items-center justify-between gap-2">
           <h1 className="font-display text-sm font-semibold">Website</h1>
-          <Button size="sm" disabled data-testid="button-website-publish">
-            <Globe className="w-3.5 h-3.5 mr-1.5" />
-            Publish
-          </Button>
+          <div className="flex items-center gap-2">
+            {prototype.data?.live ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={unpublish.isPending}
+                onClick={() => unpublish.mutate()}
+                data-testid="button-website-take-down"
+              >
+                {WEBSITE_TAKE_DOWN}
+              </Button>
+            ) : null}
+            <Button size="sm" disabled data-testid="button-website-publish">
+              <Globe className="w-3.5 h-3.5 mr-1.5" />
+              Publish
+            </Button>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-2" data-testid="text-publish-waits">
-          {WEBSITE_PUBLISH_WAITS}
-        </p>
+        {prototype.data?.live && prototype.data.host ? (
+          <p className="text-xs text-muted-foreground mt-2" data-testid="text-website-live">
+            {WEBSITE_LIVE(prototype.data.host)}
+          </p>
+        ) : prototype.data?.host && !prototype.data.live ? (
+          <p className="text-xs text-muted-foreground mt-2" data-testid="text-website-down">
+            {WEBSITE_ADDRESS_KEPT}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-2" data-testid="text-publish-waits">
+            {WEBSITE_PUBLISH_WAITS}
+          </p>
+        )}
       </div>
 
       <ScrollArea className="flex-1">

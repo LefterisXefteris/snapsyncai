@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
-import { CalendarDays, CreditCard, Crown, Loader2, Store, XCircle, Zap } from "lucide-react";
+import { CalendarDays, CreditCard, Loader2, Store, XCircle } from "lucide-react";
 import {
   useShopifyStatus,
   useShopifyConnect,
   useShopifyDisconnect,
   useSaveShopGpsrIdentity,
   useSubscriptionStatus,
-  usePaymentConfig,
-  useCreateSubscriptionCheckout,
   useCancelSubscription,
+  useSetupWriteCard,
 } from "@/hooks/use-images";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { UserButton } from "@clerk/clerk-react";
@@ -32,15 +30,12 @@ export default function Settings() {
   const shopifyDisconnect = useShopifyDisconnect();
   const saveShopGpsr = useSaveShopGpsrIdentity();
   const { data: subscriptionStatus } = useSubscriptionStatus();
-  const { data: paymentConfig } = usePaymentConfig();
-  const createSubscriptionCheckout = useCreateSubscriptionCheckout();
   const cancelSubscription = useCancelSubscription();
+  const setupWriteCard = useSetupWriteCard();
 
   const [shopDomain, setShopDomain] = useState("");
   const [shopGpsrDraft, setShopGpsrDraft] = useState(emptyGpsrIdentity());
-  const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
   const trendyol = useTrendyolStatus();
   const trendyolConnect = useTrendyolConnect();
   const trendyolDisconnect = useTrendyolDisconnect();
@@ -54,8 +49,6 @@ export default function Settings() {
 
   const isSubscribed = subscriptionStatus?.subscribed === true;
   const leftoverWeekly = subscriptionStatus?.entitlement === "leftover_weekly";
-  const monthlyPrice = (paymentConfig?.planMonthlyPricePence ?? 1900) / 100;
-  const annualPrice = (paymentConfig?.planAnnualPricePence ?? 19000) / 100;
   const allowanceUsed = subscriptionStatus?.allowanceUsed ?? 0;
   const allowanceIncluded = subscriptionStatus?.allowanceIncluded;
   const onPlan = subscriptionStatus?.entitlement === "plan";
@@ -71,19 +64,6 @@ export default function Settings() {
       return;
     }
     shopifyConnect.mutate({ shopDomain: shopDomain.trim() });
-  };
-
-  const handleSubscribe = () => {
-    createSubscriptionCheckout.mutate(billingInterval, {
-      onSuccess: (data) => {
-        if (data.checkoutUrl) {
-          if (data.sessionId) {
-            localStorage.setItem("snapsyncai_checkout_session_id", data.sessionId);
-          }
-          window.location.href = data.checkoutUrl;
-        }
-      },
-    });
   };
 
   const handleCancelSubscription = () => {
@@ -326,49 +306,48 @@ export default function Settings() {
             <h2 className="text-xs text-muted-foreground">Billing</h2>
             <div className="glass-panel rounded-lg p-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-medium">Plan</h3>
+                <h3 className="text-sm font-medium">AI listing-copy writes</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {leftoverWeekly
-                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. Switch to a Plan. Listing-copy writes and website are included.`
+                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. This leftover weekly period ends without renewal; then three free writes and £0.70 each.`
                     : onPlan
-                    ? "Listing-copy writes and website are included."
+                    ? "Listing-copy writes and website are included until this paid period ends. It will not renew."
                     : isSubscribed
                     ? "Local workspace. Listing copy is not billed."
-                    : "Subscribe for listing copy generate, listing copy refresh, and website."}
+                    : allowanceIncluded != null
+                    ? `${Math.max(0, (allowanceIncluded ?? 0) - allowanceUsed)} of ${allowanceIncluded} free AI listing-copy writes left. Then £0.70 each. Website is free.`
+                    : "Three free AI listing-copy writes, then £0.70 each. Website is free."}
                 </p>
               </div>
-              {isSubscribed ? (
-                <div className="flex items-center gap-2">
-                  {leftoverWeekly ? (
-                    <Button
-                      data-testid="button-switch-plan"
-                      size="sm"
-                      onClick={() => setShowSubscribeDialog(true)}
-                    >
-                      <Crown className="w-3.5 h-3.5 mr-1.5" />
-                      Switch to Plan
-                    </Button>
-                  ) : null}
-                <Button
-                  data-testid="button-cancel-subscription"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCancelDialog(true)}
-                >
-                  <XCircle className="w-3.5 h-3.5 mr-1.5" />
-                  Cancel
-                </Button>
-                </div>
-              ) : (
-                <Button
-                  data-testid="button-subscribe"
-                  size="sm"
-                  onClick={() => setShowSubscribeDialog(true)}
-                >
-                  <Crown className="w-3.5 h-3.5 mr-1.5" />
-                  Subscribe
-                </Button>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {!onPlan && !leftoverWeekly ? (
+                  <Button
+                    data-testid="button-setup-write-card"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setupWriteCard.mutate()}
+                    disabled={setupWriteCard.isPending}
+                  >
+                    {setupWriteCard.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Add card
+                  </Button>
+                ) : null}
+                {isSubscribed && (leftoverWeekly || onPlan) ? (
+                  <Button
+                    data-testid="button-cancel-subscription"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCancelDialog(true)}
+                  >
+                    <XCircle className="w-3.5 h-3.5 mr-1.5" />
+                    Cancel
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </section>
 
@@ -387,53 +366,6 @@ export default function Settings() {
           </section>
         </div>
       </ScrollArea>
-
-      <Dialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Crown className="w-5 h-5" />
-              Plan
-            </DialogTitle>
-            <DialogDescription>
-              Listing-copy writes and website are included. £{monthlyPrice}/month or £{annualPrice}/year.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setBillingInterval("monthly")}
-                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${billingInterval === "monthly" ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}
-              >
-                <span className="font-semibold">£{monthlyPrice}/mo</span>
-                <span className="text-xs mt-0.5">Monthly</span>
-              </button>
-              <button
-                onClick={() => setBillingInterval("annual")}
-                className={`flex flex-col items-center p-3 rounded-md border text-sm transition-colors ${billingInterval === "annual" ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}
-              >
-                <span className="font-semibold">£{annualPrice}/yr</span>
-                <span className="text-xs mt-0.5">Annual · save 2 months</span>
-              </button>
-            </div>
-            <Separator />
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Listing-copy writes included</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Listing copy refresh, Bulk SEO, and website</li>
-              <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 shrink-0" /> Push listing copy you typed or generated</li>
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSubscribeDialog(false)}>Cancel</Button>
-            <Button onClick={() => { setShowSubscribeDialog(false); handleSubscribe(); }} disabled={createSubscriptionCheckout.isPending}>
-              {createSubscriptionCheckout.isPending
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Redirecting...</>
-                : <><CreditCard className="w-4 h-4 mr-2" />{billingInterval === "annual" ? `Subscribe £${annualPrice}/yr` : `Subscribe £${monthlyPrice}/mo`}</>
-              }
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent className="sm:max-w-md">

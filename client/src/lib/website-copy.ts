@@ -11,3 +11,10 @@ export const WEBSITE_BRIEF_HINT =
 
 export const WEBSITE_PUBLISH_WAITS =
   "Publish waits until a look comes back for these products and this brief.";
+
+export const WEBSITE_TAKE_DOWN = "Take down";
+
+export const WEBSITE_LIVE = (host: string) => `Shoppers open ${host}.`;
+
+export const WEBSITE_ADDRESS_KEPT =
+  "The address stays reserved. Publish again when you want shoppers to see it.";

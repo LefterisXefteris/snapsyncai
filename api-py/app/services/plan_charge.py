@@ -78,15 +78,20 @@ async def overflow_ack_month(session: AsyncSession, settings: Settings, user_id:
     return None if sub is None else sub.overflow_confirmed_month
 
 
+def _paid_write_confirmed(sub: Subscription | None) -> bool:
+    return bool(sub is not None and sub.overflow_confirmed_month)
+
+
 async def overflow_view(session: AsyncSession, settings: Settings, user_id: str) -> tuple[bool, bool]:
     entitlement, spends, sub = await _context(session, settings, user_id)
     decision = decide(
         entitlement,
         spends,
         datetime.now(UTC),
-        "website_handoff",
+        "generate_persist",
         completed=False,
         overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
+        paid_write_confirmed=_paid_write_confirmed(sub),
     )
     return decision.overflow_notice, decision.overflow_confirm_required
 
@@ -101,7 +106,9 @@ async def may_start(
         spends,
         datetime.now(UTC),
         job,
+        completed=False,
         overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
+        paid_write_confirmed=_paid_write_confirmed(sub),
     )
     return None if decision.allowed else decision.blocked_reason
 
@@ -117,10 +124,10 @@ async def spend_when_landed[T](
     confirm_overflow: bool = False,
     product_id: int | None = None,
 ) -> Landed[T]:
-    """Run `write` if the Plan allows this job. A Plan does not record a use.
+    """Run `write` if entitlement allows. A Plan does not record a use.
 
-    The seller's subscription row stays locked until the request commits, so a concurrent
-    job decides after this one's spend is visible. Overflow reaches Stripe only after commit.
+    Free paid writes charge £0.70 before the Accept lands; a failed charge refuses.
+    Grandfathered Plan overage lines still report after commit.
     """
     entitlement, spends, sub = await _context(session, settings, user_id, lock=True)
     now = datetime.now(UTC)
@@ -133,9 +140,25 @@ async def spend_when_landed[T](
         completed=True,
         overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
         confirm_overflow=confirm_overflow,
+        paid_write_confirmed=_paid_write_confirmed(sub),
     )
     if not decision.allowed:
         return Landed(refused=decision.blocked_reason)
+
+    charge_now = decision.records_spend and decision.as_overage and entitlement == "free"
+    if charge_now:
+        try:
+            sub = await billing.ensure_payg_customer(session, settings, user_id, sub)
+            billing.charge_listing_copy_write(
+                sub.stripe_customer_id,
+                idempotency_key=f"write-{user_id}-{job}-{product_id}-{len(spends)}",
+            )
+        except billing.WriteChargeError as err:
+            return Landed(refused=str(err))
+        except Exception:
+            logger.exception("Listing-copy write charge failed for %s", user_id)
+            return Landed(refused=billing.NEED_PAYMENT)
+
     result = await write()
     if result is None:
         return Landed(result=None)
@@ -146,12 +169,14 @@ async def spend_when_landed[T](
             job,
             as_overage=decision.as_overage,
             product_id=product_id,
-            overage_reported=not decision.as_overage,
+            overage_reported=True if charge_now else not decision.as_overage,
         )
         if decision.as_overage and sub is not None:
-            sub.overflow_confirmed_month = month_key_utc(now)
+            sub.overflow_confirmed_month = (
+                "paid" if entitlement == "free" else month_key_utc(now)
+            )
             await session.flush()
-    if decision.records_spend or entitlement == "plan":
+    if decision.records_spend and decision.as_overage and entitlement != "free":
         after_commit(
             session,
             f"overage:{user_id}",

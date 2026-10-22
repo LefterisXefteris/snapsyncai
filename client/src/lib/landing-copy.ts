@@ -4,7 +4,7 @@ export const LANDING_DOCUMENT_TITLE =
   "SnapSync — your e-commerce agent for textile listings";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is your e-commerce agent for textile listings. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Import, inventory, Bulk SEO, and a website. Push to Shopify. Plan from £19/month.";
+  "SnapSync is your e-commerce agent for textile listings. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Import, inventory, Bulk SEO, and a website. Push to Shopify. Three free AI listing-copy writes, then £0.70 each.";
 
 export const LANDING_EYEBROW = "Textile listings · Shopify";
 
@@ -21,7 +21,8 @@ export const LANDING_MICRO = "No card required · catalogue, facts, and typed li
 export const LANDING_PRIMARY_CTA = "Start free";
 export const LANDING_SECONDARY_CTA = "How it works";
 
-export const LANDING_FINE_PRINT = "Plan £19/month · £190/year · Cancel anytime";
+export const LANDING_FINE_PRINT =
+  "Three free AI listing-copy writes · then £0.70 each · catalogue free";
 
 export const JOBS = [
   {
@@ -62,7 +63,7 @@ export const JOBS = [
   {
     title: "Settings",
     description:
-      "Connect your Shopify shop, save the shop GPSR identity, and see your Plan. Catalogue, facts, and listing copy you type stay free.",
+      "Connect your Shopify shop, save the shop GPSR identity, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
   },
 ] as const;
 
@@ -90,22 +91,21 @@ export const STEPS = [
 ] as const;
 
 export const WEEKLY_BULLETS = [
-  "Listing-copy writes included",
+  "Three free AI listing-copy writes, then £0.70 each",
   "New listing from photos (up to 200)",
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
-  "Import, inventory, Bulk SEO, and a website",
+  "Import, inventory, Bulk SEO, and a website free",
 ] as const;
 
 export const ANNUAL_BULLETS = [
-  "Listing-copy writes included",
+  "Three free AI listing-copy writes, then £0.70 each",
   "New listing from photos (up to 200)",
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
-  "Import, inventory, Bulk SEO, and a website",
-  "Two months free vs paying monthly",
+  "Import, inventory, Bulk SEO, and a website free",
 ] as const;
 
 export const FAQ_DATA = [
@@ -120,9 +120,9 @@ export const FAQ_DATA = [
       "Listing copy must not invent product facts a photo cannot establish. You confirm fibre composition, care instructions, and GPSR identity — or skip the blocks you do not have. Only then is listing copy written.",
   },
   {
-    question: "What does the Plan include?",
+    question: "What do AI listing-copy writes cost?",
     answer:
-      "A Plan is £19/month or £190/year. Listing-copy generate, listing copy refresh, Bulk SEO, and website are included, with no use count and no extra charge. Confirming facts does not require a Plan. No card is required to start.",
+      "Three free AI listing-copy writes for life on your shop, then £0.70 each when the write lands. Website, catalogue, facts, and typed listing copy stay free. No card is required to start.",
   },
   {
     question: "How do I create a product from photos?",
@@ -137,7 +137,7 @@ export const FAQ_DATA = [
   {
     question: "How much does SnapSync cost?",
     answer:
-      "No card to start. A Plan is £19/month or £190/year. Listing copy, listing copy refresh, Bulk SEO, and a website are included, with no extra charge. Push to Shopify and inventory stay available. Cancel anytime.",
+      "Catalogue, facts, and typed listing copy are free. Three free AI listing-copy writes, then £0.70 each. Website Publish is free. Push to Shopify and inventory stay available. No card to start.",
   },
   {
     question: "Can I edit listing copy before I push to Shopify?",

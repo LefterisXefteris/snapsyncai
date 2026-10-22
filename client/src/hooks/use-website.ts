@@ -21,6 +21,8 @@ export type WebsitePrototype = {
   productIds: number[];
   brief: string;
   look: null;
+  host: string | null;
+  live: boolean;
 };
 
 export type WebsitePrototypeSave = {
@@ -96,12 +98,35 @@ export function useWebsitePublish() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      queryClient.invalidateQueries({ queryKey: [api.website.prototype.path] });
     },
     onError: (error) => {
       if (isOverflowConfirmError(error instanceof Error ? error.message : "")) return;
       toast({
         title: "Could not publish",
         description: error instanceof Error ? error.message : "Publish failed",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useWebsiteUnpublish() {
+  const queryClient = useQueryClient();
+  const userId = useAppUserId();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest(api.website.unpublish.method, api.website.unpublish.path);
+      return res.json() as Promise<{ host: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.website.prototype.path, userId] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not take the site down",
+        description: error instanceof Error ? error.message : "Take down failed",
         variant: "destructive",
       });
     },

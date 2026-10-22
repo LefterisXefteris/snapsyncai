@@ -64,6 +64,8 @@ test("website prototype, preview, and publish live on /api/website", () => {
   assert.equal(api.website.preview.method, "POST");
   assert.equal(api.website.publish.path, "/api/website/publish");
   assert.equal(api.website.publish.method, "POST");
+  assert.equal(api.website.unpublish.path, "/api/website/unpublish");
+  assert.equal(api.website.unpublish.method, "POST");
   assert.equal(api.storefronts.read.path, "/api/storefronts/:handle");
   assert.equal(api.storefronts.read.method, "GET");
 });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useDismissListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, useSubscriptionStatus, type ListingCopyRefreshPack } from "@/hooks/use-images";
+import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useDismissListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, type ListingCopyRefreshPack } from "@/hooks/use-images";
 import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
 import { overflowNoticeText, showGenerateOverflowNotice } from "@/lib/overflow-copy";
 import { apiRequest } from "@/lib/queryClient";
@@ -38,7 +38,6 @@ import {
   PRODUCT_EDITOR_WORK,
   UNPAID_PREVIEW_DETAIL,
   UNPAID_PREVIEW_TITLE,
-  NEED_PLAN,
   listingCopyIsPresent,
   listingCopyTagsAfterAdd,
   listingCopyTagsAfterRemove,
@@ -89,7 +88,6 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const acceptListingCopyRefresh = useAcceptListingCopyRefresh();
   const dismissListingCopyRefresh = useDismissListingCopyRefresh();
   const { data: shopifyStatus } = useShopifyStatus();
-  const { data: subscriptionStatus } = useSubscriptionStatus();
   const overflow = useOverflowConfirm();
   const saveShopGpsr = useSaveShopGpsrIdentity();
 
@@ -244,13 +242,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const missingCopy = image.listingCopyPresent !== true;
   const facts = productFacts(image);
   const factsOk = image.mayGenerateListingCopy === true;
-  const planBlocked = subscriptionStatus?.subscribed !== true;
-  const canGenerate = factsOk && !planBlocked;
+  const canGenerate = factsOk;
   const generateBlockedReason = !factsOk
     ? "Confirm product facts before generating listing copy."
-    : planBlocked
-      ? NEED_PLAN
-      : undefined;
+    : undefined;
   const canRefresh = image.mayRefreshListingCopy === true;
   const refreshBlockedReason = image.refreshBlockedReason ?? null;
   const generateOverflowNotice = showGenerateOverflowNotice(

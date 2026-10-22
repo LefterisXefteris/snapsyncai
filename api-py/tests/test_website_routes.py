@@ -28,6 +28,7 @@ PROTECTED = [
     ("PUT", "/api/website/prototype"),
     ("POST", "/api/website/preview"),
     ("POST", "/api/website/publish"),
+    ("POST", "/api/website/unpublish"),
 ]
 
 
@@ -51,7 +52,18 @@ def test_website_schemas_are_camel_case(monkeypatch) -> None:
     try:
         schemas = client.get("/openapi.json").json()["components"]["schemas"]
         proto = set(schemas["WebsitePrototypeResponse"]["properties"])
-        assert proto == {"shopConnected", "shopDomain", "products", "productIds", "brief", "look"}
+        assert proto == {
+            "shopConnected",
+            "shopDomain",
+            "products",
+            "productIds",
+            "brief",
+            "look",
+            "host",
+            "live",
+        }
+        assert "WebsiteUnpublishResponse" in schemas
+        assert set(schemas["WebsiteUnpublishResponse"]["properties"]) == {"host"}
         item = set(schemas["WebsiteEligibleProduct"]["properties"])
         assert {"id", "title", "photoUrl", "shopifyProductId"} <= item
         assert "shopify_product_id" not in item
@@ -62,7 +74,22 @@ def test_website_schemas_are_camel_case(monkeypatch) -> None:
         preview = set(schemas["WebsitePreviewBody"]["properties"])
         assert preview == {"productIds", "palette", "typePairing"}
         storefront = set(schemas["StorefrontResponse"]["properties"])
-        assert storefront == {"handle", "host", "shopName", "palette", "typePairing", "products"}
+        assert storefront == {
+            "handle",
+            "host",
+            "shopName",
+            "palette",
+            "typePairing",
+            "products",
+            "shopDomain",
+        }
+        product = set(schemas["StorefrontProductResponse"]["properties"])
+        assert {
+            "price",
+            "compareAtPrice",
+            "canBuy",
+            "variants",
+        } <= product
     finally:
         get_settings.cache_clear()
 

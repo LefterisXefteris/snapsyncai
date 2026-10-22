@@ -11,10 +11,10 @@ from app.config import SettingsDep
 from app.schemas.base import CamelModel
 
 from app.services.plan import (
-    OVERAGE_PENCE,
+    FREE_WRITES_INCLUDED,
     PLAN_ANNUAL_PENCE,
-    PLAN_INCLUDED,
     PLAN_MONTHLY_PENCE,
+    WRITE_PENCE,
 )
 
 router = APIRouter(tags=["config"])
@@ -53,6 +53,6 @@ async def payments_config(settings: SettingsDep) -> PaymentsConfigResponse:
         publishable_key=settings.stripe_publishable_key,
         plan_monthly_price_pence=PLAN_MONTHLY_PENCE,
         plan_annual_price_pence=PLAN_ANNUAL_PENCE,
-        allowance_monthly=PLAN_INCLUDED,
-        overage_pence=OVERAGE_PENCE,
+        allowance_monthly=FREE_WRITES_INCLUDED,
+        overage_pence=WRITE_PENCE,
     )

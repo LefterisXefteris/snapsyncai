@@ -91,11 +91,12 @@ test("copy does not sell unshipped jobs, fake proof, or the old generator story"
   }
 });
 
-test("pricing is £19 or £190, with no extra-use charge and no weekly cap", () => {
+test("pricing is three free writes then £0.70, with no Plan subscription", () => {
   const text = landingVisibleText().toLowerCase();
-  assert.match(text, /£19/);
-  assert.match(text, /£190/);
-  assert.equal(text.includes("£0.70"), false);
+  assert.match(text, /£0\.70/);
+  assert.match(text, /three free/);
+  assert.equal(text.includes("£19"), false);
+  assert.equal(text.includes("£190"), false);
   assert.equal(text.includes("£4"), false);
   assert.equal(text.includes("30 product"), false);
   assert.equal(text.includes("unlock"), false);

@@ -19,6 +19,8 @@ from app.services.website_handoff import (
     published_storefront,
     save_website_prototype,
     saved_website_prototype,
+    seller_website_publication,
+    unpublish_website,
     with_channel_photos,
 )
 
@@ -39,6 +41,8 @@ class WebsitePrototypeResponse(CamelModel):
     product_ids: list[int] = []
     brief: str = ""
     look: Any | None = None
+    host: str | None = None
+    live: bool = False
 
 
 class WebsitePrototypeBody(CamelModel):
@@ -56,6 +60,13 @@ class WebsitePublishBody(WebsitePreviewBody):
     confirm_overflow: bool = False
 
 
+class StorefrontVariantResponse(CamelModel):
+    id: str
+    title: str
+    price: str | None = None
+    compare_at_price: str | None = None
+
+
 class StorefrontProductResponse(CamelModel):
     id: int
     shopify_product_id: str
@@ -68,6 +79,10 @@ class StorefrontProductResponse(CamelModel):
     aeo_faqs: Any = None
     photo_urls: list[str] = []
     confirmed_facts: Any = None
+    price: str | None = None
+    compare_at_price: str | None = None
+    can_buy: bool = False
+    variants: list[StorefrontVariantResponse] = []
 
 
 class StorefrontResponse(CamelModel):
@@ -77,12 +92,17 @@ class StorefrontResponse(CamelModel):
     palette: str
     type_pairing: str
     products: list[StorefrontProductResponse]
+    shop_domain: str | None = None
 
 
 class WebsitePublishResponse(CamelModel):
     host: str
     spent: bool
     product_count: int
+
+
+class WebsiteUnpublishResponse(CamelModel):
+    host: str
 
 
 def _storefront_response(site: Storefront) -> StorefrontResponse:
@@ -93,6 +113,7 @@ def _storefront_response(site: Storefront) -> StorefrontResponse:
         palette=site.palette,
         type_pairing=site.type_pairing,
         products=[StorefrontProductResponse.model_validate(product) for product in site.products],
+        shop_domain=site.shop_domain,
     )
 
 
@@ -105,6 +126,7 @@ async def _prototype_response(
         connection, settings, eligible_products(photos_from_images(images))
     )
     saved = await saved_website_prototype(session, settings, user_id)
+    publication = await seller_website_publication(session, user_id)
     return WebsitePrototypeResponse(
         shop_connected=connection is not None,
         shop_domain=connection.shop_domain if connection is not None else None,
@@ -120,6 +142,8 @@ async def _prototype_response(
         product_ids=list(saved.product_ids),
         brief=saved.brief,
         look=saved.look,
+        host=publication.host if publication is not None else None,
+        live=publication.live if publication is not None else False,
     )
 
 
@@ -187,9 +211,21 @@ async def website_publish(
     )
 
 
+@router.post("/api/website/unpublish", response_model=WebsiteUnpublishResponse)
+async def website_unpublish(user_id: CurrentUser, session: SessionDep) -> WebsiteUnpublishResponse:
+    down = await unpublish_website(session, user_id)
+    if down is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="This website is not published"
+        )
+    return WebsiteUnpublishResponse(host=down.host)
+
+
 @router.get("/api/storefronts/{handle}", response_model=StorefrontResponse)
-async def read_storefront(handle: str, session: SessionDep) -> StorefrontResponse:
-    site = await published_storefront(session, handle)
+async def read_storefront(
+    handle: str, session: SessionDep, settings: SettingsDep
+) -> StorefrontResponse:
+    site = await published_storefront(session, settings, handle)
     if site is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="This website is not published"

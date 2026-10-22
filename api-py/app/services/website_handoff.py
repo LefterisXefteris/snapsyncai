@@ -16,7 +16,15 @@ from app.services import images as store
 from app.services.plan import NEED_OVERFLOW_CONFIRM
 from app.services.plan_charge import spend_when_landed
 from app.services.product_facts import facts_from_stored, listing_copy_present, stored_from_facts
-from app.services.shopify import list_shopify_product_image_urls, shopify_graphql_for
+from app.services.shopify import (
+    list_shopify_product_image_urls,
+    list_shopify_publications,
+    online_store_publication_id,
+    price_greater_than_zero,
+    shopify_graphql_for,
+    shopify_product_status,
+    storefront_product,
+)
 from app.services.supabase_storage import channel_photo_url
 
 STOREFRONT_HOST = "sites.snapsyncai.co.uk"
@@ -83,6 +91,7 @@ class Storefront:
     palette: str
     type_pairing: str
     products: tuple[dict[str, Any], ...]
+    shop_domain: str | None = None
 
 
 def _first_text(photos: Sequence[WebsitePhoto], attr: str) -> str | None:
@@ -198,6 +207,74 @@ def snapshot_product(product: WebsiteProduct) -> dict[str, Any]:
     return snap
 
 
+def _money(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    return str(value)
+
+
+def _variant_id(node: Mapping[str, Any]) -> str | None:
+    legacy = node.get("legacyResourceId")
+    if legacy is not None and str(legacy).strip():
+        return str(legacy).strip()
+    gid = node.get("id")
+    if isinstance(gid, str) and "/" in gid:
+        return gid.rsplit("/", 1)[-1] or None
+    return None
+
+
+def selling_for_storefront(
+    product: Mapping[str, Any] | None,
+    *,
+    online_store_id: str | None,
+) -> dict[str, Any]:
+    """Live shop price and Buy for a published product page. Not frozen at Publish."""
+    empty: dict[str, Any] = {
+        "canBuy": False,
+        "price": None,
+        "compareAtPrice": None,
+        "variants": [],
+    }
+    if not isinstance(product, Mapping):
+        return empty
+    variants: list[dict[str, Any]] = []
+    for node in (product.get("variants") or {}).get("nodes") or []:
+        if not isinstance(node, Mapping):
+            continue
+        variant_id = _variant_id(node)
+        if not variant_id:
+            continue
+        variants.append(
+            {
+                "id": variant_id,
+                "title": node.get("title") if isinstance(node.get("title"), str) else "Default Title",
+                "price": _money(node.get("price")),
+                "compareAtPrice": _money(node.get("compareAtPrice")),
+            }
+        )
+    display = variants[0] if variants else None
+    price = display["price"] if display else None
+    compare_at = display["compareAtPrice"] if display else None
+    status = shopify_product_status(product.get("status") if isinstance(product.get("status"), str) else None)
+    published: set[str] = set()
+    for entry in (product.get("resourcePublicationsV2") or {}).get("nodes") or []:
+        if not isinstance(entry, Mapping) or not entry.get("isPublished"):
+            continue
+        publication = entry.get("publication") if isinstance(entry.get("publication"), Mapping) else {}
+        publication_id = publication.get("id")
+        if isinstance(publication_id, str) and publication_id:
+            published.add(publication_id)
+    on_online_store = bool(online_store_id and online_store_id in published)
+    priced = any(price_greater_than_zero(variant["price"]) for variant in variants)
+    can_buy = status == "ACTIVE" and on_online_store and priced
+    return {
+        "canBuy": can_buy,
+        "price": price,
+        "compareAtPrice": compare_at,
+        "variants": variants,
+    }
+
+
 def shop_handle(shop_domain: str) -> str:
     domain = shop_domain.strip().lower()
     suffix = ".myshopify.com"
@@ -242,6 +319,7 @@ def assemble_storefront(
         palette=palette,
         type_pairing=type_pairing,
         products=tuple(chosen),
+        shop_domain=shop_domain.strip().lower(),
     )
 
 
@@ -281,7 +359,56 @@ def _storefront_from_row(row: PublishedWebsite) -> Storefront:
         palette=row.palette,
         type_pairing=row.type_pairing,
         products=tuple(products),
+        shop_domain=row.shop_domain,
     )
+
+
+def _without_buy(product: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        **dict(product),
+        "canBuy": False,
+        "price": None,
+        "compareAtPrice": None,
+        "variants": [],
+    }
+
+
+async def _with_live_selling(
+    session: AsyncSession,
+    settings: Settings,
+    site: Storefront,
+    *,
+    seller_id: str,
+) -> Storefront:
+    connection = await connections.get_shopify(session, seller_id)
+    if connection is None:
+        return replace(
+            site,
+            products=tuple(_without_buy(product) for product in site.products),
+        )
+    graphql = shopify_graphql_for(connection, settings)
+    try:
+        online_store_id = online_store_publication_id(await list_shopify_publications(graphql))
+    except Exception:
+        return replace(
+            site,
+            products=tuple(_without_buy(product) for product in site.products),
+            shop_domain=connection.shop_domain,
+        )
+    enriched: list[dict[str, Any]] = []
+    for product in site.products:
+        shopify_id = product.get("shopifyProductId")
+        if not isinstance(shopify_id, str) or not shopify_id:
+            enriched.append(_without_buy(product))
+            continue
+        try:
+            node = await storefront_product(graphql, shopify_id)
+            selling = selling_for_storefront(node, online_store_id=online_store_id)
+        except Exception:
+            enriched.append(_without_buy(product))
+            continue
+        enriched.append({**dict(product), **selling})
+    return replace(site, products=tuple(enriched), shop_domain=connection.shop_domain)
 
 
 async def _row_for_seller(session: AsyncSession, user_id: str) -> PublishedWebsite | None:
@@ -291,14 +418,65 @@ async def _row_for_seller(session: AsyncSession, user_id: str) -> PublishedWebsi
     return result.scalar_one_or_none()
 
 
-async def published_storefront(session: AsyncSession, handle: str) -> Storefront | None:
+def public_website_row(row: PublishedWebsite | None) -> PublishedWebsite | None:
+    """Shoppers only see a Website that is still live. The address row can remain."""
+    if row is None or not row.live:
+        return None
+    return row
+
+
+async def published_storefront(
+    session: AsyncSession, settings: Settings, handle: str
+) -> Storefront | None:
     result = await session.execute(
         select(PublishedWebsite).where(PublishedWebsite.handle == handle)
     )
-    row = result.scalar_one_or_none()
+    row = public_website_row(result.scalar_one_or_none())
     if row is None:
         return None
-    return _storefront_from_row(row)
+    return await _with_live_selling(
+        session, settings, _storefront_from_row(row), seller_id=row.session_id
+    )
+
+
+@dataclass(frozen=True)
+class TakenDown:
+    handle: str
+    host: str
+
+
+@dataclass(frozen=True)
+class WebsitePublication:
+    handle: str
+    host: str
+    live: bool
+
+
+def _site_host(handle: str) -> str:
+    return f"{handle}.{STOREFRONT_HOST}"
+
+
+async def seller_website_publication(
+    session: AsyncSession, user_id: str
+) -> WebsitePublication | None:
+    row = await _row_for_seller(session, user_id)
+    if row is None:
+        return None
+    return WebsitePublication(
+        handle=row.handle,
+        host=_site_host(row.handle),
+        live=bool(row.live),
+    )
+
+
+async def unpublish_website(session: AsyncSession, user_id: str) -> TakenDown | None:
+    """Take the site down. The address stays reserved; shoppers no longer see it."""
+    row = await _row_for_seller(session, user_id)
+    if row is None:
+        return None
+    row.live = False
+    await session.flush()
+    return TakenDown(handle=row.handle, host=_site_host(row.handle))
 
 
 async def _draft(
@@ -387,6 +565,7 @@ async def publish_website(
         row.palette = site.palette
         row.type_pairing = site.type_pairing
         row.products = list(site.products)
+        row.live = True
 
     if existing is not None:
         fill(existing)
@@ -402,6 +581,7 @@ async def publish_website(
             palette=site.palette,
             type_pairing=site.type_pairing,
             products=list(site.products),
+            live=True,
         )
         session.add(row)
         await session.flush()

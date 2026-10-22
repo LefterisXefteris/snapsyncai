@@ -30,7 +30,16 @@ from app.services.plan import (
     OVERAGE_PENCE,
     PLAN_ANNUAL_PENCE,
     PLAN_MONTHLY_PENCE,
+    WRITE_PENCE,
 )
+
+PAYG_STATUS = "payg"
+PAYG_SUBSCRIPTION_ID = "payg"
+NEED_PAYMENT = "Add a card to pay £0.70 per AI listing-copy write."
+
+
+class WriteChargeError(Exception):
+    """Seller-visible refusal when a listing-copy write charge cannot run."""
 from app.services.subscriptions import (
     ACTIVE_STATUSES,
     DEV_FREE_EMAIL,
@@ -457,16 +466,97 @@ def report_overage(customer_id: str, *, idempotency_key: str) -> None:
     )
 
 
+def _default_payment_method_id(customer_id: str) -> str | None:
+    customer = stripe.Customer.retrieve(customer_id)
+    settings = getattr(customer, "invoice_settings", None)
+    default = getattr(settings, "default_payment_method", None) if settings else None
+    if default:
+        return stripe_id(default)
+    methods = stripe.PaymentMethod.list(customer=customer_id, type="card", limit=1)
+    data = getattr(methods, "data", None) or []
+    if not data:
+        return None
+    return stripe_id(data[0])
+
+
+def charge_listing_copy_write(customer_id: str, *, idempotency_key: str) -> None:
+    """One-off £0.70 charge for a landed listing-copy write. Raises WriteChargeError."""
+    configure_stripe()
+    payment_method = _default_payment_method_id(customer_id)
+    if not payment_method:
+        raise WriteChargeError(NEED_PAYMENT)
+    try:
+        stripe.PaymentIntent.create(
+            amount=WRITE_PENCE,
+            currency="gbp",
+            customer=customer_id,
+            payment_method=payment_method,
+            confirm=True,
+            off_session=True,
+            description="Listing-copy write",
+            idempotency_key=idempotency_key,
+        )
+    except stripe.StripeError as err:
+        logger.warning("Listing-copy write charge failed for %s: %s", customer_id, err)
+        raise WriteChargeError(NEED_PAYMENT) from err
+
+
+async def ensure_payg_customer(
+    session: AsyncSession,
+    settings: Settings,
+    user_id: str,
+    sub: Subscription | None,
+) -> Subscription:
+    """Stripe customer for free pay-per-write. Not an active Plan."""
+    if sub is not None and sub.stripe_customer_id:
+        return sub
+    configure_stripe()
+    email = await clerk_primary_email(user_id, settings)
+    customer = stripe.Customer.create(
+        email=email or None,
+        metadata={"userId": user_id},
+    )
+    if sub is None:
+        sub = Subscription(
+            user_id=user_id,
+            stripe_customer_id=customer.id,
+            stripe_subscription_id=PAYG_SUBSCRIPTION_ID,
+            status=PAYG_STATUS,
+        )
+        session.add(sub)
+    else:
+        sub.stripe_customer_id = customer.id
+        if not is_active_status(sub.status):
+            sub.stripe_subscription_id = PAYG_SUBSCRIPTION_ID
+            sub.status = PAYG_STATUS
+    await session.flush()
+    return sub
+
+
+def schedule_plan_period_end(stripe_subscription_id: str) -> None:
+    """Stop Plan / Leftover weekly renewing; inclusion runs until period end."""
+    if not stripe_subscription_id or stripe_subscription_id == PAYG_SUBSCRIPTION_ID:
+        return
+    configure_stripe()
+    stripe.Subscription.modify(stripe_subscription_id, cancel_at_period_end=True)
+
+
 __all__ = [
     "ACTIVE_STATUSES",
     "DEV_FREE_EMAIL",
+    "NEED_PAYMENT",
+    "PAYG_STATUS",
+    "PAYG_SUBSCRIPTION_ID",
     "WEEKLY_PRODUCT_LIMIT",
+    "WriteChargeError",
+    "charge_listing_copy_write",
     "claim_paid_session",
     "claim_paid_session_statement",
     "clerk_primary_email",
     "configure_stripe",
     "create_paid_session",
     "ensure_paid_session",
+    "ensure_payg_customer",
     "find_active_stripe_subscription",
     "from_unix",
     "get_or_create_annual_subscription_price_id",
@@ -485,6 +575,7 @@ __all__ = [
     "recurring_interval_of",
     "relink_stripe_subscription",
     "report_overage",
+    "schedule_plan_period_end",
     "stripe_id",
     "update_subscription_status",
     "upsert_subscription",

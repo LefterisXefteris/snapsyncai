@@ -4,7 +4,11 @@
 
 **Blocked by:** 01 — Publish the storefront
 
-**Status:** ready-for-agent
+**Status:** claimed
+
+## Comments
+
+- Claimed for implement with 03 (02 → 03 one pass).
 
 - [ ] Price and compare-at on the product page come from the shop, not from the frozen Publish
 - [ ] The product stays on the site when it cannot be bought

@@ -14,7 +14,6 @@ from app.services.listing_copy_propose import (
     regenerate_bulk_seo,
 )
 from app.services.listing_copy_trace import JOB_REFRESH
-from app.services.plan import NEED_PLAN
 from tests.seed import OTHER_SELLER, SELLER, confirmed_facts, plan, product
 
 PROPOSAL = {
@@ -139,11 +138,12 @@ async def test_bulk_seo_proposes_per_product_and_keeps_going(db, settings, exter
     assert [trace["pack_id"] for trace in external.traces] == [pack_id]
 
 
-async def test_bulk_seo_without_a_plan_fetches_nothing(db, settings, external) -> None:
+async def test_bulk_seo_without_a_plan_fetches_demand(db, settings, external) -> None:
     pid = await product(db, facts=confirmed_facts())
     pack, _pack_id = await propose_bulk_seo(db, settings, SELLER, [pid])
-    assert pack.error == NEED_PLAN
-    assert external.seeds == []
+    assert pack.error is None
+    assert pack.proposed_use_count == 1
+    assert external.seeds != []
 
 
 async def test_bulk_seo_regenerate_uses_the_seller_queries(db, settings, external) -> None:

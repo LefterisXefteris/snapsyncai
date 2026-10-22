@@ -24,6 +24,9 @@ class Variant:
     inventory_item: str
     tracked: bool
     sku: str | None = None
+    price: str = "0.00"
+    compare_at_price: str | None = None
+    title: str = "Default Title"
 
 
 @dataclass
@@ -57,12 +60,24 @@ class ShopifyShop:
         self._ids = count(1)
 
     def add_product(
-        self, *, status: str = "DRAFT", publications: set[str] | None = None
+        self,
+        *,
+        status: str = "DRAFT",
+        publications: set[str] | None = None,
+        price: str = "0.00",
+        compare_at_price: str | None = None,
     ) -> Product:
         product = Product(
             id=f"gid://shopify/Product/{next(self._ids)}",
             status=status,
-            variants=[self._variant(tracked=True, sku=None)],
+            variants=[
+                self._variant(
+                    tracked=True,
+                    sku=None,
+                    price=price,
+                    compare_at_price=compare_at_price,
+                )
+            ],
             publications=set(publications or ()),
         )
         self.products[product.id] = product
@@ -89,6 +104,7 @@ class ShopifyShop:
         handler = {
             "SnapSyncPublications": self._publications,
             "SnapSyncProductPublishing": self._product_publishing,
+            "SnapSyncStorefrontProduct": self._storefront_product,
             "CreateSnapSyncProduct": self._product_set,
             "AddSnapSyncProductMedia": self._create_media,
             "SnapSyncPublish": self._publish,
@@ -100,14 +116,53 @@ class ShopifyShop:
             raise AssertionError(f"The in-memory shop does not answer {name or query!r}")
         return handler(variables or {})
 
-    def _variant(self, *, tracked: bool, sku: str | None) -> Variant:
+    def _variant(
+        self,
+        *,
+        tracked: bool,
+        sku: str | None,
+        price: str = "0.00",
+        compare_at_price: str | None = None,
+        title: str = "Default Title",
+    ) -> Variant:
         n = next(self._ids)
         return Variant(
             id=f"gid://shopify/ProductVariant/{n}",
             inventory_item=f"gid://shopify/InventoryItem/{n}",
             tracked=tracked,
             sku=sku,
+            price=price,
+            compare_at_price=compare_at_price,
+            title=title,
         )
+
+    def _storefront_product(self, variables: dict) -> dict:
+        product = self.products.get(variables["id"])
+        if product is None:
+            return {"product": None}
+        return {
+            "product": {
+                "status": product.status,
+                "resourcePublicationsV2": {
+                    "nodes": [
+                        {"isPublished": True, "publication": {"id": publication_id}}
+                        for publication_id in sorted(product.publications)
+                    ]
+                },
+                "variants": {
+                    "nodes": [
+                        {
+                            "id": variant.id,
+                            "legacyResourceId": variant.id.rsplit("/", 1)[-1],
+                            "title": variant.title,
+                            "price": variant.price,
+                            "compareAtPrice": variant.compare_at_price,
+                        }
+                        for variant in product.variants
+                    ]
+                },
+            }
+        }
 
     def _publications(self, _variables: dict) -> dict:
         return {

@@ -14,18 +14,18 @@ import {
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("overflow confirm names the extra Allowance use and the invoice", () => {
+test("overflow confirm names the paid listing-copy write", () => {
   assert.equal(
     overflowConfirmBody(70),
-    "This write is an extra Allowance use. £0.70 on this month's Plan invoice.",
+    "This AI listing-copy write is £0.70. A card on file is charged when the write lands.",
   );
-  assert.doesNotMatch(overflowConfirmBody(70), /top-up|credit|overage/i);
+  assert.doesNotMatch(overflowConfirmBody(70), /top-up|credit|overage|Allowance|Plan invoice/i);
 });
 
-test("overflow notice names this next write and the invoice", () => {
+test("overflow notice names this next paid write", () => {
   assert.equal(
     overflowNoticeText(70),
-    "The next write that lands is an extra Allowance use at £0.70 on this month's Plan invoice.",
+    "The next AI listing-copy write that lands is £0.70.",
   );
 });
 

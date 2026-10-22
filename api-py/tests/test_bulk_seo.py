@@ -94,13 +94,10 @@ def test_grouped_photos_are_one_catalogue_row() -> None:
     assert view.rows[0].photo_url == "https://cdn.example/front.jpg"
 
 
-def test_start_without_a_plan_is_blocked() -> None:
+def test_free_can_start_bulk_seo() -> None:
     view = picker([_photo()], demand_configured=True, entitlement="free")
     assert view.rows[0].eligible is True
-    assert view.start_blocked_reason == (
-        "Subscribe to a Plan to generate listing copy, refresh from search demand, "
-        "run Bulk SEO, or build a website."
-    )
+    assert view.start_blocked_reason is None
 
 
 def test_unconfigured_search_demand_blocks_start() -> None:
@@ -146,13 +143,10 @@ def test_empty_catalogue_has_no_rows() -> None:
     assert view.start_blocked_reason is None
 
 
-def test_empty_catalogue_without_a_plan_still_blocks_start() -> None:
+def test_empty_catalogue_on_free_does_not_block_for_plan() -> None:
     view = picker([], demand_configured=True, entitlement="free")
     assert view.rows == ()
-    assert view.start_blocked_reason == (
-        "Subscribe to a Plan to generate listing copy, refresh from search demand, "
-        "run Bulk SEO, or build a website."
-    )
+    assert view.start_blocked_reason is None
 
 
 def test_local_bypass_can_start_without_a_paid_plan() -> None:
@@ -268,20 +262,24 @@ async def test_forged_blocked_id_returns_the_refresh_reason_and_continues() -> N
     assert pack.proposed_use_count == 1
 
 
-async def test_start_without_a_plan_does_not_fetch_demand() -> None:
+async def test_free_start_fetches_demand() -> None:
+    fetched: list[int] = []
+
+    def fetch(product_id: int, _seeds):
+        fetched.append(product_id)
+        return ("cotton t-shirt",)
+
     pack = await start_pack(
         [_photo()],
         selected_ids=[1],
         demand_configured=True,
         entitlement="free",
-        fetch=_must_not_fetch,
-        propose=_must_not_propose,
+        fetch=fetch,
+        propose=lambda _pid, **_kwargs: _PACK,
     )
-    assert pack.error == (
-        "Subscribe to a Plan to generate listing copy, refresh from search demand, "
-        "run Bulk SEO, or build a website."
-    )
-    assert pack.items == ()
+    assert pack.error is None
+    assert fetched == [1]
+    assert pack.items[0].proposal == _PACK
 
 
 async def test_regenerate_rewrites_against_the_same_snapshot() -> None:

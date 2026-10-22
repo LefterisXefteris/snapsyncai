@@ -99,6 +99,27 @@ export function useCreateSubscriptionCheckout() {
   });
 }
 
+export function useSetupWriteCard() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/setup-write-card");
+      return res.json() as Promise<{ checkoutUrl: string; sessionId: string }>;
+    },
+    onSuccess: (data) => {
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+    },
+    onError: (error) => {
+      toast({
+        title: "Card setup",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 export function useVerifySubscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

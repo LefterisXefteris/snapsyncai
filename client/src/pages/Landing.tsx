@@ -11,7 +11,6 @@ import {
 import { SiShopify } from "react-icons/si";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 import {
-  ANNUAL_BULLETS,
   DEMO,
   FAQ_DATA,
   FOOTER_BLURB,
@@ -207,8 +206,7 @@ export default function Landing() {
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
     "offers": [
-      { "@type": "Offer", "price": "19.00", "priceCurrency": "GBP", "name": "Plan monthly", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "19.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "MON" } },
-      { "@type": "Offer", "price": "190.00", "priceCurrency": "GBP", "name": "Plan annual", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "190.00", "priceCurrency": "GBP", "billingIncrement": 1, "unitCode": "ANN" } },
+      { "@type": "Offer", "price": "0.70", "priceCurrency": "GBP", "name": "AI listing-copy write", "description": "Three free AI listing-copy writes, then £0.70 each" },
     ],
     "featureList": [
       "New listing from photos",
@@ -385,68 +383,30 @@ export default function Landing() {
                 <Coins className="w-3 h-3" /> Pricing
               </Badge>
               <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-                Simple, transparent pricing
+                Pay per AI write.
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Monthly or annual. Catalogue and facts are free. Listing copy writes are the Plan.
+                Catalogue, facts, typed listing copy, and website stay free. AI listing-copy writes are three free, then £0.70 each.
               </p>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm text-primary font-medium bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5">
-                <CheckCircle2 className="w-4 h-4" />
-                Listing-copy writes included · Cancel anytime
-              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 max-w-2xl mx-auto">
-              <Card className="flex flex-col reveal">
+            <div className="max-w-md mx-auto mb-10">
+              <Card className="flex flex-col reveal border-primary">
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Crown className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-xl">Plan monthly</CardTitle>
+                    <CardTitle className="text-xl">AI listing-copy writes</CardTitle>
                   </div>
-                  <CardDescription>Listing-copy writes and website included</CardDescription>
+                  <CardDescription>First generate, refresh, and Bulk SEO Accept</CardDescription>
                   <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£19</span>
-                    <span className="text-muted-foreground text-sm ml-2">/month</span>
+                    <span className="text-4xl font-display font-bold">£0.70</span>
+                    <span className="text-muted-foreground text-sm ml-2">per write after three free</span>
                   </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <Separator className="mb-5 border-white/10" />
-                  <ul className="space-y-3 flex-1 mb-6">
-                    {WEEKLY_BULLETS.map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <span className="text-muted-foreground">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button variant="outline" className="w-full mt-auto" onClick={openLandingSignIn}>
-                    {LANDING_PRIMARY_CTA} — £19/mo
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="flex flex-col relative reveal border-primary">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-primary" />
-                      <CardTitle className="text-xl">Plan annual</CardTitle>
-                    </div>
-                    <Badge className="text-[10px] font-bold text-primary-foreground bg-primary border-0">
-                      Save £38 · Best Value
-                    </Badge>
-                  </div>
-                  <CardDescription>Same Plan, two months free vs monthly</CardDescription>
-                  <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£190</span>
-                    <span className="text-muted-foreground text-sm ml-2">/year</span>
-                  </div>
-                  <p className="text-xs text-primary mt-1 font-medium">= £15.83/mo</p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
                   <Separator className="mb-5" />
                   <ul className="space-y-3 flex-1 mb-6">
-                    {ANNUAL_BULLETS.map((item) => (
+                    {WEEKLY_BULLETS.map((item) => (
                       <li key={item} className="flex items-start gap-2.5 text-sm">
                         <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                         <span>{item}</span>
@@ -454,7 +414,7 @@ export default function Landing() {
                     ))}
                   </ul>
                   <Button className="w-full mt-auto" onClick={openLandingSignIn}>
-                    {LANDING_PRIMARY_CTA} — £190/yr
+                    {LANDING_PRIMARY_CTA}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </CardContent>
@@ -462,7 +422,7 @@ export default function Landing() {
             </div>
 
             <p className="text-center text-xs text-muted-foreground mt-8 reveal">
-              Cancel anytime · Secure payments via Stripe
+              No subscription · Secure payments via Stripe
             </p>
           </div>
         </section>

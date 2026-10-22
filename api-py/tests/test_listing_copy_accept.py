@@ -14,7 +14,6 @@ from app.db import build_engine_url, run_after_commit
 from app.services import billing
 from app.services import images as store
 from app.services.listing_copy_accept import accept_generated, accept_refresh
-from app.services.plan import NEED_PLAN
 from app.services.plan_charge import report_unreported_overage
 from app.services.plan_ledger import record_spend
 from app.services.product_facts import facts_from_stored
@@ -88,12 +87,69 @@ async def test_bulk_seo_accept_reads_facts_from_the_whole_product(db, db_setting
     assert await spends(db) == []
 
 
-async def test_without_a_plan_nothing_is_saved(db, db_settings) -> None:
+async def test_free_accept_saves_and_records_a_listing_copy_write(db, db_settings) -> None:
     pid = await product(db, facts=confirmed_facts())
     result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="bulk_seo")
-    assert (result.refused, result.message) == ("plan_blocked", NEED_PLAN)
+    assert result.refused is None
+    assert result.spent is True
+    assert await _description(db, pid) == "<p>A cotton tee.</p>"
+    assert len(await spends(db)) == 1
+
+
+async def test_free_fourth_write_without_confirm_is_refused(db, db_settings) -> None:
+    await use_allowance(db, 3)
+    pid = await product(db, facts=confirmed_facts())
+    result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
+    assert result.refused == "overflow_confirm"
     assert await _description(db, pid) == "<p>Old.</p>"
-    assert await spends(db) == []
+    assert len(await spends(db)) == 3
+
+
+async def test_free_paid_write_charges_then_saves(db, db_settings, monkeypatch) -> None:
+    await use_allowance(db, 3)
+    charged: list[str] = []
+
+    async def fake_payg(session, settings, user_id, sub):
+        return await plan(db)
+
+    monkeypatch.setattr(billing, "ensure_payg_customer", fake_payg)
+    monkeypatch.setattr(
+        billing,
+        "charge_listing_copy_write",
+        lambda customer, **_opts: charged.append(customer),
+    )
+    pid = await product(db, facts=confirmed_facts())
+    result = await accept_refresh(
+        db, db_settings, SELLER, pid, PROPOSAL, job="refresh", confirm_overflow=True
+    )
+    assert result.refused is None
+    assert result.spent is True
+    assert charged == [STRIPE_CUSTOMER]
+    assert len(await spends(db)) == 4
+
+
+async def test_free_paid_write_charge_failure_saves_nothing(
+    db, db_settings, monkeypatch
+) -> None:
+    await use_allowance(db, 3)
+
+    async def fake_payg(session, settings, user_id, sub):
+        return await plan(db)
+
+    monkeypatch.setattr(billing, "ensure_payg_customer", fake_payg)
+    monkeypatch.setattr(
+        billing,
+        "charge_listing_copy_write",
+        lambda *_a, **_k: (_ for _ in ()).throw(billing.WriteChargeError(billing.NEED_PAYMENT)),
+    )
+    pid = await product(db, facts=confirmed_facts())
+    result = await accept_refresh(
+        db, db_settings, SELLER, pid, PROPOSAL, job="refresh", confirm_overflow=True
+    )
+    assert result.refused == "plan_blocked"
+    assert result.message == billing.NEED_PAYMENT
+    assert await _description(db, pid) == "<p>Old.</p>"
+    assert len(await spends(db)) == 3
 
 
 async def test_a_plan_accept_after_recorded_uses_saves_and_does_not_charge(

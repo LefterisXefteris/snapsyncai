@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlmodel import Field, SQLModel
 
-from app.models.base import jsonb, txt
+from app.models.base import boolean, jsonb, txt
 
 
 class WebsitePrototypeRecord(SQLModel, table=True):
@@ -30,3 +30,4 @@ class PublishedWebsite(SQLModel, table=True):
     palette: str = Field(sa_column=txt(nullable=False))
     type_pairing: str = Field(sa_column=txt(nullable=False))
     products: Any = Field(default_factory=list, sa_column=jsonb(nullable=False))
+    live: bool = Field(default=True, sa_column=boolean(nullable=False, default=True))

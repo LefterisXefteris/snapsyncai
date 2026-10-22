@@ -49,6 +49,7 @@ export const api = {
     savePrototype: { method: "PUT" as const, path: "/api/website/prototype" as const },
     preview: { method: "POST" as const, path: "/api/website/preview" as const },
     publish: { method: "POST" as const, path: "/api/website/publish" as const },
+    unpublish: { method: "POST" as const, path: "/api/website/unpublish" as const },
   },
   storefronts: {
     read: { method: "GET" as const, path: "/api/storefronts/:handle" as const },
