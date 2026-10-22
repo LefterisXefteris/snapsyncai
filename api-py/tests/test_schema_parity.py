@@ -26,9 +26,6 @@ EXPECTED_TABLES = {
     "inventory_webhook_events",
     "inventory_outbox_jobs",
     "inventory_notifications",
-    "conversations",
-    "websites",
-    "website_prototypes",
     "trendyol_connections",
     "trendyol_listings",
     "trendyol_barcodes",
@@ -100,14 +97,6 @@ class TestBehaviouralConstraints:
     def test_inventory_settings_are_unique_per_user(self) -> None:
         assert SQLModel.metadata.tables["inventory_settings"].columns["user_id"].unique is True
 
-    def test_one_conversation_per_seller(self) -> None:
-        columns = SQLModel.metadata.tables["conversations"].columns
-        assert columns["session_id"].unique is True
-        assert _pg_type(columns["silence"]) == "JSONB"
-        assert _pg_type(columns["thread"]) == "JSONB"
-        assert _pg_type(columns["proposal"]) == "JSONB"
-
-
 class TestImageContract:
     """`images` is the table the SPA reads structurally."""
 
@@ -137,14 +126,6 @@ class TestImageContract:
             "idx_images_product_group_id",
             "idx_images_session_created",
         }
-
-
-def test_one_website_per_seller() -> None:
-    columns = SQLModel.metadata.tables["websites"].columns
-    assert columns["session_id"].unique is True
-    assert columns["handle"].unique is True
-    assert _pg_type(columns["products"]) == "JSONB"
-    assert _pg_type(columns["live"]) == "BOOLEAN"
 
 
 def test_shopify_connection_gpsr_identity_is_jsonb() -> None:

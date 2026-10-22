@@ -14,7 +14,7 @@ test("choosing Products with no Shopify Channel keeps the catalogue open", () =>
     shopConnected: false,
     pathname: "/",
     search: "",
-    chosenPath: "/conversation",
+    chosenPath: "/settings",
     connectFrom: null,
   });
   assert.equal(arrival.path, "/");
@@ -63,16 +63,8 @@ test("a product link stays on the product when there is no Shopify Channel", () 
   assert.equal(arrival.chosenPath, "/product/14");
 });
 
-test("Inventory, Import, New listing, the website, Bulk SEO, Settings, and the conversation stay open", () => {
-  for (const pathname of [
-    "/inventory",
-    "/import",
-    "/new",
-    "/website",
-    "/bulk-seo",
-    "/settings",
-    "/conversation",
-  ]) {
+test("Inventory, Import, New listing, Bulk SEO, and Settings stay open", () => {
+  for (const pathname of ["/inventory", "/import", "/new", "/bulk-seo", "/settings"]) {
     const arrival = workspaceArrival({
       shopConnected: false,
       pathname,
@@ -117,16 +109,16 @@ test("a connect return that has landed clears the trip and stays", () => {
   assert.equal(arrival.clearConnectFrom, true);
 });
 
-test("a shop that connected does not move them off Conversation", () => {
+test("a shop that connected does not move them off Settings", () => {
   const arrival = workspaceArrival({
     shopConnected: true,
     pathname: "/",
     search: "?shopify=connected",
-    chosenPath: "/conversation",
-    connectFrom: "/conversation",
+    chosenPath: "/settings",
+    connectFrom: "/settings",
   });
-  assert.equal(arrival.path, "/conversation?shopify=connected");
-  assert.equal(arrival.chosenPath, "/conversation");
+  assert.equal(arrival.path, "/settings?shopify=connected");
+  assert.equal(arrival.chosenPath, "/settings");
 });
 
 test("a failed connect with no remembered place is told on the workspace home", () => {

@@ -1,6 +1,6 @@
 """Propose — search demand and the model's rewrite for listing copy refresh and Bulk SEO.
 
-The product page, the Bulk SEO page, and the conversation all call this. It loads the
+The product page and the Bulk SEO page call this. It loads the
 product, checks eligibility, fetches search demand, asks the model, and records the trace.
 Nothing is saved here; the seller's accept is `listing_copy_accept`.
 

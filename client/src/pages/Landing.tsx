@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Upload, Store, FileText, ArrowRight, CheckCircle2, Coins, Crown,
-  ShieldCheck, LayoutGrid, Boxes, Download, Search, Globe, Settings,
+  ShieldCheck, LayoutGrid, Boxes, Download, Search, Settings,
 } from "lucide-react";
 import { SiShopify } from "react-icons/si";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
@@ -164,7 +164,7 @@ function useScrollReveal() {
   }, []);
 }
 
-const JOB_ICONS = [Upload, ShieldCheck, LayoutGrid, Download, Boxes, Search, Globe, Settings] as const;
+const JOB_ICONS = [Upload, ShieldCheck, LayoutGrid, Download, Boxes, Search, Settings] as const;
 const STEP_ICONS = [Upload, ShieldCheck, FileText, Store] as const;
 
 function openLandingSignIn() {
@@ -216,7 +216,6 @@ export default function Landing() {
       "Import",
       "Inventory",
       "Bulk SEO",
-      "Website",
       "Settings",
     ],
   };
@@ -354,7 +353,7 @@ export default function Landing() {
               Photo, facts, copy, Shopify
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto text-lg">
-              Import, inventory, Bulk SEO, and a website sit beside this path.
+              Import, inventory, and Bulk SEO sit beside this path.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 relative">
@@ -386,7 +385,7 @@ export default function Landing() {
                 Pay per AI write.
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Catalogue, facts, typed listing copy, and website stay free. AI listing-copy writes are three free, then £0.70 each.
+                Catalogue, facts, and typed listing copy stay free. AI listing-copy writes are three free, then £0.70 each.
               </p>
             </div>
 

@@ -29,24 +29,12 @@ The seller taking ownership, on Shopify, of a shop opened for them because they 
 _Avoid_: store setup, create store, MCP
 
 **Destination**:
-A place the seller opens in the signed-in workspace: Products, the product page, New listing, Import, Inventory, the Website page, Bulk SEO, Conversation, or Settings.
-_Avoid_: surface, screen
+A place the seller opens in the signed-in workspace: Products, the product page, New listing, Import, Inventory, Bulk SEO, or Settings. Opening the workspace lands on Products, whether or not a Shopify Channel is connected. A destination the seller opens stays until they leave. Disconnecting, and a connect or Channel claim trip, are not leaving.
+_Avoid_: surface, screen, Website, Conversation
 
 **Products**:
 The destination where the workspace opens, which the seller sees named Products and this glossary calls the catalogue. Distinct from Product.
 _Avoid_: catalog
-
-**Conversation**:
-The one dialogue for a Shopify shop, kept on that shop, and a destination beside the catalogue. Opening the workspace lands on Products, whether or not a Shopify Channel is connected. A destination the seller opens stays until they leave. Disconnecting, and a connect or Channel claim trip, are not leaving. A job it starts is the same job the catalogue page runs; confirming facts, accepting listing copy, going live, and Publish stay with the seller.
-_Avoid_: agent, Agentic SEO, SEO agent, copilot, home, thread
-
-**Silence**:
-A shop-level choice on that conversation. It can stop job offers, or stop the conversation offering or starting Bulk SEO, listing copy refresh, or a website prototype. The catalogue page for a silenced job stays. Inventory, a Channel claim, and connect cannot be silenced.
-_Avoid_: disable chat, hide page, mute
-
-**Job offer**:
-A proposal, in the conversation, of a job the seller did not ask for. It does not start the job, and declining it does not silence that job.
-_Avoid_: suggestion, agent nudge, autopilot
 
 **Publication**:
 Where this product is available inside a connected Shopify shop — Online Store, Point of Sale, Shop, and other sales apps on that shop. Not a Channel.
@@ -93,7 +81,7 @@ The job of proposing new tags, description, SEO title, and meta description for 
 _Avoid_: Agentic SEO, SEO agent, trend rewrite, competitor SEO
 
 **Accept**:
-The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. When it lands as a listing-copy write it spends under that shop's write rules, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page, the Bulk SEO page, or the conversation.
+The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. When it lands as a listing-copy write it spends under that shop's write rules, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page or the Bulk SEO page.
 _Avoid_: approve, apply, save (as the seller act)
 
 **Search demand**:
@@ -172,34 +160,14 @@ _Avoid_: Out of date, dirty
 The default GPSR identity for a connected Shopify shop. A product may override it. Changing it stales listing copy on products that use the shop default.
 _Avoid_: Account compliance, store settings (as the fact itself)
 
-**Website**:
-The seller's own storefront for one Shopify shop, hosted by SnapSync at that shop's address, not the workspace and not a Channel. Words, photos, and layout are whatever the last Publish froze; the shop's price and checkout stay on the Channel.
-_Avoid_: store, shop (when you mean this), channel, theme, Lovable, handoff
-
-**Website prototype**:
-The products the seller picks, in that order, among products already pushed with listing copy, an optional Website brief, and the look the Website agent last built for a home and one page per product; a product that is no longer eligible leaves the picks. Listing copy, photos, confirmed facts, price, and checkout are supplied by SnapSync for every picked product; the seller does not edit that look; the Website page stores the picks, the Website brief, and the last look, and shows them again; a later run replaces the look; a run that returns no look leaves the previous one; it is not the live storefront.
-_Avoid_: theme, mock, preview (as the job), prompt, palette
-
-**Website brief**:
-An optional instruction on a Website prototype about the look. Shoppers do not see it, and a run uses that brief and the picked products from the moment the seller started it.
-_Avoid_: prompt, tagline, story
-
-**Website agent**:
-SnapSync's own agent, inside the product, that builds one shop's Website prototype look at a time. The seller does not run their own; one run is in flight and at most one is waiting; a newer start replaces the waiting run; a run keeps going if the seller leaves the page, sees that shop's picked products and Website brief only, does not Publish, and does not invent product words, fibre, care, or GPSR.
-_Avoid_: Lovable, builder (as a separate product)
-
-**Publish**:
-The seller putting this shop's Website on its SnapSync address, once a Website agent run has returned a look for the picks and Website brief now on the page. It is not a listing-copy write. Taking the site down keeps the address. It is not a Push and not Go live.
-_Avoid_: handoff, deploy, launch
-
 **Listing-copy write**:
-One Accept that lands for first generate, listing copy refresh, or one Bulk SEO product. Three free for the life of one seller and one Shopify shop, then £0.70 when the write lands. A per-field regenerate after an Accept is another write; a failed generate and a stale regenerate are not. The first paid write on a shop needs the seller's confirm; later paid writes on that shop do not. A write does not land when the £0.70 charge fails. With no Shopify shop yet, the three free and that confirm sit on the seller's workspace until a shop is connected, then stay with that shop and do not reset. Website Publish, confirming facts, Classification, typed listing copy, Push, talk, and a Website agent run are not listing-copy writes.
+One Accept that lands for first generate, listing copy refresh, or one Bulk SEO product. Three free for the life of one seller and one Shopify shop, then £0.70 when the write lands. A per-field regenerate after an Accept is another write; a failed generate and a stale regenerate are not. The first paid write on a shop needs the seller's confirm; later paid writes on that shop do not. A write does not land when the £0.70 charge fails. With no Shopify shop yet, the three free and that confirm sit on the seller's workspace until a shop is connected, then stay with that shop and do not reset. Confirming facts, Classification, typed listing copy, and Push are not listing-copy writes.
 _Avoid_: credit, Allowance, Overflow, use (alone), AI generation (as the meter), pack, top-up
 
 **Plan**:
-The old £19/month or £190/year checkout for one seller and one Shopify shop, kept only until that paid period ends. While it runs, listing-copy writes and website stay included with no write count and no £0.70. It does not renew; after it ends the shop follows listing-copy write rules. New checkouts are not a Plan. Distinct from Leftover weekly.
+The old £19/month or £190/year checkout for one seller and one Shopify shop, kept only until that paid period ends. While it runs, listing-copy writes stay included with no write count and no £0.70. It does not renew; after it ends the shop follows listing-copy write rules. New checkouts are not a Plan. Distinct from Leftover weekly.
 _Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock, Allowance, Overflow, unlimited
 
 **Leftover weekly**:
-The old £4/week checkout, kept only until that paid week ends. Thirty listing-copy writes or first website Publishes each UTC week, then those jobs stop, with no £0.70. It does not renew; after it ends the shop follows listing-copy write rules. New checkouts are not Leftover weekly.
+The old £4/week checkout, kept only until that paid week ends. Thirty listing-copy writes each UTC week, then those jobs stop, with no £0.70. It does not renew; after it ends the shop follows listing-copy write rules. New checkouts are not Leftover weekly.
 _Avoid_: weekly Plan, Allowance, Overflow, credits

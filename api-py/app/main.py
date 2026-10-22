@@ -26,14 +26,12 @@ from app.routers import (
     catalogue_import,
     config,
     connections,
-    conversation,
     health,
     images,
     inventory,
     oauth,
     trendyol,
     webhooks,
-    website,
 )
 from app.services import catalogue_cache
 
@@ -86,7 +84,6 @@ def create_app() -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_allow_origins,
-            allow_origin_regex=r"https://[a-z0-9-]+\.sites\.snapsyncai\.co\.uk",
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
@@ -101,9 +98,7 @@ def create_app() -> FastAPI:
     app.include_router(billing.router)
     app.include_router(webhooks.router)
     app.include_router(inventory.router)
-    app.include_router(website.router)
     app.include_router(bulk_seo.router)
-    app.include_router(conversation.router)
     app.include_router(catalogue_import.router)
     app.include_router(trendyol.router)
     return app

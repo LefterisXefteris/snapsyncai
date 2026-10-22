@@ -155,7 +155,7 @@ async def download_storage_bytes_async(url: str, settings) -> bytes | None:
 
 
 def channel_photo_url(url: str | None) -> str | None:
-    """Website and public 302s may use Channel CDN; never a SnapSync storage path."""
+    """Public Channel CDN URLs may be used; never a SnapSync storage path."""
     if not url:
         return None
     parsed = urlparse(url)

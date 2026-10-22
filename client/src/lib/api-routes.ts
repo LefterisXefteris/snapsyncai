@@ -44,25 +44,11 @@ export const api = {
     gpsrIdentity: { method: "PUT" as const, path: "/api/shopify/gpsr-identity" as const },
     publications: { method: "GET" as const, path: "/api/shopify/publications" as const },
   },
-  website: {
-    prototype: { method: "GET" as const, path: "/api/website/prototype" as const },
-    savePrototype: { method: "PUT" as const, path: "/api/website/prototype" as const },
-    preview: { method: "POST" as const, path: "/api/website/preview" as const },
-    publish: { method: "POST" as const, path: "/api/website/publish" as const },
-    unpublish: { method: "POST" as const, path: "/api/website/unpublish" as const },
-  },
-  storefronts: {
-    read: { method: "GET" as const, path: "/api/storefronts/:handle" as const },
-  },
   bulkSeo: {
     catalogue: { method: "GET" as const, path: "/api/bulk-seo" as const },
     start: { method: "POST" as const, path: "/api/bulk-seo/start" as const },
     regenerate: { method: "POST" as const, path: "/api/bulk-seo/regenerate" as const },
     accept: { method: "POST" as const, path: "/api/bulk-seo/accept" as const },
-  },
-  conversation: {
-    read: { method: "GET" as const, path: "/api/conversation" as const },
-    post: { method: "POST" as const, path: "/api/conversation" as const },
   },
   import: {
     status: { method: "GET" as const, path: "/api/import" as const },

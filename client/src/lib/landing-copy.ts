@@ -4,7 +4,7 @@ export const LANDING_DOCUMENT_TITLE =
   "SnapSync — your e-commerce agent for textile listings";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is your e-commerce agent for textile listings. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Import, inventory, Bulk SEO, and a website. Push to Shopify. Three free AI listing-copy writes, then £0.70 each.";
+  "SnapSync is your e-commerce agent for textile listings. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Import, inventory, and Bulk SEO. Push to Shopify. Three free AI listing-copy writes, then £0.70 each.";
 
 export const LANDING_EYEBROW = "Textile listings · Shopify";
 
@@ -56,11 +56,6 @@ export const JOBS = [
       "Refresh tags, description, SEO title, and meta description for the products you pick, using search demand. You accept each one. Accept does not push to Shopify.",
   },
   {
-    title: "Website",
-    description:
-      "Pick the products and the look. The storefront is built from their listing copy. Checkout stays on Shopify.",
-  },
-  {
     title: "Settings",
     description:
       "Connect your Shopify shop, save the shop GPSR identity, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
@@ -96,7 +91,7 @@ export const WEEKLY_BULLETS = [
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
-  "Import, inventory, Bulk SEO, and a website free",
+  "Import, inventory, and Bulk SEO free",
 ] as const;
 
 export const ANNUAL_BULLETS = [
@@ -105,14 +100,14 @@ export const ANNUAL_BULLETS = [
   "Product facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
-  "Import, inventory, Bulk SEO, and a website free",
+  "Import, inventory, and Bulk SEO free",
 ] as const;
 
 export const FAQ_DATA = [
   {
     question: "What is SnapSync?",
     answer:
-      "SnapSync is your e-commerce agent for textile listings. New listing from photos is one job. You also get a product catalogue, Import from Shopify, confirmed product facts before listing copy, inventory, Bulk SEO, and a website.",
+      "SnapSync is your e-commerce agent for textile listings. New listing from photos is one job. You also get a product catalogue, Import from Shopify, confirmed product facts before listing copy, inventory, and Bulk SEO.",
   },
   {
     question: "Why do I confirm facts before listing copy?",
@@ -122,7 +117,7 @@ export const FAQ_DATA = [
   {
     question: "What do AI listing-copy writes cost?",
     answer:
-      "Three free AI listing-copy writes for life on your shop, then £0.70 each when the write lands. Website, catalogue, facts, and typed listing copy stay free. No card is required to start.",
+      "Three free AI listing-copy writes for life on your shop, then £0.70 each when the write lands. Catalogue, facts, and typed listing copy stay free. No card is required to start.",
   },
   {
     question: "How do I create a product from photos?",
@@ -137,7 +132,7 @@ export const FAQ_DATA = [
   {
     question: "How much does SnapSync cost?",
     answer:
-      "Catalogue, facts, and typed listing copy are free. Three free AI listing-copy writes, then £0.70 each. Website Publish is free. Push to Shopify and inventory stay available. No card to start.",
+      "Catalogue, facts, and typed listing copy are free. Three free AI listing-copy writes, then £0.70 each. Push to Shopify and inventory stay available. No card to start.",
   },
   {
     question: "Can I edit listing copy before I push to Shopify?",

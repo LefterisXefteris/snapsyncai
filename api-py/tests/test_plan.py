@@ -120,14 +120,6 @@ def test_local_bypass_is_unlimited_and_unbilled() -> None:
     assert view("local_bypass", spends, JAN).included is None
 
 
-def test_plan_website_publish_is_allowed_and_not_counted() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(20))
-    decision = decide("plan", spends, JAN, "website_handoff")
-    assert decision.allowed is True
-    assert decision.records_spend is False
-    assert decision.as_overage is False
-
-
 def test_entitlement_prefers_local_bypass_then_plan_then_free() -> None:
     from app.services.plan import entitlement_of
 
@@ -158,20 +150,11 @@ def test_no_entitlement_starts_a_plan_checkout() -> None:
     assert may_start_checkout("local_bypass") is False
 
 
-def test_free_website_publish_is_allowed_and_not_a_write() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
-    decision = decide("free", spends, JAN, "website_handoff")
-    assert decision.allowed is True
-    assert decision.records_spend is False
-    assert decision.as_overage is False
-
-
 def test_free_view_counts_lifetime_listing_copy_writes() -> None:
     from app.services.plan import FREE_WRITES_INCLUDED
 
     spends = (
         Spend(at=JAN, kind="generate_persist"),
-        Spend(at=JAN, kind="website_handoff"),
         Spend(at=JAN, kind="refresh_accept"),
     )
     snapshot = view("free", spends, JAN)
