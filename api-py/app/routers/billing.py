@@ -119,7 +119,7 @@ async def subscription_status(
             and sub.stripe_subscription_id != billing.PAYG_SUBSCRIPTION_ID
         ):
             try:
-                billing.schedule_plan_period_end(sub.stripe_subscription_id)
+                await billing.schedule_plan_period_end(sub.stripe_subscription_id)
                 sub.status = "canceling"
                 await session.flush()
             except Exception:
@@ -156,7 +156,9 @@ async def recover_subscription(
             raise _http_error(400, "Missing checkout session ID")
 
         billing.configure_stripe()
-        checkout = stripe.checkout.Session.retrieve(checkout_session_id)
+        checkout = await billing.stripe_call(
+            stripe.checkout.Session.retrieve, checkout_session_id
+        )
         metadata = checkout.metadata or {}
         if metadata.get("userId") != user_id:
             raise _http_error(403, "Session does not belong to this user")
@@ -165,7 +167,7 @@ async def recover_subscription(
 
         sub_id = billing.stripe_id(checkout.subscription)
         customer_id = billing.stripe_id(checkout.customer)
-        full_sub = stripe.Subscription.retrieve(sub_id)
+        full_sub = await billing.stripe_call(stripe.Subscription.retrieve, sub_id)
         period_end = billing.from_unix(getattr(full_sub, "current_period_end", None))
 
         old = await billing.get_subscription_by_stripe_id(session, sub_id)
@@ -214,14 +216,18 @@ async def recover_by_email(
             raise _http_error(400, "No email address found on your account")
 
         billing.configure_stripe()
-        customers = stripe.Customer.list(email=primary_email, limit=10)
+        customers = await billing.stripe_call(
+            stripe.Customer.list, email=primary_email, limit=10
+        )
         if not customers.data:
             return RecoverResponse(
                 recovered=False, message="No Stripe customer found for your email"
             )
 
         for customer in customers.data:
-            subs = stripe.Subscription.list(customer=customer.id, status="all", limit=5)
+            subs = await billing.stripe_call(
+                stripe.Subscription.list, customer=customer.id, status="all", limit=5
+            )
             active = next((s for s in subs.data if s.status in ("active", "trialing")), None)
             if not active:
                 continue
@@ -272,7 +278,8 @@ async def setup_write_card(
         existing = await billing.get_subscription(session, user_id)
         sub = await billing.ensure_payg_customer(session, settings, user_id, existing)
         origin = workspace_origin(settings.app_base_url)
-        checkout = stripe.checkout.Session.create(
+        checkout = await billing.stripe_call(
+            stripe.checkout.Session.create,
             mode="setup",
             customer=sub.stripe_customer_id,
             success_url=f"{origin}/settings?write_card=saved",
@@ -327,10 +334,15 @@ async def create_checkout(
         try:
             primary_email = await billing.clerk_primary_email(user_id, settings)
             if primary_email:
-                customers = stripe.Customer.list(email=primary_email, limit=5)
+                customers = await billing.stripe_call(
+                    stripe.Customer.list, email=primary_email, limit=5
+                )
                 for customer in customers.data:
-                    subs = stripe.Subscription.list(
-                        customer=customer.id, status="all", limit=3
+                    subs = await billing.stripe_call(
+                        stripe.Subscription.list,
+                        customer=customer.id,
+                        status="all",
+                        limit=3,
                     )
                     active = next(
                         (s for s in subs.data if s.status in ("active", "trialing")), None
@@ -413,7 +425,9 @@ async def create_checkout(
         elif primary_email:
             params["customer_email"] = primary_email
 
-        checkout = stripe.checkout.Session.create(**params, idempotency_key=idempotency_key)
+        checkout = await billing.stripe_call(
+            stripe.checkout.Session.create, **params, idempotency_key=idempotency_key
+        )
         return CheckoutResponse(checkout_url=checkout.url, session_id=checkout.id)
     except HTTPException:
         raise
@@ -451,8 +465,10 @@ async def verify_subscription(
             return VerifyResponse(verified=True, already_active=True)
 
         billing.configure_stripe()
-        checkout = stripe.checkout.Session.retrieve(
-            checkout_session_id, expand=["subscription"]
+        checkout = await billing.stripe_call(
+            stripe.checkout.Session.retrieve,
+            checkout_session_id,
+            expand=["subscription"],
         )
         if checkout.payment_status not in ("paid", "no_payment_required"):
             raise _http_error(
@@ -473,7 +489,9 @@ async def verify_subscription(
             period_end = billing.from_unix(getattr(stripe_sub, "current_period_end", None))
         else:
             try:
-                stripe_sub = stripe.Subscription.retrieve(subscription)
+                stripe_sub = await billing.stripe_call(
+                    stripe.Subscription.retrieve, subscription
+                )
                 sub_status = stripe_sub.status
                 period_end = billing.from_unix(getattr(stripe_sub, "current_period_end", None))
             except Exception:
@@ -510,7 +528,7 @@ async def verify_subscription(
         )
         if old_weekly_id and old_weekly_id != sub_id:
             try:
-                stripe.Subscription.delete(old_weekly_id)
+                await billing.stripe_call(stripe.Subscription.delete, old_weekly_id)
             except Exception:
                 logger.warning(
                     "Could not cancel leftover weekly subscription %s", old_weekly_id
@@ -531,7 +549,11 @@ async def cancel_subscription(user_id: CurrentUser, session: SessionDep) -> Canc
             raise _http_error(400, "No active subscription found")
 
         billing.configure_stripe()
-        stripe.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=True)
+        await billing.stripe_call(
+            stripe.Subscription.modify,
+            sub.stripe_subscription_id,
+            cancel_at_period_end=True,
+        )
         await billing.update_subscription_status(session, sub.stripe_subscription_id, "canceling")
         return CancelResponse(
             cancelled=True,

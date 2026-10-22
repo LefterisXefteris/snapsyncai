@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any, Protocol
 
@@ -137,26 +137,41 @@ async def get_shopify_shop_identity(graphql: ShopifyGraphQL) -> dict[str, Any]:
     }
 
 
-async def list_shopify_product_image_urls(
-    graphql: ShopifyGraphQL, product_id: str
-) -> tuple[str, ...]:
-    data = await graphql(
-        """
-        query SnapSyncProductMedia($id: ID!) {
-          product(id: $id) {
-            media(first: 50) {
-              nodes {
-                ... on MediaImage {
-                  image { url }
-                }
-              }
-            }
-          }
-        }
-        """,
-        {"id": product_id},
-    )
-    product = data.get("product") or {}
+_NODES_CHUNK = 50
+
+_STOREFRONT_PRODUCT_FIELDS = """
+  id
+  status
+  resourcePublicationsV2(first: 50) {
+    nodes {
+      isPublished
+      publication { id }
+    }
+  }
+  variants(first: 250) {
+    nodes {
+      id
+      legacyResourceId
+      title
+      price
+      compareAtPrice
+    }
+  }
+"""
+
+_PRODUCT_MEDIA_FIELDS = """
+  id
+  media(first: 50) {
+    nodes {
+      ... on MediaImage {
+        image { url }
+      }
+    }
+  }
+"""
+
+
+def _media_urls_from_product(product: dict[str, Any]) -> tuple[str, ...]:
     nodes = ((product.get("media") or {}).get("nodes")) or []
     urls: list[str] = []
     for node in nodes:
@@ -165,6 +180,42 @@ async def list_shopify_product_image_urls(
         if isinstance(url, str) and url.startswith("https://") and url not in urls:
             urls.append(url)
     return tuple(urls)
+
+
+async def list_shopify_product_image_urls(
+    graphql: ShopifyGraphQL, product_id: str
+) -> tuple[str, ...]:
+    by_id = await list_shopify_product_image_urls_by_id(graphql, [product_id])
+    return by_id.get(product_id, ())
+
+
+async def list_shopify_product_image_urls_by_id(
+    graphql: ShopifyGraphQL, product_ids: Sequence[str]
+) -> dict[str, tuple[str, ...]]:
+    """Batch media URLs keyed by product GID. Missing/failed products map to ()."""
+    unique = list(dict.fromkeys(pid for pid in product_ids if pid))
+    out: dict[str, tuple[str, ...]] = {pid: () for pid in unique}
+    for start in range(0, len(unique), _NODES_CHUNK):
+        chunk = unique[start : start + _NODES_CHUNK]
+        data = await graphql(
+            f"""
+            query SnapSyncProductMediaNodes($ids: [ID!]!) {{
+              nodes(ids: $ids) {{
+                ... on Product {{
+                  {_PRODUCT_MEDIA_FIELDS}
+                }}
+              }}
+            }}
+            """,
+            {"ids": chunk},
+        )
+        for node in data.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            product_id = node.get("id")
+            if isinstance(product_id, str) and product_id:
+                out[product_id] = _media_urls_from_product(node)
+    return out
 
 
 def _price(value: Any) -> float:
@@ -273,35 +324,38 @@ async def product_publishing(graphql: ShopifyGraphQL, product_id: str) -> tuple[
     return status, published
 
 
+async def storefront_products(
+    graphql: ShopifyGraphQL, product_ids: Sequence[str]
+) -> dict[str, dict[str, Any] | None]:
+    """Live status, publications, and variants keyed by product GID. Chunks of 50."""
+    unique = list(dict.fromkeys(pid for pid in product_ids if pid))
+    out: dict[str, dict[str, Any] | None] = {pid: None for pid in unique}
+    for start in range(0, len(unique), _NODES_CHUNK):
+        chunk = unique[start : start + _NODES_CHUNK]
+        data = await graphql(
+            f"""
+            query SnapSyncStorefrontProducts($ids: [ID!]!) {{
+              nodes(ids: $ids) {{
+                ... on Product {{
+                  {_STOREFRONT_PRODUCT_FIELDS}
+                }}
+              }}
+            }}
+            """,
+            {"ids": chunk},
+        )
+        for node in data.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            product_id = node.get("id")
+            if isinstance(product_id, str) and product_id:
+                out[product_id] = node
+    return out
+
+
 async def storefront_product(graphql: ShopifyGraphQL, product_id: str) -> dict[str, Any] | None:
     """Live status, Online Store publications, and variants for a public Website page."""
-    data = await graphql(
-        """
-        query SnapSyncStorefrontProduct($id: ID!) {
-          product(id: $id) {
-            status
-            resourcePublicationsV2(first: 50) {
-              nodes {
-                isPublished
-                publication { id }
-              }
-            }
-            variants(first: 250) {
-              nodes {
-                id
-                legacyResourceId
-                title
-                price
-                compareAtPrice
-              }
-            }
-          }
-        }
-        """,
-        {"id": product_id},
-    )
-    product = data.get("product")
-    return product if isinstance(product, dict) else None
+    return (await storefront_products(graphql, [product_id])).get(product_id)
 
 
 async def apply_shopify_publications(
