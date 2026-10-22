@@ -46,16 +46,16 @@ const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 const clerkAppearance = {
   baseTheme: dark,
   variables: {
-    colorPrimary: "hsl(45 70% 50%)",
-    colorBackground: "hsl(0 0% 7%)",
-    colorInputBackground: "hsl(0 0% 13%)",
-    colorText: "hsl(0 0% 95%)",
-    colorTextSecondary: "hsl(0 0% 63%)",
+    colorPrimary: "hsl(43 74% 52%)",
+    colorBackground: "hsl(30 7% 7%)",
+    colorInputBackground: "hsl(30 5% 14%)",
+    colorText: "hsl(40 12% 96%)",
+    colorTextSecondary: "hsl(30 6% 58%)",
     borderRadius: "0.5rem",
     fontFamily: "'Instrument Sans', sans-serif",
   },
   elements: {
-    card: "border border-[hsl(0_0%_15%)] shadow-none",
+    card: "border border-[hsl(30_5%_16%)] shadow-none",
   },
 };
 

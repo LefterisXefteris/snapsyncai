@@ -11,88 +11,88 @@
   --font-sans: 'Instrument Sans', sans-serif;
   --font-serif: 'Instrument Sans', sans-serif;
 
-  /* Single black theme — the app is always dark; these mirror .dark below
-     so nothing ever flashes white. */
-  --background: 0 0% 4%;
-  --foreground: 0 0% 95%;
+  /* Always dark (ADR 0041). Warmer near-blacks; gold stays the one accent.
+     Mirror .dark so nothing flashes white. Body washes stay neutral. */
+  --background: 30 8% 5%;
+  --foreground: 40 12% 96%;
 
-  --card: 0 0% 8%;
-  --card-foreground: 0 0% 95%;
+  --card: 30 7% 8%;
+  --card-foreground: 40 12% 96%;
 
-  --popover: 0 0% 7%;
-  --popover-foreground: 0 0% 95%;
+  --popover: 30 7% 7%;
+  --popover-foreground: 40 12% 96%;
 
-  --primary: 45 70% 50%;
-  --primary-foreground: 45 90% 6%;
+  --primary: 43 74% 52%;
+  --primary-foreground: 40 90% 6%;
 
-  --secondary: 0 0% 13%;
-  --secondary-foreground: 0 0% 95%;
+  --secondary: 30 5% 14%;
+  --secondary-foreground: 40 12% 96%;
 
-  --muted: 0 0% 13%;
-  --muted-foreground: 0 0% 63%;
+  --muted: 30 5% 14%;
+  --muted-foreground: 30 6% 58%;
 
-  --accent: 45 70% 50%;
-  --accent-foreground: 45 90% 6%;
+  --accent: 43 74% 52%;
+  --accent-foreground: 40 90% 6%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 15%;
-  --input: 0 0% 15%;
-  --ring: 45 70% 50%;
+  --border: 30 5% 16%;
+  --input: 30 5% 16%;
+  --ring: 43 74% 52%;
 
   --radius: 0.5rem;
   --spacing-4: 1rem;
 
-  --sidebar: 0 0% 6%;
-  --sidebar-foreground: 0 0% 95%;
-  --sidebar-border: 0 0% 15%;
-  --sidebar-ring: 45 70% 50%;
-  --sidebar-primary: 45 70% 50%;
-  --sidebar-primary-foreground: 45 90% 6%;
-  --sidebar-accent: 0 0% 13%;
-  --sidebar-accent-foreground: 0 0% 95%;
-  --sidebar-primary-border: hsl(45 70% 50% / 0.3);
-  --sidebar-accent-border: hsl(0 0% 100% / 0.06);
+  --sidebar: 30 9% 4%;
+  --sidebar-foreground: 40 12% 96%;
+  --sidebar-border: 30 5% 16%;
+  --sidebar-ring: 43 74% 52%;
+  --sidebar-primary: 43 74% 52%;
+  --sidebar-primary-foreground: 40 90% 6%;
+  --sidebar-accent: 30 5% 14%;
+  --sidebar-accent-foreground: 40 12% 96%;
+  --sidebar-primary-border: hsl(43 74% 52% / 0.3);
+  --sidebar-accent-border: hsl(0 0% 100% / 0.05);
 }
 
 .dark {
-  --background: 0 0% 4%;
-  --foreground: 0 0% 95%;
+  --background: 30 8% 5%;
+  --foreground: 40 12% 96%;
 
-  --card: 0 0% 8%;
-  --card-foreground: 0 0% 95%;
+  --card: 30 7% 8%;
+  --card-foreground: 40 12% 96%;
 
-  --popover: 0 0% 7%;
-  --popover-foreground: 0 0% 95%;
+  --popover: 30 7% 7%;
+  --popover-foreground: 40 12% 96%;
 
-  --primary: 45 70% 50%;
-  --primary-foreground: 45 90% 6%;
+  --primary: 43 74% 52%;
+  --primary-foreground: 40 90% 6%;
 
-  --secondary: 0 0% 13%;
-  --secondary-foreground: 0 0% 95%;
+  --secondary: 30 5% 14%;
+  --secondary-foreground: 40 12% 96%;
 
-  --muted: 0 0% 13%;
-  --muted-foreground: 0 0% 63%;
+  --muted: 30 5% 14%;
+  --muted-foreground: 30 6% 58%;
 
-  --accent: 45 70% 50%;
-  --accent-foreground: 45 90% 6%;
+  --accent: 43 74% 52%;
+  --accent-foreground: 40 90% 6%;
 
   --destructive: 0 70% 45%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 15%;
-  --input: 0 0% 15%;
-  --ring: 45 70% 50%;
+  --border: 30 5% 16%;
+  --input: 30 5% 16%;
+  --ring: 43 74% 52%;
 
-  --sidebar: 0 0% 6%;
-  --sidebar-foreground: 0 0% 95%;
-  --sidebar-border: 0 0% 15%;
-  --sidebar-ring: 45 70% 50%;
-  --sidebar-primary: 45 70% 50%;
-  --sidebar-primary-foreground: 45 90% 6%;
-  --sidebar-accent: 0 0% 13%;
-  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar: 30 9% 4%;
+  --sidebar-foreground: 40 12% 96%;
+  --sidebar-border: 30 5% 16%;
+  --sidebar-ring: 43 74% 52%;
+  --sidebar-primary: 43 74% 52%;
+  --sidebar-primary-foreground: 40 90% 6%;
+  --sidebar-accent: 30 5% 14%;
+  --sidebar-accent-foreground: 40 12% 96%;
 }
 
 @layer base {
@@ -103,10 +103,10 @@
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
     font-family: var(--font-body);
-    /* Neutral and corner-only so it never tints a product photo. */
+    /* Neutral and corner-only — never a coloured wash over product photos (ADR 0041). */
     background-image:
-      radial-gradient(ellipse 45% 40% at 0% 0%, hsl(0 0% 100% / 0.06), transparent 70%),
-      radial-gradient(ellipse 40% 35% at 100% 100%, hsl(0 0% 100% / 0.04), transparent 70%);
+      radial-gradient(ellipse 45% 40% at 0% 0%, hsl(0 0% 100% / 0.035), transparent 70%),
+      radial-gradient(ellipse 40% 35% at 100% 100%, hsl(0 0% 100% / 0.022), transparent 70%);
     background-attachment: fixed;
   }
 
@@ -117,6 +117,7 @@
   h5,
   h6 {
     font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 }
 
@@ -146,18 +147,18 @@
   @apply border-foreground/25;
 }
 
-/* Frosted chrome: sidebar and page headers. Content surfaces stay flat. */
+/* Quieter frosted chrome: sidebar and page headers. Content surfaces stay flat. */
 .glass-chrome {
-  background-color: hsl(var(--background) / 0.6);
-  backdrop-filter: blur(24px);
-  border-color: hsl(0 0% 100% / 0.1);
+  background-color: hsl(var(--background) / 0.88);
+  backdrop-filter: blur(12px);
+  border-color: hsl(0 0% 100% / 0.06);
 }
 
-/* Frosted overlays: dialogs, dropdowns, tooltips. */
+/* Quieter frosted overlays: dialogs, dropdowns, tooltips. */
 .glass-overlay {
-  background-color: hsl(var(--popover) / 0.8);
-  backdrop-filter: blur(24px);
-  border-color: hsl(0 0% 100% / 0.1);
+  background-color: hsl(var(--popover) / 0.94);
+  backdrop-filter: blur(14px);
+  border-color: hsl(0 0% 100% / 0.06);
 }
 
 @media (prefers-reduced-transparency: reduce) {
