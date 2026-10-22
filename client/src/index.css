@@ -147,18 +147,18 @@
   @apply border-foreground/25;
 }
 
-/* Quieter frosted chrome: sidebar and page headers. Content surfaces stay flat. */
+/* Frosted chrome: nav and page headers. Content surfaces stay flat. */
 .glass-chrome {
-  background-color: hsl(var(--background) / 0.88);
-  backdrop-filter: blur(12px);
-  border-color: hsl(0 0% 100% / 0.06);
+  background-color: hsl(var(--background) / 0.6);
+  backdrop-filter: blur(24px);
+  border-color: hsl(0 0% 100% / 0.1);
 }
 
-/* Quieter frosted overlays: dialogs, dropdowns, tooltips. */
+/* Frosted overlays: dialogs, dropdowns, tooltips. */
 .glass-overlay {
-  background-color: hsl(var(--popover) / 0.94);
-  backdrop-filter: blur(14px);
-  border-color: hsl(0 0% 100% / 0.06);
+  background-color: hsl(var(--popover) / 0.8);
+  backdrop-filter: blur(24px);
+  border-color: hsl(0 0% 100% / 0.1);
 }
 
 @media (prefers-reduced-transparency: reduce) {

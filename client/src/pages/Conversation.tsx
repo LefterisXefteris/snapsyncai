@@ -70,7 +70,7 @@ export default function ConversationPage() {
 
   return (
     <div className="h-full w-full flex flex-col bg-transparent text-foreground overflow-hidden">
-      <div className="p-3 bg-background border-b border-border z-10 sticky top-0">
+      <div className="p-3 glass-chrome border-b z-10 sticky top-0">
         <h1 className="font-display text-sm font-semibold flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           Conversation

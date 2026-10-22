@@ -25,3 +25,23 @@ test("the sidebar can collapse to an icon rail", () => {
   assert.match(sidebar, /collapsible="icon"/);
   assert.match(sidebar, /<SidebarTrigger/);
 });
+
+test("chrome frost separates from products and the current Destination shows a gold edge", () => {
+  const css = read("client/src/index.css");
+  assert.match(css, /\.glass-chrome\s*\{[^}]*0\.6[^}]*blur\(24px\)[^}]*0\.1/s);
+  assert.match(css, /\.glass-overlay\s*\{[^}]*0\.8[^}]*blur\(24px\)[^}]*0\.1/s);
+  assert.equal(css.includes("hsl(var(--background) / 0.88)"), false);
+  assert.equal(css.includes("blur(12px)"), false);
+
+  const menu = read("client/src/components/ui/sidebar.tsx");
+  assert.match(
+    menu,
+    /data-\[active=true\]:shadow-\[inset_0_0_0_2px_hsl\(var\(--sidebar-primary\)\)\]/,
+  );
+  assert.equal(menu.includes("data-[active=true]:bg-sidebar-accent"), false);
+  assert.match(menu, /data-\[active=true\]:hover:bg-transparent/);
+
+  const conversation = read("client/src/pages/Conversation.tsx");
+  assert.match(conversation, /glass-chrome/);
+  assert.equal(conversation.includes("bg-background border-b border-border"), false);
+});
