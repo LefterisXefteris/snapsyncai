@@ -11,6 +11,7 @@ import {
 import { SiShopify } from "react-icons/si";
 import { LandingLiveDemo, prefersReducedMotion } from "@/components/landing-live-demo";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
+import { workspaceNavItem } from "@/lib/workspace-nav";
 import {
   CLOSING_HEADING,
   CLOSING_SUBHEAD,
@@ -69,11 +70,24 @@ const NAV_LINKS = [
   { href: "#faq", label: "FAQ" },
 ] as const;
 
-function openLandingSignIn() {
+type SignInRedirect = { forceRedirectUrl: string; signUpForceRedirectUrl: string };
+
+function openClerkSignIn(redirectPath?: string) {
   // Preview at /page can render without ClerkProvider (dev auth bypass).
   // When Clerk is mounted it puts `Clerk` on window; otherwise this is a no-op.
-  const clerk = (window as unknown as { Clerk?: { openSignIn?: () => void } }).Clerk;
-  clerk?.openSignIn?.();
+  const clerk = (window as unknown as { Clerk?: { openSignIn?: (props?: SignInRedirect) => void } }).Clerk;
+  clerk?.openSignIn?.(
+    redirectPath ? { forceRedirectUrl: redirectPath, signUpForceRedirectUrl: redirectPath } : undefined,
+  );
+}
+
+// Button onClick passes the click event; keep it out of openClerkSignIn.
+function openLandingSignIn() {
+  openClerkSignIn();
+}
+
+function openSignInToNewListing() {
+  openClerkSignIn(workspaceNavItem("new-listing").path);
 }
 
 function scrollToHowItWorks() {
@@ -323,7 +337,7 @@ export default function Landing() {
               <h2 id="cta-heading" className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">{CLOSING_HEADING}</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mb-10 text-lg leading-relaxed">{CLOSING_SUBHEAD}</p>
               <div className="flex items-center justify-center gap-4 flex-wrap">
-                <Button size="lg" className="h-14 px-10 text-base gap-3" onClick={openLandingSignIn}>
+                <Button size="lg" className="h-14 px-10 text-base gap-3" onClick={openSignInToNewListing}>
                   {LANDING_PRIMARY_CTA}
                   <ArrowRight className="w-5 h-5" />
                 </Button>
