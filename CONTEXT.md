@@ -1,6 +1,6 @@
 # SnapSync
 
-Textile-first seller workspace for Shopify, Wix, Vinted, and Trendyol International. Listing from photos is one job inside it, not the whole product. Packaged coffee is the next product kind on the Shopify Channel only; broader food, accessories, and electronics stay out of scope until that kind is defined. This glossary is the domain language for that workspace.
+Textile-first seller workspace. Live Channels are Shopify and Trendyol International; Wix and Vinted stay in the Channel language but are not connectable yet. Listing from photos is one job inside it, not the whole product. Packaged coffee is on the Shopify Channel only; broader food, accessories, and electronics stay out of scope until that kind is defined. This glossary is the domain language for that workspace.
 
 ## Language
 

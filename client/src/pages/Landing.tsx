@@ -213,7 +213,7 @@ export default function Landing() {
       "Product kind facts before listing copy",
       "Textile fibre, care, and GPSR identity",
       "Coffee food-label facts on Shopify",
-      "Push to Shopify",
+      "Push to Shopify or Trendyol International",
       "Import",
       "Inventory",
       "Bulk SEO",
