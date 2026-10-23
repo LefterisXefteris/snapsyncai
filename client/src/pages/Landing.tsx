@@ -1,150 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
-  Upload, Store, FileText, ArrowRight, CheckCircle2, Coins, Crown,
-  ShieldCheck, LayoutGrid, Boxes, Download, Search, Settings,
+  Upload, Store, FileText, ArrowRight, CheckCircle2, Coins,
+  ShieldCheck, LayoutGrid, Boxes, Search,
 } from "lucide-react";
 import { SiShopify } from "react-icons/si";
+import { LandingLiveDemo, prefersReducedMotion } from "@/components/landing-live-demo";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 import {
-  DEMO,
+  CLOSING_HEADING,
+  CLOSING_SUBHEAD,
+  CREDIT_PACKS,
   FAQ_DATA,
+  FAQ_SUBHEAD,
   FOOTER_BLURB,
   JOBS,
+  JOBS_HEADING,
+  JOBS_SUBHEAD,
   LANDING_BRAND,
+  LANDING_CHANNELS,
   LANDING_DOCUMENT_TITLE,
   LANDING_EYEBROW,
-  LANDING_FINE_PRINT,
   LANDING_H1,
+  LANDING_H1_LEAD,
   LANDING_META_DESCRIPTION,
   LANDING_MICRO,
-  LANDING_PRODUCT_KIND,
   LANDING_PRIMARY_CTA,
   LANDING_SECONDARY_CTA,
   LANDING_SUBHEAD,
+  PRICING_BULLETS,
+  PRICING_FINE_PRINT,
+  PRICING_HEADING,
+  PRICING_SUBHEAD,
   STEPS,
-  WEEKLY_BULLETS,
+  STEPS_HEADING,
+  STEPS_SUBHEAD,
 } from "@/lib/landing-copy";
-
-type DemoPhase = "photo" | "facts" | "write" | "publish";
-
-const PHASE_LABEL: Record<DemoPhase, string> = {
-  photo: "photo",
-  facts: "confirming facts",
-  write: "listing copy",
-  publish: "shopify",
-};
-
-function HeroLiveDemo() {
-  const [phase, setPhase] = useState<DemoPhase>("photo");
-  const [chars, setChars] = useState(0);
-
-  useEffect(() => {
-    let writeTimer: ReturnType<typeof setInterval> | undefined;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const run = () => {
-      setPhase("photo");
-      setChars(0);
-      timers.push(setTimeout(() => setPhase("facts"), 2000));
-      timers.push(setTimeout(() => {
-        setPhase("write");
-        writeTimer = setInterval(() => {
-          setChars((c) => {
-            if (c >= DEMO.title.length + DEMO.description.length) {
-              clearInterval(writeTimer);
-              return c;
-            }
-            return c + 2;
-          });
-        }, 35);
-      }, 4500));
-      timers.push(setTimeout(() => setPhase("publish"), 8500));
-      timers.push(setTimeout(() => run(), 11500));
-    };
-    run();
-    return () => {
-      timers.forEach(clearTimeout);
-      if (writeTimer) clearInterval(writeTimer);
-    };
-  }, []);
-
-  const titleChars = Math.min(chars, DEMO.title.length);
-  const descChars = Math.max(0, chars - DEMO.title.length);
-  const writing = phase === "write" || phase === "publish";
-
-  return (
-    <div className="rounded-lg border border-border bg-card p-5 md:p-6 max-w-2xl mx-auto text-left">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-muted-foreground">
-          merino · facts before copy
-        </span>
-        <span className="text-xs text-foreground">
-          {PHASE_LABEL[phase]}
-        </span>
-      </div>
-
-      <div className="flex gap-5 items-stretch">
-        <div className="relative w-28 h-28 md:w-36 md:h-36 shrink-0 rounded-lg overflow-hidden border border-border">
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "repeating-linear-gradient(90deg, hsl(0 0% 22%) 0 3px, hsl(0 0% 16%) 3px 6px), radial-gradient(circle at 40% 30%, hsl(30 12% 38%), hsl(0 0% 12%) 70%)",
-            }}
-          />
-          <div className="absolute inset-x-4 top-6 bottom-5 rounded-sm bg-foreground/10" />
-          <div className="absolute inset-x-8 top-8 h-10 rounded-b-[40%] bg-background/30" />
-        </div>
-
-        <div className="flex-1 min-w-0 flex flex-col">
-          {phase === "facts" && (
-            <ul className="space-y-1.5 text-xs text-muted-foreground">
-              <li><span className="text-foreground/80">Fibre composition</span> · {DEMO.fibre}</li>
-              <li><span className="text-foreground/80">Care instructions</span> · {DEMO.care}</li>
-              <li><span className="text-foreground/80">GPSR identity</span> · {DEMO.gpsr}</li>
-            </ul>
-          )}
-          {writing && (
-            <>
-              <p className="font-semibold text-sm md:text-base leading-snug min-h-[1.4em]">
-                {DEMO.title.slice(0, titleChars)}
-                {phase === "write" && titleChars < DEMO.title.length && (
-                  <span className="inline-block w-px h-3.5 bg-foreground animate-pulse ml-0.5 align-baseline" />
-                )}
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-1.5 min-h-[3em]">
-                {DEMO.description.slice(0, descChars)}
-                {phase === "write" && titleChars >= DEMO.title.length && descChars < DEMO.description.length && (
-                  <span className="inline-block w-px h-3 bg-foreground animate-pulse ml-0.5 align-baseline" />
-                )}
-              </p>
-            </>
-          )}
-          {phase === "photo" && (
-            <div className="space-y-1.5 mt-0.5">
-              <div className="h-3.5 w-4/5 rounded bg-muted" />
-              <div className="h-2.5 w-full rounded bg-muted" />
-              <div className="h-2.5 w-2/3 rounded bg-muted" />
-            </div>
-          )}
-
-          <div className="mt-auto pt-3 flex items-center gap-3">
-            <SiShopify className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#96BF48" }} />
-            {phase === "publish" && (
-              <span className="text-xs text-foreground">
-                live on Shopify
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function useScrollReveal() {
   useEffect(() => {
@@ -164,14 +59,25 @@ function useScrollReveal() {
   }, []);
 }
 
-const JOB_ICONS = [Upload, ShieldCheck, LayoutGrid, Download, Boxes, Search, Settings] as const;
+const JOB_ICONS = [LayoutGrid, Boxes, Search] as const;
 const STEP_ICONS = [Upload, ShieldCheck, FileText, Store] as const;
+
+const NAV_LINKS = [
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#jobs", label: "What it does" },
+  { href: "#pricing", label: "Pricing" },
+  { href: "#faq", label: "FAQ" },
+] as const;
 
 function openLandingSignIn() {
   // Preview at /page can render without ClerkProvider (dev auth bypass).
   // When Clerk is mounted it puts `Clerk` on window; otherwise this is a no-op.
   const clerk = (window as unknown as { Clerk?: { openSignIn?: () => void } }).Clerk;
   clerk?.openSignIn?.();
+}
+
+function scrollToHowItWorks() {
+  document.getElementById("how-it-works")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" });
 }
 
 export default function Landing() {
@@ -205,21 +111,21 @@ export default function Landing() {
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
-    "offers": [
-      { "@type": "Offer", "price": "7.00", "priceCurrency": "GBP", "name": "10 Credits", "description": "Three free Credits, then packs of 10, 50, or 100 for AI Accepts" },
-      { "@type": "Offer", "price": "30.00", "priceCurrency": "GBP", "name": "50 Credits" },
-      { "@type": "Offer", "price": "55.00", "priceCurrency": "GBP", "name": "100 Credits" },
-    ],
+    "offers": CREDIT_PACKS.map((pack) => ({
+      "@type": "Offer",
+      "price": pack.price.replace("£", "") + ".00",
+      "priceCurrency": "GBP",
+      "name": `${pack.credits} Credits`,
+      "description": "One Credit per Accept of AI listing copy",
+    })),
     "featureList": [
-      "New listing from photos",
-      "Product kind facts before listing copy",
-      "Textile fibre, care, and GPSR identity",
-      "Coffee food-label facts on Shopify",
+      "AI listing copy from product photos",
+      "Confirmed facts before listing copy",
       "Push to Shopify or Trendyol International",
+      "Products",
       "Import",
       "Inventory",
       "Bulk SEO",
-      "Settings",
     ],
   };
 
@@ -237,101 +143,105 @@ export default function Landing() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border" aria-label="Main navigation">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur border-b border-border" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={snapsyncaiLogo} alt={`${LANDING_BRAND} logo`} className="w-8 h-8 rounded-md" width="32" height="32" />
             <span className="font-display text-lg font-bold tracking-tight">{LANDING_BRAND}</span>
           </div>
           <div className="flex items-center gap-6 flex-wrap">
-            <a href="#agent" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">The agent</a>
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">How it works</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">Pricing</a>
-            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">FAQ</a>
+            {NAV_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden md:inline">
+                {link.label}
+              </a>
+            ))}
             <Button variant="outline" size="sm" onClick={openLandingSignIn}>Sign In</Button>
             <Button size="sm" className="hidden sm:flex" onClick={openLandingSignIn}>{LANDING_PRIMARY_CTA}</Button>
           </div>
         </div>
       </nav>
 
-      <main className="pt-14">
+      <main className="pt-16">
         <section className="relative overflow-hidden" aria-labelledby="hero-heading">
-          <div className="max-w-5xl mx-auto px-6 py-24 md:py-32 relative text-center z-10">
-            <p className="text-xs text-primary mb-6">
-              {LANDING_EYEBROW}
-            </p>
-
-            <h1 id="hero-heading" className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-6">
-              {LANDING_H1}
-            </h1>
-
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-3 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-              {LANDING_SUBHEAD}
-            </p>
-            <p className="text-sm text-muted-foreground/80 max-w-xl mx-auto mb-4">
-              {LANDING_PRODUCT_KIND}
-            </p>
-
-            <p className="text-sm text-muted-foreground mb-6">
-              {LANDING_MICRO}
-            </p>
-
-            <ul className="flex flex-wrap items-center justify-center gap-2 mb-10 max-w-3xl mx-auto">
-              {JOBS.map((job) => (
-                <li key={job.title}>
-                  <a
-                    href="#agent"
-                    className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {job.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <HeroLiveDemo />
-            </div>
-
-            <div className="flex items-center justify-center gap-4 flex-wrap mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <Button size="lg" className="h-14 px-8 text-base gap-2" onClick={openLandingSignIn}>
-                {LANDING_PRIMARY_CTA}
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-              <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}>
-                {LANDING_SECONDARY_CTA}
-              </Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground animate-in fade-in duration-700 delay-300">
-              {LANDING_FINE_PRINT}
-            </p>
-
-            <div className="mt-16 flex items-center justify-center gap-8 flex-wrap relative z-10 p-6 rounded-lg border border-border bg-card max-w-3xl mx-auto">
-              <span className="text-xs text-muted-foreground font-semibold">Publishes to</span>
-              <div className="flex items-center gap-2">
-                <SiShopify className="w-6 h-6 text-[#96BF48]" />
-                <span className="text-sm font-medium text-muted-foreground">Shopify</span>
+          <div className="relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-24 lg:min-h-[calc(100svh-4rem)] grid gap-12 lg:grid-cols-[1.1fr_1fr] items-center">
+            <div className="text-center lg:text-left">
+              <div className="flex items-center justify-center lg:justify-start gap-3 mb-8 motion-safe:animate-in motion-safe:fade-in duration-700">
+                <img src={snapsyncaiLogo} alt="" className="w-10 h-10 rounded-lg" width="40" height="40" />
+                <span className="font-display text-3xl font-bold tracking-tight">{LANDING_BRAND}</span>
               </div>
+
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-5">
+                {LANDING_EYEBROW}
+              </p>
+
+              <h1 id="hero-heading" className="font-display text-4xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 duration-700">
+                <span className="text-primary">{LANDING_H1_LEAD}</span>
+                {LANDING_H1.slice(LANDING_H1_LEAD.length)}
+              </h1>
+
+              <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed mb-8">
+                {LANDING_SUBHEAD}
+              </p>
+
+              <div className="flex items-center justify-center lg:justify-start gap-4 flex-wrap mb-5">
+                <Button size="lg" className="h-14 px-8 text-base gap-2" onClick={openLandingSignIn}>
+                  {LANDING_PRIMARY_CTA}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+                <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={scrollToHowItWorks}>
+                  {LANDING_SECONDARY_CTA}
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground mb-6">{LANDING_MICRO}</p>
+
+              <div className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card px-4 py-2">
+                <SiShopify className="w-4 h-4 text-[#96BF48]" />
+                <span className="text-sm text-muted-foreground">{LANDING_CHANNELS}</span>
+              </div>
+            </div>
+
+            <div className="w-full max-w-xl mx-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-6 duration-1000">
+              <LandingLiveDemo />
             </div>
           </div>
         </section>
 
-        <section id="agent" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50" aria-labelledby="agent-heading">
+        <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50 scroll-mt-16" aria-labelledby="how-heading">
           <div className="text-center mb-16 reveal">
-            <Badge variant="outline" className="mb-4 no-default-active-elevate">The agent</Badge>
-            <h2 id="agent-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-              Listing from photos is one job.
-            </h2>
-            <p className="text-muted-foreground max-w-xl mx-auto text-lg">
-              What your e-commerce agent does today.
-            </p>
+            <Badge variant="outline" className="mb-4 no-default-active-elevate">{LANDING_SECONDARY_CTA}</Badge>
+            <h2 id="how-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{STEPS_HEADING}</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto text-lg">{STEPS_SUBHEAD}</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {STEPS.map((step, i) => {
+              const Icon = STEP_ICONS[i];
+              return (
+                <li key={step.number} className={`relative rounded-xl border border-border bg-card p-6 reveal delay-${i + 1}`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <span className="font-display text-3xl font-bold text-muted-foreground/40 tabular-nums">{step.number}</span>
+                  </div>
+                  <h3 className="font-display font-bold text-xl mb-2">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+
+        <section id="jobs" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50 scroll-mt-16" aria-labelledby="jobs-heading">
+          <div className="text-center mb-16 reveal">
+            <h2 id="jobs-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{JOBS_HEADING}</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto text-lg">{JOBS_SUBHEAD}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {JOBS.map((job, i) => {
               const Icon = JOB_ICONS[i];
               return (
-                <Card key={job.title} className="reveal">
+                <Card key={job.title} className={`reveal delay-${i + 1}`}>
                   <CardHeader>
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                       <Icon className="w-6 h-6 text-primary" />
@@ -349,95 +259,51 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24" aria-labelledby="how-heading">
-          <div className="text-center mb-16 reveal">
-            <Badge variant="outline" className="mb-4 no-default-active-elevate">How it works</Badge>
-            <h2 id="how-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-              Photo, facts, copy, Shopify
-            </h2>
-            <p className="text-muted-foreground max-w-xl mx-auto text-lg">
-              Import, inventory, and Bulk SEO sit beside this path.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 relative">
-            {STEPS.map((step, i) => {
-              const Icon = STEP_ICONS[i];
-              return (
-                <div key={step.number} className={`flex flex-col items-center text-center reveal delay-${(i % 3) + 1}`}>
-                  <div className="w-14 h-14 rounded-lg bg-muted border border-border flex items-center justify-center mb-5">
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <div className="inline-block mb-3">
-                    <Badge variant="outline" className="no-default-active-elevate text-xs tabular-nums">{step.number}</Badge>
-                  </div>
-                  <h3 className="font-display font-bold text-xl mb-3">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.description}</p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section id="pricing" className="border-t border-border py-24" aria-labelledby="pricing-heading">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center mb-16 reveal">
+        <section id="pricing" className="border-t border-border py-24 scroll-mt-16" aria-labelledby="pricing-heading">
+          <div className="max-w-5xl mx-auto px-6">
+            <div className="text-center mb-14 reveal">
               <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
                 <Coins className="w-3 h-3" /> Pricing
               </Badge>
-              <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-                Credits for AI Accepts.
-              </h2>
-              <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Catalogue, facts, and typed listing copy stay free. Three free Credits, then buy a pack.
-              </p>
+              <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{PRICING_HEADING}</h2>
+              <p className="text-muted-foreground max-w-lg mx-auto text-lg">{PRICING_SUBHEAD}</p>
             </div>
 
-            <div className="max-w-md mx-auto mb-10">
-              <Card className="flex flex-col reveal border-primary">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Crown className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-xl">Credits</CardTitle>
-                  </div>
-                  <CardDescription>One Credit per Accept — first generate, refresh, Bulk SEO</CardDescription>
-                  <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£7</span>
-                    <span className="text-muted-foreground text-sm ml-2">for 10 · larger packs cost less each</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <Separator className="mb-5" />
-                  <ul className="space-y-3 flex-1 mb-6">
-                    {WEEKLY_BULLETS.map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button className="w-full mt-auto" onClick={openLandingSignIn}>
-                    {LANDING_PRIMARY_CTA}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+              {CREDIT_PACKS.map((pack, i) => (
+                <Card key={pack.credits} className={`text-center reveal delay-${i + 1} hover:border-primary/60 transition-colors`}>
+                  <CardHeader>
+                    <CardDescription>{pack.credits} Credits</CardDescription>
+                    <CardTitle className="text-5xl font-display font-bold pt-2">{pack.price}</CardTitle>
+                  </CardHeader>
+                </Card>
+              ))}
             </div>
 
-            <p className="text-center text-xs text-muted-foreground mt-8 reveal">
-              No subscription · Secure payments via Stripe
-            </p>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto mb-10 reveal">
+              {PRICING_BULLETS.map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="text-center reveal">
+              <Button size="lg" className="h-12 px-8 gap-2" onClick={openLandingSignIn}>
+                {LANDING_PRIMARY_CTA}
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <p className="text-xs text-muted-foreground mt-6">{PRICING_FINE_PRINT}</p>
+            </div>
           </div>
         </section>
 
-        <section id="faq" className="max-w-3xl mx-auto px-6 py-24" aria-labelledby="faq-heading">
+        <section id="faq" className="max-w-3xl mx-auto px-6 py-24 scroll-mt-16" aria-labelledby="faq-heading">
           <div className="text-center mb-14 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">FAQ</Badge>
-            <h2 id="faq-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-              Questions
-            </h2>
-            <p className="text-muted-foreground max-w-lg mx-auto">
-              The agent, the facts gate, Shopify, and pricing.
-            </p>
+            <h2 id="faq-heading" className="text-4xl font-display font-bold tracking-tight mb-4">Questions</h2>
+            <p className="text-muted-foreground max-w-lg mx-auto">{FAQ_SUBHEAD}</p>
           </div>
           <div className="reveal">
             <Accordion type="single" collapsible className="w-full space-y-3">
@@ -452,20 +318,16 @@ export default function Landing() {
         </section>
 
         <section className="max-w-6xl mx-auto px-6 pb-24" aria-labelledby="cta-heading">
-          <div className="rounded-lg border border-border bg-card p-12 md:p-20 text-center reveal">
-            <div>
-              <h2 id="cta-heading" className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-                Start with a New listing
-              </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto mb-10 text-lg leading-relaxed">
-                Photos in, facts confirmed, listing copy, then Shopify. No card required to start.
-              </p>
+          <div className="relative overflow-hidden rounded-xl border border-border bg-card p-12 md:p-20 text-center reveal">
+            <div className="relative">
+              <h2 id="cta-heading" className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">{CLOSING_HEADING}</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto mb-10 text-lg leading-relaxed">{CLOSING_SUBHEAD}</p>
               <div className="flex items-center justify-center gap-4 flex-wrap">
                 <Button size="lg" className="h-14 px-10 text-base gap-3" onClick={openLandingSignIn}>
                   {LANDING_PRIMARY_CTA}
                   <ArrowRight className="w-5 h-5" />
                 </Button>
-                <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}>
+                <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={scrollToHowItWorks}>
                   {LANDING_SECONDARY_CTA}
                 </Button>
               </div>
@@ -484,20 +346,19 @@ export default function Landing() {
                 <img src={snapsyncaiLogo} alt={LANDING_BRAND} className="w-7 h-7 rounded-md" width="28" height="28" />
                 <span className="font-display text-base font-bold">{LANDING_BRAND}</span>
               </div>
-              <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
-                {FOOTER_BLURB}
-              </p>
+              <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">{FOOTER_BLURB}</p>
             </div>
             <div className="flex flex-wrap gap-8 text-sm text-muted-foreground">
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Product</p>
-                <a href="#agent" className="block hover:text-foreground transition-colors">The agent</a>
-                <a href="#how-it-works" className="block hover:text-foreground transition-colors">How it works</a>
-                <a href="#pricing" className="block hover:text-foreground transition-colors">Pricing</a>
+                {NAV_LINKS.map((link) => (
+                  <a key={link.href} href={link.href} className="block hover:text-foreground transition-colors">{link.label}</a>
+                ))}
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Channel</p>
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Channels</p>
                 <span className="block">Shopify</span>
+                <span className="block">Trendyol International</span>
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Contact</p>
