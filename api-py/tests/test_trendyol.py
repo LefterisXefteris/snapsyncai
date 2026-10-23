@@ -8,6 +8,7 @@ from app.services import connections
 from app.services import images as store
 from app.services import product as product_module
 from app.services.trendyol import (
+    COFFEE_SHOPIFY_ONLY,
     LIST_BELOW,
     NEED_BARCODE,
     NEED_BRAND,
@@ -202,6 +203,17 @@ async def test_push_waits_for_an_incomplete_listing(db, db_settings) -> None:
     missing_brand = await push(db, settings, port, seed.SELLER, pid, _draft(brand_id=None))
     assert missing_brand is not None
     assert missing_brand.push_wait == NEED_BRAND
+    assert BARCODE not in port.products
+
+
+async def test_coffee_product_may_not_push_to_trendyol(db, db_settings) -> None:
+    settings = _settings(db_settings)
+    pid = await _shop_and_product(db, facts=seed.confirmed_facts(textile=False))
+    port = MemoryTrendyol()
+    await _connect(db, settings, port)
+    waiting = await push(db, settings, port, seed.SELLER, pid, _draft())
+    assert waiting is not None
+    assert waiting.push_wait == COFFEE_SHOPIFY_ONLY
     assert BARCODE not in port.products
 
 

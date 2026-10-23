@@ -16,8 +16,13 @@ VISION_NON_TEXTILE = {"isTextile": False}
 def _confirmed_facts():
     return confirm_facts(
         persistable_from_vision(VISION_NON_TEXTILE).facts,
-        is_textile=False,
-        gpsr_choice="skip",
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
     ).facts
 
 

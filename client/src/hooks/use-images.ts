@@ -677,17 +677,26 @@ export function useConfirmProductFacts() {
   return useMutation({
     mutationFn: async ({
       imageId,
+      productKind,
       isTextile,
       composition,
       gpsrChoice,
       gpsrIdentity,
       careChoice,
       care,
+      coffeeForm,
+      roastLevel,
+      netWeight,
+      coffeeOriginChoice,
+      coffeeOrigin,
+      ingredientsList,
+      allergenStatement,
     }: {
       imageId: number;
-      isTextile: boolean;
+      productKind?: "textile" | "coffee";
+      isTextile?: boolean;
       composition?: { name: string; percent: number | null; otherName?: string }[];
-      gpsrChoice: "skip" | "shop_default" | "override";
+      gpsrChoice?: "skip" | "shop_default" | "override";
       gpsrIdentity?: {
         manufacturer: { name: string; postalAddress: string; email: string };
         manufacturerInEu: boolean;
@@ -701,11 +710,33 @@ export function useConfirmProductFacts() {
         ironing: string;
         professionalTextileCare: string;
       };
+      coffeeForm?: "beans" | "ground" | "capsules";
+      roastLevel?: string;
+      netWeight?: string;
+      coffeeOriginChoice?: "skip" | "fill";
+      coffeeOrigin?: string;
+      ingredientsList?: string;
+      allergenStatement?: string;
     }) => {
       const res = await apiRequest(
         "POST",
         buildUrl(api.images.confirmProductFacts.path, { id: imageId }),
-        { isTextile, composition, gpsrChoice, gpsrIdentity, careChoice, care },
+        {
+          productKind,
+          isTextile,
+          composition,
+          gpsrChoice,
+          gpsrIdentity,
+          careChoice,
+          care,
+          coffeeForm,
+          roastLevel,
+          netWeight,
+          coffeeOriginChoice,
+          coffeeOrigin,
+          ingredientsList,
+          allergenStatement,
+        },
       );
       return res.json();
     },

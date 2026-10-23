@@ -40,6 +40,18 @@ export type GpsrChoice = "skip" | "shop_default" | "override";
 
 export type CareChoice = "skip" | "fill";
 
+export type ProductKind = "textile" | "coffee";
+
+export type CoffeeForm = "beans" | "ground" | "capsules";
+
+export type CoffeeOriginChoice = "skip" | "fill";
+
+export const COFFEE_FORMS: { value: CoffeeForm; label: string }[] = [
+  { value: "beans", label: "Beans" },
+  { value: "ground", label: "Ground" },
+  { value: "capsules", label: "Capsules" },
+];
+
 export type CareFamily =
   | "washing"
   | "bleaching"
@@ -135,13 +147,34 @@ export type ProductFactsRecord = {
   };
   confirmed?: {
     isTextile?: boolean;
+    productKind?: ProductKind;
     composition?: { name?: string; percent?: number }[];
     gpsrChoice?: GpsrChoice;
     gpsrIdentity?: GpsrIdentity;
     careChoice?: CareChoice;
     care?: CareInstructions;
+    coffeeForm?: CoffeeForm;
+    roastLevel?: string;
+    netWeight?: string;
+    coffeeOriginChoice?: CoffeeOriginChoice;
+    coffeeOrigin?: string;
+    ingredientsList?: string;
+    allergenStatement?: string;
   };
 };
+
+export function confirmedProductKind(
+  facts: ProductFactsRecord | null | undefined,
+): ProductKind | null {
+  const kind = facts?.confirmed?.productKind;
+  if (kind === "textile" || kind === "coffee") return kind;
+  if (facts?.confirmed?.isTextile === true) return "textile";
+  return null;
+}
+
+export function isCoffeeProduct(facts: ProductFactsRecord | null | undefined): boolean {
+  return confirmedProductKind(facts) === "coffee";
+}
 
 export function productFacts(image: Pick<Image, "productFacts"> | undefined): ProductFactsRecord | null {
   const raw = image?.productFacts;

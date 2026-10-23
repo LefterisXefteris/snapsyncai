@@ -9,7 +9,29 @@ import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@/lib/api-routes";
 import { AuthenticatedImg } from "@/components/authenticated-img";
-import { productFacts, draftComposition, EU_FIBRE_NAMES, OTHER_FIBRE, emptyGpsrIdentity, isCompleteGpsr, emptyCare, isCompleteCare, CARE_FAMILIES, CARE_PICKS, type FibreRowDraft, type GpsrChoice, type GpsrIdentity, type CareChoice, type CareInstructions } from "@/lib/product-facts";
+import {
+  productFacts,
+  draftComposition,
+  confirmedProductKind,
+  isCoffeeProduct,
+  EU_FIBRE_NAMES,
+  OTHER_FIBRE,
+  COFFEE_FORMS,
+  emptyGpsrIdentity,
+  isCompleteGpsr,
+  emptyCare,
+  isCompleteCare,
+  CARE_FAMILIES,
+  CARE_PICKS,
+  type FibreRowDraft,
+  type GpsrChoice,
+  type GpsrIdentity,
+  type CareChoice,
+  type CareInstructions,
+  type ProductKind,
+  type CoffeeForm,
+  type CoffeeOriginChoice,
+} from "@/lib/product-facts";
 import type { Image } from "@/lib/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -135,6 +157,14 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [compositionRows, setCompositionRows] = useState<FibreRowDraft[]>([
     { name: "cotton", percent: "", otherName: "" },
   ]);
+  const [productKindDraft, setProductKindDraft] = useState<ProductKind | "">("");
+  const [coffeeForm, setCoffeeForm] = useState<CoffeeForm | "">("");
+  const [roastLevel, setRoastLevel] = useState("");
+  const [netWeight, setNetWeight] = useState("");
+  const [coffeeOriginChoice, setCoffeeOriginChoice] = useState<CoffeeOriginChoice | "">("");
+  const [coffeeOrigin, setCoffeeOrigin] = useState("");
+  const [ingredientsList, setIngredientsList] = useState("");
+  const [allergenStatement, setAllergenStatement] = useState("");
   const [gpsrChoice, setGpsrChoice] = useState<GpsrChoice | "">("");
   const [gpsrDraft, setGpsrDraft] = useState<GpsrIdentity>(emptyGpsrIdentity());
   const [shopGpsrDraft, setShopGpsrDraft] = useState<GpsrIdentity>(emptyGpsrIdentity());
@@ -195,7 +225,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
           }))
         : [],
     );
-    setCompositionRows(draftComposition(productFacts(image)));
+    const nextFacts = productFacts(image);
+    setCompositionRows(draftComposition(nextFacts));
+    setProductKindDraft(confirmedProductKind(nextFacts) ?? "");
+    setCoffeeForm(nextFacts?.confirmed?.coffeeForm ?? "");
+    setRoastLevel(nextFacts?.confirmed?.roastLevel ?? "");
+    setNetWeight(nextFacts?.confirmed?.netWeight ?? "");
+    setCoffeeOriginChoice(nextFacts?.confirmed?.coffeeOriginChoice ?? "");
+    setCoffeeOrigin(nextFacts?.confirmed?.coffeeOrigin ?? "");
+    setIngredientsList(nextFacts?.confirmed?.ingredientsList ?? "");
+    setAllergenStatement(nextFacts?.confirmed?.allergenStatement ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset local listing copy when the product changes
   }, [imageId]);
 
@@ -340,6 +379,18 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   };
   const careReady =
     careChoice === "skip" || (careChoice === "fill" && isCompleteCare(careDraft));
+  const coffeeReady =
+    Boolean(coffeeForm) &&
+    Boolean(roastLevel.trim()) &&
+    Boolean(netWeight.trim()) &&
+    (coffeeOriginChoice === "skip" ||
+      (coffeeOriginChoice === "fill" && Boolean(coffeeOrigin.trim()))) &&
+    Boolean(ingredientsList.trim()) &&
+    Boolean(allergenStatement.trim());
+  const coffeeProduct = isCoffeeProduct(facts);
+  const kindNeedsConfirm =
+    confirmedProductKind(facts) === null ||
+    (facts?.confirmed?.isTextile === false && facts?.confirmed?.productKind == null);
 
   const persistMediaOrder = async (orderedIds: number[], primaryId?: number) => {
     if (!image || orderedIds.length === 0) return;
@@ -968,207 +1019,300 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                 <CardHeader className="px-4 py-3">
                   <CardTitle className="text-sm font-medium">{PRODUCT_EDITOR_FACTS_TITLE}</CardTitle>
                   <CardDescription className="text-xs">
-                    Confirm this is not a textile, or enter fibre composition that sums to 100% and care instructions (or explicitly skip care instructions).
+                    Pick Product kind, then confirm that kind’s facts pack before listing copy.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 space-y-3">
-                  {facts?.suggested?.isTextile === true && (
-                    <p className="text-xs text-muted-foreground">
-                      Vision suggests this may be a textile. Confirm if it is not, or enter composition.
+                  {kindNeedsConfirm && (
+                    <p className="text-xs text-amber-600">
+                      Pick Textile product or Coffee product and confirm facts before generate, refresh, or Bulk SEO.
                     </p>
                   )}
-                  {facts?.suggested?.isTextile === false && (
-                    <p className="text-xs text-muted-foreground">
-                      Vision suggests this is not a textile.
-                    </p>
-                  )}
-                  <div className="space-y-2 pt-1">
-                    <label className="text-xs font-medium">GPSR identity</label>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Product kind</label>
                     <Select
-                      value={gpsrChoice || undefined}
-                      onValueChange={(value) => setGpsrChoice(value as GpsrChoice)}
+                      value={productKindDraft || undefined}
+                      onValueChange={(value) => setProductKindDraft(value as ProductKind)}
                     >
                       <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Choose skip, shop default, or enter" />
+                        <SelectValue placeholder="Textile product or Coffee product" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="skip">Skip — omit from the listing</SelectItem>
-                        {shopConnected && (
-                          <SelectItem value="shop_default" disabled={!shopHasGpsr}>
-                            Use shop default{shopHasGpsr ? "" : " (save a shop default first)"}
-                          </SelectItem>
-                        )}
-                        <SelectItem value="override">
-                          {shopConnected ? "Override for this product" : "Enter for this product"}
-                        </SelectItem>
+                        <SelectItem value="textile">Textile product</SelectItem>
+                        <SelectItem value="coffee">Coffee product</SelectItem>
                       </SelectContent>
                     </Select>
-                    {gpsrChoice === "override" && (
-                      <GpsrIdentityFields value={gpsrDraft} onChange={setGpsrDraft} />
-                    )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs"
-                    onClick={() =>
-                      confirmFactsMutation.mutate({
-                        imageId: image.id,
-                        isTextile: false,
-                        ...gpsrConfirmFields,
-                      })
-                    }
-                    disabled={confirmFactsMutation.isPending || !gpsrReady}
-                  >
-                    {confirmFactsMutation.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : null}
-                    Confirm: not a textile
-                  </Button>
-                  <div className="space-y-2 pt-1">
-                    <label className="text-xs font-medium">Fibre composition</label>
-                    {compositionRows.map((row, index) => (
-                      <div key={index} className="flex flex-wrap items-center gap-2">
-                        <Select
-                          value={row.name}
-                          onValueChange={(name) => {
-                            setCompositionRows((rows) =>
-                              rows.map((item, i) => (i === index ? { ...item, name } : item))
-                            );
-                          }}
-                        >
-                          <SelectTrigger className="h-8 text-xs w-[160px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {EU_FIBRE_NAMES.map((name) => (
-                              <SelectItem key={name} value={name}>{name}</SelectItem>
-                            ))}
-                            <SelectItem value={OTHER_FIBRE}>{OTHER_FIBRE}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {row.name === OTHER_FIBRE && (
-                          <Input
-                            value={row.otherName}
-                            onChange={(e) => {
-                              const otherName = e.target.value;
-                              setCompositionRows((rows) =>
-                                rows.map((item, i) => (i === index ? { ...item, otherName } : item))
-                              );
-                            }}
-                            placeholder="Fibre name"
-                            className="h-8 text-xs w-[140px]"
-                          />
-                        )}
-                        <Input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={row.percent}
-                          onChange={(e) => {
-                            const percent = e.target.value;
-                            setCompositionRows((rows) =>
-                              rows.map((item, i) => (i === index ? { ...item, percent } : item))
-                            );
-                          }}
-                          placeholder="%"
-                          className="h-8 text-xs w-[72px]"
-                        />
-                        {compositionRows.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setCompositionRows((rows) => rows.filter((_, i) => i !== index))}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() =>
-                          setCompositionRows((rows) => [...rows, { name: "cotton", percent: "", otherName: "" }])
-                        }
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        Add fibre
-                      </Button>
-                      <p className="text-[11px] text-muted-foreground tabular-nums">
-                        {compositionRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0)} / 100
-                      </p>
-                    </div>
+                  {productKindDraft === "coffee" && (
                     <div className="space-y-2 pt-1">
-                      <label className="text-xs font-medium">Care instructions</label>
+                      <label className="text-xs font-medium">Coffee form</label>
                       <Select
-                        value={careChoice || undefined}
-                        onValueChange={(value) => setCareChoice(value as CareChoice)}
+                        value={coffeeForm || undefined}
+                        onValueChange={(value) => setCoffeeForm(value as CoffeeForm)}
                       >
                         <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Fill all five, or skip" />
+                          <SelectValue placeholder="Beans, ground, or capsules" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COFFEE_FORMS.map((form) => (
+                            <SelectItem key={form.value} value={form.value}>
+                              {form.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <label className="text-xs font-medium">Roast level</label>
+                      <Input
+                        value={roastLevel}
+                        onChange={(e) => setRoastLevel(e.target.value)}
+                        placeholder="e.g. medium"
+                        className="h-8 text-xs"
+                      />
+                      <label className="text-xs font-medium">Net weight</label>
+                      <Input
+                        value={netWeight}
+                        onChange={(e) => setNetWeight(e.target.value)}
+                        placeholder="e.g. 250 g"
+                        className="h-8 text-xs"
+                      />
+                      <label className="text-xs font-medium">Coffee origin</label>
+                      <Select
+                        value={coffeeOriginChoice || undefined}
+                        onValueChange={(value) => setCoffeeOriginChoice(value as CoffeeOriginChoice)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Fill or skip" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="skip">Skip — omit from the listing</SelectItem>
-                          <SelectItem value="fill">Enter care instructions</SelectItem>
+                          <SelectItem value="fill">Enter origin</SelectItem>
                         </SelectContent>
                       </Select>
-                      {careChoice === "fill" &&
-                        CARE_FAMILIES.map(({ key, label }) => (
-                          <div key={key} className="space-y-1">
-                            <label className="text-[11px] text-muted-foreground">{label}</label>
-                            <Select
-                              value={careDraft[key] || undefined}
-                              onValueChange={(code) =>
-                                setCareDraft((current) => ({ ...current, [key]: code }))
-                              }
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder={`Choose ${label.toLowerCase()}`} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {CARE_PICKS[key].map((pick) => (
-                                  <SelectItem key={pick.code} value={pick.code}>
-                                    {pick.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        ))}
+                      {coffeeOriginChoice === "fill" && (
+                        <Input
+                          value={coffeeOrigin}
+                          onChange={(e) => setCoffeeOrigin(e.target.value)}
+                          placeholder="Country or region"
+                          className="h-8 text-xs"
+                        />
+                      )}
+                      <label className="text-xs font-medium">Ingredients list</label>
+                      <Textarea
+                        value={ingredientsList}
+                        onChange={(e) => setIngredientsList(e.target.value)}
+                        placeholder="Seller-entered ingredients"
+                        className="min-h-[72px] text-xs"
+                      />
+                      <label className="text-xs font-medium">Allergen statement</label>
+                      <Input
+                        value={allergenStatement}
+                        onChange={(e) => setAllergenStatement(e.target.value)}
+                        placeholder='Allergens, or type "none"'
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() =>
+                          confirmFactsMutation.mutate({
+                            imageId: image.id,
+                            productKind: "coffee",
+                            coffeeForm: coffeeForm as CoffeeForm,
+                            roastLevel: roastLevel.trim(),
+                            netWeight: netWeight.trim(),
+                            coffeeOriginChoice: coffeeOriginChoice as CoffeeOriginChoice,
+                            coffeeOrigin:
+                              coffeeOriginChoice === "fill" ? coffeeOrigin.trim() : undefined,
+                            ingredientsList: ingredientsList.trim(),
+                            allergenStatement: allergenStatement.trim(),
+                          })
+                        }
+                        disabled={confirmFactsMutation.isPending || !coffeeReady}
+                      >
+                        {confirmFactsMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : null}
+                        Confirm coffee facts
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() =>
-                        confirmFactsMutation.mutate({
-                          imageId: image.id,
-                          isTextile: true,
-                          composition: compositionRows.map((row) => ({
-                            name: row.name,
-                            percent: row.percent === "" ? null : Number(row.percent),
-                            otherName: row.otherName || undefined,
-                          })),
-                          ...gpsrConfirmFields,
-                          ...careConfirmFields,
-                        })
-                      }
-                      disabled={confirmFactsMutation.isPending || !gpsrReady || !careReady}
-                    >
-                      {confirmFactsMutation.isPending ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      ) : null}
-                      Confirm textile composition
-                    </Button>
-                  </div>
+                  )}
+                  {productKindDraft === "textile" && (
+                    <div className="space-y-2 pt-1">
+                      {facts?.suggested?.isTextile === true && (
+                        <p className="text-xs text-muted-foreground">
+                          Vision suggests this may be a textile.
+                        </p>
+                      )}
+                      <div className="space-y-2 pt-1">
+                        <label className="text-xs font-medium">GPSR identity</label>
+                        <Select
+                          value={gpsrChoice || undefined}
+                          onValueChange={(value) => setGpsrChoice(value as GpsrChoice)}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Choose skip, shop default, or enter" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="skip">Skip — omit from the listing</SelectItem>
+                            {shopConnected && (
+                              <SelectItem value="shop_default" disabled={!shopHasGpsr}>
+                                Use shop default{shopHasGpsr ? "" : " (save a shop default first)"}
+                              </SelectItem>
+                            )}
+                            <SelectItem value="override">
+                              {shopConnected ? "Override for this product" : "Enter for this product"}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {gpsrChoice === "override" && (
+                          <GpsrIdentityFields value={gpsrDraft} onChange={setGpsrDraft} />
+                        )}
+                      </div>
+                      <label className="text-xs font-medium">Fibre composition</label>
+                      {compositionRows.map((row, index) => (
+                        <div key={index} className="flex flex-wrap items-center gap-2">
+                          <Select
+                            value={row.name}
+                            onValueChange={(name) => {
+                              setCompositionRows((rows) =>
+                                rows.map((item, i) => (i === index ? { ...item, name } : item))
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {EU_FIBRE_NAMES.map((name) => (
+                                <SelectItem key={name} value={name}>{name}</SelectItem>
+                              ))}
+                              <SelectItem value={OTHER_FIBRE}>{OTHER_FIBRE}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {row.name === OTHER_FIBRE && (
+                            <Input
+                              value={row.otherName}
+                              onChange={(e) => {
+                                const otherName = e.target.value;
+                                setCompositionRows((rows) =>
+                                  rows.map((item, i) => (i === index ? { ...item, otherName } : item))
+                                );
+                              }}
+                              placeholder="Fibre name"
+                              className="h-8 text-xs w-[140px]"
+                            />
+                          )}
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={row.percent}
+                            onChange={(e) => {
+                              const percent = e.target.value;
+                              setCompositionRows((rows) =>
+                                rows.map((item, i) => (i === index ? { ...item, percent } : item))
+                              );
+                            }}
+                            placeholder="%"
+                            className="h-8 text-xs w-[72px]"
+                          />
+                          {compositionRows.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setCompositionRows((rows) => rows.filter((_, i) => i !== index))}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() =>
+                            setCompositionRows((rows) => [...rows, { name: "cotton", percent: "", otherName: "" }])
+                          }
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Add fibre
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground tabular-nums">
+                          {compositionRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0)} / 100
+                        </p>
+                      </div>
+                      <div className="space-y-2 pt-1">
+                        <label className="text-xs font-medium">Care instructions</label>
+                        <Select
+                          value={careChoice || undefined}
+                          onValueChange={(value) => setCareChoice(value as CareChoice)}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Fill all five, or skip" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="skip">Skip — omit from the listing</SelectItem>
+                            <SelectItem value="fill">Enter care instructions</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {careChoice === "fill" &&
+                          CARE_FAMILIES.map(({ key, label }) => (
+                            <div key={key} className="space-y-1">
+                              <label className="text-[11px] text-muted-foreground">{label}</label>
+                              <Select
+                                value={careDraft[key] || undefined}
+                                onValueChange={(code) =>
+                                  setCareDraft((current) => ({ ...current, [key]: code }))
+                                }
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder={`Choose ${label.toLowerCase()}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {CARE_PICKS[key].map((pick) => (
+                                    <SelectItem key={pick.code} value={pick.code}>
+                                      {pick.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() =>
+                          confirmFactsMutation.mutate({
+                            imageId: image.id,
+                            productKind: "textile",
+                            isTextile: true,
+                            composition: compositionRows.map((row) => ({
+                              name: row.name,
+                              percent: row.percent === "" ? null : Number(row.percent),
+                              otherName: row.otherName || undefined,
+                            })),
+                            ...gpsrConfirmFields,
+                            ...careConfirmFields,
+                          })
+                        }
+                        disabled={confirmFactsMutation.isPending || !gpsrReady || !careReady}
+                      >
+                        {confirmFactsMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : null}
+                        Confirm textile composition
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            {shopConnected && (
+            {shopConnected && !coffeeProduct && (
               <Card className="shadow-sm">
                 <CardHeader className="px-4 py-3">
                   <CardTitle className="text-sm font-medium">Shop GPSR identity</CardTitle>
@@ -1663,7 +1807,7 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
               </CardContent>
             </Card>
 
-            <TrendyolListing imageId={image.id} />
+            {!coffeeProduct && <TrendyolListing imageId={image.id} />}
 
             <details className="rounded-lg border border-border bg-card shadow-sm">
               <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground">

@@ -53,7 +53,16 @@ async def test_confirm_writes_the_facts_onto_every_photo_of_the_product(db):
     back = await seed.product(db, product_group_id="tee", listed=False)
 
     confirmed = await product.confirm(
-        db, SELLER, front, is_textile=False, gpsr_choice="skip"
+        db,
+        SELLER,
+        front,
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
     )
 
     assert confirmed.refused is None
@@ -61,7 +70,7 @@ async def test_confirm_writes_the_facts_onto_every_photo_of_the_product(db):
     reloaded = await product.load(db, SELLER, back)
     assert reloaded is not None
     assert reloaded.facts.confirmed is not None
-    assert reloaded.facts.confirmed.is_textile is False
+    assert reloaded.facts.confirmed.product_kind == "coffee"
 
 
 async def test_confirm_refuses_a_textile_without_fibre_composition_and_writes_nothing(db):
@@ -79,7 +88,18 @@ async def test_confirm_refuses_a_textile_without_fibre_composition_and_writes_no
 async def test_confirm_refuses_another_sellers_product(db):
     theirs = await seed.product(db, owner=OTHER_SELLER)
 
-    confirmed = await product.confirm(db, SELLER, theirs, is_textile=False, gpsr_choice="skip")
+    confirmed = await product.confirm(
+        db,
+        SELLER,
+        theirs,
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
+    )
 
     assert confirmed.refused == "not_found"
 
@@ -123,7 +143,15 @@ async def test_saving_shop_gpsr_stales_only_listed_products_that_use_the_shop_de
     await seed.shop(db, gpsr_identity=SHOP_GPSR)
     shop_default = await seed.product(db, listed=False)
     skipped = await seed.product(db, facts=seed.confirmed_facts())
-    await product.confirm(db, SELLER, shop_default, is_textile=False, gpsr_choice="shop_default")
+    await product.confirm(
+        db,
+        SELLER,
+        shop_default,
+        is_textile=True,
+        composition=[{"name": "cotton", "percent": 100}],
+        care_choice="skip",
+        gpsr_choice="shop_default",
+    )
     await store.update_image(db, shop_default, seed.LISTED, SELLER)
     before = await product.load(db, SELLER, shop_default)
     assert before is not None and before.facts.listing_copy_stale is False

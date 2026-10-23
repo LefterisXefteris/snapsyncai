@@ -199,13 +199,27 @@ class CareInstructionsIn(CamelModel):
     professional_textile_care: str
 
 
+class VariantNetWeightIn(CamelModel):
+    variant_id: str
+    net_weight: str
+
+
 class ConfirmProductFactsBody(CamelModel):
-    is_textile: bool
+    product_kind: Literal["textile", "coffee"] | None = None
+    is_textile: bool | None = None
     composition: list[FibreRowIn] | None = None
-    gpsr_choice: Literal["skip", "shop_default", "override"]
+    gpsr_choice: Literal["skip", "shop_default", "override"] | None = None
     gpsr_identity: GpsrIdentityIn | None = None
     care_choice: Literal["skip", "fill"] | None = None
     care: CareInstructionsIn | None = None
+    coffee_form: Literal["beans", "ground", "capsules"] | None = None
+    roast_level: str | None = None
+    net_weight: str | None = None
+    variant_net_weights: list[VariantNetWeightIn] | None = None
+    coffee_origin_choice: Literal["skip", "fill"] | None = None
+    coffee_origin: str | None = None
+    ingredients_list: str | None = None
+    allergen_statement: str | None = None
 
 
 class AssignGroupBody(CamelModel):

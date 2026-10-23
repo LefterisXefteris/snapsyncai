@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.services.product_facts import (
+    PRODUCT_KIND_COFFEE,
     ProductFacts,
     listing_copy_present,
     may_generate_listing_copy,
@@ -99,6 +100,13 @@ def seed_search_demand(
     if confirmed is not None:
         for row in confirmed.composition:
             seeds.append(row.name)
+        if confirmed.product_kind == PRODUCT_KIND_COFFEE:
+            if confirmed.coffee_form:
+                seeds.append(confirmed.coffee_form)
+            if confirmed.roast_level:
+                seeds.append(confirmed.roast_level)
+            if confirmed.coffee_origin:
+                seeds.append(confirmed.coffee_origin)
     return tuple(dict.fromkeys(seeds))
 
 

@@ -70,25 +70,102 @@ def test_unconfirmed_facts_return_a_generate_conflict() -> None:
     assert generation_blocked_reason(facts_from_stored(None)) == (
         "Confirm product facts before generating listing copy."
     )
-    confirmed = confirm_facts(
-        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
-        is_textile=False,
-        gpsr_choice="skip",
-    ).facts
-    assert generation_blocked_reason(confirmed) is None
 
 
-def test_confirming_not_a_textile_opens_the_gate() -> None:
+def test_legacy_non_textile_confirmed_does_not_open_the_gate() -> None:
+    facts = facts_from_stored(
+        {"confirmed": {"isTextile": False, "gpsrChoice": "skip"}}
+    )
+    assert facts.confirmed is not None
+    assert facts.confirmed.is_textile is False
+    assert facts.confirmed.product_kind is None
+    assert may_generate_listing_copy(facts) is False
+    assert generation_blocked_reason(facts) == (
+        "Confirm product facts before generating listing copy."
+    )
+
+
+def test_confirming_without_product_kind_is_rejected() -> None:
     facts = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
     result = confirm_facts(facts, is_textile=False, gpsr_choice="skip")
+    assert result.ok is False
+    assert result.error == "Product kind is required."
+    assert may_generate_listing_copy(result.facts) is False
+
+
+def test_confirming_coffee_product_opens_the_gate() -> None:
+    facts = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
+    result = confirm_facts(
+        facts,
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
+    )
     assert result.ok is True
     assert result.facts.confirmed is not None
+    assert result.facts.confirmed.product_kind == "coffee"
     assert result.facts.confirmed.is_textile is False
     assert may_generate_listing_copy(result.facts) is True
-    assert listing_copy_constraints(result.facts) == (
-        "This product is not a textile. Do not invent fibre composition, "
-        "care instructions, manufacturer identity, or GPSR / EU responsible person details."
+    assert generation_blocked_reason(result.facts) is None
+
+
+def test_coffee_description_blocks_assemble_confirmed_food_label_facts() -> None:
+    facts = confirm_facts(
+        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
+        product_kind="coffee",
+        coffee_form="ground",
+        roast_level="dark",
+        net_weight="1 kg",
+        coffee_origin_choice="fill",
+        coffee_origin="Brazil",
+        ingredients_list="arabica coffee",
+        allergen_statement="none",
+    ).facts
+    html = description_blocks(facts)
+    assert html == (
+        "<p>Coffee form: ground.</p>\n"
+        "<p>Roast level: dark.</p>\n"
+        "<p>Net weight: 1 kg.</p>\n"
+        "<p>Coffee origin: Brazil.</p>\n"
+        "<p>Ingredients: arabica coffee.</p>\n"
+        "<p>Allergens: none.</p>"
     )
+    restored = facts_from_stored(stored_from_facts(facts))
+    assert description_blocks(restored) == html
+    assert may_generate_listing_copy(restored) is True
+
+
+def test_coffee_with_variant_net_weights_requires_every_variant() -> None:
+    facts = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
+    incomplete = confirm_facts(
+        facts,
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        variant_net_weights=[{"variantId": "250g", "netWeight": "250 g"}],
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
+    )
+    assert incomplete.ok is True
+    assert may_generate_listing_copy(incomplete.facts) is True
+
+    missing_weight = confirm_facts(
+        facts,
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        variant_net_weights=[{"variantId": "250g", "netWeight": ""}],
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
+    )
+    assert missing_weight.ok is False
+    assert missing_weight.error == "Each variant needs a net weight."
 
 
 def test_confirming_a_textile_without_composition_does_not_open_the_gate() -> None:
@@ -127,6 +204,39 @@ COTTON_POLYESTER = [
     {"name": "cotton", "percent": 80},
     {"name": "polyester", "percent": 20},
 ]
+
+
+def _coffee_confirm(facts=None, **kwargs):
+    values = dict(
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
+    )
+    values.update(kwargs)
+    return confirm_facts(
+        facts if facts is not None else persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
+        **values,
+    )
+
+
+def _textile_for_gpsr(facts=None, **kwargs):
+    values = dict(
+        is_textile=True,
+        composition=COTTON_POLYESTER,
+        care_choice="skip",
+        gpsr_choice="skip",
+    )
+    values.update(kwargs)
+    return confirm_facts(
+        facts
+        if facts is not None
+        else persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts,
+        **values,
+    )
 
 
 def test_confirmed_textile_composition_opens_the_gate() -> None:
@@ -254,27 +364,23 @@ def test_suggested_fibre_names_drop_percentages() -> None:
 
 
 def test_unlock_vision_does_not_clear_confirmed_facts() -> None:
-    confirmed = confirm_facts(
-        facts_from_stored(None), is_textile=False, gpsr_choice="skip"
-    ).facts
+    confirmed = _coffee_confirm(facts_from_stored(None)).facts
     persistable = persistable_from_vision(VISION_WITH_LISTING_COPY)
     kept = apply_suggested(confirmed, persistable.facts.suggested)
     assert may_generate_listing_copy(kept) is True
     assert kept.confirmed is not None
-    assert kept.confirmed.is_textile is False
+    assert kept.confirmed.product_kind == "coffee"
     assert kept.suggested is not None
     assert kept.suggested.fibre_names == ("cotton",)
 
     suggested_only = stored_from_facts(persistable_from_vision(VISION_WITH_LISTING_COPY).facts)
     confirmed = stored_from_facts(
-        confirm_facts(
-            facts_from_stored(suggested_only), is_textile=False, gpsr_choice="skip"
-        ).facts
+        _coffee_confirm(facts_from_stored(suggested_only)).facts
     )
     merged = merge_product_facts([suggested_only, None, confirmed])
     assert may_generate_listing_copy(merged) is True
     assert merged.confirmed is not None
-    assert merged.confirmed.is_textile is False
+    assert merged.confirmed.product_kind == "coffee"
 
 
 COMPLETE_GPSR = {
@@ -309,38 +415,40 @@ GPSR_BLOCK_EU = "<p>Manufacturer: Acme Ltd, 1 Rue Example, Paris, acme@example.c
 
 
 def test_empty_gpsr_is_not_a_skip() -> None:
-    facts = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
-    result = confirm_facts(facts, is_textile=False)
+    facts = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    result = confirm_facts(
+        facts, is_textile=True, composition=COTTON_POLYESTER, care_choice="skip"
+    )
     assert result.ok is False
     assert result.error == "GPSR identity must be filled or explicitly skipped."
     assert may_generate_listing_copy(result.facts) is False
 
 
 def test_skip_omits_the_gpsr_block() -> None:
-    facts = confirm_facts(
-        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
-        is_textile=False,
-        gpsr_choice="skip",
-    ).facts
+    facts = _textile_for_gpsr().facts
     assert may_generate_listing_copy(facts) is True
     html = description_blocks(facts, shop_gpsr=COMPLETE_GPSR)
-    assert html == ""
+    assert "Manufacturer" not in html
+    assert "Fibre composition" in html
     assert effective_gpsr(facts, COMPLETE_GPSR) is None
     constraints = listing_copy_constraints(facts, shop_gpsr=COMPLETE_GPSR)
     assert GPSR_BLOCK not in constraints
     assert "do not invent" in constraints.lower()
     assert "gpsr" in constraints.lower()
-    assert apply_description_blocks(GPSR_BLOCK, facts, shop_gpsr=COMPLETE_GPSR) == ""
-    assert apply_description_blocks(
-        f"<p>A mug.</p>{GPSR_BLOCK}", facts, shop_gpsr=COMPLETE_GPSR
-    ) == "<p>A mug.</p>"
+    assert "Manufacturer" not in apply_description_blocks(
+        GPSR_BLOCK, facts, shop_gpsr=COMPLETE_GPSR
+    )
+    stripped = apply_description_blocks(
+        f"<p>A tee.</p>{GPSR_BLOCK}", facts, shop_gpsr=COMPLETE_GPSR
+    )
+    assert stripped.startswith("<p>A tee.</p>")
+    assert "Manufacturer" not in stripped
 
 
 def test_effective_gpsr_is_override_else_shop_default_else_none() -> None:
-    suggested = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
-    override = confirm_facts(
+    suggested = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    override = _textile_for_gpsr(
         suggested,
-        is_textile=False,
         gpsr_choice="override",
         gpsr_identity=COMPLETE_GPSR,
         shop_gpsr=COMPLETE_GPSR_EU,
@@ -351,11 +459,10 @@ def test_effective_gpsr_is_override_else_shop_default_else_none() -> None:
     assert identity.manufacturer_in_eu is False
     assert identity.eu_responsible_person is not None
     assert identity.eu_responsible_person.name == "EU Agent BV"
-    assert description_blocks(override, shop_gpsr=COMPLETE_GPSR_EU) == GPSR_BLOCK
+    assert GPSR_BLOCK in description_blocks(override, shop_gpsr=COMPLETE_GPSR_EU)
 
-    shop_default = confirm_facts(
+    shop_default = _textile_for_gpsr(
         suggested,
-        is_textile=False,
         gpsr_choice="shop_default",
         shop_gpsr=COMPLETE_GPSR_EU,
     ).facts
@@ -363,25 +470,23 @@ def test_effective_gpsr_is_override_else_shop_default_else_none() -> None:
     assert shop_identity is not None
     assert shop_identity.manufacturer_in_eu is True
     assert shop_identity.eu_responsible_person is None
-    assert description_blocks(shop_default, shop_gpsr=COMPLETE_GPSR_EU) == GPSR_BLOCK_EU
+    assert GPSR_BLOCK_EU in description_blocks(shop_default, shop_gpsr=COMPLETE_GPSR_EU)
 
-    no_shop = confirm_facts(
+    no_shop = _textile_for_gpsr(
         suggested,
-        is_textile=False,
         gpsr_choice="shop_default",
         shop_gpsr=None,
     )
     assert no_shop.ok is False
-    skipped = confirm_facts(suggested, is_textile=False, gpsr_choice="skip").facts
+    skipped = _textile_for_gpsr(suggested, gpsr_choice="skip").facts
     assert effective_gpsr(skipped, None) is None
-    assert description_blocks(skipped) == ""
+    assert "Manufacturer" not in description_blocks(skipped)
 
 
 def test_incomplete_gpsr_cannot_confirm() -> None:
-    facts = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
-    empty_name = confirm_facts(
+    facts = persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    empty_name = _textile_for_gpsr(
         facts,
-        is_textile=False,
         gpsr_choice="override",
         gpsr_identity={
             "manufacturer": {"name": "", "postalAddress": "1 Rue", "email": "a@b.c"},
@@ -391,9 +496,8 @@ def test_incomplete_gpsr_cannot_confirm() -> None:
     assert empty_name.ok is False
     assert empty_name.error == "GPSR identity is incomplete."
 
-    missing_rp = confirm_facts(
+    missing_rp = _textile_for_gpsr(
         facts,
-        is_textile=False,
         gpsr_choice="override",
         gpsr_identity=COMPLETE_GPSR_EU | {"manufacturerInEu": False},
     )
@@ -561,23 +665,15 @@ def test_care_block_sits_between_composition_and_gpsr() -> None:
     )
 
 
-def test_non_textile_does_not_require_or_show_care() -> None:
-    facts = confirm_facts(
-        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
-        is_textile=False,
-        gpsr_choice="skip",
-    ).facts
+def test_coffee_product_does_not_require_or_show_care() -> None:
+    facts = _coffee_confirm().facts
     assert may_generate_listing_copy(facts) is True
-    assert description_blocks(facts) == ""
-    assert "care" not in description_blocks(facts).lower()
-    filled_anyway = confirm_facts(
-        persistable_from_vision(VISION_WITH_LISTING_COPY).facts,
-        is_textile=False,
-        gpsr_choice="skip",
-        care_choice="fill",
-        care=COMPLETE_CARE,
-    ).facts
-    assert description_blocks(filled_anyway) == ""
+    html = description_blocks(facts)
+    assert "care" not in html.lower()
+    assert "Fibre composition" not in html
+    assert "Manufacturer" not in html
+    filled_anyway = _coffee_confirm(care_choice="fill", care=COMPLETE_CARE).facts
+    assert "Care instructions" not in description_blocks(filled_anyway)
     assert "Care instructions" not in listing_copy_constraints(filled_anyway)
 
 
@@ -675,9 +771,7 @@ def test_any_listing_copy_field_counts_as_copy_on_first_confirm() -> None:
         {"aeo_snippet": "A ceramic mug."},
         {"aeo_faqs": [{"q": "Is it ceramic?", "a": "Yes."}]},
     ):
-        result = confirm_facts(
-            suggested, is_textile=False, gpsr_choice="skip", listing_copy=listing_copy
-        )
+        result = _coffee_confirm(suggested, listing_copy=listing_copy)
         assert result.facts.listing_copy_stale is True, listing_copy
         assert may_generate_listing_copy(result.facts) is True
 
@@ -685,9 +779,7 @@ def test_any_listing_copy_field_counts_as_copy_on_first_confirm() -> None:
 def test_empty_listing_copy_fields_do_not_count_as_copy() -> None:
     suggested = persistable_from_vision(VISION_WITH_LISTING_COPY).facts
     for listing_copy in (None, {}, {"title": ""}, {"title": "  "}, {"tags": []}):
-        result = confirm_facts(
-            suggested, is_textile=False, gpsr_choice="skip", listing_copy=listing_copy
-        )
+        result = _coffee_confirm(suggested, listing_copy=listing_copy)
         assert result.facts.listing_copy_stale is False, listing_copy
 
 
@@ -760,14 +852,9 @@ def test_changing_care_gpsr_or_textile_with_listing_copy_marks_stale() -> None:
     )
     assert gpsr_override.facts.listing_copy_stale is True
 
-    not_textile = confirm_facts(
-        textile,
-        is_textile=False,
-        gpsr_choice="skip",
-        listing_copy=listing_copy,
-    )
-    assert not_textile.facts.listing_copy_stale is True
-    assert may_generate_listing_copy(not_textile.facts) is True
+    switched_to_coffee = _coffee_confirm(textile, listing_copy=listing_copy)
+    assert switched_to_coffee.facts.listing_copy_stale is True
+    assert may_generate_listing_copy(switched_to_coffee.facts) is True
 
 
 def test_accept_generated_description_applies_blocks_and_clears_stale() -> None:

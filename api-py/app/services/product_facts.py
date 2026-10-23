@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 _GATE_CLOSED = "Confirm product facts before generating listing copy."
+_PRODUCT_KIND_REQUIRED = "Product kind is required."
 _TEXTILE_NEEDS_COMPOSITION = (
     "Fibre composition is required to confirm a textile product."
 )
@@ -31,6 +32,21 @@ _CARE_REQUIRED = "Care instructions must be filled or explicitly skipped."
 _CARE_INCOMPLETE = "Care instructions must be a complete five-family set or an explicit skip."
 _CARE_SKIP = "skip"
 _CARE_FILL = "fill"
+
+PRODUCT_KIND_TEXTILE = "textile"
+PRODUCT_KIND_COFFEE = "coffee"
+PRODUCT_KINDS = (PRODUCT_KIND_TEXTILE, PRODUCT_KIND_COFFEE)
+
+COFFEE_FORMS = ("beans", "ground", "capsules")
+_COFFEE_FORM_REQUIRED = "Coffee form is required (beans, ground, or capsules)."
+_ROAST_REQUIRED = "Roast level is required."
+_NET_WEIGHT_REQUIRED = "Net weight is required."
+_VARIANT_NET_WEIGHT_REQUIRED = "Each variant needs a net weight."
+_INGREDIENTS_REQUIRED = "Ingredients list is required."
+_ALLERGEN_REQUIRED = "Allergen statement is required (use none when there are none)."
+_ORIGIN_REQUIRED = "Coffee origin must be filled or explicitly skipped."
+_ORIGIN_SKIP = "skip"
+_ORIGIN_FILL = "fill"
 
 CARE_PICKS: dict[str, dict[str, str]] = {
     "washing": {
@@ -122,13 +138,28 @@ class CareInstructions:
 
 
 @dataclass(frozen=True)
+class VariantNetWeight:
+    variant_id: str
+    net_weight: str
+
+
+@dataclass(frozen=True)
 class ConfirmedFacts:
     is_textile: bool
+    product_kind: str | None = None
     composition: tuple[FibreRow, ...] = ()
     gpsr_choice: str | None = None
     gpsr_override: GpsrIdentity | None = None
     care_choice: str | None = None
     care: CareInstructions | None = None
+    coffee_form: str | None = None
+    roast_level: str | None = None
+    net_weight: str | None = None
+    variant_net_weights: tuple[VariantNetWeight, ...] = ()
+    coffee_origin_choice: str | None = None
+    coffee_origin: str | None = None
+    ingredients_list: str | None = None
+    allergen_statement: str | None = None
 
 
 @dataclass(frozen=True)
@@ -214,52 +245,20 @@ def facts_from_stored(record: Mapping[str, Any] | None) -> ProductFacts:
         )
     confirmed = None
     if isinstance(confirmed_raw, Mapping) and (
-        "isTextile" in confirmed_raw or "is_textile" in confirmed_raw
+        "isTextile" in confirmed_raw
+        or "is_textile" in confirmed_raw
+        or "productKind" in confirmed_raw
+        or "product_kind" in confirmed_raw
     ):
-        is_textile = bool(
-            _as_bool(confirmed_raw.get("isTextile", confirmed_raw.get("is_textile")))
-        )
-        composition = ()
-        if is_textile:
-            parsed, error = _parse_composition(
-                confirmed_raw.get("composition") or ()
+        confirmed = _confirmed_from_stored(confirmed_raw)
+        if confirmed is None and (
+            "isTextile" in confirmed_raw or "is_textile" in confirmed_raw
+        ):
+            return ProductFacts(
+                suggested=suggested,
+                confirmed=None,
+                listing_copy_stale=_listing_copy_stale(record),
             )
-            if error or parsed is None:
-                return ProductFacts(
-                    suggested=suggested,
-                    confirmed=None,
-                    listing_copy_stale=_listing_copy_stale(record),
-                )
-            composition = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
-        care_choice = None
-        care = None
-        if is_textile:
-            care_choice = _care_choice(
-                confirmed_raw.get("careChoice", confirmed_raw.get("care_choice"))
-            )
-            if care_choice == _CARE_FILL:
-                parsed_care, care_error = parse_care_instructions(
-                    confirmed_raw.get("care")
-                )
-                if care_error or parsed_care is None:
-                    return ProductFacts(
-                        suggested=suggested,
-                        confirmed=None,
-                        listing_copy_stale=_listing_copy_stale(record),
-                    )
-                care = parsed_care
-        confirmed = ConfirmedFacts(
-            is_textile=is_textile,
-            composition=composition,
-            gpsr_choice=_gpsr_choice(
-                confirmed_raw.get("gpsrChoice", confirmed_raw.get("gpsr_choice"))
-            ),
-            gpsr_override=_identity_or_none(
-                confirmed_raw.get("gpsrIdentity", confirmed_raw.get("gpsr_identity"))
-            ),
-            care_choice=care_choice,
-            care=care,
-        )
     return ProductFacts(
         suggested=suggested,
         confirmed=confirmed,
@@ -275,21 +274,40 @@ def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
             "fibreNames": list(facts.suggested.fibre_names),
         }
     if facts.confirmed is not None:
-        stored["confirmed"] = {"isTextile": facts.confirmed.is_textile}
-        if facts.confirmed.composition:
+        confirmed = facts.confirmed
+        stored["confirmed"] = {"isTextile": confirmed.is_textile}
+        if confirmed.product_kind:
+            stored["confirmed"]["productKind"] = confirmed.product_kind
+        if confirmed.composition:
             stored["confirmed"]["composition"] = [
-                {"name": row.name, "percent": row.percent} for row in facts.confirmed.composition
+                {"name": row.name, "percent": row.percent} for row in confirmed.composition
             ]
-        if facts.confirmed.gpsr_choice:
-            stored["confirmed"]["gpsrChoice"] = facts.confirmed.gpsr_choice
-        if facts.confirmed.gpsr_override is not None:
+        if confirmed.gpsr_choice:
+            stored["confirmed"]["gpsrChoice"] = confirmed.gpsr_choice
+        if confirmed.gpsr_override is not None:
             stored["confirmed"]["gpsrIdentity"] = stored_gpsr_identity(
-                facts.confirmed.gpsr_override
+                confirmed.gpsr_override
             )
-        if facts.confirmed.care_choice:
-            stored["confirmed"]["careChoice"] = facts.confirmed.care_choice
-        if facts.confirmed.care is not None:
-            stored["confirmed"]["care"] = stored_care_instructions(facts.confirmed.care)
+        if confirmed.care_choice:
+            stored["confirmed"]["careChoice"] = confirmed.care_choice
+        if confirmed.care is not None:
+            stored["confirmed"]["care"] = stored_care_instructions(confirmed.care)
+        if confirmed.product_kind == PRODUCT_KIND_COFFEE:
+            stored["confirmed"]["coffeeForm"] = confirmed.coffee_form
+            stored["confirmed"]["roastLevel"] = confirmed.roast_level
+            if confirmed.net_weight:
+                stored["confirmed"]["netWeight"] = confirmed.net_weight
+            if confirmed.variant_net_weights:
+                stored["confirmed"]["variantNetWeights"] = [
+                    {"variantId": row.variant_id, "netWeight": row.net_weight}
+                    for row in confirmed.variant_net_weights
+                ]
+            if confirmed.coffee_origin_choice:
+                stored["confirmed"]["coffeeOriginChoice"] = confirmed.coffee_origin_choice
+            if confirmed.coffee_origin:
+                stored["confirmed"]["coffeeOrigin"] = confirmed.coffee_origin
+            stored["confirmed"]["ingredientsList"] = confirmed.ingredients_list
+            stored["confirmed"]["allergenStatement"] = confirmed.allergen_statement
     stored["listingCopyStale"] = facts.listing_copy_stale
     return stored
 
@@ -297,36 +315,64 @@ def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
 def confirm_facts(
     facts: ProductFacts,
     *,
-    is_textile: bool,
+    is_textile: bool | None = None,
+    product_kind: str | None = None,
     composition: Sequence[Mapping[str, Any]] | None = None,
     gpsr_choice: str | None = None,
     gpsr_identity: Mapping[str, Any] | None = None,
     shop_gpsr: Mapping[str, Any] | None = None,
     care_choice: str | None = None,
     care: Mapping[str, Any] | None = None,
+    coffee_form: str | None = None,
+    roast_level: str | None = None,
+    net_weight: str | None = None,
+    variant_net_weights: Sequence[Mapping[str, Any]] | None = None,
+    coffee_origin_choice: str | None = None,
+    coffee_origin: str | None = None,
+    ingredients_list: str | None = None,
+    allergen_statement: str | None = None,
     listing_copy: Mapping[str, Any] | None = None,
 ) -> ConfirmResult:
+    kind = _product_kind(product_kind)
+    if kind is None and is_textile is True:
+        kind = PRODUCT_KIND_TEXTILE
+    if kind is None:
+        return ConfirmResult(facts=facts, error=_PRODUCT_KIND_REQUIRED)
+
+    if kind == PRODUCT_KIND_COFFEE:
+        return _confirm_coffee(
+            facts,
+            coffee_form=coffee_form,
+            roast_level=roast_level,
+            net_weight=net_weight,
+            variant_net_weights=variant_net_weights,
+            coffee_origin_choice=coffee_origin_choice,
+            coffee_origin=coffee_origin,
+            ingredients_list=ingredients_list,
+            allergen_statement=allergen_statement,
+            listing_copy=listing_copy,
+        )
+
     choice = _gpsr_choice(gpsr_choice)
     if choice is None:
         return ConfirmResult(facts=facts, error=_GPSR_REQUIRED)
     composition_rows: tuple[FibreRow, ...] = ()
     stored_care_choice: str | None = None
     care_value: CareInstructions | None = None
-    if is_textile:
-        if not composition:
-            return ConfirmResult(facts=facts, error=_TEXTILE_NEEDS_COMPOSITION)
-        parsed, error = _parse_composition(composition)
-        if error or parsed is None:
-            return ConfirmResult(facts=facts, error=error or _TEXTILE_NEEDS_COMPOSITION)
-        composition_rows = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
-        stored_care_choice = _care_choice(care_choice)
-        if stored_care_choice is None:
-            return ConfirmResult(facts=facts, error=_CARE_REQUIRED)
-        if stored_care_choice == _CARE_FILL:
-            parsed_care, care_error = parse_care_instructions(care)
-            if care_error or parsed_care is None:
-                return ConfirmResult(facts=facts, error=care_error or _CARE_INCOMPLETE)
-            care_value = parsed_care
+    if not composition:
+        return ConfirmResult(facts=facts, error=_TEXTILE_NEEDS_COMPOSITION)
+    parsed, error = _parse_composition(composition)
+    if error or parsed is None:
+        return ConfirmResult(facts=facts, error=error or _TEXTILE_NEEDS_COMPOSITION)
+    composition_rows = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
+    stored_care_choice = _care_choice(care_choice)
+    if stored_care_choice is None:
+        return ConfirmResult(facts=facts, error=_CARE_REQUIRED)
+    if stored_care_choice == _CARE_FILL:
+        parsed_care, care_error = parse_care_instructions(care)
+        if care_error or parsed_care is None:
+            return ConfirmResult(facts=facts, error=care_error or _CARE_INCOMPLETE)
+        care_value = parsed_care
     override: GpsrIdentity | None = None
     if choice == _GPSR_SKIP:
         override = None
@@ -340,7 +386,8 @@ def confirm_facts(
             return ConfirmResult(facts=facts, error=error or _GPSR_INCOMPLETE)
         override = identity
     confirmed = ConfirmedFacts(
-        is_textile=is_textile,
+        is_textile=True,
+        product_kind=PRODUCT_KIND_TEXTILE,
         composition=composition_rows,
         gpsr_choice=choice,
         gpsr_override=override,
@@ -363,9 +410,13 @@ def may_generate_listing_copy(facts: ProductFacts) -> bool:
     confirmed = facts.confirmed
     if confirmed is None:
         return False
-    if confirmed.is_textile is False:
-        return True
-    return confirmed.is_textile is True and bool(confirmed.composition)
+    if confirmed.product_kind == PRODUCT_KIND_COFFEE:
+        return _coffee_pack_complete(confirmed)
+    if confirmed.product_kind == PRODUCT_KIND_TEXTILE or (
+        confirmed.product_kind is None and confirmed.is_textile is True
+    ):
+        return bool(confirmed.composition)
+    return False
 
 
 def generation_blocked_reason(facts: ProductFacts) -> str | None:
@@ -386,6 +437,14 @@ def listing_copy_constraints(
         parts.append(
             f"Include this English facts block in the description HTML, unchanged: {blocks}"
         )
+    if confirmed.product_kind == PRODUCT_KIND_COFFEE:
+        parts.append(
+            "This product is a Coffee product. "
+            "Do not invent ingredients, allergens, net weight, roast, form, or origin "
+            "beyond the confirmed facts. Do not invent fibre composition, care instructions, "
+            "or GPSR / EU responsible person details."
+        )
+        return "\n".join(parts)
     if confirmed.is_textile is False:
         if effective_gpsr(facts, shop_gpsr) is None:
             parts.append(_NON_TEXTILE_CONSTRAINTS)
@@ -415,6 +474,9 @@ def description_blocks(
 ) -> str:
     chunks: list[str] = []
     confirmed = facts.confirmed
+    if confirmed is not None and confirmed.product_kind == PRODUCT_KIND_COFFEE:
+        chunks.extend(_coffee_description_chunks(confirmed))
+        return "".join(chunks) if len(chunks) == 1 else "\n".join(chunks)
     if confirmed is not None and confirmed.is_textile and confirmed.composition:
         parts = ", ".join(f"{row.percent}% {row.name}" for row in confirmed.composition)
         chunks.append(f"<p>Fibre composition: {parts}.</p>")
@@ -431,6 +493,8 @@ def effective_gpsr(
 ) -> GpsrIdentity | None:
     confirmed = facts.confirmed
     if confirmed is None:
+        return None
+    if confirmed.product_kind == PRODUCT_KIND_COFFEE:
         return None
     choice = confirmed.gpsr_choice
     if choice == _GPSR_SKIP or choice is None:
@@ -477,6 +541,10 @@ _GPSR_BLOCK = re.compile(
     r"<p>Manufacturer:.*?</p>(?:\s*<p>EU responsible person:.*?</p>)?",
     re.IGNORECASE | re.DOTALL,
 )
+_COFFEE_FACT_BLOCKS = re.compile(
+    r"<p>(?:Coffee form|Roast level|Net weight|Coffee origin|Ingredients|Allergens):.*?</p>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def apply_description_blocks(
@@ -485,8 +553,11 @@ def apply_description_blocks(
     shop_gpsr: Mapping[str, Any] | None = None,
 ) -> str:
     """Put the module's English blocks into listing-copy description HTML."""
-    stripped = _GPSR_BLOCK.sub(
-        "", _CARE_BLOCK.sub("", _COMPOSITION_BLOCK.sub("", description))
+    stripped = _COFFEE_FACT_BLOCKS.sub(
+        "",
+        _GPSR_BLOCK.sub(
+            "", _CARE_BLOCK.sub("", _COMPOSITION_BLOCK.sub("", description))
+        ),
     ).strip()
     blocks = description_blocks(facts, shop_gpsr)
     if not blocks:
@@ -572,6 +643,241 @@ def payload_outcomes(
 
 def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _product_kind(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    kind = value.strip().lower().replace("-", "_")
+    if kind in PRODUCT_KINDS:
+        return kind
+    return None
+
+
+def _origin_choice(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    choice = value.strip().lower().replace("-", "_")
+    if choice in {_ORIGIN_SKIP, _ORIGIN_FILL}:
+        return choice
+    return None
+
+
+def _coffee_form(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    form = value.strip().lower()
+    if form in COFFEE_FORMS:
+        return form
+    return None
+
+
+def _coffee_pack_complete(confirmed: ConfirmedFacts) -> bool:
+    if confirmed.product_kind != PRODUCT_KIND_COFFEE:
+        return False
+    if confirmed.coffee_form not in COFFEE_FORMS:
+        return False
+    if not _text(confirmed.roast_level):
+        return False
+    if confirmed.variant_net_weights:
+        if any(not _text(row.net_weight) for row in confirmed.variant_net_weights):
+            return False
+    elif not _text(confirmed.net_weight):
+        return False
+    if confirmed.coffee_origin_choice == _ORIGIN_SKIP:
+        pass
+    elif confirmed.coffee_origin_choice == _ORIGIN_FILL and _text(confirmed.coffee_origin):
+        pass
+    else:
+        return False
+    if not _text(confirmed.ingredients_list):
+        return False
+    if not _text(confirmed.allergen_statement):
+        return False
+    return True
+
+
+def _parse_variant_net_weights(
+    raw: Sequence[Mapping[str, Any]] | None,
+) -> tuple[tuple[VariantNetWeight, ...] | None, str | None]:
+    if not raw:
+        return (), None
+    rows: list[VariantNetWeight] = []
+    for item in raw:
+        if not isinstance(item, Mapping):
+            return None, _VARIANT_NET_WEIGHT_REQUIRED
+        variant_id = _text(item.get("variantId", item.get("variant_id")))
+        weight = _text(item.get("netWeight", item.get("net_weight")))
+        if not variant_id or not weight:
+            return None, _VARIANT_NET_WEIGHT_REQUIRED
+        rows.append(VariantNetWeight(variant_id=variant_id, net_weight=weight))
+    return tuple(rows), None
+
+
+def _confirm_coffee(
+    facts: ProductFacts,
+    *,
+    coffee_form: str | None,
+    roast_level: str | None,
+    net_weight: str | None,
+    variant_net_weights: Sequence[Mapping[str, Any]] | None,
+    coffee_origin_choice: str | None,
+    coffee_origin: str | None,
+    ingredients_list: str | None,
+    allergen_statement: str | None,
+    listing_copy: Mapping[str, Any] | None,
+) -> ConfirmResult:
+    form = _coffee_form(coffee_form)
+    if form is None:
+        return ConfirmResult(facts=facts, error=_COFFEE_FORM_REQUIRED)
+    roast = _text(roast_level)
+    if not roast:
+        return ConfirmResult(facts=facts, error=_ROAST_REQUIRED)
+    weights, weight_error = _parse_variant_net_weights(variant_net_weights)
+    if weight_error:
+        return ConfirmResult(facts=facts, error=weight_error)
+    assert weights is not None
+    product_weight = _text(net_weight)
+    if weights:
+        product_weight = ""
+    elif not product_weight:
+        return ConfirmResult(facts=facts, error=_NET_WEIGHT_REQUIRED)
+    origin_choice = _origin_choice(coffee_origin_choice)
+    if origin_choice is None:
+        return ConfirmResult(facts=facts, error=_ORIGIN_REQUIRED)
+    origin_text = _text(coffee_origin)
+    if origin_choice == _ORIGIN_FILL and not origin_text:
+        return ConfirmResult(facts=facts, error=_ORIGIN_REQUIRED)
+    if origin_choice == _ORIGIN_SKIP:
+        origin_text = ""
+    ingredients = _text(ingredients_list)
+    if not ingredients:
+        return ConfirmResult(facts=facts, error=_INGREDIENTS_REQUIRED)
+    allergens = _text(allergen_statement)
+    if not allergens:
+        return ConfirmResult(facts=facts, error=_ALLERGEN_REQUIRED)
+    confirmed = ConfirmedFacts(
+        is_textile=False,
+        product_kind=PRODUCT_KIND_COFFEE,
+        coffee_form=form,
+        roast_level=roast,
+        net_weight=product_weight or None,
+        variant_net_weights=weights,
+        coffee_origin_choice=origin_choice,
+        coffee_origin=origin_text or None,
+        ingredients_list=ingredients,
+        allergen_statement=allergens,
+    )
+    stale = facts.listing_copy_stale
+    if confirmed != facts.confirmed and _listing_copy_present(listing_copy):
+        stale = True
+    return ConfirmResult(
+        facts=ProductFacts(
+            suggested=facts.suggested,
+            confirmed=confirmed,
+            listing_copy_stale=stale,
+        )
+    )
+
+
+def _confirmed_from_stored(confirmed_raw: Mapping[str, Any]) -> ConfirmedFacts | None:
+    kind = _product_kind(
+        confirmed_raw.get("productKind", confirmed_raw.get("product_kind"))
+    )
+    is_textile_raw = _as_bool(confirmed_raw.get("isTextile", confirmed_raw.get("is_textile")))
+    if kind is None and is_textile_raw is True:
+        kind = PRODUCT_KIND_TEXTILE
+    if kind == PRODUCT_KIND_COFFEE:
+        form = _coffee_form(confirmed_raw.get("coffeeForm", confirmed_raw.get("coffee_form")))
+        roast = _text(confirmed_raw.get("roastLevel", confirmed_raw.get("roast_level")))
+        origin_choice = _origin_choice(
+            confirmed_raw.get("coffeeOriginChoice", confirmed_raw.get("coffee_origin_choice"))
+        )
+        origin = _text(confirmed_raw.get("coffeeOrigin", confirmed_raw.get("coffee_origin")))
+        ingredients = _text(
+            confirmed_raw.get("ingredientsList", confirmed_raw.get("ingredients_list"))
+        )
+        allergens = _text(
+            confirmed_raw.get("allergenStatement", confirmed_raw.get("allergen_statement"))
+        )
+        weights_raw = confirmed_raw.get(
+            "variantNetWeights", confirmed_raw.get("variant_net_weights")
+        )
+        weights: tuple[VariantNetWeight, ...] = ()
+        if isinstance(weights_raw, Sequence) and not isinstance(weights_raw, (str, bytes)):
+            parsed_weights, weight_error = _parse_variant_net_weights(weights_raw)
+            if weight_error or parsed_weights is None:
+                return None
+            weights = parsed_weights
+        net_weight = _text(confirmed_raw.get("netWeight", confirmed_raw.get("net_weight")))
+        draft = ConfirmedFacts(
+            is_textile=False,
+            product_kind=PRODUCT_KIND_COFFEE,
+            coffee_form=form,
+            roast_level=roast or None,
+            net_weight=net_weight or None,
+            variant_net_weights=weights,
+            coffee_origin_choice=origin_choice,
+            coffee_origin=origin or None,
+            ingredients_list=ingredients or None,
+            allergen_statement=allergens or None,
+        )
+        return draft
+
+    is_textile = bool(is_textile_raw) if is_textile_raw is not None else False
+    if kind == PRODUCT_KIND_TEXTILE:
+        is_textile = True
+    composition: tuple[FibreRow, ...] = ()
+    care_choice = None
+    care = None
+    if is_textile:
+        parsed, error = _parse_composition(confirmed_raw.get("composition") or ())
+        if error or parsed is None:
+            return None
+        composition = tuple(FibreRow(name=name, percent=percent) for name, percent in parsed)
+        care_choice = _care_choice(
+            confirmed_raw.get("careChoice", confirmed_raw.get("care_choice"))
+        )
+        if care_choice == _CARE_FILL:
+            parsed_care, care_error = parse_care_instructions(confirmed_raw.get("care"))
+            if care_error or parsed_care is None:
+                return None
+            care = parsed_care
+    return ConfirmedFacts(
+        is_textile=is_textile,
+        product_kind=kind,
+        composition=composition,
+        gpsr_choice=_gpsr_choice(
+            confirmed_raw.get("gpsrChoice", confirmed_raw.get("gpsr_choice"))
+        ),
+        gpsr_override=_identity_or_none(
+            confirmed_raw.get("gpsrIdentity", confirmed_raw.get("gpsr_identity"))
+        ),
+        care_choice=care_choice,
+        care=care,
+    )
+
+
+def _coffee_description_chunks(confirmed: ConfirmedFacts) -> list[str]:
+    chunks: list[str] = []
+    if confirmed.coffee_form:
+        chunks.append(f"<p>Coffee form: {confirmed.coffee_form}.</p>")
+    if confirmed.roast_level:
+        chunks.append(f"<p>Roast level: {confirmed.roast_level}.</p>")
+    if confirmed.variant_net_weights:
+        parts = ", ".join(
+            f"{row.variant_id}: {row.net_weight}" for row in confirmed.variant_net_weights
+        )
+        chunks.append(f"<p>Net weight: {parts}.</p>")
+    elif confirmed.net_weight:
+        chunks.append(f"<p>Net weight: {confirmed.net_weight}.</p>")
+    if confirmed.coffee_origin_choice == _ORIGIN_FILL and confirmed.coffee_origin:
+        chunks.append(f"<p>Coffee origin: {confirmed.coffee_origin}.</p>")
+    if confirmed.ingredients_list:
+        chunks.append(f"<p>Ingredients: {confirmed.ingredients_list}.</p>")
+    if confirmed.allergen_statement:
+        chunks.append(f"<p>Allergens: {confirmed.allergen_statement}.</p>")
+    return chunks
 
 
 def _listing_copy_stale(record: Mapping[str, Any]) -> bool:
