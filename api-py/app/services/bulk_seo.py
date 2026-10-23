@@ -86,6 +86,8 @@ def photos_from_images(images: Sequence[Any]) -> list[BulkSeoPhoto]:
 
 EMPTY_SELECTION = "Pick products to start Bulk SEO."
 PARSE_FAILED = "Could not parse listing copy refresh."
+MAX_START_ELIGIBLE = 25
+TOO_MANY_ELIGIBLE = f"Bulk SEO is limited to {MAX_START_ELIGIBLE} products per Start."
 
 
 @dataclass(frozen=True)
@@ -151,17 +153,24 @@ async def start_pack(
         return Pack(error=blocked)
 
     primaries = _primary_for_ids(photos)
-    items: list[PackItem] = []
+    selected: list[tuple[BulkSeoPhoto, str | None]] = []
     seen: set[int] = set()
     for selected_id in selected_ids:
         primary = primaries.get(selected_id)
         if primary is None or primary.id in seen:
             continue
         seen.add(primary.id)
-        product_id = primary.id
         gate = refresh_blocked_reason(
             primary.facts, primary.listing_copy, demand_configured
         )
+        selected.append((primary, gate))
+
+    if sum(1 for _primary, gate in selected if gate is None) > MAX_START_ELIGIBLE:
+        return Pack(error=TOO_MANY_ELIGIBLE)
+
+    items: list[PackItem] = []
+    for primary, gate in selected:
+        product_id = primary.id
         if gate:
             started = start_listing_copy_refresh(
                 primary.facts,

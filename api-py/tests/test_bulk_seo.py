@@ -168,6 +168,14 @@ def _must_not_propose(_product_id, **_kwargs):
     raise AssertionError("must not propose listing copy")
 
 
+_PACK = {
+    "tags": ["cotton", "tee"],
+    "description": "<p>A cotton tee.</p>",
+    "seoTitle": "Cotton tee",
+    "seoDescription": "Buy a cotton tee",
+}
+
+
 async def test_start_with_no_ids_is_refused() -> None:
     pack = await start_pack(
         [_photo()],
@@ -181,12 +189,47 @@ async def test_start_with_no_ids_is_refused() -> None:
     assert pack.items == ()
 
 
-_PACK = {
-    "tags": ["cotton", "tee"],
-    "description": "<p>A cotton tee.</p>",
-    "seoTitle": "Cotton tee",
-    "seoDescription": "Buy a cotton tee",
-}
+async def test_start_with_26_eligible_primaries_is_refused_with_zero_propose() -> None:
+    photos = [
+        _photo(id=i, title=f"Product {i}", listing_copy={"title": f"Product {i}"})
+        for i in range(1, 27)
+    ]
+    pack = await start_pack(
+        photos,
+        selected_ids=[p.id for p in photos],
+        demand_configured=True,
+        entitlement="plan",
+        fetch=_must_not_fetch,
+        propose=_must_not_propose,
+    )
+    assert pack.error == "Bulk SEO is limited to 25 products per Start."
+    assert pack.items == ()
+    assert pack.proposed_use_count == 0
+
+
+async def test_start_with_25_eligible_primaries_still_runs() -> None:
+    photos = [
+        _photo(id=i, title=f"Product {i}", listing_copy={"title": f"Product {i}"})
+        for i in range(1, 26)
+    ]
+    proposed: list[int] = []
+
+    def propose(product_id: int, **_kwargs):
+        proposed.append(product_id)
+        return _PACK
+
+    pack = await start_pack(
+        photos,
+        selected_ids=[p.id for p in photos],
+        demand_configured=True,
+        entitlement="plan",
+        fetch=lambda _pid, _seeds: ("cotton t-shirt",),
+        propose=propose,
+    )
+    assert pack.error is None
+    assert len(pack.items) == 25
+    assert pack.proposed_use_count == 25
+    assert proposed == [p.id for p in photos]
 
 
 async def test_one_empty_demand_item_does_not_drop_siblings() -> None:
