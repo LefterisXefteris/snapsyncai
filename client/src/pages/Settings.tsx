@@ -7,7 +7,8 @@ import {
   useSaveShopGpsrIdentity,
   useSubscriptionStatus,
   useCancelSubscription,
-  useSetupWriteCard,
+  useBuyCredits,
+  useVerifyCredits,
 } from "@/hooks/use-images";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,8 @@ export default function Settings() {
   const saveShopGpsr = useSaveShopGpsrIdentity();
   const { data: subscriptionStatus } = useSubscriptionStatus();
   const cancelSubscription = useCancelSubscription();
-  const setupWriteCard = useSetupWriteCard();
+  const buyCredits = useBuyCredits();
+  const verifyCredits = useVerifyCredits();
 
   const [shopDomain, setShopDomain] = useState("");
   const [shopGpsrDraft, setShopGpsrDraft] = useState(emptyGpsrIdentity());
@@ -52,11 +54,34 @@ export default function Settings() {
   const allowanceUsed = subscriptionStatus?.allowanceUsed ?? 0;
   const allowanceIncluded = subscriptionStatus?.allowanceIncluded;
   const onPlan = subscriptionStatus?.entitlement === "plan";
+  const creditBalance = subscriptionStatus?.creditBalance ?? 0;
+  const creditPacks = subscriptionStatus?.creditPacks ?? [
+    { size: 10, pence: 700 },
+    { size: 50, pence: 3000 },
+    { size: 100, pence: 5500 },
+  ];
 
   useEffect(() => {
     const identity = shopifyStatus?.gpsrIdentity as GpsrIdentity | undefined;
     if (identity && isCompleteGpsr(identity)) setShopGpsrDraft(identity);
   }, [shopifyStatus?.gpsrIdentity]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("credits") !== "success") return;
+    const checkoutSessionId = params.get("checkout_session_id");
+    if (!checkoutSessionId) return;
+    verifyCredits.mutate(checkoutSessionId, {
+      onSettled: () => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("credits");
+        url.searchParams.delete("checkout_session_id");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      },
+    });
+    // Intentionally once on mount for return-from-Stripe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConnect = () => {
     if (!shopDomain.trim()) {
@@ -304,38 +329,22 @@ export default function Settings() {
 
           <section className="space-y-4">
             <h2 className="text-xs text-muted-foreground">Billing</h2>
-            <div className="glass-panel rounded-lg p-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-medium">AI listing-copy writes</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {leftoverWeekly
-                    ? `${allowanceUsed} of ${allowanceIncluded} listing-copy writes this week. This leftover weekly period ends without renewal; then three free writes and £0.70 each.`
-                    : onPlan
-                    ? "Listing-copy writes are included until this paid period ends. It will not renew."
-                    : isSubscribed
-                    ? "Local workspace. Listing copy is not billed."
-                    : allowanceIncluded != null
-                    ? `${Math.max(0, (allowanceIncluded ?? 0) - allowanceUsed)} of ${allowanceIncluded} free AI listing-copy writes left. Then £0.70 each.`
-                    : "Three free AI listing-copy writes, then £0.70 each."}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {!onPlan && !leftoverWeekly ? (
-                  <Button
-                    data-testid="button-setup-write-card"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setupWriteCard.mutate()}
-                    disabled={setupWriteCard.isPending}
-                  >
-                    {setupWriteCard.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Add card
-                  </Button>
-                ) : null}
+            <div className="glass-panel rounded-lg p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium">Credits</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {leftoverWeekly
+                      ? `${allowanceUsed} of ${allowanceIncluded} Accepts this week. This leftover weekly period ends without renewal; then three free Credits, then packs.`
+                      : onPlan
+                      ? "Accepts do not spend Credits until this paid period ends. It will not renew."
+                      : isSubscribed
+                      ? "Local workspace. Listing copy is not billed."
+                      : allowanceIncluded != null
+                      ? `${Math.max(0, (allowanceIncluded ?? 0) - allowanceUsed)} of ${allowanceIncluded} free Credits left. Balance: ${creditBalance}. One Credit per Accept (generate, refresh, Bulk SEO).`
+                      : `Three free Credits, then packs. Balance: ${creditBalance}.`}
+                  </p>
+                </div>
                 {isSubscribed && (leftoverWeekly || onPlan) ? (
                   <Button
                     data-testid="button-cancel-subscription"
@@ -348,6 +357,27 @@ export default function Settings() {
                   </Button>
                 ) : null}
               </div>
+              {!onPlan && !leftoverWeekly && !isSubscribed ? (
+                <div className="flex flex-wrap gap-2">
+                  {creditPacks.map((pack) => (
+                    <Button
+                      key={pack.size}
+                      data-testid={`button-buy-credits-${pack.size}`}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => buyCredits.mutate(pack.size)}
+                      disabled={buyCredits.isPending}
+                    >
+                      {buyCredits.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      {pack.size} · £{(pack.pence / 100).toFixed(pack.pence % 100 === 0 ? 0 : 2)}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </section>
 

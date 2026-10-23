@@ -231,7 +231,7 @@ async def accept_generated_listing_copy_route(
 
 
 def _accepted_out(result: Accepted, settings) -> ImageOut:
-    if result.refused in ("plan_blocked", "overflow_confirm"):
+    if result.refused in ("plan_blocked", "overflow_confirm", "credits_needed"):
         raise HTTPException(status_code=403, detail=result.message)
     if result.refused is not None or result.product is None:
         raise HTTPException(status_code=404, detail="Image not found")

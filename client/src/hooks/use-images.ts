@@ -60,6 +60,13 @@ export function useSubscriptionStatus() {
           overageThisMonth: 0,
           overflowNotice: false,
           overflowConfirmRequired: false,
+          creditBalance: 0,
+          creditsNeeded: false,
+          creditPacks: [
+            { size: 10, pence: 700 },
+            { size: 50, pence: 3000 },
+            { size: 100, pence: 5500 },
+          ],
         };
       }
       const res = await apiFetch('/api/subscription/status');
@@ -72,6 +79,9 @@ export function useSubscriptionStatus() {
         overageThisMonth?: number;
         overflowNotice?: boolean;
         overflowConfirmRequired?: boolean;
+        creditBalance?: number;
+        creditsNeeded?: boolean;
+        creditPacks?: { size: number; pence: number }[];
         status?: string;
         currentPeriodEnd?: string;
         stripeSubscriptionId?: string;
@@ -113,6 +123,62 @@ export function useSetupWriteCard() {
     onError: (error) => {
       toast({
         title: "Card setup",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useBuyCredits() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (pack: number) => {
+      const res = await apiRequest("POST", "/api/subscription/buy-credits", { pack });
+      return res.json() as Promise<{ checkoutUrl: string; sessionId: string }>;
+    },
+    onSuccess: (data) => {
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+    },
+    onError: (error) => {
+      toast({
+        title: "Buy Credits",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useVerifyCredits() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (checkoutSessionId: string) => {
+      const res = await apiRequest("POST", "/api/subscription/verify-credits", {
+        checkoutSessionId,
+      });
+      return res.json() as Promise<{
+        verified: boolean;
+        creditBalance?: number;
+        alreadyClaimed?: boolean;
+      }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      toast({
+        title: data.alreadyClaimed ? "Credits already added" : "Credits added",
+        description:
+          data.creditBalance != null
+            ? `Balance: ${data.creditBalance} Credits.`
+            : "Your Credit pack is ready.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Credit pack",
         description: error.message,
         variant: "destructive",
       });

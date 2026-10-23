@@ -1,12 +1,16 @@
-"""Plan module — Allowance math with an injected clock. No Stripe."""
+"""Plan module — Credit / entitlement math with an injected clock. No Stripe."""
 
 from datetime import UTC, datetime
 
 from app.services.plan import (
+    CREDIT_PACKS,
+    FREE_CREDITS_INCLUDED,
     LEFTOVER_WEEKLY_INCLUDED,
+    NEED_CREDITS,
     WEEKLY_LIMIT,
     Spend,
     decide,
+    pack_pence,
     view,
 )
 
@@ -17,28 +21,41 @@ MONDAY = datetime(2026, 1, 12, 10, 0, tzinfo=UTC)  # Monday
 NEXT_MONDAY = datetime(2026, 1, 19, 0, 0, tzinfo=UTC)
 
 
-def test_free_listing_copy_write_is_allowed_within_three() -> None:
+def test_free_accept_is_allowed_within_three() -> None:
     decision = decide("free", (), JAN, "generate_persist")
     assert decision.allowed is True
     assert decision.blocked_reason is None
     assert decision.records_spend is True
     assert decision.as_overage is False
+    assert decision.spends_credit is False
 
 
-def test_free_fourth_write_needs_paid_confirm() -> None:
+def test_free_fourth_accept_without_credits_is_refused() -> None:
     spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
-    decision = decide("free", spends, JAN, "generate_persist")
+    decision = decide("free", spends, JAN, "generate_persist", credit_balance=0)
     assert decision.allowed is False
-    assert decision.blocked_reason == "overflow_confirm_required"
-    assert decision.overflow_confirm_required is True
+    assert decision.blocked_reason == NEED_CREDITS
+    assert decision.credits_needed is True
     assert decision.records_spend is False
+    assert decision.spends_credit is False
 
 
-def test_free_fourth_write_may_start_before_accept_confirm() -> None:
+def test_free_fourth_accept_with_credits_spends_one_credit() -> None:
     spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
-    decision = decide("free", spends, JAN, "generate_persist", completed=False)
+    decision = decide("free", spends, JAN, "generate_persist", credit_balance=5)
     assert decision.allowed is True
-    assert decision.overflow_confirm_required is True
+    assert decision.records_spend is True
+    assert decision.spends_credit is True
+    assert decision.credits_needed is False
+
+
+def test_free_fourth_may_start_before_accept_even_without_credits() -> None:
+    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
+    decision = decide(
+        "free", spends, JAN, "generate_persist", completed=False, credit_balance=0
+    )
+    assert decision.allowed is True
+    assert decision.credits_needed is True
     assert decision.records_spend is False
 
 
@@ -150,32 +167,15 @@ def test_no_entitlement_starts_a_plan_checkout() -> None:
     assert may_start_checkout("local_bypass") is False
 
 
-def test_free_view_counts_lifetime_listing_copy_writes() -> None:
-    from app.services.plan import FREE_WRITES_INCLUDED
-
+def test_free_view_counts_lifetime_accepts() -> None:
     spends = (
         Spend(at=JAN, kind="generate_persist"),
         Spend(at=JAN, kind="refresh_accept"),
     )
     snapshot = view("free", spends, JAN)
-    assert snapshot.included == FREE_WRITES_INCLUDED
+    assert snapshot.included == FREE_CREDITS_INCLUDED
     assert snapshot.used == 2
     assert snapshot.overage == 0
-
-
-def test_free_paid_write_after_confirm_records_overage() -> None:
-    spends = tuple(Spend(at=JAN, kind="generate_persist") for _ in range(3))
-    decision = decide(
-        "free",
-        spends,
-        JAN,
-        "generate_persist",
-        paid_write_confirmed=True,
-    )
-    assert decision.allowed is True
-    assert decision.records_spend is True
-    assert decision.as_overage is True
-    assert decision.overflow_confirm_required is False
 
 
 def test_free_stale_regenerate_does_not_spend() -> None:
@@ -185,3 +185,12 @@ def test_free_stale_regenerate_does_not_spend() -> None:
     assert decision.allowed is True
     assert decision.records_spend is False
 
+
+def test_credit_packs_are_cheaper_per_credit_at_larger_size() -> None:
+    assert pack_pence(10) == 700
+    assert pack_pence(50) == 3000
+    assert pack_pence(100) == 5500
+    assert CREDIT_PACKS[10] / 10 == 70
+    assert CREDIT_PACKS[50] / 50 < 70
+    assert CREDIT_PACKS[100] / 100 < CREDIT_PACKS[50] / 50
+    assert pack_pence(25) is None

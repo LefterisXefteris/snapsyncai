@@ -18,7 +18,7 @@ import {
   bulkSeoStartEnabled,
 } from "@/lib/bulk-seo";
 import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
-import { overflowNoticeText } from "@/lib/overflow-copy";
+import { creditsNeededNotice, overflowNoticeText } from "@/lib/overflow-copy";
 
 export default function BulkSeoPage() {
   const catalogue = useBulkSeoCatalogue();
@@ -82,8 +82,8 @@ export default function BulkSeoPage() {
               <Search className="w-3.5 h-3.5 mr-1.5" />
             )}
             Start
-            {eligibleTickCount > 0 && !started ? ` (${eligibleTickCount} uses)` : ""}
-            {started ? ` (${proposedUseCount} uses)` : ""}
+            {eligibleTickCount > 0 && !started ? ` (${eligibleTickCount} Credits)` : ""}
+            {started ? ` (${proposedUseCount} Credits)` : ""}
           </Button>
         </div>
       </div>
@@ -110,7 +110,7 @@ export default function BulkSeoPage() {
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     {eligibleTickCount} selected · accepting all would spend {eligibleTickCount}{" "}
-                    {eligibleTickCount === 1 ? "use" : "uses"}
+                    {eligibleTickCount === 1 ? "Credit" : "Credits"}
                   </p>
                   <Button
                     type="button"
@@ -126,14 +126,18 @@ export default function BulkSeoPage() {
                 </div>
               ) : (
                 <>
-                  {overflow.overflowNotice ? (
+                  {overflow.creditsNeeded ? (
+                    <p className="text-xs text-muted-foreground" data-testid="text-credits-needed">
+                      {creditsNeededNotice()}
+                    </p>
+                  ) : overflow.overflowNotice ? (
                     <p className="text-xs text-muted-foreground" data-testid="text-overflow-notice">
                       {overflowNoticeText(overflow.overagePence)}
                     </p>
                   ) : null}
                   <p className="text-xs text-muted-foreground">
                     Accepting these proposals would spend {proposedUseCount}{" "}
-                    {proposedUseCount === 1 ? "use" : "uses"}
+                    {proposedUseCount === 1 ? "Credit" : "Credits"}
                   </p>
                   {acceptBlockedReason ? (
                     <p className="text-sm text-muted-foreground">{acceptBlockedReason}</p>

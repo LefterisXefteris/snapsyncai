@@ -81,7 +81,7 @@ The job of proposing new tags, description, SEO title, and meta description for 
 _Avoid_: Agentic SEO, SEO agent, trend rewrite, competitor SEO
 
 **Accept**:
-The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. When it lands as a listing-copy write it spends under that shop's write rules, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page or the Bulk SEO page.
+The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. When it lands it spends one Credit under that shop's Credit rules, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page or the Bulk SEO page.
 _Avoid_: approve, apply, save (as the seller act)
 
 **Search demand**:
@@ -192,14 +192,14 @@ _Avoid_: Out of date, dirty
 The default GPSR identity for a connected Shopify shop, used by Textile products. A product may override it. Changing it stales listing copy on Textile products that use the shop default. Not used by Coffee product.
 _Avoid_: Account compliance, store settings (as the fact itself)
 
-**Listing-copy write**:
-One Accept that lands for first generate, listing copy refresh, or one Bulk SEO product. Three free for the life of one seller and one Shopify shop, then £0.70 when the write lands. A per-field regenerate after an Accept is another write; a failed generate and a stale regenerate are not. The first paid write on a shop needs the seller's confirm; later paid writes on that shop do not. A write does not land when the £0.70 charge fails. With no Shopify shop yet, the three free and that confirm sit on the seller's workspace until a shop is connected, then stay with that shop and do not reset. Confirming facts, Classification, typed listing copy, and Push are not listing-copy writes.
-_Avoid_: credit, Allowance, Overflow, use (alone), AI generation (as the meter), pack, top-up
+**Credit**:
+A prepaid unit on one seller and one Shopify shop. One Credit is spent when an Accept lands for first generate, listing copy refresh, a per-field regenerate after an Accept, or one Bulk SEO product. Three free for the life of that shop, then the seller buys a fixed pack of 10 (£7), 50 (£30), or 100 (£55); larger packs cost less per Credit than £0.70. An empty balance refuses the Accept — there is no £0.70 per-Accept charge. Propose, Start, failed generate, and stale regenerate do not spend. Buying a pack is consent; Accept does not ask again. With no Shopify shop yet, the three free and unused Credits sit on the seller's workspace until a shop is connected, then stay with that shop and do not reset. Confirming facts, Classification, typed listing copy, and Push are not Credits.
+_Avoid_: listing-copy write (as the meter), Allowance, Overflow, use (alone), AI generation (as the meter), top-up, pay-per-write
 
 **Plan**:
-The old £19/month or £190/year checkout for one seller and one Shopify shop, kept only until that paid period ends. While it runs, listing-copy writes stay included with no write count and no £0.70. It does not renew; after it ends the shop follows listing-copy write rules. New checkouts are not a Plan. Distinct from Leftover weekly.
-_Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), credits, unlock, Allowance, Overflow, unlimited
+The old £19/month or £190/year checkout for one seller and one Shopify shop, kept only until that paid period ends. While it runs, Accepts do not spend Credits. It does not renew; after it ends the shop follows Credit rules. New checkouts are not a Plan. Distinct from Leftover weekly.
+_Avoid_: Pro, SnapSync AI Pro, subscription (as the product name), unlock, Allowance, Overflow, unlimited
 
 **Leftover weekly**:
-The old £4/week checkout, kept only until that paid week ends. Thirty listing-copy writes each UTC week, then those jobs stop, with no £0.70. It does not renew; after it ends the shop follows listing-copy write rules. New checkouts are not Leftover weekly.
-_Avoid_: weekly Plan, Allowance, Overflow, credits
+The old £4/week checkout, kept only until that paid week ends. Thirty Accepts each UTC week that do not spend Credits, then those jobs stop. It does not renew; after it ends the shop follows Credit rules. New checkouts are not Leftover weekly.
+_Avoid_: weekly Plan, Allowance, Overflow

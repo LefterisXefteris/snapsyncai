@@ -24,7 +24,7 @@ from app.services.listing_copy_trace import (
     mark_generated_field,
     mark_refresh,
 )
-from app.services.plan import NEED_OVERFLOW_CONFIRM
+from app.services.plan import NEED_CREDITS, NEED_OVERFLOW_CONFIRM
 from app.services.plan_charge import spend_when_landed
 from app.services.product_facts import (
     accept_generated_listing_copy,
@@ -33,7 +33,12 @@ from app.services.product_facts import (
 )
 
 Refused = Literal[
-    "not_found", "facts_blocked", "invalid_proposal", "plan_blocked", "overflow_confirm"
+    "not_found",
+    "facts_blocked",
+    "invalid_proposal",
+    "plan_blocked",
+    "overflow_confirm",
+    "credits_needed",
 ]
 RefreshJob = Literal["refresh", "bulk_seo"]
 
@@ -65,6 +70,8 @@ def _refuse(refused: Refused, message: str) -> Accepted:
 def _plan_refusal(reason: str) -> Accepted:
     if reason == NEED_OVERFLOW_CONFIRM:
         return _refuse("overflow_confirm", reason)
+    if reason == NEED_CREDITS:
+        return _refuse("credits_needed", reason)
     return _refuse("plan_blocked", reason)
 
 

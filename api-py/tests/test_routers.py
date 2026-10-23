@@ -39,7 +39,7 @@ class TestPublicConfig:
         assert response.json() == {"publishableKey": "pk_test_clerk"}
 
     def test_payments_config_matches_free_write_constants(self, client: TestClient) -> None:
-        """Three free listing-copy writes, then £0.70 — ADR 0040."""
+        """Three free Credits, then packs — ADR 0049."""
         assert client.get("/api/payments/config").json() == {
             "publishableKey": "pk_test_stripe",
             "planMonthlyPricePence": 1900,
@@ -177,6 +177,9 @@ class TestResponseContract:
             "overageThisMonth",
             "overflowNotice",
             "overflowConfirmRequired",
+            "creditBalance",
+            "creditsNeeded",
+            "creditPacks",
             "status",
             "currentPeriodEnd",
             "stripeSubscriptionId",
@@ -225,6 +228,8 @@ class TestResponseContract:
             "/api/subscription/recover",
             "/api/subscription/recover-by-email",
             "/api/subscription/create-checkout",
+            "/api/subscription/buy-credits",
+            "/api/subscription/verify-credits",
             "/api/subscription/verify",
             "/api/subscription/cancel",
             "/api/subscription/unlock-images",
@@ -248,8 +253,12 @@ class TestPlanStatus:
         async def no_overflow(_session, _settings, _user_id):
             return False, False
 
+        async def no_credits(_session, _settings, _user_id):
+            return 0, False
+
         monkeypatch.setattr(routes, "list_spends_for_entitlement", no_spends)
         monkeypatch.setattr(routes, "overflow_view", no_overflow)
+        monkeypatch.setattr(routes, "credits_view", no_credits)
         monkeypatch.setattr(routes.billing, "is_local_pro", lambda _s: False)
 
         async def not_dev(_uid, _s):

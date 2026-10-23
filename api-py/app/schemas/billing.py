@@ -11,6 +11,10 @@ class CreateCheckoutBody(CamelModel):
     billing_interval: str | None = None
 
 
+class BuyCreditsBody(CamelModel):
+    pack: int
+
+
 class UnlockImagesBody(CamelModel):
     image_ids: list[int] | None = None
 
@@ -23,9 +27,18 @@ class SubscriptionStatusResponse(CamelModel):
     overage_this_month: int | None = None
     overflow_notice: bool = False
     overflow_confirm_required: bool = False
+    credit_balance: int = 0
+    credits_needed: bool = False
+    credit_packs: list[dict] | None = None
     status: str | None = None
     current_period_end: str | None = None
     stripe_subscription_id: str | None = None
+
+
+class VerifyCreditsResponse(CamelModel):
+    verified: bool
+    credit_balance: int | None = None
+    already_claimed: bool | None = None
 
 
 class RecoverResponse(CamelModel):

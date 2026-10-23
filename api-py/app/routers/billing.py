@@ -17,6 +17,7 @@ from app.auth.clerk import CurrentUser
 from app.config import SettingsDep
 from app.db import SessionDep
 from app.schemas.billing import (
+    BuyCreditsBody,
     CancelResponse,
     CheckoutResponse,
     CheckoutSessionBody,
@@ -25,17 +26,20 @@ from app.schemas.billing import (
     SubscriptionStatusResponse,
     UnlockImagesBody,
     UnlockResponse,
+    VerifyCreditsResponse,
     VerifyResponse,
 )
 from app.services import billing
 from app.services.plan import (
+    CREDIT_PACKS,
     entitlement_of,
     leftover_weekly_from_interval,
     may_start_checkout,
+    pack_pence,
     view,
     workspace_origin,
 )
-from app.services.plan_charge import entitlement_for, overflow_view
+from app.services.plan_charge import credits_view, entitlement_for, overflow_view
 from app.services.plan_ledger import list_spends_for_entitlement
 
 logger = logging.getLogger(__name__)
@@ -53,6 +57,7 @@ async def _plan_status(
     overflow_notice, overflow_confirm_required = await overflow_view(
         session, settings, user_id
     )
+    credit_balance, credits_needed = await credits_view(session, settings, user_id)
     return SubscriptionStatusResponse(
         subscribed=entitlement != "free",
         entitlement=entitlement,
@@ -61,6 +66,11 @@ async def _plan_status(
         overage_this_month=snapshot.overage,
         overflow_notice=overflow_notice,
         overflow_confirm_required=overflow_confirm_required,
+        credit_balance=credit_balance,
+        credits_needed=credits_needed,
+        credit_packs=[
+            {"size": size, "pence": pence} for size, pence in CREDIT_PACKS.items()
+        ],
         status=(
             "active"
             if entitlement == "local_bypass"
@@ -266,13 +276,17 @@ async def recover_by_email(
         raise _http_error(500, "Failed to recover subscription") from None
 
 
-@router.post("/api/subscription/setup-write-card", response_model=CheckoutResponse)
-async def setup_write_card(
+@router.post("/api/subscription/buy-credits", response_model=CheckoutResponse)
+async def buy_credits(
     user_id: CurrentUser,
     session: SessionDep,
     settings: SettingsDep,
+    body: BuyCreditsBody,
 ) -> CheckoutResponse:
-    """Save a card for £0.70 listing-copy writes after the three free ones."""
+    """Stripe Checkout for a fixed Credit pack (10 / 50 / 100)."""
+    pence = pack_pence(body.pack)
+    if pence is None:
+        raise _http_error(400, "Choose a Credit pack of 10, 50, or 100.")
     try:
         billing.configure_stripe()
         existing = await billing.get_subscription(session, user_id)
@@ -280,19 +294,108 @@ async def setup_write_card(
         origin = workspace_origin(settings.app_base_url)
         checkout = await billing.stripe_call(
             stripe.checkout.Session.create,
-            mode="setup",
+            mode="payment",
             customer=sub.stripe_customer_id,
-            success_url=f"{origin}/settings?write_card=saved",
-            cancel_url=f"{origin}/settings?write_card=cancelled",
+            success_url=(
+                f"{origin}/settings?credits=success&checkout_session_id={{CHECKOUT_SESSION_ID}}"
+            ),
+            cancel_url=f"{origin}/settings?credits=cancelled",
             payment_method_types=["card"],
-            metadata={"userId": user_id, "purpose": "listing_copy_write"},
+            line_items=[
+                {
+                    "quantity": 1,
+                    "price_data": {
+                        "currency": "gbp",
+                        "unit_amount": pence,
+                        "product_data": {
+                            "name": f"{body.pack} Credits",
+                            "description": (
+                                "Credits for AI listing Accepts "
+                                "(first generate, refresh, Bulk SEO)"
+                            ),
+                        },
+                    },
+                }
+            ],
+            metadata={
+                "userId": user_id,
+                "purpose": "credit_pack",
+                "creditPack": str(body.pack),
+            },
         )
         return CheckoutResponse(checkout_url=checkout.url, session_id=checkout.id)
     except HTTPException:
         raise
     except Exception:
-        logger.exception("setup-write-card error")
-        raise _http_error(500, "Failed to start card setup") from None
+        logger.exception("buy-credits error")
+        raise _http_error(500, "Failed to start Credit pack checkout") from None
+
+
+@router.post(
+    "/api/subscription/verify-credits",
+    response_model=VerifyCreditsResponse,
+    response_model_exclude_none=True,
+)
+async def verify_credits(
+    user_id: CurrentUser,
+    session: SessionDep,
+    body: CheckoutSessionBody | None = None,
+) -> VerifyCreditsResponse:
+    checkout_session_id = (body.checkout_session_id if body else None) or None
+    if not checkout_session_id:
+        raise _http_error(400, "Missing checkout session ID")
+    try:
+        billing.configure_stripe()
+        checkout = await billing.stripe_call(
+            stripe.checkout.Session.retrieve, checkout_session_id
+        )
+        metadata = checkout.metadata or {}
+        if metadata.get("userId") != user_id:
+            raise _http_error(403, "Session does not belong to this user")
+        if metadata.get("purpose") != "credit_pack":
+            raise _http_error(400, "Not a Credit pack checkout")
+        if checkout.payment_status != "paid":
+            raise _http_error(402, "Payment not completed", status=checkout.payment_status)
+        try:
+            pack = int(metadata.get("creditPack") or "0")
+        except ValueError:
+            pack = 0
+        pence = pack_pence(pack)
+        if pence is None:
+            raise _http_error(400, "Unknown Credit pack on checkout")
+        amount_paid = int(getattr(checkout, "amount_total", None) or 0)
+        await billing.ensure_paid_session(
+            session,
+            checkout_session_id=checkout_session_id,
+            session_id=user_id,
+            amount_paid=amount_paid,
+        )
+        claimed = await billing.claim_paid_session(session, checkout_session_id)
+        if not claimed:
+            balance = await billing.credit_balance(session, user_id)
+            return VerifyCreditsResponse(
+                verified=True, already_claimed=True, credit_balance=balance
+            )
+        balance = await billing.add_credits(session, user_id, pack)
+        return VerifyCreditsResponse(verified=True, credit_balance=balance)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("verify-credits error")
+        raise _http_error(500, "Failed to verify Credit pack") from None
+
+
+@router.post("/api/subscription/setup-write-card", response_model=CheckoutResponse)
+async def setup_write_card(
+    user_id: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CheckoutResponse:
+    """Retired: Credits replace pay-per-write card setup."""
+    raise _http_error(
+        410,
+        "Buy Credits in Settings. Pay-per-write cards are no longer used.",
+    )
 
 
 @router.post("/api/subscription/create-checkout", response_model=CheckoutResponse)
@@ -307,7 +410,7 @@ async def create_checkout(
         if not may_start_checkout("free"):
             raise _http_error(
                 400,
-                "The Plan is not sold. AI listing-copy writes are three free, then £0.70 each.",
+                "The Plan is not sold. Buy Credits after three free Accepts.",
             )
         existing = await billing.get_subscription(session, user_id)
         local = billing.is_local_pro(settings) or await billing.is_dev_free_user(

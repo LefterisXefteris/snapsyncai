@@ -20,7 +20,6 @@ from app.services.product_facts import facts_from_stored
 from tests.seed import (
     OTHER_SELLER,
     SELLER,
-    STRIPE_CUSTOMER,
     confirmed_facts,
     plan,
     product,
@@ -96,60 +95,24 @@ async def test_free_accept_saves_and_records_a_listing_copy_write(db, db_setting
     assert len(await spends(db)) == 1
 
 
-async def test_free_fourth_write_without_confirm_is_refused(db, db_settings) -> None:
+async def test_free_fourth_accept_without_credits_is_refused(db, db_settings) -> None:
     await use_allowance(db, 3)
     pid = await product(db, facts=confirmed_facts())
     result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
-    assert result.refused == "overflow_confirm"
+    assert result.refused == "credits_needed"
     assert await _description(db, pid) == "<p>Old.</p>"
     assert len(await spends(db)) == 3
 
 
-async def test_free_paid_write_charges_then_saves(db, db_settings, monkeypatch) -> None:
+async def test_free_accept_after_three_deducts_one_credit(db, db_settings) -> None:
     await use_allowance(db, 3)
-    charged: list[str] = []
-
-    async def fake_payg(session, settings, user_id, sub):
-        return await plan(db)
-
-    monkeypatch.setattr(billing, "ensure_payg_customer", fake_payg)
-    monkeypatch.setattr(
-        billing,
-        "charge_listing_copy_write",
-        lambda customer, **_opts: charged.append(customer),
-    )
+    await billing.add_credits(db, SELLER, 2)
     pid = await product(db, facts=confirmed_facts())
-    result = await accept_refresh(
-        db, db_settings, SELLER, pid, PROPOSAL, job="refresh", confirm_overflow=True
-    )
+    result = await accept_refresh(db, db_settings, SELLER, pid, PROPOSAL, job="refresh")
     assert result.refused is None
     assert result.spent is True
-    assert charged == [STRIPE_CUSTOMER]
+    assert await billing.credit_balance(db, SELLER) == 1
     assert len(await spends(db)) == 4
-
-
-async def test_free_paid_write_charge_failure_saves_nothing(
-    db, db_settings, monkeypatch
-) -> None:
-    await use_allowance(db, 3)
-
-    async def fake_payg(session, settings, user_id, sub):
-        return await plan(db)
-
-    monkeypatch.setattr(billing, "ensure_payg_customer", fake_payg)
-    monkeypatch.setattr(
-        billing,
-        "charge_listing_copy_write",
-        lambda *_a, **_k: (_ for _ in ()).throw(billing.WriteChargeError(billing.NEED_PAYMENT)),
-    )
-    pid = await product(db, facts=confirmed_facts())
-    result = await accept_refresh(
-        db, db_settings, SELLER, pid, PROPOSAL, job="refresh", confirm_overflow=True
-    )
-    assert result.refused == "plan_blocked"
-    assert result.message == billing.NEED_PAYMENT
-    assert await _description(db, pid) == "<p>Old.</p>"
-    assert len(await spends(db)) == 3
 
 
 async def test_a_plan_accept_after_recorded_uses_saves_and_does_not_charge(

@@ -3,7 +3,11 @@ import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useImages, useProductGroup, useAssignToGroup, useAssignMultipleToGroup, useUnlinkFromGroup, useUpdateImage, useDeleteImage, usePushToShopify, useUploadImages, useConfirmProductFacts, useAcceptGeneratedListingCopy, useAcceptListingCopyRefresh, useDismissListingCopyRefresh, useListingCopyRefresh, useRegenerateListingCopyRefresh, useShopifyStatus, useShopifyPublications, useSaveShopGpsrIdentity, type ListingCopyRefreshPack } from "@/hooks/use-images";
 import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
-import { overflowNoticeText, showGenerateOverflowNotice } from "@/lib/overflow-copy";
+import {
+  creditsNeededNotice,
+  overflowNoticeText,
+  showGenerateOverflowNotice,
+} from "@/lib/overflow-copy";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
@@ -287,15 +291,16 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     : undefined;
   const canRefresh = image.mayRefreshListingCopy === true;
   const refreshBlockedReason = image.refreshBlockedReason ?? null;
-  const generateOverflowNotice = showGenerateOverflowNotice(
-    overflow.overflowNotice,
-    image.listingCopyStale,
-  )
-    ? overflowNoticeText(overflow.overagePence)
-    : null;
-  const refreshOverflowNotice = canRefresh && overflow.overflowNotice
-    ? overflowNoticeText(overflow.overagePence)
-    : null;
+  const generateOverflowNotice = overflow.creditsNeeded && image.listingCopyStale !== true
+    ? creditsNeededNotice()
+    : showGenerateOverflowNotice(overflow.overflowNotice, image.listingCopyStale)
+      ? overflowNoticeText(overflow.overagePence)
+      : null;
+  const refreshOverflowNotice = canRefresh && overflow.creditsNeeded
+    ? creditsNeededNotice()
+    : canRefresh && overflow.overflowNotice
+      ? overflowNoticeText(overflow.overagePence)
+      : null;
 
   const acceptGenerated = (
     generated: Parameters<typeof acceptListingCopy.mutate>[0]["generated"],

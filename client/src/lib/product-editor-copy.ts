@@ -22,7 +22,7 @@ export const UNPAID_PREVIEW_TITLE = "This product has no listing copy yet.";
 export const UNPAID_PREVIEW_DETAIL =
   "Confirm product facts, then generate listing copy — or type it yourself and push.";
 export const NEED_PLAN =
-  "Add a card to pay £0.70 per AI listing-copy write after your three free writes.";
+  "Buy Credits in Settings after your three free Accepts.";
 export const PRODUCT_EDITOR_ALT_TEXT_LABEL = "Alt text";
 
 export function productEditorShowsVariants(variantCount: number): boolean {

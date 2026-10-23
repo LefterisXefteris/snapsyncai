@@ -206,7 +206,9 @@ export default function Landing() {
     "operatingSystem": "Web",
     "inLanguage": "en-GB",
     "offers": [
-      { "@type": "Offer", "price": "0.70", "priceCurrency": "GBP", "name": "AI listing-copy write", "description": "Three free AI listing-copy writes, then £0.70 each" },
+      { "@type": "Offer", "price": "7.00", "priceCurrency": "GBP", "name": "10 Credits", "description": "Three free Credits, then packs of 10, 50, or 100 for AI Accepts" },
+      { "@type": "Offer", "price": "30.00", "priceCurrency": "GBP", "name": "50 Credits" },
+      { "@type": "Offer", "price": "55.00", "priceCurrency": "GBP", "name": "100 Credits" },
     ],
     "featureList": [
       "New listing from photos",
@@ -383,10 +385,10 @@ export default function Landing() {
                 <Coins className="w-3 h-3" /> Pricing
               </Badge>
               <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">
-                Pay per AI write.
+                Credits for AI Accepts.
               </h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Catalogue, facts, and typed listing copy stay free. AI listing-copy writes are three free, then £0.70 each.
+                Catalogue, facts, and typed listing copy stay free. Three free Credits, then buy a pack.
               </p>
             </div>
 
@@ -395,12 +397,12 @@ export default function Landing() {
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <Crown className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-xl">AI listing-copy writes</CardTitle>
+                    <CardTitle className="text-xl">Credits</CardTitle>
                   </div>
-                  <CardDescription>First generate, refresh, and Bulk SEO Accept</CardDescription>
+                  <CardDescription>One Credit per Accept — first generate, refresh, Bulk SEO</CardDescription>
                   <div className="pt-3">
-                    <span className="text-4xl font-display font-bold">£0.70</span>
-                    <span className="text-muted-foreground text-sm ml-2">per write after three free</span>
+                    <span className="text-4xl font-display font-bold">£7</span>
+                    <span className="text-muted-foreground text-sm ml-2">for 10 · larger packs cost less each</span>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
