@@ -1,20 +1,20 @@
 export const LANDING_BRAND = "SnapSync";
 
 export const LANDING_DOCUMENT_TITLE =
-  "SnapSync — your e-commerce agent for textile listings";
+  "SnapSync — your e-commerce agent for textile and coffee listings";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is your e-commerce agent for textile listings. New listing from photos, confirm fibre composition, care instructions, and GPSR identity, then listing copy. Import, inventory, and Bulk SEO. Push to Shopify. Three free AI listing-copy writes, then £0.70 each.";
+  "SnapSync is your e-commerce agent for textile and coffee listings. Pick Product kind, confirm the facts pack, then listing copy. Import, inventory, and Bulk SEO. Push to Shopify. Three free AI listing-copy writes, then £0.70 each.";
 
-export const LANDING_EYEBROW = "Textile listings · Shopify";
+export const LANDING_EYEBROW = "Textile-first · Coffee on Shopify";
 
-export const LANDING_H1 = "Your e-commerce agent for textile listings";
+export const LANDING_H1 = "Your e-commerce agent for textile and coffee listings";
 
 export const LANDING_SUBHEAD =
-  "It groups photos into products, waits until you confirm the facts, then writes listing copy and pushes to Shopify.";
+  "It groups photos into products, waits until you confirm the facts for that Product kind, then writes listing copy and pushes to Shopify.";
 
-export const LANDING_NON_TEXTILE =
-  "Not a textile? You still confirm facts. The fibre pack is only for textile products.";
+export const LANDING_PRODUCT_KIND =
+  "Pick Textile product or Coffee product. Each kind has its own facts pack before listing copy.";
 
 export const LANDING_MICRO = "No card required · catalogue, facts, and typed listing copy free";
 
@@ -33,7 +33,7 @@ export const JOBS = [
   {
     title: "Product facts, then listing copy",
     description:
-      "A photo may suggest fibre names. You confirm fibre composition, care instructions, and GPSR identity. Listing copy — including SEO and AEO — is not written until those facts are confirmed.",
+      "Pick Product kind. Textile products confirm fibre composition, care instructions, and GPSR identity. Coffee products confirm the food-label pack — form, roast, net weight, ingredients, and allergens. Listing copy is not written until those facts are confirmed.",
   },
   {
     title: "Products",
@@ -58,7 +58,7 @@ export const JOBS = [
   {
     title: "Settings",
     description:
-      "Connect your Shopify shop, save the shop GPSR identity, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
+      "Connect your Shopify shop, save the shop GPSR identity for textiles, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
   },
 ] as const;
 
@@ -71,7 +71,8 @@ export const STEPS = [
   {
     number: "02",
     title: "Confirm facts",
-    description: "Accept fibre composition, care instructions, and GPSR identity — or skip what you do not have.",
+    description:
+      "Pick Textile product or Coffee product, then confirm that kind’s facts pack — or skip only what that pack allows.",
   },
   {
     number: "03",
@@ -88,7 +89,7 @@ export const STEPS = [
 export const WEEKLY_BULLETS = [
   "Three free AI listing-copy writes, then £0.70 each",
   "New listing from photos (up to 200)",
-  "Product facts, then listing copy",
+  "Product kind facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
   "Import, inventory, and Bulk SEO free",
@@ -97,7 +98,7 @@ export const WEEKLY_BULLETS = [
 export const ANNUAL_BULLETS = [
   "Three free AI listing-copy writes, then £0.70 each",
   "New listing from photos (up to 200)",
-  "Product facts, then listing copy",
+  "Product kind facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify",
   "Import, inventory, and Bulk SEO free",
@@ -107,12 +108,17 @@ export const FAQ_DATA = [
   {
     question: "What is SnapSync?",
     answer:
-      "SnapSync is your e-commerce agent for textile listings. New listing from photos is one job. You also get a product catalogue, Import from Shopify, confirmed product facts before listing copy, inventory, and Bulk SEO.",
+      "SnapSync is your e-commerce agent for textile and coffee listings. New listing from photos is one job. You also get a product catalogue, Import from Shopify, confirmed product facts before listing copy, inventory, and Bulk SEO.",
   },
   {
     question: "Why do I confirm facts before listing copy?",
     answer:
-      "Listing copy must not invent product facts a photo cannot establish. You confirm fibre composition, care instructions, and GPSR identity — or skip the blocks you do not have. Only then is listing copy written.",
+      "Listing copy must not invent product facts a photo cannot establish. You pick Product kind, confirm that kind’s pack, and only then is listing copy written.",
+  },
+  {
+    question: "What is Product kind?",
+    answer:
+      "Textile product or Coffee product — which facts pack applies. Textile uses fibre composition, care instructions, and GPSR identity. Coffee uses the food-label pack and may Push only to Shopify.",
   },
   {
     question: "What do AI listing-copy writes cost?",
@@ -122,12 +128,12 @@ export const FAQ_DATA = [
   {
     question: "How do I create a product from photos?",
     answer:
-      "Open New listing and drag in up to 200 photos. Group them into products. Confirm facts, generate listing copy, then push to Shopify. No card is required to start.",
+      "Open New listing and drag in up to 200 photos. Group them into products. Pick Product kind, confirm facts, generate listing copy, then push to Shopify. No card is required to start.",
   },
   {
     question: "Which shops does SnapSync publish to?",
     answer:
-      "Shopify. Connect your shop in Settings, then push products from the catalogue.",
+      "Shopify. Connect your shop in Settings, then push products from the catalogue. Coffee products Push to Shopify only.",
   },
   {
     question: "How much does SnapSync cost?",
@@ -138,11 +144,6 @@ export const FAQ_DATA = [
     question: "Can I edit listing copy before I push to Shopify?",
     answer:
       "Yes. Every field on the product is editable — title, description, price, facts, SEO, AEO, variants, and media — before you push.",
-  },
-  {
-    question: "What if the product is not a textile?",
-    answer:
-      "You can still list it. You still confirm facts. The fibre pack applies to textile products; non-textiles skip that pack, not the confirm step.",
   },
 ] as const;
 
@@ -155,7 +156,7 @@ export const DEMO = {
 } as const;
 
 export const FOOTER_BLURB =
-  "Your e-commerce agent for textile listings. New listing from photos is one job.";
+  "Your e-commerce agent for textile and coffee listings. New listing from photos is one job.";
 
 export function landingVisibleText(): string {
   return [
@@ -165,7 +166,7 @@ export function landingVisibleText(): string {
     LANDING_EYEBROW,
     LANDING_H1,
     LANDING_SUBHEAD,
-    LANDING_NON_TEXTILE,
+    LANDING_PRODUCT_KIND,
     LANDING_MICRO,
     LANDING_PRIMARY_CTA,
     LANDING_SECONDARY_CTA,

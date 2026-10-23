@@ -22,7 +22,7 @@ import {
   LANDING_H1,
   LANDING_META_DESCRIPTION,
   LANDING_MICRO,
-  LANDING_NON_TEXTILE,
+  LANDING_PRODUCT_KIND,
   LANDING_PRIMARY_CTA,
   LANDING_SECONDARY_CTA,
   LANDING_SUBHEAD,
@@ -210,8 +210,9 @@ export default function Landing() {
     ],
     "featureList": [
       "New listing from photos",
-      "Confirmed product facts before listing copy",
-      "Fibre composition, care instructions, and GPSR identity",
+      "Product kind facts before listing copy",
+      "Textile fibre, care, and GPSR identity",
+      "Coffee food-label facts on Shopify",
       "Push to Shopify",
       "Import",
       "Inventory",
@@ -266,7 +267,7 @@ export default function Landing() {
               {LANDING_SUBHEAD}
             </p>
             <p className="text-sm text-muted-foreground/80 max-w-xl mx-auto mb-4">
-              {LANDING_NON_TEXTILE}
+              {LANDING_PRODUCT_KIND}
             </p>
 
             <p className="text-sm text-muted-foreground mb-6">
