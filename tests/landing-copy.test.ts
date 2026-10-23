@@ -39,6 +39,7 @@ test("the hero names your e-commerce agent for textile and coffee listings, then
     "coffee",
     "listing copy",
     "shopify",
+    "trendyol international",
   ]) {
     assert.match(text, new RegExp(phrase));
   }
@@ -60,10 +61,10 @@ test("jobs are the live ones, listing-first", () => {
   );
 });
 
-test("how it works is photo, confirm facts, listing copy, Shopify", () => {
+test("how it works is photo, confirm facts, listing copy, then Push to a Channel", () => {
   assert.deepEqual(
     STEPS.map((step) => step.title),
-    ["Photos", "Confirm facts", "Listing copy", "Push to Shopify"],
+    ["Photos", "Confirm facts", "Listing copy", "Push to a Channel"],
   );
 });
 

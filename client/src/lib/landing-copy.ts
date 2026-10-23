@@ -4,14 +4,14 @@ export const LANDING_DOCUMENT_TITLE =
   "SnapSync — your e-commerce agent for textile and coffee listings";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is your e-commerce agent for textile and coffee listings. Pick Product kind, confirm the facts pack, then listing copy. Import, inventory, and Bulk SEO. Push to Shopify. Three free AI listing-copy writes, then £0.70 each.";
+  "SnapSync is your e-commerce agent for textile and coffee listings. Pick Product kind, confirm the facts pack, then listing copy. Import, inventory, and Bulk SEO. Textile products push to Shopify or Trendyol International; coffee to Shopify only. Three free AI listing-copy writes, then £0.70 each.";
 
 export const LANDING_EYEBROW = "Textile-first · Coffee on Shopify";
 
 export const LANDING_H1 = "Your e-commerce agent for textile and coffee listings";
 
 export const LANDING_SUBHEAD =
-  "It groups photos into products, waits until you confirm the facts for that Product kind, then writes listing copy and pushes to Shopify.";
+  "It groups photos into products, waits until you confirm the facts for that Product kind, then writes listing copy and pushes to Shopify or Trendyol International — coffee to Shopify only.";
 
 export const LANDING_PRODUCT_KIND =
   "Pick Textile product or Coffee product. Each kind has its own facts pack before listing copy.";
@@ -38,7 +38,7 @@ export const JOBS = [
   {
     title: "Products",
     description:
-      "The catalogue you live in. Review and edit every field, then push to Shopify when the listing is ready.",
+      "The catalogue you live in. Review and edit every field, then push to Shopify or Trendyol International when the listing is ready. Coffee products push to Shopify only.",
   },
   {
     title: "Import",
@@ -53,12 +53,12 @@ export const JOBS = [
   {
     title: "Bulk SEO",
     description:
-      "Refresh tags, description, SEO title, and meta description for the products you pick, using search demand. You accept each one. Accept does not push to Shopify.",
+      "Refresh tags, description, SEO title, and meta description for the products you pick, using search demand. You accept each one. Accept does not push to a Channel.",
   },
   {
     title: "Settings",
     description:
-      "Connect your Shopify shop, save the shop GPSR identity for textiles, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
+      "Connect Shopify and Trendyol International, save the shop GPSR identity for textiles, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
   },
 ] as const;
 
@@ -81,8 +81,9 @@ export const STEPS = [
   },
   {
     number: "04",
-    title: "Push to Shopify",
-    description: "Edit anything, then publish the product to your connected Shopify shop.",
+    title: "Push to a Channel",
+    description:
+      "Edit anything, then push to Shopify or Trendyol International. Coffee products push to Shopify only.",
   },
 ] as const;
 
@@ -91,7 +92,7 @@ export const WEEKLY_BULLETS = [
   "New listing from photos (up to 200)",
   "Product kind facts, then listing copy",
   "SEO and AEO in the listing copy",
-  "Push to Shopify",
+  "Push to Shopify or Trendyol International",
   "Import, inventory, and Bulk SEO free",
 ] as const;
 
@@ -100,7 +101,7 @@ export const ANNUAL_BULLETS = [
   "New listing from photos (up to 200)",
   "Product kind facts, then listing copy",
   "SEO and AEO in the listing copy",
-  "Push to Shopify",
+  "Push to Shopify or Trendyol International",
   "Import, inventory, and Bulk SEO free",
 ] as const;
 
@@ -128,20 +129,20 @@ export const FAQ_DATA = [
   {
     question: "How do I create a product from photos?",
     answer:
-      "Open New listing and drag in up to 200 photos. Group them into products. Pick Product kind, confirm facts, generate listing copy, then push to Shopify. No card is required to start.",
+      "Open New listing and drag in up to 200 photos. Group them into products. Pick Product kind, confirm facts, generate listing copy, then push to Shopify or Trendyol International. Coffee products push to Shopify only. No card is required to start.",
   },
   {
     question: "Which shops does SnapSync publish to?",
     answer:
-      "Shopify. Connect your shop in Settings, then push products from the catalogue. Coffee products Push to Shopify only.",
+      "Shopify and Trendyol International. Connect each Channel in Settings, then push from the catalogue. Coffee products Push to Shopify only.",
   },
   {
     question: "How much does SnapSync cost?",
     answer:
-      "Catalogue, facts, and typed listing copy are free. Three free AI listing-copy writes, then £0.70 each. Push to Shopify and inventory stay available. No card to start.",
+      "Catalogue, facts, and typed listing copy are free. Three free AI listing-copy writes, then £0.70 each. Push and Shopify inventory stay available. No card to start.",
   },
   {
-    question: "Can I edit listing copy before I push to Shopify?",
+    question: "Can I edit listing copy before I push?",
     answer:
       "Yes. Every field on the product is editable — title, description, price, facts, SEO, AEO, variants, and media — before you push.",
   },
