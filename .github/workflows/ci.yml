@@ -84,10 +84,11 @@ jobs:
         run: |
           set -euo pipefail
           base="https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
-          curl -sSfL "${base}/osv-scanner_linux_amd64" -o osv-scanner
+          # Filename must match the SUMS entry — sha256sum -c looks up that path.
+          curl -sSfL "${base}/osv-scanner_linux_amd64" -o osv-scanner_linux_amd64
           curl -sSfL "${base}/osv-scanner_SHA256SUMS" -o osv-scanner_SHA256SUMS
           grep ' osv-scanner_linux_amd64$' osv-scanner_SHA256SUMS | sha256sum -c -
-          sudo install -m 755 osv-scanner /usr/local/bin/osv-scanner
+          sudo install -m 755 osv-scanner_linux_amd64 /usr/local/bin/osv-scanner
           osv-scanner --version
 
       - name: Fail on malware or high/critical CVEs in npm and Python lockfiles
