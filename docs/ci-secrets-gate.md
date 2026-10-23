@@ -5,7 +5,7 @@ CI job `secrets` (in `.github/workflows/ci.yml`) fails when:
 1. Any committed file matches `.env` or `.env.*` except `.env.example` and `api-py/.env.example`
 2. [gitleaks](https://github.com/gitleaks/gitleaks) finds secret content (those two example paths are allowlisted in `.gitleaks.toml`)
 
-A red check alone does not block merge. Turn on branch protection so `main` requires a PR and the three CI jobs.
+A red check alone does not block merge. Turn on branch protection so `main` requires a PR and the four CI jobs (`web`, `api`, `secrets`, `deps-security`). Railway Wait for CI and post-deploy smoke are ADR 0047 — enable Wait for CI with `scripts/enable-railway-wait-for-ci.sh`.
 
 ## Enable protection (checklist)
 
@@ -14,13 +14,13 @@ In GitHub → **Settings → Branches → Branch protection rules** (or **Rules 
 - [ ] Require a pull request before merging
 - [ ] Require status checks to pass before merging
 - [ ] Require branches to be up to date before merging (recommended)
-- [ ] Required checks: `web`, `api`, `secrets`  
+- [ ] Required checks: `web`, `api`, `secrets`, `deps-security`  
   (If the UI lists them as `CI / web`, etc., select those. Names appear after the workflow has run once on a PR.)
 - [ ] Do **not** enable “Do not allow bypassing the above settings” if you want admin break-glass (ADR 0044 / grill: admin bypass allowed)
 
 ## `gh` sketch (classic branch protection)
 
-After the `secrets` job has appeared at least once on a PR, adjust owner/repo and exact check contexts if your UI shows `CI / …`:
+After the four jobs have appeared at least once on a PR, adjust owner/repo and exact check contexts if your UI shows `CI / …`:
 
 ```bash
 OWNER=YOUR_ORG_OR_USER
@@ -32,7 +32,7 @@ gh api -X PUT "repos/${OWNER}/${REPO}/branches/main/protection" \
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["web", "api", "secrets"]
+    "contexts": ["web", "api", "secrets", "deps-security"]
   },
   "enforce_admins": false,
   "required_pull_request_reviews": {

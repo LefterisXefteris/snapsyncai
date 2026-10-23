@@ -1,0 +1,34 @@
+# Thin unauthenticated smoke after Railway marks a production deploy success.
+# Must NOT run on push to main — Railway Wait for CI waits for every workflow
+# on the commit (ADR 0047).
+name: Post-deploy smoke
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  api-health:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'production'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert production API health
+        env:
+          HEALTH_URL: https://api.snapsyncai.co.uk/api/health
+        run: |
+          set -euo pipefail
+          body="$(curl -sS -f --max-time 20 "$HEALTH_URL")"
+          printf '%s\n' "$body"
+          printf '%s' "$body" | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          ok = data.get("status") == "ok" and data.get("service") == "snapsyncai-api"
+          if not ok:
+              print("::error::Unexpected health payload:", data, file=sys.stderr)
+              sys.exit(1)
+          print("health ok:", data)
+          '
