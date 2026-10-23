@@ -182,6 +182,7 @@ async def confirm_product_facts(
         user_id,
         image_id,
         is_textile=body.is_textile,
+        product_kind=body.product_kind,
         composition=[row.model_dump() for row in body.composition]
         if body.composition is not None
         else None,
@@ -189,6 +190,16 @@ async def confirm_product_facts(
         gpsr_identity=body.gpsr_identity.model_dump(by_alias=True) if body.gpsr_identity else None,
         care_choice=body.care_choice,
         care=body.care.model_dump(by_alias=True) if body.care else None,
+        coffee_form=body.coffee_form,
+        roast_level=body.roast_level,
+        net_weight=body.net_weight,
+        variant_net_weights=[row.model_dump(by_alias=True) for row in body.variant_net_weights]
+        if body.variant_net_weights is not None
+        else None,
+        coffee_origin_choice=body.coffee_origin_choice,
+        coffee_origin=body.coffee_origin,
+        ingredients_list=body.ingredients_list,
+        allergen_statement=body.allergen_statement,
     )
     if confirmed.refused == "invalid":
         raise HTTPException(status_code=400, detail=confirmed.message)

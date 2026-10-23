@@ -21,7 +21,7 @@ from app.services import product
 from app.services.crypto import decrypt_shopify_token, encrypt_shopify_token
 from app.services.inventory.core import calculate_sellable_quantity
 from app.services.listing_copy_refresh import listing_copy_from_image
-from app.services.product_facts import listing_copy_present
+from app.services.product_facts import PRODUCT_KIND_COFFEE, listing_copy_present
 from app.services.supabase_storage import media_original_source
 
 TURKEY = "This Channel is not the Turkey marketplace."
@@ -40,6 +40,7 @@ NEED_BARCODE = "This product needs a barcode."
 NEED_SKU = "This product needs a SKU."
 NEED_SALE = "This product needs a sale price greater than zero."
 NEED_LIST = "This product needs a list price."
+COFFEE_SHOPIFY_ONLY = "A Coffee product may Push only to Shopify."
 LIST_BELOW = "The list price must be at least the sale price."
 TURKEY_CODE = "TR"
 
@@ -546,16 +547,22 @@ async def _page(
     if refresh_wait:
         missing = await _missing_attribute_name(trendyol, credentials, storefront, listing)
     copy = listing_copy_from_image(loaded.photo)
-    wait = _gap(
-        connected=link is not None,
-        listing=listing,
-        copy_present=listing_copy_present(copy),
-        title=_clean(copy.get("title")),
-        description=_clean(copy.get("description")),
-        barcode=barcode,
-        sku=_clean(loaded.photo.sku),
-        missing_attribute=missing,
-    )
+    if (
+        loaded.facts.confirmed is not None
+        and loaded.facts.confirmed.product_kind == PRODUCT_KIND_COFFEE
+    ):
+        wait: str | None = COFFEE_SHOPIFY_ONLY
+    else:
+        wait = _gap(
+            connected=link is not None,
+            listing=listing,
+            copy_present=listing_copy_present(copy),
+            title=_clean(copy.get("title")),
+            description=_clean(copy.get("description")),
+            barcode=barcode,
+            sku=_clean(loaded.photo.sku),
+            missing_attribute=missing,
+        )
     return Page(
         connected=link is not None,
         storefront=link.storefront_code if link else None,

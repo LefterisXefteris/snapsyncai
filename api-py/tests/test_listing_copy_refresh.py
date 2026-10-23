@@ -34,8 +34,13 @@ VISION_NON_TEXTILE = {"isTextile": False}
 def _confirmed_facts():
     return confirm_facts(
         persistable_from_vision(VISION_NON_TEXTILE).facts,
-        is_textile=False,
-        gpsr_choice="skip",
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="skip",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
     ).facts
 
 
@@ -199,6 +204,23 @@ def test_search_demand_is_seeded_from_title_tags_and_fibre_names() -> None:
     ) == ("Summer tee", "crew neck", "cotton")
 
 
+def test_search_demand_is_seeded_from_coffee_form_roast_and_origin() -> None:
+    facts = confirm_facts(
+        persistable_from_vision({"isTextile": False}).facts,
+        product_kind="coffee",
+        coffee_form="beans",
+        roast_level="medium",
+        net_weight="250 g",
+        coffee_origin_choice="fill",
+        coffee_origin="Ethiopia",
+        ingredients_list="coffee beans",
+        allergen_statement="none",
+    ).facts
+    assert seed_search_demand(
+        facts, {"title": "House blend", "tags": ["espresso"]}
+    ) == ("House blend", "espresso", "beans", "medium", "Ethiopia")
+
+
 def test_rewrite_constraints_keep_the_facts_block_and_name_the_queries() -> None:
     facts = confirm_facts(
         persistable_from_vision({"isTextile": True}).facts,
@@ -284,11 +306,8 @@ def test_accept_refresh_persists_four_fields_and_keeps_the_facts_block() -> None
 
 
 def test_accept_refresh_leaves_stale_listing_copy_as_it_was() -> None:
-    facts = confirm_facts(
-        persistable_from_vision({"isTextile": False}).facts,
-        is_textile=False,
-        gpsr_choice="skip",
-    ).facts
+    facts = _confirmed_facts()
+    block = description_blocks(facts)
     stale = ProductFacts(
         suggested=facts.suggested,
         confirmed=facts.confirmed,
@@ -298,7 +317,7 @@ def test_accept_refresh_leaves_stale_listing_copy_as_it_was() -> None:
         stale,
         {
             "tags": ["mug"],
-            "description": "<p>A mug.</p>",
+            "description": f"<p>A mug.</p>\n{block}",
             "seoTitle": "Mug",
             "seoDescription": "A mug",
         },
@@ -332,11 +351,13 @@ def test_accept_refresh_does_not_stamp_description_blocks() -> None:
 
 
 def test_accept_refresh_truncates_seo_title_and_meta() -> None:
+    facts = _confirmed_facts()
+    block = description_blocks(facts)
     accepted = accept_listing_copy_refresh(
-        _confirmed_facts(),
+        facts,
         {
             "tags": ["tee"],
-            "description": "<p>A tee.</p>",
+            "description": f"<p>A tee.</p>\n{block}",
             "seoTitle": "T" * 80,
             "seoDescription": "M" * 400,
         },

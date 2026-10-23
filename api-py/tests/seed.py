@@ -39,8 +39,13 @@ def confirmed_facts(*, textile: bool = False, stale: bool = False) -> dict:
     else:
         facts = confirm_facts(
             persistable_from_vision({"isTextile": False}).facts,
-            is_textile=False,
-            gpsr_choice="skip",
+            product_kind="coffee",
+            coffee_form="beans",
+            roast_level="medium",
+            net_weight="250 g",
+            coffee_origin_choice="skip",
+            ingredients_list="coffee beans",
+            allergen_statement="none",
         ).facts
     if stale:
         facts = ProductFacts(
