@@ -221,11 +221,15 @@ pre {
 
 .reveal {
   opacity: 0;
-  transition: opacity 0.4s ease-out;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .reveal.revealed {
   opacity: 1;
+  transform: none;
 }
 
 .reveal.delay-1 {
@@ -248,14 +252,89 @@ pre {
   transition-delay: 0.50s;
 }
 
+.reveal-draw {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-draw.revealed {
+  transform: scaleX(1);
+}
+
+/* cqh is this tile. Scan stroke is 2px, so the travel stops on the bottom edge. */
+.demo-tile {
+  container-type: size;
+}
+
+.demo-scan {
+  animation: demo-scan 1.6s linear forwards;
+}
+
+@keyframes demo-scan {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(calc(100cqh - 2px));
+  }
+}
+
+.demo-ping {
+  background-color: hsl(var(--primary) / 0.45);
+  animation: demo-ping 0.75s cubic-bezier(0, 0, 0.2, 1) 2 both;
+}
+
+@keyframes demo-ping {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.7);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+}
+
+.demo-paused .demo-scan,
+.demo-paused .demo-ping,
+.demo-paused .animate-pulse {
+  animation-play-state: paused;
+}
+
+.demo-bar {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.demo-bar.is-filled {
+  transform: scaleX(1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-settle,
-  .animate-in-fade {
+  .animate-in-fade,
+  .demo-scan,
+  .demo-ping {
     animation: none !important;
   }
 
-  .reveal {
+  .reveal,
+  .reveal-draw {
     opacity: 1;
+    transform: none;
     transition: none;
+  }
+
+  .demo-bar {
+    transition: none;
+  }
+
+  .demo-scan,
+  .demo-ping {
+    opacity: 0;
   }
 }

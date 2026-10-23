@@ -55,7 +55,7 @@ function useScrollReveal() {
       },
       { threshold: 0.12, rootMargin: "0px 0px -48px 0px" }
     );
-    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+    document.querySelectorAll(".reveal, .reveal-draw").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 }
@@ -198,9 +198,9 @@ export default function Landing() {
               </p>
 
               <div className="flex items-center justify-center lg:justify-start gap-4 flex-wrap mb-5">
-                <Button size="lg" className="h-14 px-8 text-base gap-2" onClick={openLandingSignIn}>
+                <Button size="lg" className="group h-14 px-8 text-base gap-2" onClick={openLandingSignIn}>
                   {LANDING_PRIMARY_CTA}
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  <ArrowRight className="w-4 h-4 ml-1 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-1" />
                 </Button>
                 <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={scrollToHowItWorks}>
                   {LANDING_SECONDARY_CTA}
@@ -227,23 +227,31 @@ export default function Landing() {
             <h2 id="how-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{STEPS_HEADING}</h2>
             <p className="text-muted-foreground max-w-xl mx-auto text-lg">{STEPS_SUBHEAD}</p>
           </div>
-          <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {STEPS.map((step, i) => {
-              const Icon = STEP_ICONS[i];
-              return (
-                <li key={step.number} className={`relative rounded-xl border border-border bg-card p-6 reveal delay-${i + 1}`}>
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-primary" />
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="reveal-draw pointer-events-none absolute inset-x-0 top-[calc(50%-0.5px)] z-0 hidden h-px bg-primary/30 lg:block"
+            />
+            <ol className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {STEPS.map((step, i) => {
+                const Icon = STEP_ICONS[i];
+                return (
+                  <li key={step.number} className="group h-full motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-1">
+                    <div className={`relative z-10 flex h-full flex-col rounded-xl border border-border bg-card p-6 reveal delay-${i + 1}`}>
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:scale-[1.08]">
+                          <Icon className="w-5 h-5 text-primary" />
+                        </div>
+                        <span className="font-display text-3xl font-bold text-muted-foreground/40 tabular-nums">{step.number}</span>
+                      </div>
+                      <h3 className="font-display font-bold text-xl mb-2">{step.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
                     </div>
-                    <span className="font-display text-3xl font-bold text-muted-foreground/40 tabular-nums">{step.number}</span>
-                  </div>
-                  <h3 className="font-display font-bold text-xl mb-2">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
-                </li>
-              );
-            })}
-          </ol>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         </section>
 
         <section id="jobs" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50 scroll-mt-16" aria-labelledby="jobs-heading">
@@ -255,19 +263,21 @@ export default function Landing() {
             {JOBS.map((job, i) => {
               const Icon = JOB_ICONS[i];
               return (
-                <Card key={job.title} className={`reveal delay-${i + 1}`}>
-                  <CardHeader>
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                      <Icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <CardTitle className="text-xl font-bold">{job.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="leading-relaxed text-sm text-muted-foreground">
-                      {job.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
+                <div key={job.title} className="group h-full motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-1">
+                  <Card className={`h-full reveal delay-${i + 1}`}>
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:scale-[1.08]">
+                        <Icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <CardTitle className="text-xl font-bold">{job.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription className="leading-relaxed text-sm text-muted-foreground">
+                        {job.description}
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                </div>
               );
             })}
           </div>
@@ -285,12 +295,14 @@ export default function Landing() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
               {CREDIT_PACKS.map((pack, i) => (
-                <Card key={pack.credits} className={`text-center reveal delay-${i + 1} hover:border-primary/60 transition-colors`}>
-                  <CardHeader>
-                    <CardDescription>{pack.credits} Credits</CardDescription>
-                    <CardTitle className="text-5xl font-display font-bold pt-2">{pack.price}</CardTitle>
-                  </CardHeader>
-                </Card>
+                <div key={pack.credits} className="h-full motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-1">
+                  <Card className={`h-full text-center reveal delay-${i + 1} hover:border-primary/60 transition-colors`}>
+                    <CardHeader>
+                      <CardDescription>{pack.credits} Credits</CardDescription>
+                      <CardTitle className="text-5xl font-display font-bold pt-2">{pack.price}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                </div>
               ))}
             </div>
 
@@ -304,9 +316,9 @@ export default function Landing() {
             </ul>
 
             <div className="text-center reveal">
-              <Button size="lg" className="h-12 px-8 gap-2" onClick={openLandingSignIn}>
+              <Button size="lg" className="group h-12 px-8 gap-2" onClick={openLandingSignIn}>
                 {LANDING_PRIMARY_CTA}
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-1" />
               </Button>
               <p className="text-xs text-muted-foreground mt-6">{PRICING_FINE_PRINT}</p>
             </div>
@@ -337,9 +349,9 @@ export default function Landing() {
               <h2 id="cta-heading" className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">{CLOSING_HEADING}</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mb-10 text-lg leading-relaxed">{CLOSING_SUBHEAD}</p>
               <div className="flex items-center justify-center gap-4 flex-wrap">
-                <Button size="lg" className="h-14 px-10 text-base gap-3" onClick={openSignInToNewListing}>
+                <Button size="lg" className="group h-14 px-10 text-base gap-3" onClick={openSignInToNewListing}>
                   {LANDING_PRIMARY_CTA}
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-5 h-5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-1" />
                 </Button>
                 <Button size="lg" variant="outline" className="h-14 px-8 text-base" onClick={scrollToHowItWorks}>
                   {LANDING_SECONDARY_CTA}
