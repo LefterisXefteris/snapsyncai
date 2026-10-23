@@ -52,7 +52,10 @@ from app.services.product_facts import (
 )
 from app.services.subscriptions import has_active_subscription
 from app.services.supabase_storage import upload_file_to_storage
-from app.services.upload_langgraph import resolve_upload_processing_mode
+from app.services.upload_langgraph import (
+    resolve_upload_processing_mode,
+    ungrouped_upload_cap_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +231,12 @@ async def upload_images(
             )
         if len(files) > MAX_UPLOAD_FILES:
             return _message(400, "Maximum 200 images per upload.")
+        group_flag = group_as_one in ("true", "True", "1")
+        cap_error = ungrouped_upload_cap_error(
+            file_count=len(files), group_as_one=group_flag
+        )
+        if cap_error is not None:
+            return _message(400, cap_error)
         if not settings.supabase_url or not settings.supabase_service_role_key:
             return _message(503, PHOTO_STORAGE_NOT_CONFIGURED)
 
@@ -238,7 +247,6 @@ async def upload_images(
                 return _message(400, f"{upload.filename} exceeds the 10MB limit.")
             loaded.append((upload, data))
 
-        group_flag = group_as_one in ("true", "True", "1")
         paid = await has_active_subscription(session, user_id, settings)
         upload_mode = resolve_upload_processing_mode(
             file_count=len(loaded),

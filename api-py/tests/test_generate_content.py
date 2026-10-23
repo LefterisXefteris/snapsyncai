@@ -65,6 +65,24 @@ def test_upload_refuses_when_photo_storage_is_not_configured(monkeypatch) -> Non
         get_settings.cache_clear()
 
 
+def test_ungrouped_upload_with_21_files_is_refused_before_vision(monkeypatch) -> None:
+    from app.services.upload_langgraph import TOO_MANY_UNGROUPED
+
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-test")
+    client = _client(monkeypatch)
+    try:
+        files = [
+            ("images", (f"shirt-{i}.jpg", b"not-a-real-jpeg", "image/jpeg"))
+            for i in range(21)
+        ]
+        response = client.post("/api/images/upload", files=files)
+        assert response.status_code == 400
+        assert response.json() == {"message": TOO_MANY_UNGROUPED}
+    finally:
+        get_settings.cache_clear()
+
+
 def test_generate_listing_copy_asks_for_seo_title_and_meta_description() -> None:
     assert '"seoTitle"' in GENERATE_CONTENT_SYSTEM
     assert '"seoDescription"' in GENERATE_CONTENT_SYSTEM
