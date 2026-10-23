@@ -1,6 +1,6 @@
-"""Plan charge. Jobs ask here before they start and spend here when their write lands.
+"""Plan charge. Jobs ask here before they start and spend here when Accept lands.
 
-The Plan module stays a pure function of Spend rows.
+The Plan module stays a pure function of Spend rows and Credit balance.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from app.db import after_commit
 from app.models.billing import Subscription
 from app.services import billing
 from app.services.plan import (
+    NEED_CREDITS,
     JobKind,
     decide,
     entitlement_of,
@@ -61,25 +62,26 @@ async def _context(
 ):
     local = billing.is_local_pro(settings) or await billing.is_dev_free_user(user_id, settings)
     if local:
-        return entitlement_of(local_pro=True, has_active_plan=False), [], None
+        return entitlement_of(local_pro=True, has_active_plan=False), [], None, 0
     if session is None:
-        return entitlement_of(local_pro=False, has_active_plan=False), [], None
+        return entitlement_of(local_pro=False, has_active_plan=False), [], None, 0
     if lock:
         sub = await _locked_subscription(session, user_id)
     else:
         sub = await billing.get_subscription(session, user_id)
     entitlement = entitlement_for(sub, local=False)
     spends = await list_spends_for_entitlement(session, user_id, entitlement)
-    return entitlement, spends, sub
+    balance = await billing.credit_balance(session, user_id)
+    return entitlement, spends, sub, balance
 
 
 async def current_entitlement(session: AsyncSession, settings: Settings, user_id: str):
-    entitlement, _spends, _sub = await _context(session, settings, user_id)
+    entitlement, _spends, _sub, _balance = await _context(session, settings, user_id)
     return entitlement
 
 
 async def overflow_ack_month(session: AsyncSession, settings: Settings, user_id: str) -> str | None:
-    _entitlement, _spends, sub = await _context(session, settings, user_id)
+    _entitlement, _spends, sub, _balance = await _context(session, settings, user_id)
     return None if sub is None else sub.overflow_confirmed_month
 
 
@@ -88,30 +90,51 @@ def _paid_write_confirmed(sub: Subscription | None) -> bool:
 
 
 async def overflow_view(session: AsyncSession, settings: Settings, user_id: str) -> tuple[bool, bool]:
-    entitlement, spends, sub = await _context(session, settings, user_id)
+    """Legacy tuple: (overflow_notice, overflow_confirm_required). Both false under Credits."""
+    entitlement, spends, sub, balance = await _context(session, settings, user_id)
     decision = decide(
         entitlement,
         spends,
         datetime.now(UTC),
         "generate_persist",
         completed=False,
+        credit_balance=balance,
         overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
         paid_write_confirmed=_paid_write_confirmed(sub),
     )
     return decision.overflow_notice, decision.overflow_confirm_required
 
 
+async def credits_view(
+    session: AsyncSession, settings: Settings, user_id: str
+) -> tuple[int, bool]:
+    """Credit balance and whether the next Accept needs a Credit (free tier used)."""
+    entitlement, spends, sub, balance = await _context(session, settings, user_id)
+    decision = decide(
+        entitlement,
+        spends,
+        datetime.now(UTC),
+        "generate_persist",
+        completed=False,
+        credit_balance=balance,
+        overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
+        paid_write_confirmed=_paid_write_confirmed(sub),
+    )
+    return balance, decision.credits_needed
+
+
 async def may_start(
     session: AsyncSession, settings: Settings, user_id: str, job: JobKind
 ) -> str | None:
     """The Plan reason this job may not start, or None. Spends nothing."""
-    entitlement, spends, sub = await _context(session, settings, user_id)
+    entitlement, spends, sub, balance = await _context(session, settings, user_id)
     decision = decide(
         entitlement,
         spends,
         datetime.now(UTC),
         job,
         completed=False,
+        credit_balance=balance,
         overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
         paid_write_confirmed=_paid_write_confirmed(sub),
     )
@@ -131,10 +154,10 @@ async def spend_when_landed[T](
 ) -> Landed[T]:
     """Run `write` if entitlement allows. A Plan does not record a use.
 
-    Free paid writes charge £0.70 before the Accept lands; a failed charge refuses.
+    Free path after three free Accepts deducts one Credit when Accept lands.
     Grandfathered Plan overage lines still report after commit.
     """
-    entitlement, spends, sub = await _context(session, settings, user_id, lock=True)
+    entitlement, spends, sub, balance = await _context(session, settings, user_id, lock=True)
     now = datetime.now(UTC)
     decision = decide(
         entitlement,
@@ -143,6 +166,7 @@ async def spend_when_landed[T](
         job,
         listing_copy_was_stale=listing_copy_was_stale,
         completed=True,
+        credit_balance=balance,
         overflow_confirmed_month=None if sub is None else sub.overflow_confirmed_month,
         confirm_overflow=confirm_overflow,
         paid_write_confirmed=_paid_write_confirmed(sub),
@@ -150,23 +174,16 @@ async def spend_when_landed[T](
     if not decision.allowed:
         return Landed(refused=decision.blocked_reason)
 
-    charge_now = decision.records_spend and decision.as_overage and entitlement == "free"
-    if charge_now:
-        try:
-            sub = await billing.ensure_payg_customer(session, settings, user_id, sub)
-            await asyncio.to_thread(
-                billing.charge_listing_copy_write,
-                sub.stripe_customer_id,
-                idempotency_key=f"write-{user_id}-{job}-{product_id}-{len(spends)}",
-            )
-        except billing.WriteChargeError as err:
-            return Landed(refused=str(err))
-        except Exception:
-            logger.exception("Listing-copy write charge failed for %s", user_id)
-            return Landed(refused=billing.NEED_PAYMENT)
+    deducted = False
+    if decision.records_spend and decision.spends_credit and entitlement == "free":
+        if not await billing.deduct_credit(session, user_id):
+            return Landed(refused=NEED_CREDITS)
+        deducted = True
 
     result = await write()
     if result is None:
+        if deducted:
+            await billing.add_credits(session, user_id, 1)
         return Landed(result=None)
     if decision.records_spend:
         await record_spend(
@@ -175,7 +192,7 @@ async def spend_when_landed[T](
             job,
             as_overage=decision.as_overage,
             product_id=product_id,
-            overage_reported=True if charge_now else not decision.as_overage,
+            overage_reported=True,
         )
         if decision.as_overage and sub is not None:
             sub.overflow_confirmed_month = (

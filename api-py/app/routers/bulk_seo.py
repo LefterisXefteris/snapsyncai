@@ -179,7 +179,7 @@ async def bulk_seo_accept(
         trace_id=body.trace_id,
         pack_id=body.pack_id or "",
     )
-    if result.refused in ("plan_blocked", "overflow_confirm"):
+    if result.refused in ("plan_blocked", "overflow_confirm", "credits_needed"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=result.message)
     if result.refused == "not_found":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.message)

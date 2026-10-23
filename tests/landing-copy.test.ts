@@ -95,10 +95,13 @@ test("copy does not sell unshipped jobs, fake proof, or the old generator story"
   }
 });
 
-test("pricing is three free writes then £0.70, with no Plan subscription", () => {
+test("pricing is three free Credits then packs, with no Plan subscription", () => {
   const text = landingVisibleText().toLowerCase();
-  assert.match(text, /£0\.70/);
   assert.match(text, /three free/);
+  assert.match(text, /credits/);
+  assert.match(text, /10.*50.*100|packs of 10/);
+  assert.equal(text.includes("bulk seo free"), false);
+  assert.equal(text.includes("£0.70 each"), false);
   assert.equal(text.includes("£19"), false);
   assert.equal(text.includes("£190"), false);
   assert.equal(text.includes("£4"), false);

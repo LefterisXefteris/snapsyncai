@@ -27,7 +27,7 @@ _T = TypeVar("_T")
 from app.auth.clerk import _client
 from app.config import Settings, get_settings
 from app.models import Image, ShopifyConnection
-from app.models.billing import PaidSession, Subscription
+from app.models.billing import PaidSession, Subscription, UserCredits
 from app.services.plan import (
     LEFTOVER_WEEKLY_INCLUDED as WEEKLY_PRODUCT_LIMIT,
 )
@@ -37,14 +37,6 @@ from app.services.plan import (
     PLAN_MONTHLY_PENCE,
     WRITE_PENCE,
 )
-
-PAYG_STATUS = "payg"
-PAYG_SUBSCRIPTION_ID = "payg"
-NEED_PAYMENT = "Add a card to pay £0.70 per AI listing-copy write."
-
-
-class WriteChargeError(Exception):
-    """Seller-visible refusal when a listing-copy write charge cannot run."""
 from app.services.subscriptions import (
     ACTIVE_STATUSES,
     DEV_FREE_EMAIL,
@@ -52,6 +44,15 @@ from app.services.subscriptions import (
     is_dev_free_user,
     is_local_pro,
 )
+
+PAYG_STATUS = "payg"
+PAYG_SUBSCRIPTION_ID = "payg"
+NEED_PAYMENT = "Buy Credits in Settings to Accept after your three free ones."
+
+
+class WriteChargeError(Exception):
+    """Seller-visible refusal when a Credit cannot be spent."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -302,6 +303,50 @@ async def claim_paid_session(session: AsyncSession, checkout_session_id: str) ->
     if row is None or (row.used or 0) > 0:
         return False
     row.used = 1
+    await session.flush()
+    return True
+
+
+async def _locked_credits(session: AsyncSession, user_id: str) -> UserCredits:
+    result = await session.execute(
+        select(UserCredits).where(UserCredits.user_id == user_id).with_for_update()
+    )
+    row = result.scalar_one_or_none()
+    if row is not None:
+        return row
+    row = UserCredits(user_id=user_id, balance=0, lifetime_credits=0)
+    session.add(row)
+    await session.flush()
+    result = await session.execute(
+        select(UserCredits).where(UserCredits.user_id == user_id).with_for_update()
+    )
+    return result.scalar_one()
+
+
+async def credit_balance(session: AsyncSession, user_id: str) -> int:
+    result = await session.execute(select(UserCredits).where(UserCredits.user_id == user_id))
+    row = result.scalar_one_or_none()
+    return int(row.balance) if row is not None else 0
+
+
+async def add_credits(session: AsyncSession, user_id: str, amount: int) -> int:
+    if amount <= 0:
+        raise ValueError("Credit pack amount must be positive")
+    row = await _locked_credits(session, user_id)
+    row.balance = int(row.balance) + amount
+    row.lifetime_credits = int(row.lifetime_credits) + amount
+    row.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.flush()
+    return int(row.balance)
+
+
+async def deduct_credit(session: AsyncSession, user_id: str) -> bool:
+    """Spend one Credit. False when the balance is empty."""
+    row = await _locked_credits(session, user_id)
+    if int(row.balance) < 1:
+        return False
+    row.balance = int(row.balance) - 1
+    row.updated_at = datetime.now(UTC).replace(tzinfo=None)
     await session.flush()
     return True
 
@@ -578,12 +623,15 @@ __all__ = [
     "PAYG_SUBSCRIPTION_ID",
     "WEEKLY_PRODUCT_LIMIT",
     "WriteChargeError",
+    "add_credits",
     "charge_listing_copy_write",
     "claim_paid_session",
     "claim_paid_session_statement",
     "clerk_primary_email",
     "configure_stripe",
     "create_paid_session",
+    "credit_balance",
+    "deduct_credit",
     "ensure_paid_session",
     "ensure_payg_customer",
     "find_active_stripe_subscription",

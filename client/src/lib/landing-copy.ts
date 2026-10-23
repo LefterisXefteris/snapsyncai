@@ -4,7 +4,7 @@ export const LANDING_DOCUMENT_TITLE =
   "SnapSync — your e-commerce agent for textile and coffee listings";
 
 export const LANDING_META_DESCRIPTION =
-  "SnapSync is your e-commerce agent for textile and coffee listings. Pick Product kind, confirm the facts pack, then listing copy. Import, inventory, and Bulk SEO. Textile products push to Shopify or Trendyol International; coffee to Shopify only. Three free AI listing-copy writes, then £0.70 each.";
+  "SnapSync is your e-commerce agent for textile and coffee listings. Pick Product kind, confirm the facts pack, then listing copy. Import, inventory, and Bulk SEO. Textile products push to Shopify or Trendyol International; coffee to Shopify only. Three free Credits, then buy packs for AI Accepts.";
 
 export const LANDING_EYEBROW = "Textile-first · Coffee on Shopify";
 
@@ -22,7 +22,7 @@ export const LANDING_PRIMARY_CTA = "Start free";
 export const LANDING_SECONDARY_CTA = "How it works";
 
 export const LANDING_FINE_PRINT =
-  "Three free AI listing-copy writes · then £0.70 each · catalogue free";
+  "Three free Credits · then packs of 10, 50, or 100 · catalogue free";
 
 export const JOBS = [
   {
@@ -53,12 +53,12 @@ export const JOBS = [
   {
     title: "Bulk SEO",
     description:
-      "Refresh tags, description, SEO title, and meta description for the products you pick, using search demand. You accept each one. Accept does not push to a Channel.",
+      "Refresh tags, description, SEO title, and meta description for the products you pick, using search demand. You accept each one — one Credit per Accept. Accept does not push to a Channel.",
   },
   {
     title: "Settings",
     description:
-      "Connect Shopify and Trendyol International, save the shop GPSR identity for textiles, and see your AI listing-copy writes. Catalogue, facts, and listing copy you type stay free.",
+      "Connect Shopify and Trendyol International, save the shop GPSR identity for textiles, and buy Credits. Catalogue, facts, and listing copy you type stay free.",
   },
 ] as const;
 
@@ -88,22 +88,16 @@ export const STEPS = [
 ] as const;
 
 export const WEEKLY_BULLETS = [
-  "Three free AI listing-copy writes, then £0.70 each",
+  "Three free Credits, then packs of 10 / 50 / 100",
+  "One Credit per Accept — first generate, refresh, or Bulk SEO",
   "New listing from photos (up to 200)",
   "Product kind facts, then listing copy",
   "SEO and AEO in the listing copy",
   "Push to Shopify or Trendyol International",
-  "Import, inventory, and Bulk SEO free",
+  "Import and inventory free",
 ] as const;
 
-export const ANNUAL_BULLETS = [
-  "Three free AI listing-copy writes, then £0.70 each",
-  "New listing from photos (up to 200)",
-  "Product kind facts, then listing copy",
-  "SEO and AEO in the listing copy",
-  "Push to Shopify or Trendyol International",
-  "Import, inventory, and Bulk SEO free",
-] as const;
+export const ANNUAL_BULLETS = WEEKLY_BULLETS;
 
 export const FAQ_DATA = [
   {
@@ -122,9 +116,9 @@ export const FAQ_DATA = [
       "Textile product or Coffee product — which facts pack applies. Textile uses fibre composition, care instructions, and GPSR identity. Coffee uses the food-label pack and may Push only to Shopify.",
   },
   {
-    question: "What do AI listing-copy writes cost?",
+    question: "What do Credits cost?",
     answer:
-      "Three free AI listing-copy writes for life on your shop, then £0.70 each when the write lands. Catalogue, facts, and typed listing copy stay free. No card is required to start.",
+      "Three free Credits for life on your shop. Then buy a pack of 10 (£7), 50 (£30), or 100 (£55). One Credit is spent when an Accept lands for first generate, refresh, or Bulk SEO. Catalogue, facts, and typed listing copy stay free. No card is required to start.",
   },
   {
     question: "How do I create a product from photos?",
@@ -139,7 +133,7 @@ export const FAQ_DATA = [
   {
     question: "How much does SnapSync cost?",
     answer:
-      "Catalogue, facts, and typed listing copy are free. Three free AI listing-copy writes, then £0.70 each. Push and Shopify inventory stay available. No card to start.",
+      "Catalogue, facts, and typed listing copy are free. Three free Credits, then packs of 10, 50, or 100. Push and Shopify inventory stay available. No card to start.",
   },
   {
     question: "Can I edit listing copy before I push?",

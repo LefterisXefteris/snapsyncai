@@ -2,31 +2,41 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 Entitlement = Literal["free", "plan", "leftover_weekly", "local_bypass"]
 JobKind = Literal["generate_persist", "refresh_accept", "bulk_seo_persist"]
+CreditPackSize = Literal[10, 50, 100]
 
 PLAN_INCLUDED = 20
 LEFTOVER_WEEKLY_INCLUDED = 30
-FREE_WRITES_INCLUDED = 3
+FREE_CREDITS_INCLUDED = 3
+FREE_WRITES_INCLUDED = FREE_CREDITS_INCLUDED  # legacy alias for callers/tests mid-migration
 PLAN_MONTHLY_PENCE = 1900
 PLAN_ANNUAL_PENCE = 19_000
 OVERAGE_PENCE = 70
 WRITE_PENCE = OVERAGE_PENCE
+
+# Fixed packs: list pence; larger packs cost less per Credit than £0.70.
+CREDIT_PACKS: Mapping[CreditPackSize, int] = {
+    10: 700,
+    50: 3000,
+    100: 5500,
+}
 
 NEED_PLAN = (
     "Subscribe to a Plan to generate listing copy, refresh from search demand, "
     "or run Bulk SEO."
 )
 WEEKLY_LIMIT = (
-    "You've used all 30 listing-copy writes this week. "
+    "You've used all 30 listing-copy Accepts this week. "
     "Your leftover weekly Plan resets every Monday at midnight UTC."
 )
-NEED_OVERFLOW_CONFIRM = "overflow_confirm_required"
+NEED_CREDITS = "Buy Credits to Accept after your three free ones."
+NEED_OVERFLOW_CONFIRM = "overflow_confirm_required"  # legacy; free path no longer uses it
 
 _LISTING_COPY_WRITE_JOBS = frozenset(
     {"generate_persist", "refresh_accept", "bulk_seo_persist"}
@@ -54,8 +64,10 @@ class SpendDecision:
     blocked_reason: str | None
     records_spend: bool
     as_overage: bool
+    spends_credit: bool = False
     overflow_notice: bool = False
     overflow_confirm_required: bool = False
+    credits_needed: bool = False
 
 
 def _aware(value: datetime) -> datetime:
@@ -82,6 +94,12 @@ def _listing_copy_writes(spends: Sequence[Spend]) -> int:
     return sum(1 for item in spends if item.kind in _LISTING_COPY_WRITE_JOBS)
 
 
+def pack_pence(size: int) -> int | None:
+    if size not in CREDIT_PACKS:
+        return None
+    return CREDIT_PACKS[size]  # type: ignore[index]
+
+
 def view(entitlement: Entitlement, spends: Sequence[Spend], now: datetime) -> AllowanceView:
     if entitlement == "local_bypass":
         return AllowanceView(entitlement=entitlement, included=None, used=0, overage=0)
@@ -89,9 +107,9 @@ def view(entitlement: Entitlement, spends: Sequence[Spend], now: datetime) -> Al
         used = _listing_copy_writes(spends)
         return AllowanceView(
             entitlement=entitlement,
-            included=FREE_WRITES_INCLUDED,
+            included=FREE_CREDITS_INCLUDED,
             used=used,
-            overage=max(0, used - FREE_WRITES_INCLUDED),
+            overage=max(0, used - FREE_CREDITS_INCLUDED),
         )
     if entitlement == "leftover_weekly":
         start = week_start_utc(now)
@@ -119,10 +137,13 @@ def decide(
     *,
     listing_copy_was_stale: bool = False,
     completed: bool = True,
+    credit_balance: int = 0,
     overflow_confirmed_month: str | None = None,
     confirm_overflow: bool = False,
     paid_write_confirmed: bool = False,
 ) -> SpendDecision:
+    # overflow_* / paid_write_confirmed kept for call-site compat; free path uses Credits.
+    _ = (overflow_confirmed_month, confirm_overflow, paid_write_confirmed)
     if entitlement == "free":
         if job not in _LISTING_COPY_WRITE_JOBS:
             return SpendDecision(
@@ -135,36 +156,42 @@ def decide(
         records = _records_listing_copy_write(
             job, completed=completed, listing_copy_was_stale=listing_copy_was_stale
         )
-        if used < FREE_WRITES_INCLUDED:
+        if used < FREE_CREDITS_INCLUDED:
             return SpendDecision(
                 allowed=True,
                 blocked_reason=None,
                 records_spend=records,
                 as_overage=False,
             )
-        confirmed = paid_write_confirmed or bool(overflow_confirmed_month)
-        if not (confirm_overflow or confirmed):
-            if not completed:
-                return SpendDecision(
-                    allowed=True,
-                    blocked_reason=None,
-                    records_spend=False,
-                    as_overage=True,
-                    overflow_notice=True,
-                    overflow_confirm_required=True,
-                )
+        if not completed:
+            return SpendDecision(
+                allowed=True,
+                blocked_reason=None,
+                records_spend=False,
+                as_overage=False,
+                credits_needed=credit_balance < 1,
+            )
+        if not records:
+            return SpendDecision(
+                allowed=True,
+                blocked_reason=None,
+                records_spend=False,
+                as_overage=False,
+            )
+        if credit_balance < 1:
             return SpendDecision(
                 allowed=False,
-                blocked_reason=NEED_OVERFLOW_CONFIRM,
+                blocked_reason=NEED_CREDITS,
                 records_spend=False,
-                as_overage=True,
-                overflow_confirm_required=True,
+                as_overage=False,
+                credits_needed=True,
             )
         return SpendDecision(
             allowed=True,
             blocked_reason=None,
-            records_spend=records,
-            as_overage=True,
+            records_spend=True,
+            as_overage=False,
+            spends_credit=True,
         )
     if entitlement == "local_bypass":
         return SpendDecision(
