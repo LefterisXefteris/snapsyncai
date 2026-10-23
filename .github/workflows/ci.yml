@@ -71,3 +71,115 @@ jobs:
       - name: Scan for secrets
         # Working tree at this commit (not git history). Matches "full tree at head".
         run: gitleaks detect --source . --no-git --verbose --redact --config .gitleaks.toml
+
+  # OSV gate: known malware (MAL-*) and high/critical CVSS (>= 7.0) in lockfiles.
+  deps-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install osv-scanner
+        env:
+          OSV_SCANNER_VERSION: "2.7.0"
+        run: |
+          set -euo pipefail
+          base="https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
+          curl -sSfL "${base}/osv-scanner_linux_amd64" -o osv-scanner
+          curl -sSfL "${base}/osv-scanner_SHA256SUMS" -o osv-scanner_SHA256SUMS
+          grep ' osv-scanner_linux_amd64$' osv-scanner_SHA256SUMS | sha256sum -c -
+          sudo install -m 755 osv-scanner /usr/local/bin/osv-scanner
+          osv-scanner --version
+
+      - name: Fail on malware or high/critical CVEs in npm and Python lockfiles
+        run: |
+          set -euo pipefail
+          # Exit 1 = findings exist; we gate only on MAL-* and CVSS >= 7.
+          set +e
+          osv-scanner scan --format json \
+            --lockfile=package-lock.json \
+            --lockfile=api-py/uv.lock \
+            > osv-scan.json
+          status=$?
+          set -e
+          if [ "$status" -gt 1 ]; then
+            echo "::error::osv-scanner failed with exit code ${status}"
+            cat osv-scan.json || true
+            exit "${status}"
+          fi
+          python3 <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          HIGH_CRITICAL_MIN = 7.0
+
+          raw = Path("osv-scan.json").read_text()
+          start = raw.find("{")
+          if start < 0:
+              print("::error::osv-scanner produced no JSON output")
+              sys.exit(2)
+          data = json.loads(raw[start:])
+          if "results" not in data:
+              print("::error::osv-scanner JSON missing results")
+              sys.exit(2)
+
+          blocking = []
+          for result in data.get("results") or []:
+              source = (result.get("source") or {}).get("path", "?")
+              for pkg in result.get("packages") or []:
+                  meta = pkg.get("package") or {}
+                  label = (
+                      f"{meta.get('ecosystem')} {meta.get('name')}@{meta.get('version')}"
+                  )
+
+                  for group in pkg.get("groups") or []:
+                      raw_sev = group.get("max_severity")
+                      try:
+                          score = float(raw_sev)
+                      except (TypeError, ValueError):
+                          score = None
+                      if score is not None and score >= HIGH_CRITICAL_MIN:
+                          blocking.append(
+                              {
+                                  "kind": "high-critical",
+                                  "source": source,
+                                  "label": label,
+                                  "ids": list(group.get("ids") or []),
+                                  "detail": f"CVSS {score}",
+                              }
+                          )
+
+                  for vuln in pkg.get("vulnerabilities") or []:
+                      ids = [vuln.get("id") or ""] + list(vuln.get("aliases") or [])
+                      mal_ids = [i for i in ids if i.startswith("MAL-")]
+                      if not mal_ids:
+                          continue
+                      blocking.append(
+                          {
+                              "kind": "malware",
+                              "source": source,
+                              "label": label,
+                              "ids": mal_ids,
+                              "detail": (vuln.get("summary") or vuln.get("details") or "")[
+                                  :500
+                              ],
+                          }
+                      )
+
+          if not blocking:
+              print(
+                  "No malware (MAL-*) or high/critical (CVSS >= 7) findings "
+                  "in package-lock.json or api-py/uv.lock"
+              )
+              sys.exit(0)
+
+          print(f"::error::{len(blocking)} blocking dependency finding(s)")
+          for hit in blocking:
+              print(
+                  f"::error file={hit['source']}::"
+                  f"[{hit['kind']}] {hit['label']} — {', '.join(hit['ids'])}"
+              )
+              if hit["detail"]:
+                  print(hit["detail"])
+          sys.exit(1)
+          PY
