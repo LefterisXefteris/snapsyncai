@@ -32,3 +32,42 @@ jobs:
 
       - run: uv run pytest
         working-directory: api-py
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deny committed dotenv files
+        run: |
+          set -euo pipefail
+          allowed='^\.env\.example$|^api-py/\.env\.example$'
+          bad=0
+          while IFS= read -r -d '' f; do
+            rel="${f#./}"
+            if printf '%s\n' "$rel" | grep -Eq "$allowed"; then
+              continue
+            fi
+            echo "::error file=$rel::Forbidden dotenv path (allowlist: .env.example, api-py/.env.example)"
+            bad=1
+          done < <(find . -type f \( -name '.env' -o -name '.env.*' \) \
+            ! -path './.git/*' -print0)
+          if [ "$bad" -ne 0 ]; then
+            echo "Committed dotenv files are not allowed. Use ignored .env.local (or similar) and keep only allowlisted *.example templates."
+            exit 1
+          fi
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}" \
+            | tar -xz gitleaks
+          sudo install -m 755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan for secrets
+        # Working tree at this commit (not git history). Matches "full tree at head".
+        run: gitleaks detect --source . --no-git --verbose --redact --config .gitleaks.toml

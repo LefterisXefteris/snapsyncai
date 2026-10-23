@@ -1,0 +1,15 @@
+# Secret content scan for the CI `secrets` job (see .github/workflows/ci.yml).
+# Dotenv *paths* are denied separately; this file only allowlists example templates
+# so placeholder values (e.g. sk-dummy-local) do not fail the gate.
+
+title = "SnapSync"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Tracked env templates — documentation only, not real secrets"
+paths = [
+  '''^\.env\.example$''',
+  '''^api-py/\.env\.example$''',
+]
