@@ -9,6 +9,7 @@ import {
   ShieldCheck, LayoutGrid, Boxes, Search,
 } from "lucide-react";
 import { SiShopify } from "react-icons/si";
+import { LandingDust } from "@/components/landing-dust";
 import { LandingLiveDemo, prefersReducedMotion } from "@/components/landing-live-demo";
 import snapsyncaiLogo from "../assets/snapsyncai-logo.png";
 import { workspaceNavItem } from "@/lib/workspace-nav";
@@ -62,6 +63,8 @@ function useScrollReveal() {
 
 const JOB_ICONS = [LayoutGrid, Boxes, Search] as const;
 const STEP_ICONS = [Upload, ShieldCheck, FileText, Store] as const;
+
+const LANDING_HEADING = "font-landing text-4xl md:text-5xl font-normal tracking-tight leading-[1.05]";
 
 const NAV_LINKS = [
   { href: "#how-it-works", label: "How it works" },
@@ -152,12 +155,14 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-foreground">
+    <div className="relative min-h-screen bg-background text-foreground">
+      <LandingDust />
+      <div className="relative z-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur border-b border-border" aria-label="Main navigation">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={snapsyncaiLogo} alt={`${LANDING_BRAND} logo`} className="w-8 h-8 rounded-md" width="32" height="32" />
@@ -184,12 +189,12 @@ export default function Landing() {
                 <span className="font-display text-3xl font-bold tracking-tight">{LANDING_BRAND}</span>
               </div>
 
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-5">
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-primary mb-5">
                 {LANDING_EYEBROW}
               </p>
 
-              <h1 id="hero-heading" className="font-display text-4xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 duration-700">
-                <span className="text-primary">{LANDING_H1_LEAD}</span>
+              <h1 id="hero-heading" className="font-landing text-5xl sm:text-6xl md:text-7xl lg:text-[5.25rem] font-normal tracking-tight leading-[0.95] mb-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 duration-700">
+                <span className="italic text-primary">{LANDING_H1_LEAD}</span>
                 {LANDING_H1.slice(LANDING_H1_LEAD.length)}
               </h1>
 
@@ -211,7 +216,7 @@ export default function Landing() {
 
               <div className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card px-4 py-2">
                 <SiShopify className="w-4 h-4 text-[#96BF48]" />
-                <span className="text-sm text-muted-foreground">{LANDING_CHANNELS}</span>
+                <span className="font-mono text-xs tracking-wide text-muted-foreground">{LANDING_CHANNELS}</span>
               </div>
             </div>
 
@@ -224,7 +229,7 @@ export default function Landing() {
         <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50 scroll-mt-16" aria-labelledby="how-heading">
           <div className="text-center mb-16 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">{LANDING_SECONDARY_CTA}</Badge>
-            <h2 id="how-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{STEPS_HEADING}</h2>
+            <h2 id="how-heading" className={`${LANDING_HEADING} mb-4`}>{STEPS_HEADING}</h2>
             <p className="text-muted-foreground max-w-xl mx-auto text-lg">{STEPS_SUBHEAD}</p>
           </div>
           <div className="relative">
@@ -242,7 +247,7 @@ export default function Landing() {
                         <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:scale-[1.08]">
                           <Icon className="w-5 h-5 text-primary" />
                         </div>
-                        <span className="font-display text-3xl font-bold text-muted-foreground/40 tabular-nums">{step.number}</span>
+                        <span className="font-mono text-xs tracking-[0.2em] text-primary tabular-nums">{step.number}</span>
                       </div>
                       <h3 className="font-display font-bold text-xl mb-2">{step.title}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
@@ -256,7 +261,7 @@ export default function Landing() {
 
         <section id="jobs" className="max-w-6xl mx-auto px-6 py-24 border-t border-border/50 scroll-mt-16" aria-labelledby="jobs-heading">
           <div className="text-center mb-16 reveal">
-            <h2 id="jobs-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{JOBS_HEADING}</h2>
+            <h2 id="jobs-heading" className={`${LANDING_HEADING} mb-4`}>{JOBS_HEADING}</h2>
             <p className="text-muted-foreground max-w-xl mx-auto text-lg">{JOBS_SUBHEAD}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -289,7 +294,7 @@ export default function Landing() {
               <Badge variant="outline" className="mb-4 no-default-active-elevate gap-1.5">
                 <Coins className="w-3 h-3" /> Pricing
               </Badge>
-              <h2 id="pricing-heading" className="text-4xl font-display font-bold tracking-tight mb-4">{PRICING_HEADING}</h2>
+              <h2 id="pricing-heading" className={`${LANDING_HEADING} mb-4`}>{PRICING_HEADING}</h2>
               <p className="text-muted-foreground max-w-lg mx-auto text-lg">{PRICING_SUBHEAD}</p>
             </div>
 
@@ -299,7 +304,7 @@ export default function Landing() {
                   <Card className={`h-full text-center reveal delay-${i + 1} hover:border-primary/60 transition-colors`}>
                     <CardHeader>
                       <CardDescription>{pack.credits} Credits</CardDescription>
-                      <CardTitle className="text-5xl font-display font-bold pt-2">{pack.price}</CardTitle>
+                      <CardTitle className="font-landing text-5xl md:text-6xl font-normal tracking-tight pt-2">{pack.price}</CardTitle>
                     </CardHeader>
                   </Card>
                 </div>
@@ -328,7 +333,7 @@ export default function Landing() {
         <section id="faq" className="max-w-3xl mx-auto px-6 py-24 scroll-mt-16" aria-labelledby="faq-heading">
           <div className="text-center mb-14 reveal">
             <Badge variant="outline" className="mb-4 no-default-active-elevate">FAQ</Badge>
-            <h2 id="faq-heading" className="text-4xl font-display font-bold tracking-tight mb-4">Questions</h2>
+            <h2 id="faq-heading" className={`${LANDING_HEADING} mb-4`}>Questions</h2>
             <p className="text-muted-foreground max-w-lg mx-auto">{FAQ_SUBHEAD}</p>
           </div>
           <div className="reveal">
@@ -346,7 +351,7 @@ export default function Landing() {
         <section className="max-w-6xl mx-auto px-6 pb-24" aria-labelledby="cta-heading">
           <div className="relative overflow-hidden rounded-xl border border-border bg-card p-12 md:p-20 text-center reveal">
             <div className="relative">
-              <h2 id="cta-heading" className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">{CLOSING_HEADING}</h2>
+              <h2 id="cta-heading" className="font-landing text-4xl md:text-6xl font-normal tracking-tight leading-[0.95] mb-6">{CLOSING_HEADING}</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mb-10 text-lg leading-relaxed">{CLOSING_SUBHEAD}</p>
               <div className="flex items-center justify-center gap-4 flex-wrap">
                 <Button size="lg" className="group h-14 px-10 text-base gap-3" onClick={openSignInToNewListing}>
@@ -376,18 +381,18 @@ export default function Landing() {
             </div>
             <div className="flex flex-wrap gap-8 text-sm text-muted-foreground">
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Product</p>
+                <p className="font-mono text-[11px] font-medium text-foreground uppercase tracking-[0.18em]">Product</p>
                 {NAV_LINKS.map((link) => (
                   <a key={link.href} href={link.href} className="block hover:text-foreground transition-colors">{link.label}</a>
                 ))}
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Channels</p>
+                <p className="font-mono text-[11px] font-medium text-foreground uppercase tracking-[0.18em]">Channels</p>
                 <span className="block">Shopify</span>
                 <span className="block">Trendyol International</span>
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Contact</p>
+                <p className="font-mono text-[11px] font-medium text-foreground uppercase tracking-[0.18em]">Contact</p>
                 <a href="mailto:lefteris@tribeagent.co.uk" className="block hover:text-foreground transition-colors">lefteris@tribeagent.co.uk</a>
               </div>
             </div>
@@ -398,6 +403,7 @@ export default function Landing() {
           </p>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

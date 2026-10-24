@@ -90,6 +90,7 @@ export default {
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
         display: ["var(--font-display)"],
+        landing: ["var(--font-landing)", "Georgia", "serif"],
         body: ["var(--font-body)"],
       },
       keyframes: {
