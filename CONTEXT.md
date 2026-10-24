@@ -32,6 +32,10 @@ _Avoid_: store setup, create store, MCP
 A place the seller opens in the signed-in workspace: Products, the product page, New listing, Import, Inventory, Bulk SEO, or Settings. Opening the workspace lands on Products, whether or not a Shopify Channel is connected. A destination the seller opens stays until they leave. Disconnecting, and a connect or Channel claim trip, are not leaving.
 _Avoid_: surface, screen, Website, Conversation
 
+**Landing**:
+The public marketing page a stranger opens before sign-in. Distinct from a Destination.
+_Avoid_: Homepage (as a Destination), Website
+
 **Products**:
 The destination where the workspace opens, which the seller sees named Products and this glossary calls the catalogue. Distinct from Product.
 _Avoid_: catalog
