@@ -12,6 +12,14 @@ export function bulkSeoEligibleIds(rows: { id: number; eligible: boolean }[]): n
   return rows.filter((row) => row.eligible).map((row) => row.id);
 }
 
+export function bulkSeoTickedEligibleIds(
+  rows: { id: number; eligible: boolean }[],
+  selectedIds: Iterable<number>,
+): number[] {
+  const wanted = new Set(selectedIds);
+  return rows.filter((row) => row.eligible && wanted.has(row.id)).map((row) => row.id);
+}
+
 export function bulkSeoEligibleTickCount(
   rows: { id: number; eligible: boolean }[],
   selectedIds: Iterable<number>,

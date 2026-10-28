@@ -9,6 +9,7 @@ import {
   bulkSeoEligibleIds,
   bulkSeoEligibleTickCount,
   bulkSeoStartEnabled,
+  bulkSeoTickedEligibleIds,
 } from "../client/src/lib/bulk-seo.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,6 +46,7 @@ test("Start is disabled when blocked, without demand, or with no eligible ticks"
 test("proposed uses count ticked eligible products, not blocked rows", () => {
   assert.equal(bulkSeoEligibleTickCount(rows, [1, 2, 3]), 2);
   assert.equal(bulkSeoEligibleTickCount(rows, [2]), 0);
+  assert.deepEqual(bulkSeoTickedEligibleIds(rows, [1, 2, 3]), [1, 3]);
 });
 
 test("empty catalogue copy is an empty state, not a broken picker", () => {
@@ -55,6 +57,8 @@ test("empty catalogue copy is an empty state, not a broken picker", () => {
 test("Bulk SEO page is the picker, not a stub, and has no Push chrome", () => {
   assert.match(page, /from ["']@\/lib\/bulk-seo["']/);
   assert.match(page, /useBulkSeoStart/);
+  assert.match(page, /rememberBulkSeoTicks\(tickedEligible\)/);
+  assert.match(page, /bulkSeoTickedEligibleIds/);
   assert.match(page, /Regenerate/);
   assert.match(page, /Dismiss/);
   assert.match(page, /Accept/);

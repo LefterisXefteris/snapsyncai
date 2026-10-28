@@ -182,6 +182,69 @@ export function productFacts(image: Pick<Image, "productFacts"> | undefined): Pr
   return raw as ProductFactsRecord;
 }
 
+export function draftsFromConfirmed(facts: ProductFactsRecord | null): {
+  composition: FibreRowDraft[];
+  gpsrChoice: GpsrChoice | "";
+  careChoice: CareChoice | "";
+  care: CareInstructions;
+  gpsr: GpsrIdentity;
+} {
+  const confirmed = facts?.confirmed;
+  return {
+    composition: compositionFromConfirmed(facts),
+    gpsrChoice: confirmed?.gpsrChoice ?? "",
+    careChoice: confirmed?.careChoice ?? "",
+    care: confirmed?.care ?? emptyCare(),
+    gpsr: confirmed?.gpsrIdentity ?? emptyGpsrIdentity(),
+  };
+}
+
+function compositionFromConfirmed(facts: ProductFactsRecord | null): FibreRowDraft[] {
+  const rows = facts?.confirmed?.composition;
+  if (!rows || rows.length === 0) return draftComposition(facts);
+  return rows.map((row) => fibreDraft(row.name ?? "", row.percent));
+}
+
+function fibreDraft(name: string, percent: number | undefined): FibreRowDraft {
+  const canonical = canonicalFibre(name);
+  const percentText = typeof percent === "number" ? String(percent) : "";
+  if (EU_FIBRE_NAMES.includes(canonical as (typeof EU_FIBRE_NAMES)[number])) {
+    return { name: canonical, percent: percentText, otherName: "" };
+  }
+  return { name: OTHER_FIBRE, percent: percentText, otherName: name.trim() };
+}
+
+/** Changes when the open product page should show new facts or typed listing copy. */
+export function shownOnProductPage(
+  image:
+    | {
+        id?: number;
+        productFacts?: unknown;
+        title?: string | null;
+        description?: string | null;
+        tags?: string[] | null;
+        seoTitle?: string | null;
+        seoDescription?: string | null;
+        aeoSnippet?: string | null;
+        aeoFaqs?: unknown;
+      }
+    | null
+    | undefined,
+): string {
+  if (!image) return "";
+  return JSON.stringify({
+    id: image.id ?? null,
+    productFacts: image.productFacts ?? null,
+    title: image.title ?? "",
+    description: image.description ?? "",
+    tags: image.tags ?? [],
+    seoTitle: image.seoTitle ?? "",
+    seoDescription: image.seoDescription ?? "",
+    aeoSnippet: image.aeoSnippet ?? "",
+    aeoFaqs: image.aeoFaqs ?? [],
+  });
+}
+
 export function draftComposition(facts: ProductFactsRecord | null): FibreRowDraft[] {
   const names = facts?.suggested?.fibreNames ?? [];
   if (names.length === 0) {

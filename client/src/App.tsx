@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AmbientProvider } from "@/components/ambient/AmbientProvider";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ChatCard } from "@/components/chat-card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { useShopifyStatus } from "@/hooks/use-images";
@@ -174,6 +175,7 @@ function AuthenticatedLayout() {
             <AuthenticatedRouter />
           </Suspense>
         </div>
+        <ChatCard />
       </SidebarInset>
     </SidebarProvider>
   );

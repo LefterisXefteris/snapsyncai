@@ -13,9 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 import { filterImageLikeFiles } from "@/lib/image-file-utils";
 import { api, buildUrl } from "@/lib/api-routes";
 import { AuthenticatedImg } from "@/components/authenticated-img";
+import { rememberPageProposal } from "@/lib/chat-page";
 import {
   productFacts,
-  draftComposition,
+  draftsFromConfirmed,
+  shownOnProductPage,
   confirmedProductKind,
   isCoffeeProduct,
   EU_FIBRE_NAMES,
@@ -177,6 +179,10 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
 
   const image = images?.find((img: Image) => img.id === Number(params.id));
   const imageId = image?.id;
+  useEffect(() => {
+    return () => rememberPageProposal(null);
+  }, [params.id]);
+  const savedStamp = shownOnProductPage(image);
   const {
     data: shopifyPublications,
     isLoading: publicationsLoading,
@@ -198,29 +204,35 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const displayImageId = selectedImageId ?? image?.id;
 
-  // Re-hydrate when switching products, not on every catalogue refetch.
+  // Selling and publications reset only when the seller opens a different product.
   useEffect(() => {
     if (!image) return;
-    setTitle(image.title || image.originalName || "");
-    setDescription(image.description || "");
     setPrice(image.price || "0.00");
     setCategory(image.category || "");
     setProductType(image.productType || "");
-    setSeoTitle(image.seoTitle || "");
-    setSeoDescription(image.seoDescription || "");
     setAltText(image.altText || "");
-    setAeoSnippet(image.aeoSnippet || "");
     setCompareAtPrice(image.compareAtPrice || "");
     setCostPerItem(image.costPerItem || "");
     setSku(image.sku || "");
     setBarcode(image.barcode || "");
     setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
     setInventoryQuantity(image.inventoryQuantity || 0);
-    setTags(Array.isArray(image.tags) ? image.tags : []);
     setShopifyListingStatus(shopifyProductStatus(image.shopifyProductStatus));
     setSelectedPublicationIds(
       Array.isArray(image.shopifyPublicationIds) ? image.shopifyPublicationIds : [],
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- imageId is the open product
+  }, [imageId]);
+
+  // Facts and typed listing copy, including a save from Chat while this page stays open.
+  useEffect(() => {
+    if (!image) return;
+    setTitle(image.title || image.originalName || "");
+    setDescription(image.description || "");
+    setSeoTitle(image.seoTitle || "");
+    setSeoDescription(image.seoDescription || "");
+    setAeoSnippet(image.aeoSnippet || "");
+    setTags(Array.isArray(image.tags) ? image.tags : []);
     setAeoFaqs(
       Array.isArray(image.aeoFaqs)
         ? (image.aeoFaqs as { q?: string; a?: string; question?: string; answer?: string }[]).map((f) => ({
@@ -230,7 +242,12 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
         : [],
     );
     const nextFacts = productFacts(image);
-    setCompositionRows(draftComposition(nextFacts));
+    const drafts = draftsFromConfirmed(nextFacts);
+    setCompositionRows(drafts.composition);
+    setGpsrChoice(drafts.gpsrChoice);
+    setGpsrDraft(drafts.gpsr);
+    setCareChoice(drafts.careChoice);
+    setCareDraft(drafts.care);
     setProductKindDraft(confirmedProductKind(nextFacts) ?? "");
     setCoffeeForm(nextFacts?.confirmed?.coffeeForm ?? "");
     setRoastLevel(nextFacts?.confirmed?.roastLevel ?? "");
@@ -239,8 +256,8 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
     setCoffeeOrigin(nextFacts?.confirmed?.coffeeOrigin ?? "");
     setIngredientsList(nextFacts?.confirmed?.ingredientsList ?? "");
     setAllergenStatement(nextFacts?.confirmed?.allergenStatement ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset local listing copy when the product changes
-  }, [imageId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- savedStamp is this product's facts and listing copy
+  }, [savedStamp]);
 
   useEffect(() => {
     if (!shopifyPublications?.productStatus) return;
@@ -1364,6 +1381,15 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
                       if (parsed.seoTitle) setSeoTitle(parsed.seoTitle.slice(0, 70));
                       if (parsed.seoDescription) setSeoDescription(parsed.seoDescription.slice(0, 320));
                       if (parsed.aeoFaqs) setAeoFaqs(parsed.aeoFaqs);
+                      rememberPageProposal({
+                        productId: image.id,
+                        title: parsed.title,
+                        description: parsed.description,
+                        tags: parsed.seoKeywords ?? [],
+                        seoTitle: parsed.seoTitle ?? "",
+                        seoDescription: parsed.seoDescription ?? "",
+                        aeoFaqs: parsed.aeoFaqs ?? [],
+                      });
                     }}
                     onAcceptTitle={(v, traceId) => {
                       setTitle(v);

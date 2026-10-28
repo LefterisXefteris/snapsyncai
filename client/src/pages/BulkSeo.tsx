@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +16,9 @@ import {
   bulkSeoEligibleIds,
   bulkSeoEligibleTickCount,
   bulkSeoStartEnabled,
+  bulkSeoTickedEligibleIds,
 } from "@/lib/bulk-seo";
+import { rememberBulkSeoTicks } from "@/lib/chat-page";
 import { useOverflowConfirm } from "@/hooks/use-overflow-confirm";
 import { creditsNeededNotice, overflowNoticeText } from "@/lib/overflow-copy";
 
@@ -33,6 +35,14 @@ export default function BulkSeoPage() {
   const [acceptBlockedReason, setAcceptBlockedReason] = useState<string | null>(null);
 
   const rows = catalogue.data?.rows ?? [];
+  const tickedEligible = useMemo(
+    () => bulkSeoTickedEligibleIds(rows, selectedIds),
+    [rows, selectedIds],
+  );
+  useEffect(() => {
+    rememberBulkSeoTicks(tickedEligible);
+    return () => rememberBulkSeoTicks([]);
+  }, [tickedEligible]);
   const startBlockedReason = catalogue.data?.startBlockedReason ?? null;
   const ticksLocked = startBlockedReason != null;
   const eligibleIds = bulkSeoEligibleIds(rows);
