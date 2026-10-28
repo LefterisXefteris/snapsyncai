@@ -1,5 +1,7 @@
 # Chat is a card beside the API
 
+The open-and-close card in the first sentence is superseded by [0052](./0052-chat-stays-along-the-bottom.md). The rest of this decision still holds.
+
 **Chat** is the card along the bottom of the signed-in workspace: one thread per shop, the same thread across Destinations, absent from the Landing page. It is not a Destination. [0042](./0042-remove-website-and-conversation.md) still holds for Website and for a Conversation Destination. There is no Silence and no unprompted job offer.
 
 SnapSync runs the model on its own service and holds the key. The seller does not. The Railway API is the only caller, one authenticated call per message, as that seller. The service may request an act that message asked for. The API runs the existing operation, so the page's gates and job caps still hold. The Shopify token and the session cookie stay off the model service. SnapSync stores the thread, so any instance can take the next turn. A turn ends when the API has run or refused that message. A message sent during a turn waits. One message stops after 10 model calls. The thread says it stopped. Acts that already landed stay landed, and later ones do not run. Import's turn ends once Import has started. Talk and questions spend no Credit. The model bill is SnapSync's.

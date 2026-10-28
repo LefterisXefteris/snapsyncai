@@ -123,10 +123,6 @@ export function rollbackPhotoIntake(photoCount: number, epoch: number): void {
   intakeLines = intakeLines.slice(0, -1);
 }
 
-export function closeChatCard(): void {
-  intakeLines = [];
-}
-
 /** Eligible rows ticked on Bulk SEO. A Products selection is not stored here. */
 export function rememberBulkSeoTicks(ids: readonly number[]): void {
   bulkSeoTicks = [...ids];

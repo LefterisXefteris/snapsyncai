@@ -166,16 +166,18 @@ function AuthenticatedLayout() {
     <SidebarProvider className="min-h-svh">
       <AppSidebar />
       <ShopArrival />
-      <SidebarInset className="min-h-svh min-w-0 overflow-hidden bg-transparent">
+      <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden bg-transparent">
         <header className="flex h-12 items-center gap-2 px-2 md:hidden shrink-0">
           <SidebarTrigger />
         </header>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <Suspense fallback={<RouteFallback />}>
-            <AuthenticatedRouter />
-          </Suspense>
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div className="h-full min-h-0 overflow-hidden">
+            <Suspense fallback={<RouteFallback />}>
+              <AuthenticatedRouter />
+            </Suspense>
+          </div>
+          <ChatCard />
         </div>
-        <ChatCard />
       </SidebarInset>
     </SidebarProvider>
   );
