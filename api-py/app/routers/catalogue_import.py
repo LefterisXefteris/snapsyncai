@@ -83,20 +83,10 @@ async def import_status(user_id: CurrentUser, session: SessionDep) -> ImportStat
     return _status(connection is not None, lock.last, lock.in_progress())
 
 
-@router.post("/api/import/start", response_model=ImportStatusResponse)
-async def import_start(
-    user_id: CurrentUser, session: SessionDep, graphql_for: ShopifyGraphQLForDep
-) -> ImportStatusResponse:
-    connection = await connections.get_shopify(session, user_id)
-    lock = RUNS.for_user(user_id)
-    connected = connection is not None
-    blocked = start_blocked_reason(
-        shopify_connected=connected, run_in_progress=lock.in_progress()
-    )
-    if blocked:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocked)
-    assert connection is not None
-    graphql = graphql_for(connection)
+async def run_connected_import(
+    session, user_id: str, graphql, lock, *, already_holding: bool = False
+):
+    """The page's Start once Shopify is connected. Chat may already hold the run lock."""
 
     async def existing_ids() -> list[str]:
         images = await store.list_images(session, user_id)
@@ -115,14 +105,32 @@ async def import_start(
     async def persist(product) -> None:
         await persist_imported_product(session, user_id, product)
 
-    result = await start_import(
+    return await start_import(
         shopify_connected=True,
         existing_channel_ids=existing_ids,
         channel_products=channel_products,
         persist=persist,
         load_photo=load_channel_photo,
         run_lock=lock,
+        already_holding=already_holding,
     )
+
+
+@router.post("/api/import/start", response_model=ImportStatusResponse)
+async def import_start(
+    user_id: CurrentUser, session: SessionDep, graphql_for: ShopifyGraphQLForDep
+) -> ImportStatusResponse:
+    connection = await connections.get_shopify(session, user_id)
+    lock = RUNS.for_user(user_id)
+    connected = connection is not None
+    blocked = start_blocked_reason(
+        shopify_connected=connected, run_in_progress=lock.in_progress()
+    )
+    if blocked:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocked)
+    assert connection is not None
+    graphql = graphql_for(connection)
+    result = await run_connected_import(session, user_id, graphql, lock)
     if result.blocked_reason:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=result.blocked_reason

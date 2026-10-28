@@ -30,7 +30,11 @@ _Avoid_: store setup, create store, MCP
 
 **Destination**:
 A place the seller opens in the signed-in workspace: Products, the product page, New listing, Import, Inventory, Bulk SEO, or Settings. Opening the workspace lands on Products, whether or not a Shopify Channel is connected. A destination the seller opens stays until they leave. Disconnecting, and a connect or Channel claim trip, are not leaving.
-_Avoid_: surface, screen, Website, Conversation
+_Avoid_: surface, screen, Website, Conversation, Chat
+
+**Chat**:
+The card a seller opens along the bottom of the signed-in workspace. One thread per shop, the same thread across Destinations. A message is a request for an act that seller could already perform on that shop. A question is not an act. Not a Destination, and not where they buy Credits, connect or disconnect a Channel, claim a shop, cancel a Plan, or choose photos.
+_Avoid_: Conversation, Agentic SEO, chat card, agent
 
 **Landing**:
 The public marketing page a stranger opens before sign-in. Distinct from a Destination.
@@ -85,7 +89,7 @@ The job of proposing new tags, description, SEO title, and meta description for 
 _Avoid_: Agentic SEO, SEO agent, trend rewrite, competitor SEO
 
 **Accept**:
-The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. When it lands it spends one Credit under that shop's Credit rules, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page or the Bulk SEO page.
+The seller's explicit choice to keep proposed listing copy for one product. It saves that copy and does not Push. When it lands it spends one Credit under that shop's Credit rules, and not when stale listing copy is regenerated. First generate, listing copy refresh, and Bulk SEO each end in an accept; the same accept runs from the product page, the Bulk SEO page, or Chat. From Chat it is a later message, after that proposal is already in the thread.
 _Avoid_: approve, apply, save (as the seller act)
 
 **Search demand**:
@@ -97,7 +101,7 @@ Stock on hand for products in the workspace. Distinct from listing copy and from
 _Avoid_: Stock, quantity (alone)
 
 **Listing copy**:
-The title, description, tags, SEO title, meta description, and AEO text written for a product. It must not be generated until product facts are confirmed. Confirmed kind facts that belong in the description are assembled as structured blocks (fibre, care, and GPSR on a Textile product; coffee form, roast level, net weight, coffee origin when not skipped, ingredients list, and allergen statement on a Coffee product) and must not be invented beyond those facts.
+The title, description, tags, SEO title, meta description, and AEO text written for a product. It must not be generated until product facts are confirmed. Words the seller quotes in Chat are typed listing copy. Confirmed kind facts that belong in the description are assembled as structured blocks (fibre, care, and GPSR on a Textile product; coffee form, roast level, net weight, coffee origin when not skipped, ingredients list, and allergen statement on a Coffee product) and must not be invented beyond those facts.
 _Avoid_: AI content, content, listing (alone)
 
 **Selling**:

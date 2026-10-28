@@ -34,6 +34,7 @@ from app.services.image_analysis import (
     quick_preview_multiple_images,
 )
 from app.services.image_buffers import set_image_buffer
+from app.services.listing_copy_generate import FIELD_PROMPTS, PHOTO_FILE_MISSING, generate_messages
 from app.services.listing_copy_refresh import search_demand_configured
 from app.services.listing_copy_trace import (
     JOB_GENERATE,
@@ -65,54 +66,10 @@ MIN_IMAGE_COUNT = 1
 MAX_UPLOAD_FILES = 200
 MAX_FILE_BYTES = 10 * 1024 * 1024
 CONCURRENCY_LIMIT = 10
-PHOTO_FILE_MISSING = (
-    "This photo's file is missing. Re-upload it before generating listing copy."
-)
 PHOTO_STORAGE_NOT_CONFIGURED = (
     "Photo storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY "
     "for this environment."
 )
-
-FIELD_PROMPTS = {
-    "title": "Generate a single product title. Output only the title text, no JSON, no quotes.",
-    "description": (
-        "Rewrite the product description — 3-4 engaging paragraphs. Output only the description text."
-    ),
-    "seoKeywords": (
-        'Generate SEO keywords as a JSON array of strings: ["keyword1", "keyword2", ...]. '
-        "Output only the JSON array."
-    ),
-    "seoTitle": (
-        "Generate an SEO title. Max 70 characters, specific, with product name. "
-        "Output only the title text, no JSON, no quotes."
-    ),
-    "seoDescription": (
-        "Generate a meta description. Max 320 characters, specific to this product. "
-        "Output only the description text."
-    ),
-    "aeoFaqs": (
-        'Generate FAQ pairs as a JSON array: [{"q": "...", "a": "..."}]. '
-        "Output only the JSON array."
-    ),
-}
-
-GENERATE_CONTENT_SYSTEM = """You are an expert e-commerce copywriter. Generate product listing content for a product shown in the image.
-Output ONLY valid JSON with this exact structure (no markdown, no code fences):
-{
-  "title": "Product title — specific, benefit-led, max 80 chars",
-  "description": "3-4 paragraph product description, engaging and conversion-optimised",
-  "seoKeywords": ["keyword1", "keyword2", ...],
-  "seoTitle": "SEO title — specific, max 70 chars",
-  "seoDescription": "Meta description — specific, max 320 chars",
-  "aeoFaqs": [{"q": "Question?", "a": "Answer."}, ...]
-}
-Rules:
-- seoKeywords: 8-12 specific keywords/phrases for Shopify search — brand, material, use case, style
-- seoTitle: SEO title for search results, max 70 characters
-- seoDescription: meta description for search results, max 320 characters
-- aeoFaqs: 4-6 FAQ pairs that answer common buyer questions about this type of product (price not included)
-- Use the category, style/tone, and target audience provided by the user"""
-
 
 def _message(status: int, message: str, **extra: Any) -> JSONResponse:
     """Express-shaped error body: `{ message }` (the SPA reads this key)."""
@@ -483,29 +440,15 @@ async def generate_content(
     buf = await store.load_image_bytes(image)
     if buf is None:
         return _message(400, PHOTO_FILE_MISSING)
-    mime = image.mime_type or "image/jpeg"
-    user_text = (
-        f"Category: {body.category or image.category or 'General'}\n"
-        f"Style/tone: {body.style_tone or 'professional'}\n"
-        f"Target audience: {body.audience or 'general buyers'}\n"
-        f"Product title context: {image.title or image.original_name or ''}"
+    messages = generate_messages(
+        image,
+        facts,
+        loaded.shop_gpsr,
+        buf,
+        category=body.category,
+        style_tone=body.style_tone,
+        audience=body.audience,
     )
-    messages = [
-        {
-            "role": "system",
-            "content": _generation_system(GENERATE_CONTENT_SYSTEM, facts, loaded.shop_gpsr),
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": user_text},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{base64.b64encode(buf).decode()}"},
-                },
-            ],
-        },
-    ]
     return StreamingResponse(
         _stream_chat(messages, 1500, _listing_copy_trace(settings, image, JOB_GENERATE)),
         media_type="text/event-stream",

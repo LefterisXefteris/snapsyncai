@@ -6,9 +6,9 @@ it and will propose dropping the table.
 """
 
 from app.models.billing import AllowanceSpend, PaidSession, Subscription, UserCredits
+from app.models.chat import ChatThread
 from app.models.connections import ShopifyConnection
 from app.models.image import Image
-from app.models.trendyol import TrendyolBarcode, TrendyolConnection, TrendyolListing
 from app.models.inventory import (
     InventoryBundleComponent,
     InventoryChannelLink,
@@ -20,9 +20,11 @@ from app.models.inventory import (
     InventorySettings,
     InventoryWebhookEvent,
 )
+from app.models.trendyol import TrendyolBarcode, TrendyolConnection, TrendyolListing
 
 __all__ = [
     "AllowanceSpend",
+    "ChatThread",
     "Image",
     "InventoryBundleComponent",
     "InventoryChannelLink",

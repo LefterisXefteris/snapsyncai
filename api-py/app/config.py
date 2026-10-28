@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     search_demand_api_key: str | None = None
     search_demand_login: str | None = None
     search_demand_url: str | None = None
+    # Chat's model service, on its own machine. Unset URL: Chat is unavailable.
+    # The token is how this API authenticates that call. The model key stays there.
+    chat_model_url: str | None = None
+    chat_model_token: str | None = None
 
     # --- Shopify ------------------------------------------------------------
     shopify_api_key: str | None = None

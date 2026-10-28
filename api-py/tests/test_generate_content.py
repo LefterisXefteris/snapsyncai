@@ -5,9 +5,10 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.db import get_session
 from app.main import create_app
-from app.routers.ai import FIELD_PROMPTS, GENERATE_CONTENT_SYSTEM
+from app.routers.ai import FIELD_PROMPTS
 from app.schemas.ai import RegenerateFieldBody
 from app.services import images as store
+from app.services.listing_copy_generate import GENERATE_CONTENT_SYSTEM
 from tests import seed
 
 

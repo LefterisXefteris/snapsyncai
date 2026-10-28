@@ -24,6 +24,7 @@ from app.routers import (
     billing,
     bulk_seo,
     catalogue_import,
+    chat,
     config,
     connections,
     health,
@@ -100,5 +101,6 @@ def create_app() -> FastAPI:
     app.include_router(inventory.router)
     app.include_router(bulk_seo.router)
     app.include_router(catalogue_import.router)
+    app.include_router(chat.router)
     app.include_router(trendyol.router)
     return app

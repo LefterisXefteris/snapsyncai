@@ -196,15 +196,17 @@ async def start_import(
     persist: Callable[[ImportProduct], Any],
     run_lock: MemoryRunLock,
     load_photo: Callable[[str], Any] | None = None,
+    already_holding: bool = False,
 ) -> ImportResult:
-    blocked = start_blocked_reason(
-        shopify_connected=shopify_connected,
-        run_in_progress=run_lock.in_progress(),
-    )
-    if blocked:
-        return ImportResult(blocked_reason=blocked)
-    if not run_lock.begin():
-        return ImportResult(blocked_reason=IN_PROGRESS)
+    if not already_holding:
+        blocked = start_blocked_reason(
+            shopify_connected=shopify_connected,
+            run_in_progress=run_lock.in_progress(),
+        )
+        if blocked:
+            return ImportResult(blocked_reason=blocked)
+        if not run_lock.begin():
+            return ImportResult(blocked_reason=IN_PROGRESS)
 
     created = 0
     skipped = 0
