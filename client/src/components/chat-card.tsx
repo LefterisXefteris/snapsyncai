@@ -8,7 +8,6 @@ import {
   applyGroupedDraftPhotos,
   chatBody,
   choosePhotos,
-  closeChatCard,
   importRunning,
   intakeSentences,
   rollbackPhotoIntake,
@@ -26,17 +25,15 @@ function ignoreFileDrop(event: DragEvent) {
 }
 
 /**
- * The card along the bottom of the signed-in workspace.
- * Opening it does not change Destination. It is not mounted on the Landing page.
+ * Chat along the bottom of the signed-in content area.
+ * It overlays the Destination. It is not mounted on the Landing page.
  */
 
 export function ChatCard() {
-  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [lines, setLines] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const scroller = useRef<HTMLDivElement>(null);
-  const field = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const shopify = useShopifyStatus();
   const shopDomain = shopify.data?.shopDomain ?? "";
@@ -78,21 +75,10 @@ export function ChatCard() {
   });
 
   useEffect(() => {
-    if (!open) return;
-    field.current?.focus();
-  }, [open]);
-
-  useEffect(() => {
     const node = scroller.current;
     if (!node) return;
     node.scrollTop = node.scrollHeight;
-  }, [turns.length, lines.length, open]);
-
-  const close = () => {
-    closeChatCard();
-    setLines([]);
-    setOpen(false);
-  };
+  }, [turns.length, lines.length]);
 
   const onPhotos = (list: FileList | null) => {
     const choice = choosePhotos(list && list.length > 0 ? Array.from(list) : null);
@@ -113,115 +99,94 @@ export function ChatCard() {
   };
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-40">
-      <div className="flex w-[min(24rem,calc(100vw-2rem))] flex-col items-end">
-        {open ? (
-          <section
-            aria-label="Chat"
-            onDragOver={ignoreFileDrop}
-            onDrop={ignoreFileDrop}
-            className="pointer-events-auto flex max-h-[min(32rem,70vh)] w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
+    <section
+      aria-label="Chat"
+      onDragOver={ignoreFileDrop}
+      onDrop={ignoreFileDrop}
+      className="absolute bottom-4 left-1/2 z-40 flex h-[min(24rem,calc(100%-1rem))] w-[min(40rem,calc(100%-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-[1rem] border border-primary/40 bg-card text-card-foreground opacity-60 shadow-[0_20px_48px_-16px_hsl(43_74%_52%/0.45)] motion-safe:transition-opacity motion-safe:duration-200 hover:opacity-100 focus-within:opacity-100"
+    >
+      <header className="flex shrink-0 items-center border-b border-primary/25 px-3 py-2">
+        <h2 className="font-display text-sm font-semibold text-primary">Chat</h2>
+      </header>
+      <div
+        ref={scroller}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
+        aria-live="polite"
+      >
+        {turns.map((turn, index) => (
+          <p
+            key={`${index}-${turn.text}`}
+            className={cn(
+              "max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed",
+              turn.role === "seller"
+                ? "ml-auto bg-primary text-primary-foreground"
+                : "mr-auto bg-secondary text-foreground",
+            )}
           >
-            <header className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
-              <h2 className="font-display text-sm font-semibold">Chat</h2>
-              <button
-                type="button"
-                className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={close}
-              >
-                Close
-              </button>
-            </header>
-            <div
-              ref={scroller}
-              className="min-h-32 flex-1 space-y-3 overflow-y-auto px-3 py-3"
-              aria-live="polite"
-            >
-              {turns.map((turn, index) => (
-                <p
-                  key={`${index}-${turn.text}`}
-                  className={cn(
-                    "max-w-[85%] whitespace-pre-wrap text-sm leading-relaxed",
-                    turn.role === "seller"
-                      ? "ml-auto rounded-lg bg-secondary px-3 py-2"
-                      : "mr-auto text-foreground",
-                  )}
-                >
-                  {turn.text}
-                </p>
-              ))}
-              {thread.isError && (
-                <p className="text-sm text-destructive">Chat is not available right now.</p>
-              )}
-              {send.isError && (
-                <p className="text-sm text-destructive">That message didn't send.</p>
-              )}
-              {lines.map((line, index) => (
-                <p key={`${index}-${line}`} className="mr-auto text-sm leading-relaxed text-foreground">
-                  {line}
-                </p>
-              ))}
-            </div>
-            <form onSubmit={onSubmit} className="flex shrink-0 gap-2 border-t border-border p-2">
-              <input
-                ref={picker}
-                type="file"
-                accept={PHOTO_ACCEPT}
-                multiple
-                className="hidden"
-                tabIndex={-1}
-                aria-hidden
-                onChange={(event) => {
-                  onPhotos(event.target.files);
-                  event.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                className="self-end shrink-0 rounded-lg px-2 py-2 text-xs font-medium text-foreground hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => picker.current?.click()}
-              >
-                Choose photos
-              </button>
-              <label className="sr-only" htmlFor="chat-message">
-                Message
-              </label>
-              <textarea
-                ref={field}
-                id="chat-message"
-                rows={2}
-                value={draft}
-                placeholder="Ask for an act"
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    event.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                className="min-h-10 flex-1 resize-none rounded-lg border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-              <button
-                type="submit"
-                disabled={send.isPending || draft.trim() === ""}
-                className="self-end rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {send.isPending ? "Sending" : "Send"}
-              </button>
-            </form>
-          </section>
-        ) : (
-          <button
-            type="button"
-            className="pointer-events-auto rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-card-foreground shadow-lg hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onDragOver={ignoreFileDrop}
-            onDrop={ignoreFileDrop}
-            onClick={() => setOpen(true)}
-          >
-            Chat
-          </button>
+            {turn.text}
+          </p>
+        ))}
+        {thread.isError && (
+          <p className="text-sm text-destructive">Chat is not available right now.</p>
         )}
+        {send.isError && (
+          <p className="text-sm text-destructive">That message didn't send.</p>
+        )}
+        {lines.map((line, index) => (
+          <p
+            key={`${index}-${line}`}
+            className="mr-auto max-w-[85%] rounded-lg bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground"
+          >
+            {line}
+          </p>
+        ))}
       </div>
-    </div>
+      <form onSubmit={onSubmit} className="flex shrink-0 gap-2 border-t border-primary/25 p-2">
+        <input
+          ref={picker}
+          type="file"
+          accept={PHOTO_ACCEPT}
+          multiple
+          className="hidden"
+          tabIndex={-1}
+          aria-hidden
+          onChange={(event) => {
+            onPhotos(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className="self-end shrink-0 rounded-lg px-2 py-2 text-xs font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => picker.current?.click()}
+        >
+          Choose photos
+        </button>
+        <label className="sr-only" htmlFor="chat-message">
+          Message
+        </label>
+        <textarea
+          id="chat-message"
+          rows={2}
+          value={draft}
+          placeholder="Ask for an act"
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
+          className="min-h-10 flex-1 resize-none rounded-lg border border-primary/30 bg-background/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <button
+          type="submit"
+          disabled={send.isPending || draft.trim() === ""}
+          className="self-end rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Send
+        </button>
+      </form>
+    </section>
   );
 }

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import * as chatPage from "../client/src/lib/chat-page.ts";
 import {
   applyGroupedDraftPhotos,
   chatBody,
   choosePhotos,
-  closeChatCard,
   importRunning,
   intakeSentences,
   newListingDrafts,
@@ -129,9 +129,9 @@ function photo(name: string) {
 }
 
 test("one photo becomes one unselected draft and the singular sentence", () => {
-  closeChatCard();
   rememberNewListingDrafts([]);
   rememberNewListingSelection([]);
+  const linesBefore = intakeSentences().length;
 
   choosePhotos([photo("coat.jpg")]);
 
@@ -139,14 +139,14 @@ test("one photo becomes one unselected draft and the singular sentence", () => {
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].items.length, 1);
   assert.deepEqual(selectedDraftPhotoIds(), []);
-  assert.deepEqual(intakeSentences(), ["1 draft product is on New listing."]);
+  assert.deepEqual(intakeSentences().slice(linesBefore), ["1 draft product is on New listing."]);
   assert.deepEqual(chatBody("hello", "/products"), { message: "hello" });
 });
 
 test("four photos become four unselected drafts after the ones already there", () => {
-  closeChatCard();
   rememberNewListingDrafts([{ id: "coat", items: [{ id: "c1" }] }]);
   rememberNewListingSelection(["c1"]);
+  const linesBefore = intakeSentences().length;
 
   choosePhotos([photo("a.jpg"), photo("b.jpg"), photo("c.jpg"), photo("d.jpg")]);
 
@@ -159,46 +159,46 @@ test("four photos become four unselected drafts after the ones already there", (
     assert.equal(selectedDraftPhotoIds().includes(draft.items[0].id), false);
   }
   assert.deepEqual(selectedDraftPhotoIds(), ["c1"]);
-  assert.deepEqual(intakeSentences(), ["4 draft products are on New listing."]);
+  assert.deepEqual(intakeSentences().slice(linesBefore), ["4 draft products are on New listing."]);
 });
 
 test("a file that is not a photo is skipped", () => {
-  closeChatCard();
   rememberNewListingDrafts([{ id: "coat", items: [{ id: "c1" }] }]);
   rememberNewListingSelection([]);
+  const linesBefore = intakeSentences().length;
 
   choosePhotos([photo("a.jpg"), { name: "notes.txt", type: "text/plain" }]);
 
   assert.equal(newListingDrafts().length, 2);
   assert.equal(newListingDrafts()[0].id, "coat");
-  assert.deepEqual(intakeSentences(), ["1 draft product is on New listing."]);
+  assert.deepEqual(intakeSentences().slice(linesBefore), ["1 draft product is on New listing."]);
 });
 
 test("a pick with no photos yields the failure sentence and no drafts", () => {
-  closeChatCard();
   rememberNewListingDrafts([{ id: "coat", items: [{ id: "c1" }] }]);
+  const linesBefore = intakeSentences().length;
 
   choosePhotos([{ name: "notes.txt", type: "text/plain" }]);
 
   assert.equal(newListingDrafts().length, 1);
   assert.equal(newListingDrafts()[0].id, "coat");
-  assert.deepEqual(intakeSentences(), ["None of those are photos."]);
+  assert.deepEqual(intakeSentences().slice(linesBefore), ["None of those are photos."]);
 });
 
 test("a cancelled pick yields no sentence and no drafts", () => {
-  closeChatCard();
   rememberNewListingDrafts([{ id: "coat", items: [{ id: "c1" }] }]);
+  const linesBefore = [...intakeSentences()];
 
   choosePhotos(null);
   choosePhotos([]);
 
   assert.equal(newListingDrafts().length, 1);
-  assert.deepEqual(intakeSentences(), []);
+  assert.deepEqual(intakeSentences(), linesBefore);
 });
 
 test("a canvas that keeps none of the photos adds no sentence and no drafts", () => {
-  closeChatCard();
   rememberNewListingDrafts([{ id: "coat", items: [{ id: "c1" }] }]);
+  const linesBefore = [...intakeSentences()];
   const stop = registerPhotoIntake(() => false);
 
   choosePhotos([photo("a.jpg")]);
@@ -206,26 +206,22 @@ test("a canvas that keeps none of the photos adds no sentence and no drafts", ()
 
   assert.equal(newListingDrafts().length, 1);
   assert.equal(newListingDrafts()[0].id, "coat");
-  assert.deepEqual(intakeSentences(), []);
+  assert.deepEqual(intakeSentences(), linesBefore);
 });
 
-test("close clears the sentences and leaves the drafts", () => {
-  closeChatCard();
-  rememberNewListingDrafts([]);
+test("a later pick stacks another sentence and the drafts stay", () => {
+  const linesBefore = intakeSentences().length;
+  const draftsBefore = newListingDrafts().length;
 
   choosePhotos([photo("a.jpg")]);
   choosePhotos([photo("b.jpg")]);
 
-  assert.deepEqual(intakeSentences(), [
+  assert.deepEqual(intakeSentences().slice(linesBefore), [
     "1 draft product is on New listing.",
     "1 draft product is on New listing.",
   ]);
-  assert.equal(newListingDrafts().length, 2);
-
-  closeChatCard();
-
-  assert.deepEqual(intakeSentences(), []);
-  assert.equal(newListingDrafts().length, 2);
+  assert.equal(newListingDrafts().length, draftsBefore + 2);
+  assert.equal("closeChatCard" in chatPage, false);
 });
 
 test("the card keeps reading the thread while Import is in progress", () => {
