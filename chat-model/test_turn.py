@@ -5,6 +5,18 @@ import json
 from turn import authorized, step_from_model, turn
 
 
+def test_a_question_is_asked_for_the_words_the_seller_reads() -> None:
+    seen: list[str] = []
+
+    def complete(prompt: str) -> str:
+        seen.append(prompt)
+        return json.dumps({"text": "Hi.", "done": True})
+
+    turn({"message": "hello"}, complete)
+    assert 'set "text" to the words the seller reads' in seen[0]
+    assert 'Never reply with only "done"' in seen[0]
+
+
 def test_a_question_comes_back_as_text_with_no_act() -> None:
     def complete(prompt: str) -> str:
         assert "What's on hand?" in prompt
