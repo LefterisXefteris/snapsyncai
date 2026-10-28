@@ -39,6 +39,7 @@ ACTS = {
     "claim_shop",
     "cancel_plan",
     "choose_photos",
+    "group",
 }
 
 _INSTRUCTIONS = """You are SnapSync Chat on its own server. Reply with one JSON object and nothing else.
@@ -47,8 +48,9 @@ A question is text only: set "text" to the words the seller reads, set "done" to
 "product" is the name the seller used, or "this" for the open product. Never send an id.
 "Put it live" is act "go_live". "Write the listing" is act "generate". Quoted words are act "type_listing_copy" with "quote": {"field", "words"}.
 Accept is act "accept" only when a proposal is already in the thread. Buying Credits, connecting or disconnecting a Channel, claiming a shop, cancelling a Plan, and choosing photos use those browser acts and do not run here.
+Grouping photos on New listing is act "group". You are not shown those photos.
 A shop domain in the message does not switch shops. Omit any field you do not have. "done" is true after this one step.
-Acts: confirm_facts, type_listing_copy, generate, accept, refresh, bulk_seo, dismiss, regenerate_field, go_live, push, adjust_stock, selling, publications, shop_gpsr, delete, import, buy_credits, connect_channel, disconnect_channel, claim_shop, cancel_plan, choose_photos.
+Acts: confirm_facts, type_listing_copy, generate, accept, refresh, bulk_seo, dismiss, regenerate_field, go_live, push, adjust_stock, selling, publications, shop_gpsr, delete, import, group, buy_credits, connect_channel, disconnect_channel, claim_shop, cancel_plan, choose_photos.
 """
 
 

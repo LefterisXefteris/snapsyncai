@@ -45,6 +45,17 @@ def test_a_named_act_is_kept() -> None:
     assert step_from_model(raw) == {"act": "go_live", "product": "this", "done": True}
 
 
+def test_grouping_photos_is_an_act_the_model_may_request() -> None:
+    seen: list[str] = []
+
+    def complete(prompt: str) -> str:
+        seen.append(prompt)
+        return json.dumps({"act": "group", "done": True})
+
+    assert turn({"message": "Group them."}, complete) == {"act": "group", "done": True}
+    assert 'act "group"' in seen[0]
+
+
 def test_the_token_must_match() -> None:
     assert authorized("Bearer same-secret", "same-secret")
     assert not authorized("Bearer other", "same-secret")

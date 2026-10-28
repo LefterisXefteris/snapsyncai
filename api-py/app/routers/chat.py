@@ -55,6 +55,7 @@ class ChatTurnOut(CamelModel):
 
 class ChatResponse(CamelModel):
     thread: list[ChatTurnOut]
+    grouped_photo_ids: list[str] | None = None
 
 
 class ChatFaq(CamelModel):
@@ -76,6 +77,7 @@ class ChatBody(CamelModel):
     open_product_id: int | None = None
     page_proposal: ChatProposalIn | None = None
     bulk_seo_ids: list[int] = []
+    draft_photo_ids: list[str] = []
 
 
 def get_chat_model(settings: SettingsDep) -> Model:
@@ -234,8 +236,14 @@ def _page_proposal(body: ChatProposalIn | None) -> Proposal | None:
     return proposal
 
 
-def _response(thread: tuple[tuple[str, str], ...]) -> ChatResponse:
-    return ChatResponse(thread=[ChatTurnOut(role=role, text=text) for role, text in thread])
+def _response(
+    thread: tuple[tuple[str, str], ...],
+    grouped: tuple[str, ...] = (),
+) -> ChatResponse:
+    return ChatResponse(
+        thread=[ChatTurnOut(role=role, text=text) for role, text in thread],
+        grouped_photo_ids=list(grouped) or None,
+    )
 
 
 CONNECT_SHOPIFY = "Connect Shopify in Settings to push this product."
@@ -374,14 +382,14 @@ async def _shop_domain(session, user_id: str) -> str | None:
     return connection.shop_domain
 
 
-@router.get("/api/chat", response_model=ChatResponse)
+@router.get("/api/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def read_chat(user_id: CurrentUser, session: SessionDep) -> ChatResponse:
     domain = await _shop_domain(session, user_id)
     thread = await SqlThreadStore(session).load(user_id, domain)
     return _response(thread)
 
 
-@router.post("/api/chat", response_model=ChatResponse)
+@router.post("/api/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def post_chat(
     body: ChatBody,
     user_id: CurrentUser,
@@ -405,8 +413,9 @@ async def post_chat(
         listing=_Listing(session, settings, user_id),
         page_proposal=_page_proposal(body.page_proposal),
         bulk_ticks=tuple(body.bulk_seo_ids),
+        draft_photo_ids=tuple(body.draft_photo_ids),
         channels=_Channels(session, settings, user_id, graphql_for, trendyol),
         records=ShopRecords(session, settings, user_id, graphql_for),
         importer=ShopifyImport(session, user_id, domain, graphql_for),
     )
-    return _response(result.thread)
+    return _response(result.thread, result.grouped_photo_ids)

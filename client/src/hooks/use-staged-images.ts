@@ -1,4 +1,5 @@
 import { openDB, DBSchema } from 'idb';
+import { extractAsDraft } from '@/lib/draft-products';
 import { photoFromRecord, smallerPicture } from '@/lib/staged-photo';
 
 // ─── Shared types (imported by 05-02, 05-03) ───────────────────────────────
@@ -218,4 +219,72 @@ export function useStagedImages(): StagedImagesHook {
   }
 
   return { loadStaged, saveBlob, deleteBlob, saveGroups, clearAll };
+}
+
+export const MAX_STAGED_PHOTOS = 200;
+
+/** One draft product per photo, appended to the canvas New listing already stores. */
+export async function appendStagedDrafts(files: File[]): Promise<number> {
+  if (files.length === 0) return 0;
+  try {
+    const db = await getDB();
+    const groupsRecord = await db.get('groups', 'groups-v1');
+    const existing = groupsRecord?.groups ?? [];
+    const existingCount = existing.reduce((sum, group) => sum + group.itemIds.length, 0);
+    if (existingCount + files.length > MAX_STAGED_PHOTOS) return 0;
+
+    const added: { id: string; itemIds: string[]; maxImages: number }[] = [];
+    for (const file of files) {
+      const id = crypto.randomUUID();
+      const smaller = await smallerPicture(file);
+      await db.put('blobs', {
+        id,
+        blob: file,
+        ...(smaller ? { displayBlob: smaller } : {}),
+        filename: file.name,
+        mimeType: file.type,
+        savedAt: Date.now(),
+      });
+      added.push({ id: crypto.randomUUID(), itemIds: [id], maxImages: Number.MAX_SAFE_INTEGER });
+    }
+    await db.put('groups', {
+      id: 'groups-v1',
+      groups: [...existing, ...added],
+      savedAt: Date.now(),
+    });
+    return files.length;
+  } catch (err) {
+    console.warn('[use-staged-images] IDB unavailable:', err);
+    return 0;
+  }
+}
+
+/** The same Group as the dock, written for a canvas that is not open. */
+export async function groupStagedDrafts(photoIds: readonly string[]): Promise<boolean> {
+  if (photoIds.length < 2) return false;
+  try {
+    const db = await getDB();
+    const record = await db.get('groups', 'groups-v1');
+    const existing = record?.groups ?? [];
+    const limits = new Map(existing.map((group) => [group.id, group.maxImages]));
+    const drafts = existing.map((group) => ({
+      id: group.id,
+      items: group.itemIds.map((id) => ({ id })),
+    }));
+    const next = extractAsDraft(drafts, photoIds, crypto.randomUUID());
+    if (next === drafts) return false;
+    await db.put('groups', {
+      id: 'groups-v1',
+      groups: next.map((group) => ({
+        id: group.id,
+        itemIds: group.items.map((item) => item.id),
+        maxImages: limits.get(group.id) ?? Number.MAX_SAFE_INTEGER,
+      })),
+      savedAt: Date.now(),
+    });
+    return true;
+  } catch (err) {
+    console.warn('[use-staged-images] IDB unavailable:', err);
+    return false;
+  }
 }
