@@ -33,7 +33,7 @@ A place the seller opens in the signed-in workspace: Products, the product page,
 _Avoid_: surface, screen, Website, Conversation, Chat
 
 **Chat**:
-The card a seller opens along the bottom of the signed-in workspace. One thread per shop, the same thread across Destinations. A message is a request for an act that seller could already perform on that shop. A question is not an act. Not a Destination, and not where they buy Credits, connect or disconnect a Channel, claim a shop, cancel a Plan, or choose photos.
+The card a seller opens along the bottom of the signed-in workspace. One thread per shop, the same thread across Destinations. A message is a request for an act that seller could already perform on that shop. A question is not an act. The seller may choose photos from the open card; each photo starts as its own draft product on New listing, and the open Destination stays. That choice does not add a turn. Not a Destination, and not where they buy Credits, connect or disconnect a Channel, claim a shop, or cancel a Plan.
 _Avoid_: Conversation, Agentic SEO, chat card, agent
 
 **Landing**:

@@ -6,7 +6,8 @@ import { isImageLikeFile } from "@/lib/image-file-utils";
 import { photoFromRecord, smallerPicture } from "@/lib/staged-photo";
 import { useUploadImages } from "@/hooks/use-images";
 import { useToast } from "@/hooks/use-toast";
-import { Group, FileItem, useStagedImages } from "@/hooks/use-staged-images";
+import { useChatPhotoIntake } from "@/hooks/use-chat-photo-intake";
+import { Group, FileItem, MAX_STAGED_PHOTOS, useStagedImages } from "@/hooks/use-staged-images";
 import { useGroupSelection } from "@/hooks/use-group-selection";
 import { ListingLightTable } from "@/components/listing-light-table";
 import {
@@ -63,17 +64,6 @@ export function UploadZone({
   const urlsRef = useRef<string[]>([]);
   useEffect(() => () => { urlsRef.current.forEach(URL.revokeObjectURL); }, []);
 
-  // Restore staged images on mount
-  useEffect(() => {
-    async function restore() {
-      const { groups: restored, urlsCreated } = await loadStaged();
-      if (restored.length === 0) return;
-      urlsCreated.forEach(u => urlsRef.current.push(u));
-      setGroups(packMultiPhotoFirst(restored));
-    }
-    restore();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => { onUploadingChange?.(uploadingQueue); }, [uploadingQueue, onUploadingChange]);
 
   const totalFiles = groups.reduce((sum, g) => sum + g.items.length, 0);
@@ -124,7 +114,7 @@ export function UploadZone({
 
       setGroups(prev => {
         const existingCount = prev.reduce((n, g) => n + g.items.length, 0);
-        if (existingCount + prepared.length > 200) {
+        if (existingCount + prepared.length > MAX_STAGED_PHOTOS) {
           const rejected = new Set(prepared.map(({ item }) => item.url));
           prepared.forEach(({ item }) => URL.revokeObjectURL(item.url));
           urlsRef.current = urlsRef.current.filter((url) => !rejected.has(url));
@@ -186,6 +176,8 @@ export function UploadZone({
     noKeyboard: true,
     noDragEventsBubbling: true,
   });
+
+  useChatPhotoIntake(groups, setGroups, selectedIds, onDrop, loadStaged, urlsRef, saveGroups, clearSelection);
 
   // ── Split a group into individual products ─────────────────────────────────
   const splitGroup = (groupId: string) => {

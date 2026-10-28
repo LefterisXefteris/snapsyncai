@@ -121,7 +121,7 @@ async def test_browser_only_acts_do_nothing() -> None:
         ("disconnect_channel", "Disconnecting a Channel stays on the page."),
         ("claim_shop", "Claiming a shop stays on the page."),
         ("cancel_plan", "Cancelling a Plan stays on the page."),
-        ("choose_photos", "Choosing photos stays on the page."),
+        ("choose_photos", "Use Choose photos."),
     )
     store = MemoryThreadStore()
 
@@ -283,5 +283,67 @@ async def test_a_browser_act_without_reply_text_does_nothing() -> None:
         "Buy Credits.",
         "Buying Credits stays on the page.",
     ]
+    assert result.credits_spent == 0
+    assert result.shop_changed is False
+
+
+async def test_a_group_of_two_photos_is_stored_and_the_model_sees_no_ids() -> None:
+    from app.services.chat import model_payload
+
+    store = MemoryThreadStore()
+    seen: list[ModelContext] = []
+
+    async def model(ctx: ModelContext) -> ModelStep:
+        seen.append(ctx)
+        return ModelStep(act="group")
+
+    result = await ask(
+        store,
+        user_id="user_seller",
+        shop_domain="tees.myshopify.com",
+        message="Group them.",
+        model=model,
+        draft_photo_ids=("draft-photo-1", "draft-photo-2"),
+    )
+
+    assert [text for role, text in result.thread if role == "chat"] == [
+        "Those photos are one draft product."
+    ]
+    assert result.grouped_photo_ids == ("draft-photo-1", "draft-photo-2")
+    assert result.credits_spent == 0
+    assert result.shop_changed is False
+    assert [text for _, text in await store.load("user_seller", "tees.myshopify.com")] == [
+        "Group them.",
+        "Those photos are one draft product.",
+    ]
+    assert model_payload(seen[0]) == {
+        "message": "Group them.",
+        "thread": [{"role": "seller", "text": "Group them."}],
+        "shopDomain": "tees.myshopify.com",
+        "callsMade": 0,
+        "openProduct": None,
+        "product": None,
+    }
+
+
+async def test_a_group_with_fewer_than_two_photos_asks_and_groups_nothing() -> None:
+    store = MemoryThreadStore()
+
+    async def model(_ctx: ModelContext) -> ModelStep:
+        return ModelStep(act="group")
+
+    result = await ask(
+        store,
+        user_id="user_seller",
+        shop_domain="tees.myshopify.com",
+        message="Group them.",
+        model=model,
+        draft_photo_ids=("draft-photo-1",),
+    )
+
+    assert [text for role, text in result.thread if role == "chat"] == [
+        "Select at least two photos on New listing."
+    ]
+    assert result.grouped_photo_ids == ()
     assert result.credits_spent == 0
     assert result.shop_changed is False

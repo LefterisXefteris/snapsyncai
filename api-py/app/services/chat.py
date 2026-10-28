@@ -52,8 +52,11 @@ BROWSER_ACTS = {
     "disconnect_channel": "Disconnecting a Channel stays on the page.",
     "claim_shop": "Claiming a shop stays on the page.",
     "cancel_plan": "Cancelling a Plan stays on the page.",
-    "choose_photos": "Choosing photos stays on the page.",
+    "choose_photos": "Use Choose photos.",
 }
+GROUP = "group"
+GROUPED = "Those photos are one draft product."
+SELECT_TWO = "Select at least two photos on New listing."
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,7 @@ class Asked:
     credits_spent: int
     shop_changed: bool
     product: NamedProduct | None = None
+    grouped_photo_ids: tuple[str, ...] = ()
 
 
 Model = Callable[[ModelContext], Awaitable[ModelStep]]
@@ -256,6 +260,16 @@ def _resolve(
     return _which(matches)
 
 
+def _draft_photo_ids(ids: tuple[str, ...]) -> tuple[str, ...]:
+    """The ids the client sent. Blanks and repeats do not count."""
+    seen: list[str] = []
+    for raw in ids:
+        item = raw.strip()
+        if item and item not in seen:
+            seen.append(item)
+    return tuple(seen)
+
+
 async def ask(
     store: ThreadStore,
     *,
@@ -272,6 +286,7 @@ async def ask(
     channels: ChannelSends | None = None,
     records: PageRecords | None = None,
     importer=None,
+    draft_photo_ids: tuple[str, ...] = (),
 ) -> Asked:
     text = message.strip()
     pending = None
@@ -284,6 +299,8 @@ async def ask(
         open_product = _open_product(products, open_product_id)
         resolved: NamedProduct | None = None
         credits = 0
+        draft_ids = _draft_photo_ids(draft_photo_ids)
+        grouped: tuple[str, ...] = ()
         for calls_made in range(MODEL_CALL_LIMIT):
             step = await model(
                 ModelContext(
@@ -300,6 +317,7 @@ async def ask(
                 step.product
                 and step.act != SHOP_GPSR
                 and step.act != IMPORT
+                and step.act != GROUP
                 and not _holds(step.act, token, step.products)
             ):
                 found = _resolve(step.product, products, open_product)
@@ -401,6 +419,12 @@ async def ask(
                 thread.append(("chat", refused or TYPED[next(iter(update))]))
                 if refused:
                     break
+            elif step.act == GROUP:
+                if len(draft_ids) >= 2:
+                    thread.append(("chat", GROUPED))
+                    grouped = draft_ids
+                else:
+                    thread.append(("chat", SELECT_TWO))
             elif step.act in BROWSER_ACTS:
                 thread.append(("chat", BROWSER_ACTS[step.act]))
             elif step.text:
@@ -411,7 +435,13 @@ async def ask(
             thread.append(("chat", STOPPED))
         saved = tuple(thread)
         await store.save(user_id, shop_domain, saved, tuple(proposals))
-        asked = Asked(saved, credits_spent=credits, shop_changed=False, product=resolved)
+        asked = Asked(
+            saved,
+            credits_spent=credits,
+            shop_changed=False,
+            product=resolved,
+            grouped_photo_ids=grouped,
+        )
     if pending is not None:
         watch_import(store, user_id, shop_domain, pending)
     return asked
