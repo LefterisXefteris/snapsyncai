@@ -12,7 +12,7 @@ swallow to the lookup — a 500 from the DB still gets logged here, which Expres
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.clerk import CurrentUser
@@ -156,14 +156,18 @@ async def shopify_publications(
 
 @router.put("/api/shopify/gpsr-identity", response_model=ShopifyStatus)
 async def put_shop_gpsr_identity(
-    body: GpsrIdentityIn, user_id: CurrentUser, session: SessionDep
+    user_id: CurrentUser,
+    session: SessionDep,
+    body: GpsrIdentityIn | None = Body(),
 ) -> ShopifyStatus:
-    identity, error = parse_gpsr_identity(body.model_dump(by_alias=True))
-    if error or identity is None:
-        raise HTTPException(status_code=400, detail=error or "GPSR identity is incomplete.")
-    updated = await connections.update_shopify_gpsr(
-        session, user_id, stored_gpsr_identity(identity)
-    )
+    if body is None:
+        stored = None
+    else:
+        identity, error = parse_gpsr_identity(body.model_dump(by_alias=True))
+        if error or identity is None:
+            raise HTTPException(status_code=400, detail=error or "GPSR identity is incomplete.")
+        stored = stored_gpsr_identity(identity)
+    updated = await connections.update_shopify_gpsr(session, user_id, stored)
     if updated is None:
         raise HTTPException(
             status_code=400,

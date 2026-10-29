@@ -5,6 +5,7 @@ from app.services.product_facts import (
     apply_description_blocks,
     apply_suggested,
     confirm_facts,
+    confirmed_as_confirm_kwargs,
     description_blocks,
     effective_gpsr,
     facts_from_stored,
@@ -734,6 +735,25 @@ def test_changing_confirmed_facts_with_listing_copy_marks_stale() -> None:
     assert changed.facts.listing_copy_stale is True
     assert may_generate_listing_copy(changed.facts) is True
     assert description_blocks(changed.facts) == "<p>Fibre composition: 100% cotton.</p>"
+
+
+def test_confirming_the_previous_pack_again_stales_listing_copy() -> None:
+    first = _confirm_textile(
+        persistable_from_vision({**VISION_WITH_LISTING_COPY, "isTextile": True}).facts
+    )
+    changed = _confirm_textile(
+        first.facts, composition=COTTON_ONLY, listing_copy={"title": "Generated Tee"}
+    )
+    restored = confirm_facts(
+        changed.facts,
+        **confirmed_as_confirm_kwargs(first.facts.confirmed),
+        listing_copy={"title": "Generated Tee"},
+    )
+
+    assert changed.facts.listing_copy_stale is True
+    assert restored.ok is True
+    assert restored.facts.listing_copy_stale is True
+    assert restored.facts.confirmed == first.facts.confirmed
 
 
 def test_same_values_confirm_keeps_an_existing_stale_mark() -> None:

@@ -14,7 +14,13 @@ from sqlmodel import select
 
 from app.models.inventory import InventoryItem
 from app.services import product as product_page
-from app.services.chat_listing import ListingReply
+from app.services.chat_listing import (
+    ListingReply,
+    PreviousGpsr,
+    PreviousInventory,
+    PreviousPublications,
+    PreviousSelling,
+)
 from app.services.connections import get_shopify, update_shopify_gpsr
 from app.services.images import (
     delete_image,
@@ -74,13 +80,19 @@ logger = logging.getLogger(__name__)
 class PageRecords(Protocol):
     """The page's stock, Selling, publications, Shop GPSR, and delete."""
 
-    async def adjust_stock(self, product_id: int, quantity: int, reason: str) -> str | None: ...
+    async def adjust_stock(
+        self, product_id: int, quantity: int, reason: str
+    ) -> str | PreviousInventory | None: ...
 
-    async def selling(self, product_id: int, fields: Mapping[str, str]) -> str | None: ...
+    async def selling(
+        self, product_id: int, fields: Mapping[str, str]
+    ) -> str | Mapping[str, str] | None: ...
 
-    async def publications(self, product_id: int, names: Sequence[str]) -> str | None: ...
+    async def publications(
+        self, product_id: int, names: Sequence[str]
+    ) -> str | tuple[str, ...] | None: ...
 
-    async def shop_gpsr(self, identity: Mapping[str, object]) -> str | None: ...
+    async def shop_gpsr(self, identity: Mapping[str, object]) -> str | PreviousGpsr | None: ...
 
     async def delete(self, product_id: int) -> str | None: ...
 
@@ -95,6 +107,12 @@ def _selling_fields(raw: Mapping[str, str] | None) -> dict[str, str] | None:
         if name and text:
             fields[name] = text
     return fields or None
+
+
+def _selling_text(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value)
 
 
 def _kept(text: str) -> ListingReply:
@@ -145,8 +163,10 @@ async def _adjust(
     words = (reason or "").strip()
     if len(words) < 3 or len(words) > 250:
         return _asked(WHICH_REASON)
-    refused = await records.adjust_stock(product_id, quantity, words)
-    return _asked(refused) if refused else _kept(STOCK)
+    written = await records.adjust_stock(product_id, quantity, words)
+    if isinstance(written, str):
+        return _asked(written)
+    return ListingReply(STOCK, continue_turn=True, inventory_before=written)
 
 
 async def _selling(
@@ -155,8 +175,16 @@ async def _selling(
     fields = _selling_fields(selling)
     if fields is None:
         return _asked(WHICH_SELLING)
-    refused = await records.selling(product_id, fields)
-    return _asked(refused) if refused else _kept(SELLING_SAVED)
+    written = await records.selling(product_id, fields)
+    if isinstance(written, str):
+        return _asked(written)
+    if not isinstance(written, Mapping):
+        return _kept(SELLING_SAVED)
+    return ListingReply(
+        SELLING_SAVED,
+        continue_turn=True,
+        selling_before=PreviousSelling(product_id, dict(written)),
+    )
 
 
 async def _publications(
@@ -165,15 +193,27 @@ async def _publications(
     chosen = tuple(name.strip() for name in names if isinstance(name, str) and name.strip())
     if not chosen:
         return _asked(WHICH_PUBLICATIONS)
-    refused = await records.publications(product_id, chosen)
-    return _asked(refused) if refused else _kept(PUBLICATIONS_SET)
+    written = await records.publications(product_id, chosen)
+    if isinstance(written, str):
+        return _asked(written)
+    if not isinstance(written, tuple):
+        return _kept(PUBLICATIONS_SET)
+    return ListingReply(
+        PUBLICATIONS_SET,
+        continue_turn=True,
+        publications_before=PreviousPublications(product_id, written),
+    )
 
 
 async def _gpsr(records: PageRecords, gpsr: Mapping[str, object] | None) -> ListingReply:
     if not gpsr:
         return _asked(GPSR_INCOMPLETE)
-    refused = await records.shop_gpsr(gpsr)
-    return _asked(refused) if refused else _kept(GPSR_SAVED)
+    written = await records.shop_gpsr(gpsr)
+    if isinstance(written, str):
+        return _asked(written)
+    if not isinstance(written, PreviousGpsr):
+        return _kept(GPSR_SAVED)
+    return ListingReply(GPSR_SAVED, continue_turn=True, gpsr_before=written)
 
 
 async def _delete(records: PageRecords, product_id: int) -> ListingReply:
@@ -235,7 +275,9 @@ class ShopRecords:
         self._user_id = user_id
         self._graphql_for = graphql_for
 
-    async def adjust_stock(self, product_id: int, quantity: int, reason: str) -> str | None:
+    async def adjust_stock(
+        self, product_id: int, quantity: int, reason: str
+    ) -> str | PreviousInventory | None:
         image = await get_image(self._session, product_id, self._user_id)
         if image is None:
             return NOT_SEEN
@@ -257,6 +299,7 @@ class ShopRecords:
         item_id = rows[0].id
         if item_id is None:
             return NO_STOCK_ROW
+        previous = int(rows[0].ledger_quantity)
         try:
             await adjust_inventory_item(
                 self._session,
@@ -269,18 +312,24 @@ class ShopRecords:
             )
         except InventoryError as exc:
             return str(exc)
-        return None
+        return PreviousInventory(item_id, previous)
 
-    async def selling(self, product_id: int, fields: Mapping[str, str]) -> str | None:
+    async def selling(
+        self, product_id: int, fields: Mapping[str, str]
+    ) -> str | dict[str, str] | None:
+        image = await get_image(self._session, product_id, self._user_id)
+        if image is None:
+            return NOT_SEEN
+        previous = {name: _selling_text(getattr(image, name, None)) for name in fields}
         try:
             saved = await update_image(self._session, product_id, dict(fields), self._user_id)
         except ValueError:
             return "Invalid update data"
         if saved is None:
             return NOT_SEEN
-        return None
+        return previous
 
-    async def publications(self, product_id: int, names: Sequence[str]) -> str | None:
+    async def publications(self, product_id: int, names: Sequence[str]) -> str | tuple[str, ...] | None:
         image = await get_image(self._session, product_id, self._user_id)
         if image is None:
             return NOT_SEEN
@@ -303,6 +352,11 @@ class ShopRecords:
             if len(matches) != 1:
                 return WHICH_PUBLICATION.format(name=name)
             ids.append(matches[0]["id"])
+        previous = tuple(
+            item
+            for item in (image.shopify_publication_ids or [])
+            if isinstance(item, str) and item
+        )
         saved = await update_image(
             self._session,
             product_id,
@@ -311,19 +365,24 @@ class ShopRecords:
         )
         if saved is None:
             return NOT_SEEN
-        return None
+        return previous
 
-    async def shop_gpsr(self, identity: Mapping[str, object]) -> str | None:
+    async def shop_gpsr(self, identity: Mapping[str, object]) -> str | PreviousGpsr | None:
         parsed, error = parse_gpsr_identity(identity)
         if error or parsed is None:
             return error or GPSR_INCOMPLETE
+        connection = await get_shopify(self._session, self._user_id)
+        if connection is None:
+            return CONNECT_GPSR
+        raw = connection.gpsr_identity
+        previous = dict(raw) if isinstance(raw, Mapping) else None
         updated = await update_shopify_gpsr(
             self._session, self._user_id, stored_gpsr_identity(parsed)
         )
         if updated is None:
             return CONNECT_GPSR
         await product_page.stale_shop_default_products(self._session, self._user_id)
-        return None
+        return PreviousGpsr(previous)
 
     async def delete(self, product_id: int) -> str | None:
         image = await get_image(self._session, product_id, self._user_id)

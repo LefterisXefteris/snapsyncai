@@ -1,6 +1,7 @@
 """Confirm facts and typed listing copy. Seam: `ask`. The page's confirm is the writer."""
 
 from app.services.chat import MemoryThreadStore, ModelStep, ask
+from app.services.chat_listing import PreviousCopy, PreviousFacts
 from app.services.product_facts import ProductFacts, confirm_facts, stored_from_facts
 from tests.test_chat_product import BACK, SHIRT
 
@@ -20,17 +21,26 @@ class Catalogue:
     def __init__(self) -> None:
         self.facts: dict[int, dict] = {}
         self.copy: dict[int, dict] = {}
+        self.words: dict[int, dict[str, str]] = {}
+        self.packs: dict[int, dict] = {}
 
-    async def confirm(self, product_id: int, facts: dict) -> str | None:
+    async def confirm(self, product_id: int, facts: dict) -> str | PreviousFacts:
         result = confirm_facts(ProductFacts(), **facts)
         if not result.ok:
-            return result.error
+            return result.error or "Those facts are incomplete."
+        previous = dict(self.packs.get(product_id, {}))
         self.facts[product_id] = stored_from_facts(result.facts)
-        return None
+        self.packs[product_id] = dict(facts)
+        return PreviousFacts(product_id, previous)
 
-    async def type_listing_copy(self, product_id: int, updates: dict) -> str | None:
+    async def type_listing_copy(self, product_id: int, updates: dict) -> str | PreviousCopy:
+        field = next(iter(updates))
+        stored = self.words.setdefault(product_id, {})
+        previous = stored.get(field, "")
+        value = updates[field]
+        stored[field] = ", ".join(value) if isinstance(value, list) else str(value)
         self.copy[product_id] = dict(updates)
-        return None
+        return PreviousCopy(product_id, field, previous)
 
 
 def _confirmed(catalogue: Catalogue) -> dict:
@@ -110,6 +120,7 @@ async def test_a_missing_or_invalid_input_asks_and_saves_nothing() -> None:
     assert catalogue.facts == {}
     assert calls == 1
     assert result.credits_spent == 0
+    assert result.facts_undos == ()
     assert result.shop_changed is False
     assert [text for _, text in result.thread] == [
         "It's 80% cotton.",
@@ -138,6 +149,7 @@ async def test_a_missing_input_asks_and_saves_nothing() -> None:
     )
 
     assert catalogue.facts == {}
+    assert result.facts_undos == ()
     assert [text for _, text in result.thread] == [
         "It's a textile. Skip GPSR.",
         "Fibre composition is required to confirm a textile product.",
@@ -247,6 +259,7 @@ async def test_a_quote_with_no_field_asks_and_saves_nothing() -> None:
 
     assert catalogue.copy == {}
     assert result.credits_spent == 0
+    assert result.copy_undos == ()
     assert [text for _, text in result.thread] == [
         'Say "It is organic cotton."',
         "Which part of the listing copy — title, description, tags, SEO title, "

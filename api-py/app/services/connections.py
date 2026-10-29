@@ -55,7 +55,7 @@ async def upsert_shopify(session: AsyncSession, **values) -> ShopifyConnection:
 
 
 async def update_shopify_gpsr(
-    session: AsyncSession, user_id: str, identity: dict
+    session: AsyncSession, user_id: str, identity: dict | None
 ) -> ShopifyConnection | None:
     connection = await get_shopify(session, user_id)
     if connection is None:

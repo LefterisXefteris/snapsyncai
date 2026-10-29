@@ -20,7 +20,14 @@ from app.services.chat_inputs import (
     facts_from_payload,
     quote_from_payload,
 )
-from app.services.chat_listing import ListingCopy, Proposal, Shown, listing_act
+from app.services.chat_listing import (
+    ListingCopy,
+    PreviousCopy,
+    PreviousFacts,
+    Proposal,
+    Shown,
+    listing_act,
+)
 from app.services.chat_records import (
     SHOP_GPSR,
     PageRecords,
@@ -99,25 +106,86 @@ class ModelStep:
 
 
 @dataclass(frozen=True)
+class InventoryUndo:
+    """The previous Inventory quantity for one reply. It is not stored on the thread."""
+
+    reply_index: int
+    item_id: int
+    quantity: int
+
+
+@dataclass(frozen=True)
+class SellingUndo:
+    """The previous Selling fields for one reply. They are not stored on the thread."""
+
+    reply_index: int
+    product_id: int
+    fields: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class CopyUndo:
+    """The previous words of one listing-copy field. They are not stored on the thread."""
+
+    reply_index: int
+    product_id: int
+    fields: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class FactsUndo:
+    """The previous facts pack for one reply. It is not stored on the thread."""
+
+    reply_index: int
+    product_id: int
+    facts: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class PublicationsUndo:
+    """The previous publication set for one reply. It is not stored on the thread."""
+
+    reply_index: int
+    product_id: int
+    publication_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class GpsrUndo:
+    """The previous Shop GPSR identity for one reply. It is not stored on the thread."""
+
+    reply_index: int
+    identity: Mapping[str, object] | None
+
+
+@dataclass(frozen=True)
 class Asked:
     thread: tuple[tuple[str, str], ...]
     credits_spent: int
     shop_changed: bool
     product: NamedProduct | None = None
     grouped_photo_ids: tuple[str, ...] = ()
+    inventory_undos: tuple[InventoryUndo, ...] = ()
+    selling_undos: tuple[SellingUndo, ...] = ()
+    publication_undos: tuple[PublicationsUndo, ...] = ()
+    gpsr_undos: tuple[GpsrUndo, ...] = ()
+    copy_undos: tuple[CopyUndo, ...] = ()
+    facts_undos: tuple[FactsUndo, ...] = ()
 
 
 Model = Callable[[ModelContext], Awaitable[ModelStep]]
 
 
 class ProductWriter(Protocol):
-    """The page's confirm. A string is the refusal, and that call saved nothing."""
+    """The page's confirm and typed listing copy. A string is the refusal, and that call saved nothing."""
 
-    async def confirm(self, product_id: int, facts: Mapping[str, object]) -> str | None: ...
+    async def confirm(
+        self, product_id: int, facts: Mapping[str, object]
+    ) -> str | PreviousFacts | None: ...
 
     async def type_listing_copy(
         self, product_id: int, updates: Mapping[str, object]
-    ) -> str | None: ...
+    ) -> str | PreviousCopy | None: ...
 
 
 class ThreadStore(Protocol):
@@ -301,6 +369,12 @@ async def ask(
         credits = 0
         draft_ids = _draft_photo_ids(draft_photo_ids)
         grouped: tuple[str, ...] = ()
+        undos: list[InventoryUndo] = []
+        selling_undos: list[SellingUndo] = []
+        publication_undos: list[PublicationsUndo] = []
+        gpsr_undos: list[GpsrUndo] = []
+        copy_undos: list[CopyUndo] = []
+        facts_undos: list[FactsUndo] = []
         for calls_made in range(MODEL_CALL_LIMIT):
             step = await model(
                 ModelContext(
@@ -380,6 +454,27 @@ async def ask(
                     break
             if outcome is not None:
                 thread.append(("chat", outcome.text))
+                if outcome.inventory_before is not None:
+                    before = outcome.inventory_before
+                    undos.append(InventoryUndo(len(thread) - 1, before.item_id, before.quantity))
+                if outcome.selling_before is not None:
+                    earlier = outcome.selling_before
+                    selling_undos.append(
+                        SellingUndo(len(thread) - 1, earlier.product_id, earlier.fields)
+                    )
+                if outcome.publications_before is not None:
+                    earlier_set = outcome.publications_before
+                    publication_undos.append(
+                        PublicationsUndo(
+                            len(thread) - 1,
+                            earlier_set.product_id,
+                            earlier_set.publication_ids,
+                        )
+                    )
+                if outcome.gpsr_before is not None:
+                    gpsr_undos.append(
+                        GpsrUndo(len(thread) - 1, outcome.gpsr_before.identity)
+                    )
                 if outcome.shown_after is not None:
                     proposals[:] = list(outcome.shown_after)
                 elif outcome.shown is not None:
@@ -395,10 +490,15 @@ async def ask(
                 if writer is None:
                     thread.append(("chat", UNAVAILABLE))
                     break
-                refused = await writer.confirm(resolved.id, fact_kwargs(step.facts))
-                thread.append(("chat", refused or CONFIRMED))
-                if refused:
+                written = await writer.confirm(resolved.id, fact_kwargs(step.facts))
+                if isinstance(written, str):
+                    thread.append(("chat", written))
                     break
+                thread.append(("chat", CONFIRMED))
+                if isinstance(written, PreviousFacts) and written.facts:
+                    facts_undos.append(
+                        FactsUndo(len(thread) - 1, written.product_id, written.facts)
+                    )
             elif step.act == TYPE_COPY:
                 if resolved is None:
                     thread.append(("chat", NAME_IT))
@@ -415,10 +515,19 @@ async def ask(
                     if open_product is not None and open_product.id in resolved.photo_ids
                     else resolved
                 )
-                refused = await writer.type_listing_copy(shown.id, update)
-                thread.append(("chat", refused or TYPED[next(iter(update))]))
-                if refused:
+                written = await writer.type_listing_copy(shown.id, update)
+                if isinstance(written, str):
+                    thread.append(("chat", written))
                     break
+                thread.append(("chat", TYPED[next(iter(update))]))
+                if isinstance(written, PreviousCopy):
+                    copy_undos.append(
+                        CopyUndo(
+                            len(thread) - 1,
+                            written.product_id,
+                            {written.field: written.words},
+                        )
+                    )
             elif step.act == GROUP:
                 if len(draft_ids) >= 2:
                     thread.append(("chat", GROUPED))
@@ -441,6 +550,12 @@ async def ask(
             shop_changed=False,
             product=resolved,
             grouped_photo_ids=grouped,
+            inventory_undos=tuple(undos),
+            selling_undos=tuple(selling_undos),
+            publication_undos=tuple(publication_undos),
+            gpsr_undos=tuple(gpsr_undos),
+            copy_undos=tuple(copy_undos),
+            facts_undos=tuple(facts_undos),
         )
     if pending is not None:
         watch_import(store, user_id, shop_domain, pending)

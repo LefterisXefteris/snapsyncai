@@ -1,6 +1,6 @@
 """The proposal the page shows. Generate puts it in the thread. Accept is a later message."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -49,12 +49,64 @@ class ListingCopy(Protocol):
 
 
 @dataclass(frozen=True)
+class PreviousInventory:
+    """The Inventory quantity before this reply set a new one."""
+
+    item_id: int
+    quantity: int
+
+
+@dataclass(frozen=True)
+class PreviousSelling:
+    """The Selling fields this reply replaced. An empty string was empty."""
+
+    product_id: int
+    fields: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class PreviousCopy:
+    """The words this reply replaced on one listing-copy field. An empty string was empty."""
+
+    product_id: int
+    field: str
+    words: str
+
+
+@dataclass(frozen=True)
+class PreviousFacts:
+    """The facts pack this reply replaced. An empty mapping was not confirmed."""
+
+    product_id: int
+    facts: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class PreviousPublications:
+    """The publication ids this reply replaced. An empty tuple was none."""
+
+    product_id: int
+    publication_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PreviousGpsr:
+    """The Shop GPSR identity this reply replaced. None was no identity."""
+
+    identity: Mapping[str, object] | None
+
+
+@dataclass(frozen=True)
 class ListingReply:
     text: str
     shown: Shown | None = None
     credits_spent: int = 0
     shown_after: tuple[Shown, ...] | None = None
     continue_turn: bool = False
+    inventory_before: PreviousInventory | None = None
+    selling_before: PreviousSelling | None = None
+    publications_before: PreviousPublications | None = None
+    gpsr_before: PreviousGpsr | None = None
 
 
 def proposal_text(proposal: Proposal) -> str:

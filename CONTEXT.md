@@ -33,8 +33,12 @@ A place the seller opens in the signed-in workspace: Products, the product page,
 _Avoid_: surface, screen, Website, Conversation, Chat
 
 **Chat**:
-Always there along the bottom of the signed-in workspace, not a card the seller opens and closes. One thread per shop, the same thread across Destinations. A message is a request for an act that seller could already perform on that shop. A question is not an act. The seller may choose photos from Chat; each photo starts as its own draft product on New listing, and the open Destination stays. That choice does not add a turn. Not a Destination, and not where they buy Credits, connect or disconnect a Channel, claim a shop, or cancel a Plan.
+Always there along the bottom of the signed-in workspace, not a card the seller opens and closes. One thread per shop, the same thread across Destinations. A message is a request for an act that seller could already perform on that shop. A question is not an act. When the message already carries the inputs, the act runs on that turn. One missing input is asked, and nothing runs. The seller may choose photos from Chat; each photo starts as its own draft product on New listing, and the open Destination stays. That choice does not add a turn. Not a Destination, and not where they buy Credits, connect or disconnect a Channel, claim a shop, or cancel a Plan.
 _Avoid_: Conversation, Agentic SEO, chat card, agent
+
+**Undo**:
+The 9-second control on a Chat reply that puts back the previous value of that reply’s Selling, Inventory, typed listing copy, confirmed facts, publications, or Shop GPSR. Each reply keeps its own until its 9 seconds end. A reload clears the control and the write stays. Push, Go live, delete, Import, and Accept have none.
+_Avoid_: revert, rollback, undo message
 
 **Landing**:
 The public marketing page a stranger opens before sign-in. Distinct from a Destination.
