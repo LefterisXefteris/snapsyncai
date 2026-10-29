@@ -1,6 +1,17 @@
 """Stock, Selling, publications, Shop GPSR, and delete. Seam: `ask`."""
 
-from app.services.chat import MemoryThreadStore, ModelStep, NamedProduct, ask, step_from_payload
+from app.services.chat import (
+    GpsrUndo,
+    InventoryUndo,
+    MemoryThreadStore,
+    ModelStep,
+    NamedProduct,
+    PublicationsUndo,
+    SellingUndo,
+    ask,
+    step_from_payload,
+)
+from app.services.chat_listing import PreviousGpsr, PreviousInventory
 
 SHIRT = NamedProduct(id=7, title="Blue linen shirt", photo_ids=(7,))
 DRESS = NamedProduct(id=9, title="Wool dress", photo_ids=(9,))
@@ -25,6 +36,14 @@ MAKER = {
     },
     "manufacturerInEu": True,
 }
+EARLIER = {
+    "manufacturer": {
+        "name": "Old Mill",
+        "postalAddress": "2 Loom Street",
+        "email": "old@example.com",
+    },
+    "manufacturerInEu": True,
+}
 
 
 class Writes:
@@ -35,24 +54,52 @@ class Writes:
         self.gpsr: list[dict] = []
         self.deleted: list[int] = []
         self.adjust_refusal: str | None = None
+        self.selling_refusal: str | None = None
+        self.publication_refusal: str | None = None
+        self.publication_before: dict[int, tuple[str, ...]] | None = None
+        self.publication_queue: list[tuple[str, ...]] = []
+        self.gpsr_refusal: str | None = None
+        self.gpsr_before: dict | None = None
+        self.gpsr_before_known = False
+        self.previous: PreviousInventory | None = None
+        self.previous_queue: list[PreviousInventory] = []
 
-    async def adjust_stock(self, product_id: int, quantity: int, reason: str) -> str | None:
+    async def adjust_stock(
+        self, product_id: int, quantity: int, reason: str
+    ) -> str | PreviousInventory | None:
         if self.adjust_refusal:
             return self.adjust_refusal
         self.adjusted.append((product_id, quantity, reason))
-        return None
+        if self.previous_queue:
+            return self.previous_queue.pop(0)
+        return self.previous
 
-    async def selling(self, product_id: int, fields: dict) -> str | None:
+    async def selling(self, product_id: int, fields: dict) -> str | dict | None:
+        if self.selling_refusal:
+            return self.selling_refusal
         self.sold.append((product_id, fields))
-        return None
+        before = getattr(self, "before", {}).get(product_id)
+        if before is None:
+            return None
+        return {name: before.get(name, "") for name in fields}
 
-    async def publications(self, product_id: int, names: tuple[str, ...]) -> str | None:
+    async def publications(self, product_id: int, names: tuple[str, ...]) -> str | tuple[str, ...] | None:
+        if self.publication_refusal:
+            return self.publication_refusal
         self.published.append((product_id, names))
-        return None
+        if self.publication_queue:
+            return self.publication_queue.pop(0)
+        if self.publication_before is None or product_id not in self.publication_before:
+            return None
+        return self.publication_before[product_id]
 
-    async def shop_gpsr(self, identity: dict) -> str | None:
+    async def shop_gpsr(self, identity: dict) -> str | PreviousGpsr | None:
+        if self.gpsr_refusal:
+            return self.gpsr_refusal
         self.gpsr.append(identity)
-        return None
+        if not self.gpsr_before_known:
+            return None
+        return PreviousGpsr(self.gpsr_before)
 
     async def delete(self, product_id: int) -> str | None:
         self.deleted.append(product_id)
@@ -91,6 +138,65 @@ async def test_stock_adjustment_uses_the_quantity_and_reason_and_spends_nothing(
     assert result.thread[-1] == ("chat", STOCK)
 
 
+async def test_a_landed_stock_adjustment_returns_the_previous_quantity_outside_the_thread() -> None:
+    writes = Writes()
+    writes.previous = PreviousInventory(item_id=3, quantity=12)
+    store = MemoryThreadStore()
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(
+            act="adjust_stock",
+            product="Blue linen shirt",
+            quantity=4,
+            reason="Stock count",
+        )
+
+    result = await _ask(model, writes, store=store)
+
+    assert writes.adjusted == [(SHIRT.id, 4, "Stock count")]
+    assert result.inventory_undos == (InventoryUndo(reply_index=1, item_id=3, quantity=12),)
+    assert result.thread[-1] == ("chat", STOCK)
+    assert all("12" not in text for _, text in result.thread)
+    stored = await store.load("user_seller", "tees.myshopify.com")
+    assert stored == result.thread
+
+
+async def test_two_inventory_adjustments_in_one_message_each_keep_their_previous_quantity() -> None:
+    writes = Writes()
+    writes.previous_queue = [
+        PreviousInventory(item_id=3, quantity=12),
+        PreviousInventory(item_id=3, quantity=4),
+    ]
+
+    async def model(ctx) -> ModelStep:
+        if ctx.calls_made == 0:
+            return ModelStep(
+                act="adjust_stock",
+                product="Blue linen shirt",
+                quantity=4,
+                reason="Stock count",
+                done=False,
+            )
+        return ModelStep(
+            act="adjust_stock",
+            product="Blue linen shirt",
+            quantity=9,
+            reason="Recount",
+        )
+
+    result = await _ask(model, writes)
+
+    assert writes.adjusted == [
+        (SHIRT.id, 4, "Stock count"),
+        (SHIRT.id, 9, "Recount"),
+    ]
+    assert result.inventory_undos == (
+        InventoryUndo(reply_index=1, item_id=3, quantity=12),
+        InventoryUndo(reply_index=2, item_id=3, quantity=4),
+    )
+    assert all("12" not in text and "4" not in text for _, text in result.thread)
+
+
 async def test_a_missing_quantity_or_a_short_reason_asks_and_writes_nothing() -> None:
     writes = Writes()
     steps = [
@@ -108,6 +214,7 @@ async def test_a_missing_quantity_or_a_short_reason_asks_and_writes_nothing() ->
         result = await _ask(model, writes, store=MemoryThreadStore())
         assert writes.adjusted == []
         assert result.credits_spent == 0
+        assert result.inventory_undos == ()
         assert result.thread[-1] == ("chat", expected)
         steps.pop(0)
 
@@ -151,6 +258,7 @@ async def test_a_refused_adjustment_stops_the_later_act() -> None:
     assert calls == [0]
     assert writes.adjusted == []
     assert writes.deleted == []
+    assert result.inventory_undos == ()
     assert result.thread[-1] == ("chat", "Inventory has no stock row for that SKU.")
 
 
@@ -173,6 +281,87 @@ async def test_selling_saves_only_the_fields_the_message_names() -> None:
     assert result.thread[-1] == ("chat", SELLING)
 
 
+async def test_setting_the_price_hands_the_previous_price_to_the_browser_and_not_the_thread() -> None:
+    writes = Writes()
+    writes.before = {SHIRT.id: {"price": "12.50"}}
+    store = MemoryThreadStore()
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(act="selling", product="Blue linen shirt", selling={"price": "19"})
+
+    result = await _ask(model, writes, store=store, message="Set the price to 19")
+
+    assert writes.sold == [(SHIRT.id, {"price": "19"})]
+    assert result.credits_spent == 0
+    assert result.thread[-1] == ("chat", SELLING)
+    assert result.selling_undos == (
+        SellingUndo(reply_index=1, product_id=SHIRT.id, fields={"price": "12.50"}),
+    )
+    stored = await store.load("user_seller", "tees.myshopify.com")
+    assert stored == result.thread
+    assert "12.50" not in " ".join(text for _, text in stored)
+
+
+async def test_an_empty_price_is_the_previous_selling() -> None:
+    writes = Writes()
+    writes.before = {SHIRT.id: {"price": ""}}
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(act="selling", product="Blue linen shirt", selling={"price": "19"})
+
+    result = await _ask(model, writes, message="Set the price to 19")
+
+    assert result.selling_undos == (
+        SellingUndo(reply_index=1, product_id=SHIRT.id, fields={"price": ""}),
+    )
+
+
+async def test_one_reply_hands_back_every_selling_field_it_changed() -> None:
+    writes = Writes()
+    writes.before = {SHIRT.id: {"price": "12.50", "sku": ""}}
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(
+            act="selling",
+            product="Blue linen shirt",
+            selling={"price": "19", "sku": "LINEN-1"},
+        )
+
+    result = await _ask(model, writes, message="Price 19, SKU LINEN-1")
+
+    assert writes.sold == [(SHIRT.id, {"price": "19", "sku": "LINEN-1"})]
+    assert result.selling_undos == (
+        SellingUndo(
+            reply_index=1,
+            product_id=SHIRT.id,
+            fields={"price": "12.50", "sku": ""},
+        ),
+    )
+    assert "12.50" not in " ".join(text for _, text in result.thread)
+
+
+async def test_a_second_selling_reply_keeps_its_own_previous_fields() -> None:
+    writes = Writes()
+    writes.before = {SHIRT.id: {"price": "12.50"}, DRESS.id: {"sku": "WOOL"}}
+
+    async def model(ctx) -> ModelStep:
+        if ctx.calls_made == 0:
+            return ModelStep(
+                act="selling",
+                product="Blue linen shirt",
+                selling={"price": "19"},
+                done=False,
+            )
+        return ModelStep(act="selling", product="Wool dress", selling={"sku": "WOOL-1"})
+
+    result = await _ask(model, writes, message="Price 19 on the shirt, then the dress SKU")
+
+    assert result.selling_undos == (
+        SellingUndo(reply_index=1, product_id=SHIRT.id, fields={"price": "12.50"}),
+        SellingUndo(reply_index=2, product_id=DRESS.id, fields={"sku": "WOOL"}),
+    )
+
+
 async def test_selling_with_no_field_asks_and_writes_nothing() -> None:
     writes = Writes()
 
@@ -182,7 +371,37 @@ async def test_selling_with_no_field_asks_and_writes_nothing() -> None:
     result = await _ask(model, writes)
 
     assert writes.sold == []
+    assert result.selling_undos == ()
     assert result.thread[-1] == ("chat", WHICH_SELLING)
+
+
+async def test_a_selling_message_with_no_product_asks_and_writes_nothing() -> None:
+    writes = Writes()
+    writes.before = {SHIRT.id: {"price": "12.50"}}
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(act="selling", selling={"price": "19"})
+
+    result = await _ask(model, writes, message="19")
+
+    assert writes.sold == []
+    assert result.selling_undos == ()
+    assert result.thread[-1] == ("chat", NAME_IT)
+
+
+async def test_a_refused_selling_write_has_no_undo() -> None:
+    writes = Writes()
+    writes.selling_refusal = "Invalid update data"
+    writes.before = {SHIRT.id: {"price": "12.50"}}
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(act="selling", product="Blue linen shirt", selling={"price": "19"})
+
+    result = await _ask(model, writes)
+
+    assert writes.sold == []
+    assert result.selling_undos == ()
+    assert result.thread[-1] == ("chat", "Invalid update data")
 
 
 async def test_publications_are_the_set_the_message_names() -> None:
@@ -202,6 +421,207 @@ async def test_publications_are_the_set_the_message_names() -> None:
     assert result.thread[-1] == ("chat", PUBLICATIONS)
 
 
+async def test_a_landed_publications_change_returns_the_previous_set_outside_the_thread() -> None:
+    writes = Writes()
+    writes.publication_before = {SHIRT.id: ("gid://shopify/Publication/1",)}
+    store = MemoryThreadStore()
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(
+            act="publications",
+            product="Blue linen shirt",
+            publications=("Online Store", "Shop"),
+        )
+
+    result = await _ask(model, writes, store=store)
+
+    assert writes.published == [(SHIRT.id, ("Online Store", "Shop"))]
+    assert result.credits_spent == 0
+    assert result.publication_undos == (
+        PublicationsUndo(
+            reply_index=1,
+            product_id=SHIRT.id,
+            publication_ids=("gid://shopify/Publication/1",),
+        ),
+    )
+    assert result.thread[-1] == ("chat", PUBLICATIONS)
+    assert all("Publication/1" not in text for _, text in result.thread)
+    stored = await store.load("user_seller", "tees.myshopify.com")
+    assert stored == result.thread
+
+
+async def test_an_empty_publication_set_is_the_previous_set() -> None:
+    writes = Writes()
+    writes.publication_before = {SHIRT.id: ()}
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(
+            act="publications",
+            product="Blue linen shirt",
+            publications=("Online Store",),
+        )
+
+    result = await _ask(model, writes)
+
+    assert result.publication_undos == (
+        PublicationsUndo(reply_index=1, product_id=SHIRT.id, publication_ids=()),
+    )
+    assert result.credits_spent == 0
+
+
+async def test_two_publication_replies_each_keep_their_previous_set() -> None:
+    writes = Writes()
+    writes.publication_queue = [
+        ("gid://shopify/Publication/1",),
+        ("gid://shopify/Publication/3",),
+    ]
+
+    async def model(ctx) -> ModelStep:
+        if ctx.calls_made == 0:
+            return ModelStep(
+                act="publications",
+                product="Blue linen shirt",
+                publications=("Shop",),
+                done=False,
+            )
+        return ModelStep(
+            act="publications",
+            product="Wool dress",
+            publications=("Online Store",),
+        )
+
+    result = await _ask(model, writes)
+
+    assert result.publication_undos == (
+        PublicationsUndo(
+            reply_index=1,
+            product_id=SHIRT.id,
+            publication_ids=("gid://shopify/Publication/1",),
+        ),
+        PublicationsUndo(
+            reply_index=2,
+            product_id=DRESS.id,
+            publication_ids=("gid://shopify/Publication/3",),
+        ),
+    )
+    assert result.credits_spent == 0
+
+
+async def test_a_missing_set_or_an_unknown_publication_writes_nothing_and_has_no_undo() -> None:
+    missing = Writes()
+
+    async def no_set(_ctx) -> ModelStep:
+        return ModelStep(act="publications", product="Wool dress")
+
+    unknown = Writes()
+    unknown.publication_refusal = "Which publication? I don't see Shop."
+    unknown.publication_before = {SHIRT.id: ("gid://shopify/Publication/1",)}
+
+    async def not_on_the_shop(_ctx) -> ModelStep:
+        return ModelStep(
+            act="publications",
+            product="Blue linen shirt",
+            publications=("Shop",),
+        )
+
+    asked = await _ask(no_set, missing)
+    refused = await _ask(not_on_the_shop, unknown)
+
+    assert missing.published == []
+    assert asked.publication_undos == ()
+    assert asked.thread[-1] == ("chat", WHICH_PUBLICATIONS)
+    assert unknown.published == []
+    assert refused.publication_undos == ()
+    assert refused.thread[-1] == ("chat", "Which publication? I don't see Shop.")
+
+
+async def test_a_landed_shop_gpsr_save_returns_the_previous_identity_outside_the_thread() -> None:
+    writes = Writes()
+    writes.gpsr_before_known = True
+    writes.gpsr_before = EARLIER
+    store = MemoryThreadStore()
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(act="shop_gpsr", gpsr=MAKER)
+
+    result = await _ask(model, writes, store=store)
+
+    assert writes.gpsr == [MAKER]
+    assert result.credits_spent == 0
+    assert result.gpsr_undos == (GpsrUndo(reply_index=1, identity=EARLIER),)
+    assert result.thread[-1] == ("chat", GPSR_SAVED)
+    assert all("Old Mill" not in text for _, text in result.thread)
+    stored = await store.load("user_seller", "tees.myshopify.com")
+    assert stored == result.thread
+
+
+async def test_an_empty_shop_gpsr_identity_is_the_previous_identity() -> None:
+    writes = Writes()
+    writes.gpsr_before_known = True
+
+    async def model(_ctx) -> ModelStep:
+        return ModelStep(act="shop_gpsr", gpsr=MAKER)
+
+    result = await _ask(model, writes)
+
+    assert result.gpsr_undos == (GpsrUndo(reply_index=1, identity=None),)
+    assert result.credits_spent == 0
+
+
+async def test_a_publications_reply_and_a_shop_gpsr_reply_each_keep_their_previous_value() -> None:
+    writes = Writes()
+    writes.publication_before = {SHIRT.id: ("gid://shopify/Publication/1",)}
+    writes.gpsr_before_known = True
+    writes.gpsr_before = EARLIER
+
+    async def model(ctx) -> ModelStep:
+        if ctx.calls_made == 0:
+            return ModelStep(
+                act="publications",
+                product="Blue linen shirt",
+                publications=("Shop",),
+                done=False,
+            )
+        return ModelStep(act="shop_gpsr", gpsr=MAKER)
+
+    result = await _ask(model, writes)
+
+    assert result.publication_undos == (
+        PublicationsUndo(
+            reply_index=1,
+            product_id=SHIRT.id,
+            publication_ids=("gid://shopify/Publication/1",),
+        ),
+    )
+    assert result.gpsr_undos == (GpsrUndo(reply_index=2, identity=EARLIER),)
+    assert result.credits_spent == 0
+    assert all("Old Mill" not in text and "Publication/1" not in text for _, text in result.thread)
+
+
+async def test_an_incomplete_shop_gpsr_identity_writes_nothing_and_has_no_undo() -> None:
+    missing = Writes()
+    incomplete = Writes()
+    incomplete.gpsr_refusal = GPSR_INCOMPLETE
+    incomplete.gpsr_before_known = True
+    incomplete.gpsr_before = EARLIER
+
+    async def no_identity(_ctx) -> ModelStep:
+        return ModelStep(act="shop_gpsr")
+
+    async def half(_ctx) -> ModelStep:
+        return ModelStep(act="shop_gpsr", gpsr={"manufacturer": {"name": "Mill House"}})
+
+    asked = await _ask(no_identity, missing)
+    refused = await _ask(half, incomplete)
+
+    assert missing.gpsr == []
+    assert asked.gpsr_undos == ()
+    assert asked.thread[-1] == ("chat", GPSR_INCOMPLETE)
+    assert incomplete.gpsr == []
+    assert refused.gpsr_undos == ()
+    assert refused.thread[-1] == ("chat", GPSR_INCOMPLETE)
+
+
 async def test_publications_with_no_set_ask_and_write_nothing() -> None:
     writes = Writes()
 
@@ -211,6 +631,7 @@ async def test_publications_with_no_set_ask_and_write_nothing() -> None:
     result = await _ask(model, writes)
 
     assert writes.published == []
+    assert result.publication_undos == ()
     assert result.thread[-1] == ("chat", WHICH_PUBLICATIONS)
 
 
@@ -237,6 +658,7 @@ async def test_shop_gpsr_without_an_identity_asks_and_writes_nothing() -> None:
     result = await _ask(model, writes)
 
     assert writes.gpsr == []
+    assert result.gpsr_undos == ()
     assert result.thread[-1] == ("chat", GPSR_INCOMPLETE)
 
 
@@ -259,6 +681,7 @@ async def test_delete_removes_only_the_named_product() -> None:
     assert writes.adjusted == [(SHIRT.id, 4, "Stock count")]
     assert writes.deleted == [DRESS.id]
     assert result.credits_spent == 0
+    assert result.selling_undos == ()
     assert result.thread[-1] == ("chat", DELETED)
 
 

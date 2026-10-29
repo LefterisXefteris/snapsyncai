@@ -5,6 +5,21 @@ import json
 from turn import authorized, step_from_model, turn
 
 
+def test_the_model_runs_an_act_when_the_message_already_has_its_inputs() -> None:
+    seen: list[str] = []
+
+    def complete(prompt: str) -> str:
+        seen.append(prompt)
+        return json.dumps({"text": "Hi.", "done": True})
+
+    turn({"message": "Set the price to 19"}, complete)
+    instruction = seen[0]
+    assert "name that act and those inputs" in instruction
+    assert "Do not ask the seller to confirm" in instruction
+    assert "only when one required input is absent" in instruction
+    assert "Do not invent a price, a quantity, a fibre, or a legal fact" in instruction
+
+
 def test_a_question_is_asked_for_the_words_the_seller_reads() -> None:
     seen: list[str] = []
 

@@ -312,6 +312,48 @@ def stored_from_facts(facts: ProductFacts) -> dict[str, Any]:
     return stored
 
 
+def confirmed_as_confirm_kwargs(confirmed: ConfirmedFacts | None) -> dict[str, Any]:
+    """The previous pack, in the inputs the page's confirm accepts."""
+    if confirmed is None:
+        return {}
+    body: dict[str, Any] = {"is_textile": confirmed.is_textile}
+    if confirmed.product_kind:
+        body["product_kind"] = confirmed.product_kind
+    if confirmed.composition:
+        body["composition"] = [
+            {"name": row.name, "percent": row.percent} for row in confirmed.composition
+        ]
+    if confirmed.gpsr_choice:
+        body["gpsr_choice"] = confirmed.gpsr_choice
+    if confirmed.gpsr_override is not None:
+        body["gpsr_identity"] = stored_gpsr_identity(confirmed.gpsr_override)
+    if confirmed.care_choice:
+        body["care_choice"] = confirmed.care_choice
+    if confirmed.care is not None:
+        body["care"] = stored_care_instructions(confirmed.care)
+    if confirmed.product_kind == PRODUCT_KIND_COFFEE:
+        if confirmed.coffee_form:
+            body["coffee_form"] = confirmed.coffee_form
+        if confirmed.roast_level:
+            body["roast_level"] = confirmed.roast_level
+        if confirmed.net_weight:
+            body["net_weight"] = confirmed.net_weight
+        if confirmed.variant_net_weights:
+            body["variant_net_weights"] = [
+                {"variant_id": row.variant_id, "net_weight": row.net_weight}
+                for row in confirmed.variant_net_weights
+            ]
+        if confirmed.coffee_origin_choice:
+            body["coffee_origin_choice"] = confirmed.coffee_origin_choice
+        if confirmed.coffee_origin:
+            body["coffee_origin"] = confirmed.coffee_origin
+        if confirmed.ingredients_list is not None:
+            body["ingredients_list"] = confirmed.ingredients_list
+        if confirmed.allergen_statement is not None:
+            body["allergen_statement"] = confirmed.allergen_statement
+    return body
+
+
 def confirm_facts(
     facts: ProductFacts,
     *,
