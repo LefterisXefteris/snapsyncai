@@ -1,6 +1,6 @@
 """Typed listing copy and confirmed facts Undo. Seam: `ask`."""
 
-from app.services.chat import CopyUndo, FactsUndo, MemoryThreadStore, ModelStep, ask
+from app.services.chat import MemoryThreadStore, ModelStep, Undo, ask
 from tests.test_chat_facts import LINEN, Catalogue
 from tests.test_chat_product import SHIRT
 
@@ -36,10 +36,9 @@ async def test_typed_listing_copy_hands_the_previous_words_to_the_browser() -> N
         writer=catalogue,
     )
 
-    assert result.copy_undos == (
-        CopyUndo(reply_index=1, product_id=SHIRT.id, fields={"description": "A linen shirt."}),
+    assert result.undos == (
+        Undo(1, "copy", product_id=SHIRT.id, fields={"description": "A linen shirt."}),
     )
-    assert result.facts_undos == ()
     assert result.credits_spent == 0
     assert all("A linen shirt." not in text for _, text in result.thread)
     stored = await store.load("user_seller", "tees.myshopify.com")
@@ -63,7 +62,7 @@ async def test_a_first_confirm_saves_the_facts_and_shows_no_undo() -> None:
     )
 
     assert catalogue.facts[SHIRT.id]["confirmed"]["isTextile"] is True
-    assert result.facts_undos == ()
+    assert result.undos == ()
     assert result.thread[-1] == ("chat", "Those facts are confirmed.")
 
 
@@ -89,8 +88,7 @@ async def test_a_confirm_hands_the_previous_pack_to_the_browser() -> None:
         writer=catalogue,
     )
 
-    assert result.facts_undos == (FactsUndo(reply_index=1, product_id=SHIRT.id, facts=LINEN),)
-    assert result.copy_undos == ()
+    assert result.undos == (Undo(1, "facts", product_id=SHIRT.id, facts=LINEN),)
     assert result.credits_spent == 0
     assert all("80" not in text for _, text in result.thread)
     stored = await store.load("user_seller", "tees.myshopify.com")
@@ -118,7 +116,7 @@ async def test_a_quote_with_no_words_asks_and_saves_nothing() -> None:
     )
 
     assert catalogue.copy == {}
-    assert result.copy_undos == ()
+    assert result.undos == ()
     assert result.thread[-1] == ("chat", "What should it say?")
 
 
@@ -148,10 +146,10 @@ async def test_a_quote_and_a_confirm_each_keep_their_previous_value() -> None:
         writer=catalogue,
     )
 
-    assert result.copy_undos == (
-        CopyUndo(reply_index=1, product_id=SHIRT.id, fields={"description": "Old copy."}),
+    assert result.undos == (
+        Undo(1, "copy", product_id=SHIRT.id, fields={"description": "Old copy."}),
+        Undo(2, "facts", product_id=SHIRT.id, facts=LINEN),
     )
-    assert result.facts_undos == (FactsUndo(reply_index=2, product_id=SHIRT.id, facts=LINEN),)
     assert all("Old copy." not in text and "80" not in text for _, text in result.thread)
 
 
@@ -176,6 +174,4 @@ async def test_an_empty_description_is_the_previous_words() -> None:
         writer=catalogue,
     )
 
-    assert result.copy_undos == (
-        CopyUndo(reply_index=1, product_id=SHIRT.id, fields={"description": ""}),
-    )
+    assert result.undos == (Undo(1, "copy", product_id=SHIRT.id, fields={"description": ""}),)

@@ -120,7 +120,7 @@ async def test_a_missing_or_invalid_input_asks_and_saves_nothing() -> None:
     assert catalogue.facts == {}
     assert calls == 1
     assert result.credits_spent == 0
-    assert result.facts_undos == ()
+    assert result.undos == ()
     assert result.shop_changed is False
     assert [text for _, text in result.thread] == [
         "It's 80% cotton.",
@@ -149,7 +149,7 @@ async def test_a_missing_input_asks_and_saves_nothing() -> None:
     )
 
     assert catalogue.facts == {}
-    assert result.facts_undos == ()
+    assert result.undos == ()
     assert [text for _, text in result.thread] == [
         "It's a textile. Skip GPSR.",
         "Fibre composition is required to confirm a textile product.",
@@ -259,7 +259,7 @@ async def test_a_quote_with_no_field_asks_and_saves_nothing() -> None:
 
     assert catalogue.copy == {}
     assert result.credits_spent == 0
-    assert result.copy_undos == ()
+    assert result.undos == ()
     assert [text for _, text in result.thread] == [
         'Say "It is organic cotton."',
         "Which part of the listing copy — title, description, tags, SEO title, "

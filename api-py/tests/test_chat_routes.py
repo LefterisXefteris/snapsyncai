@@ -295,7 +295,9 @@ async def test_a_page_proposal_is_accepted_on_a_later_message(seller_app, db) ->
     assert len(await spends(db)) == 1
 
 
-async def test_setting_the_price_hands_the_previous_price_only_on_that_reply(seller_app, db) -> None:
+async def test_setting_the_price_hands_the_previous_price_only_on_that_reply(
+    seller_app, db
+) -> None:
     from decimal import Decimal
 
     from app.routers.chat import get_chat_model
@@ -317,17 +319,19 @@ async def test_setting_the_price_hands_the_previous_price_only_on_that_reply(sel
 
     body = posted.json()
     assert body["thread"][-1] == {"role": "chat", "text": "That's the selling."}
-    assert "12.50" not in posted.text.split("sellingUndos")[0]
-    assert body["sellingUndos"] == [
-        {"replyIndex": 1, "productId": image_id, "price": "12.50"}
+    assert "12.50" not in posted.text.split("undos")[0]
+    assert body["undos"] == [
+        {"replyIndex": 1, "kind": "selling", "productId": image_id, "price": "12.50"}
     ]
-    assert "sellingUndos" not in fetched.json()
+    assert "undos" not in fetched.json()
     assert "12.50" not in fetched.text
     row = next(item for item in catalogue.json() if item["id"] == image_id)
     assert row["price"] == "19"
 
 
-async def test_setting_publications_hands_the_previous_set_only_on_that_reply(seller_app, db) -> None:
+async def test_setting_publications_hands_the_previous_set_only_on_that_reply(
+    seller_app, db
+) -> None:
     from app.routers.chat import get_chat_model
     from app.services.chat import ModelStep
     from app.services.shopify import get_shopify_graphql_for
@@ -356,11 +360,16 @@ async def test_setting_publications_hands_the_previous_set_only_on_that_reply(se
 
     body = posted.json()
     assert body["thread"][-1] == {"role": "chat", "text": "Those publications are set."}
-    assert ONLINE_STORE not in posted.text.split("publicationUndos")[0]
-    assert body["publicationUndos"] == [
-        {"replyIndex": 1, "productId": image_id, "publicationIds": [ONLINE_STORE]}
+    assert ONLINE_STORE not in posted.text.split("undos")[0]
+    assert body["undos"] == [
+        {
+            "replyIndex": 1,
+            "kind": "publications",
+            "productId": image_id,
+            "publicationIds": [ONLINE_STORE],
+        }
     ]
-    assert "publicationUndos" not in fetched.json()
+    assert "undos" not in fetched.json()
     row = next(item for item in catalogue.json() if item["id"] == image_id)
     assert row["shopifyPublicationIds"] == [shop_app]
 
@@ -392,12 +401,14 @@ async def test_an_unknown_publication_changes_nothing_and_has_no_undo(seller_app
 
     body = posted.json()
     assert body["thread"][-1]["text"] == "Which publication? I don't see Shop."
-    assert "publicationUndos" not in body
+    assert "undos" not in body
     row = next(item for item in catalogue.json() if item["id"] == image_id)
     assert row["shopifyPublicationIds"] == [ONLINE_STORE]
 
 
-async def test_saving_shop_gpsr_hands_the_previous_identity_only_on_that_reply(seller_app, db) -> None:
+async def test_saving_shop_gpsr_hands_the_previous_identity_only_on_that_reply(
+    seller_app, db
+) -> None:
     from app.routers.chat import get_chat_model
     from app.services.chat import ModelStep
     from app.services.connections import get_shopify
@@ -432,16 +443,18 @@ async def test_saving_shop_gpsr_hands_the_previous_identity_only_on_that_reply(s
 
     body = posted.json()
     assert body["thread"][-1] == {"role": "chat", "text": "Shop GPSR identity saved."}
-    assert "Old Mill" not in posted.text.split("gpsrUndos")[0]
-    assert body["gpsrUndos"] == [{"replyIndex": 1, "identity": earlier}]
-    assert "gpsrUndos" not in fetched.json()
+    assert "Old Mill" not in posted.text.split("undos")[0]
+    assert body["undos"] == [{"replyIndex": 1, "kind": "gpsr", "identity": earlier}]
+    assert "undos" not in fetched.json()
     assert "Old Mill" not in fetched.text
     connection = await get_shopify(db, SELLER)
     assert connection is not None
     assert connection.gpsr_identity == maker
 
 
-async def test_an_incomplete_shop_gpsr_identity_is_not_saved_and_has_no_undo(seller_app, db) -> None:
+async def test_an_incomplete_shop_gpsr_identity_is_not_saved_and_has_no_undo(
+    seller_app, db
+) -> None:
     from app.routers.chat import get_chat_model
     from app.services.chat import ModelStep
     from app.services.connections import get_shopify
@@ -466,7 +479,7 @@ async def test_an_incomplete_shop_gpsr_identity_is_not_saved_and_has_no_undo(sel
         posted = await client.post("/api/chat", json={"message": "Save this shop GPSR identity"})
 
     assert posted.json()["thread"][-1]["text"] == "GPSR identity is incomplete."
-    assert "gpsrUndos" not in posted.json()
+    assert "undos" not in posted.json()
     connection = await get_shopify(db, SELLER)
     assert connection is not None
     assert connection.gpsr_identity == earlier

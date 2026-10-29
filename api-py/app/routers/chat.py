@@ -12,13 +12,9 @@ from app.db import SessionDep
 from app.schemas.base import CamelModel
 from app.services import product as product_page
 from app.services.chat import (
-    CopyUndo,
-    FactsUndo,
-    GpsrUndo,
-    InventoryUndo,
     Model,
-    PublicationsUndo,
     SqlThreadStore,
+    Undo,
     ask,
     model_from,
     products_from_images,
@@ -35,7 +31,6 @@ from app.services.chat_listing import (
     copy_for_refresh,
     proposal_text,
 )
-from app.services.product_facts import confirmed_as_confirm_kwargs
 from app.services.chat_records import ShopRecords
 from app.services.connections import get_shopify
 from app.services.images import get_image, get_images_by_ids, list_images, update_image
@@ -43,6 +38,7 @@ from app.services.listing_copy_accept import accept_generated, accept_refresh
 from app.services.listing_copy_generate import generate_listing_copy, regenerate_listing_field
 from app.services.listing_copy_propose import propose_bulk_seo, propose_refresh
 from app.services.listing_copy_trace import listing_copy_trace_store, mark_refresh
+from app.services.product_facts import confirmed_as_confirm_kwargs
 from app.services.push import RECONNECT_FOR_PUBLICATIONS, push_products
 from app.services.shopify import (
     ShopifyGraphQLForDep,
@@ -67,59 +63,32 @@ class ChatTurnOut(CamelModel):
     text: str
 
 
-class InventoryUndoOut(CamelModel):
+class UndoOut(CamelModel):
     reply_index: int
-    item_id: int
-    quantity: int
-
-
-class SellingUndoOut(CamelModel):
-    reply_index: int
-    product_id: int
+    kind: str
+    item_id: int | None = None
+    quantity: int | None = None
+    product_id: int | None = None
     price: str | None = None
     compare_at_price: str | None = None
     cost_per_item: str | None = None
     sku: str | None = None
     barcode: str | None = None
-
-
-class CopyUndoOut(CamelModel):
-    reply_index: int
-    product_id: int
     title: str | None = None
     description: str | None = None
     tags: str | None = None
     seo_title: str | None = None
     seo_description: str | None = None
     aeo_snippet: str | None = None
-
-
-class FactsUndoOut(CamelModel):
-    reply_index: int
-    product_id: int
-    facts: dict
-
-
-class PublicationsUndoOut(CamelModel):
-    reply_index: int
-    product_id: int
-    publication_ids: list[str]
-
-
-class GpsrUndoOut(CamelModel):
-    reply_index: int
+    facts: dict | None = None
+    publication_ids: list[str] | None = None
     identity: dict | None = None
 
 
 class ChatResponse(CamelModel):
     thread: list[ChatTurnOut]
     grouped_photo_ids: list[str] | None = None
-    inventory_undos: list[InventoryUndoOut] | None = None
-    selling_undos: list[SellingUndoOut] | None = None
-    publication_undos: list[PublicationsUndoOut] | None = None
-    gpsr_undos: list[GpsrUndoOut] | None = None
-    copy_undos: list[CopyUndoOut] | None = None
-    facts_undos: list[FactsUndoOut] | None = None
+    undos: list[UndoOut] | None = None
 
 
 class ChatFaq(CamelModel):
@@ -317,66 +286,34 @@ def _copy_words(image, field: str) -> str:
     return raw
 
 
-def _selling_undo_out(item) -> SellingUndoOut:
-    return SellingUndoOut(
-        reply_index=item.reply_index,
-        product_id=item.product_id,
-        **item.fields,
-    )
-
-
-def _copy_undo_out(item: CopyUndo) -> CopyUndoOut:
-    return CopyUndoOut(reply_index=item.reply_index, product_id=item.product_id, **item.fields)
-
-
-def _facts_undo_out(item: FactsUndo) -> FactsUndoOut:
-    return FactsUndoOut(
-        reply_index=item.reply_index,
-        product_id=item.product_id,
-        facts=dict(item.facts),
-    )
+def _undo_out(item: Undo) -> UndoOut:
+    payload: dict = {"reply_index": item.reply_index, "kind": item.kind}
+    if item.kind == "inventory":
+        payload["item_id"] = item.item_id
+        payload["quantity"] = item.quantity
+    elif item.kind in ("selling", "copy"):
+        payload["product_id"] = item.product_id
+        payload.update(item.fields or {})
+    elif item.kind == "facts":
+        payload["product_id"] = item.product_id
+        payload["facts"] = dict(item.facts or {})
+    elif item.kind == "publications":
+        payload["product_id"] = item.product_id
+        payload["publication_ids"] = list(item.publication_ids or ())
+    elif item.kind == "gpsr":
+        payload["identity"] = None if item.identity is None else dict(item.identity)
+    return UndoOut(**payload)
 
 
 def _response(
     thread: tuple[tuple[str, str], ...],
     grouped: tuple[str, ...] = (),
-    *,
-    inventory: tuple[InventoryUndo, ...] = (),
-    selling: tuple = (),
-    publications: tuple[PublicationsUndo, ...] = (),
-    gpsr: tuple[GpsrUndo, ...] = (),
-    copy: tuple[CopyUndo, ...] = (),
-    facts: tuple[FactsUndo, ...] = (),
+    undos: tuple[Undo, ...] = (),
 ) -> ChatResponse:
-    undos = [
-        InventoryUndoOut(reply_index=item.reply_index, item_id=item.item_id, quantity=item.quantity)
-        for item in inventory
-    ]
-    selling_undos = [_selling_undo_out(item) for item in selling]
     return ChatResponse(
         thread=[ChatTurnOut(role=role, text=text) for role, text in thread],
         grouped_photo_ids=list(grouped) or None,
-        inventory_undos=undos or None,
-        selling_undos=selling_undos or None,
-        publication_undos=[
-            PublicationsUndoOut(
-                reply_index=item.reply_index,
-                product_id=item.product_id,
-                publication_ids=list(item.publication_ids),
-            )
-            for item in publications
-        ]
-        or None,
-        gpsr_undos=[
-            GpsrUndoOut(
-                reply_index=item.reply_index,
-                identity=None if item.identity is None else dict(item.identity),
-            )
-            for item in gpsr
-        ]
-        or None,
-        copy_undos=[_copy_undo_out(item) for item in copy] or None,
-        facts_undos=[_facts_undo_out(item) for item in facts] or None,
+        undos=[_undo_out(item) for item in undos] or None,
     )
 
 
@@ -552,13 +489,4 @@ async def post_chat(
         records=ShopRecords(session, settings, user_id, graphql_for),
         importer=ShopifyImport(session, user_id, domain, graphql_for),
     )
-    return _response(
-        result.thread,
-        result.grouped_photo_ids,
-        inventory=result.inventory_undos,
-        selling=result.selling_undos,
-        publications=result.publication_undos,
-        gpsr=result.gpsr_undos,
-        copy=result.copy_undos,
-        facts=result.facts_undos,
-    )
+    return _response(result.thread, result.grouped_photo_ids, result.undos)

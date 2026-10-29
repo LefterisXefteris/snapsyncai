@@ -56,7 +56,7 @@ async def test_import_starts_and_the_turn_ends_once_it_has_started() -> None:
     assert job.starts == 1
     assert calls == ["import"]
     assert result.credits_spent == 0
-    assert result.selling_undos == ()
+    assert result.undos == ()
     assert result.thread[-1] == ("chat", RUNNING)
     assert job.done is not None
     job.done.set_result(job.result)

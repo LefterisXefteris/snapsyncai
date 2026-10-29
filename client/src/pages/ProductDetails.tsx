@@ -17,6 +17,8 @@ import { rememberPageProposal } from "@/lib/chat-page";
 import {
   productFacts,
   draftsFromConfirmed,
+  publicationsOnTheOpenPage,
+  sellingOnTheOpenPage,
   shownOnProductPage,
   confirmedProductKind,
   isCoffeeProduct,
@@ -204,25 +206,39 @@ export default function ProductDetails({ params }: { params: { id: string } }) {
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const displayImageId = selectedImageId ?? image?.id;
 
-  // Selling and publications reset only when the seller opens a different product.
+  // Category and the image's own stock reset only when the seller opens a different product.
   useEffect(() => {
     if (!image) return;
-    setPrice(image.price || "0.00");
     setCategory(image.category || "");
     setProductType(image.productType || "");
     setAltText(image.altText || "");
+    setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
+    setInventoryQuantity(image.inventoryQuantity || 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- imageId is the open product
+  }, [imageId]);
+
+  const sellingStamp = sellingOnTheOpenPage(image);
+  // Selling follows the server while this page stays open, including a Chat write and Undo.
+  useEffect(() => {
+    if (!image) return;
+    setPrice(image.price || "0.00");
     setCompareAtPrice(image.compareAtPrice || "");
     setCostPerItem(image.costPerItem || "");
     setSku(image.sku || "");
     setBarcode(image.barcode || "");
-    setTrackQuantity(image.trackQuantity === "true" || image.trackQuantity === true);
-    setInventoryQuantity(image.inventoryQuantity || 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sellingStamp is this product's Selling
+  }, [sellingStamp]);
+
+  const publicationStamp = publicationsOnTheOpenPage(image);
+  // Publications follow the server while this page stays open, including a Chat write and Undo.
+  useEffect(() => {
+    if (!image) return;
     setShopifyListingStatus(shopifyProductStatus(image.shopifyProductStatus));
     setSelectedPublicationIds(
       Array.isArray(image.shopifyPublicationIds) ? image.shopifyPublicationIds : [],
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- imageId is the open product
-  }, [imageId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- publicationStamp is this product's publications
+  }, [publicationStamp]);
 
   // Facts and typed listing copy, including a save from Chat while this page stays open.
   useEffect(() => {

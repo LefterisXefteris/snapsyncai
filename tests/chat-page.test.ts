@@ -6,32 +6,10 @@ import {
   applyGroupedDraftPhotos,
   chatBody,
   choosePhotos,
-  copyUndoControls,
-  copyUndoWrite,
-  factsUndoControls,
-  factsUndoWrite,
+  holdUndos,
   importRunning,
-  gpsrUndoControls,
-  gpsrUndoWrite,
-  holdCopyUndos,
-  holdFactsUndos,
-  holdGpsrUndos,
-  holdInventoryUndos,
-  holdPublicationsUndos,
-  holdSellingUndos,
   intakeSentences,
-  inventoryUndoControls,
-  inventoryUndoWrite,
-  landCopyUndo,
-  landFactsUndo,
-  landGpsrUndo,
-  landInventoryUndo,
-  landPublicationsUndo,
-  landSellingUndo,
-  publicationsUndoControls,
-  publicationsUndoWrite,
-  sellingUndoControls,
-  sellingUndoWrite,
+  landUndo,
   newListingDrafts,
   openProductId,
   registerPhotoIntake,
@@ -40,6 +18,8 @@ import {
   rememberNewListingSelection,
   rememberPageProposal,
   selectedDraftPhotoIds,
+  undoControls,
+  undoWrite,
 } from "../client/src/lib/chat-page.ts";
 
 test("a product page is that product", () => {
@@ -249,88 +229,90 @@ test("a later pick stacks another sentence and the drafts stay", () => {
 });
 
 test("a selling reply keeps Undo for 9 seconds, and a second reply keeps its own", () => {
-  let held = holdSellingUndos([], [{ replyIndex: 1, productId: 7, price: "12.50" }], 0);
-  held = holdSellingUndos(held, [{ replyIndex: 3, productId: 9, sku: "WOOL" }], 4_000);
+  let held = holdUndos([], [{ replyIndex: 1, kind: "selling", productId: 7, price: "12.50" }], 0);
+  held = holdUndos(held, [{ replyIndex: 3, kind: "selling", productId: 9, sku: "WOOL" }], 4_000);
 
   assert.deepEqual(
-    sellingUndoControls(held, 8_000).map((item) => item.replyIndex),
+    undoControls(held, 8_000).map((item) => item.replyIndex),
     [1, 3],
   );
   assert.deepEqual(
-    sellingUndoControls(held, 9_000).map((item) => item.replyIndex),
+    undoControls(held, 9_000).map((item) => item.replyIndex),
     [3],
   );
-  assert.deepEqual(sellingUndoControls(held, 13_000), []);
-  assert.equal(sellingUndoWrite(held, 1, 13_000), null);
+  assert.deepEqual(undoControls(held, 13_000), []);
+  assert.equal(undoWrite(held, 1, 13_000), null);
 });
 
 test("undo puts the previous selling back, including an empty price, and drops only when the write lands", () => {
-  const held = holdSellingUndos(
+  const held = holdUndos(
     [],
-    [{ replyIndex: 1, productId: 7, price: "", sku: "OLD" }],
+    [{ replyIndex: 1, kind: "selling", productId: 7, price: "", sku: "OLD" }],
     0,
   );
 
-  assert.deepEqual(sellingUndoWrite(held, 1, 1_000), {
-    productId: 7,
+  assert.deepEqual(undoWrite(held, 1, 1_000), {
+    method: "PUT",
+    path: "/api/images/7",
     body: { price: null, sku: "OLD" },
+    refresh: ["/api/images", "/api/images/group"],
   });
-  assert.deepEqual(sellingUndoControls(held, 1_000), [
-    { replyIndex: 1, productId: 7, price: "", sku: "OLD" },
+  assert.deepEqual(undoControls(held, 1_000), [
+    { replyIndex: 1, kind: "selling", productId: 7, price: "", sku: "OLD" },
   ]);
-  assert.deepEqual(sellingUndoControls(landSellingUndo(held, 1), 1_000), []);
+  assert.deepEqual(undoControls(landUndo(held, 1), 1_000), []);
 });
 
 test("a thread with no previous selling shows no undo", () => {
-  assert.deepEqual(sellingUndoControls([], 0), []);
-  assert.equal(sellingUndoWrite([], 1, 0), null);
+  assert.deepEqual(undoControls([], 0), []);
+  assert.equal(undoWrite([], 1, 0), null);
 });
 
 test("an inventory reply keeps Undo for 9 seconds, and the write puts the previous quantity back", () => {
   const shownAt = 1_000;
-  const held = holdInventoryUndos([], [{ replyIndex: 1, itemId: 3, quantity: 12 }], shownAt);
+  const held = holdUndos(
+    [],
+    [{ replyIndex: 1, kind: "inventory", itemId: 3, quantity: 12 }],
+    shownAt,
+  );
 
-  assert.deepEqual(inventoryUndoControls(held, shownAt + 8_999), [
-    { replyIndex: 1, itemId: 3, quantity: 12 },
+  assert.deepEqual(undoControls(held, shownAt + 8_999), [
+    { replyIndex: 1, kind: "inventory", itemId: 3, quantity: 12 },
   ]);
-  assert.deepEqual(inventoryUndoControls(held, shownAt + 9_000), []);
-  assert.equal(inventoryUndoWrite(held, 1, shownAt + 9_000), null);
-  assert.deepEqual(inventoryUndoWrite(held, 1, shownAt + 500), {
-    itemId: 3,
-    mode: "set",
-    quantity: 12,
-    reason: "Undo",
+  assert.deepEqual(undoControls(held, shownAt + 9_000), []);
+  assert.equal(undoWrite(held, 1, shownAt + 9_000), null);
+  assert.deepEqual(undoWrite(held, 1, shownAt + 500), {
+    method: "POST",
+    path: "/api/inventory/items/3/adjustments",
+    body: { mode: "set", quantity: 12, reason: "Undo" },
+    refresh: ["/api/inventory/overview", "/api/inventory/items"],
   });
-  assert.deepEqual(inventoryUndoControls(held, shownAt + 500), [
-    { replyIndex: 1, itemId: 3, quantity: 12 },
-  ]);
-  assert.deepEqual(inventoryUndoControls(landInventoryUndo(held, 1), shownAt + 500), []);
+  assert.deepEqual(undoControls(landUndo(held, 1), shownAt + 500), []);
 });
 
 test("a second inventory reply keeps the first Undo until that reply's 9 seconds end", () => {
-  const first = holdInventoryUndos([], [{ replyIndex: 1, itemId: 3, quantity: 12 }], 0);
-  const both = holdInventoryUndos(first, [{ replyIndex: 3, itemId: 8, quantity: 4 }], 1_000);
+  const first = holdUndos([], [{ replyIndex: 1, kind: "inventory", itemId: 3, quantity: 12 }], 0);
+  const both = holdUndos(first, [{ replyIndex: 3, kind: "inventory", itemId: 8, quantity: 4 }], 1_000);
 
   assert.deepEqual(
-    inventoryUndoControls(both, 8_999).map((control) => control.replyIndex),
+    undoControls(both, 8_999).map((control) => control.replyIndex),
     [1, 3],
   );
   assert.deepEqual(
-    inventoryUndoControls(both, 9_000).map((control) => control.replyIndex),
+    undoControls(both, 9_000).map((control) => control.replyIndex),
     [3],
   );
-  assert.deepEqual(inventoryUndoControls([], 0), []);
-  assert.deepEqual(inventoryUndoWrite(both, 1, 8_999), {
-    itemId: 3,
-    mode: "set",
-    quantity: 12,
-    reason: "Undo",
+  assert.deepEqual(undoWrite(both, 1, 8_999), {
+    method: "POST",
+    path: "/api/inventory/items/3/adjustments",
+    body: { mode: "set", quantity: 12, reason: "Undo" },
+    refresh: ["/api/inventory/overview", "/api/inventory/items"],
   });
-  assert.deepEqual(inventoryUndoWrite(both, 3, 9_000), {
-    itemId: 8,
-    mode: "set",
-    quantity: 4,
-    reason: "Undo",
+  assert.deepEqual(undoWrite(both, 3, 9_000), {
+    method: "POST",
+    path: "/api/inventory/items/8/adjustments",
+    body: { mode: "set", quantity: 4, reason: "Undo" },
+    refresh: ["/api/inventory/overview", "/api/inventory/items"],
   });
 });
 
@@ -341,61 +323,73 @@ const EARLIER = {
 
 test("a publications reply keeps Undo for 9 seconds and puts the previous set back, including an empty set", () => {
   const shownAt = 1_000;
-  const held = holdPublicationsUndos(
+  const held = holdUndos(
     [],
-    [{ replyIndex: 1, productId: 7, publicationIds: [] }],
+    [{ replyIndex: 1, kind: "publications", productId: 7, publicationIds: [] }],
     shownAt,
   );
 
-  assert.deepEqual(publicationsUndoControls(held, shownAt + 8_999), [
-    { replyIndex: 1, productId: 7, publicationIds: [] },
+  assert.deepEqual(undoControls(held, shownAt + 8_999), [
+    { replyIndex: 1, kind: "publications", productId: 7, publicationIds: [] },
   ]);
-  assert.deepEqual(publicationsUndoWrite(held, 1, shownAt + 8_999), {
-    productId: 7,
+  assert.deepEqual(undoWrite(held, 1, shownAt + 8_999), {
+    method: "PUT",
+    path: "/api/images/7",
     body: { shopifyPublicationIds: [] },
+    refresh: ["/api/images", "/api/images/group"],
   });
-  assert.deepEqual(publicationsUndoControls(held, shownAt + 9_000), []);
-  assert.equal(publicationsUndoWrite(held, 1, shownAt + 9_000), null);
-  assert.deepEqual(publicationsUndoControls(landPublicationsUndo(held, 1), shownAt + 500), []);
+  assert.deepEqual(undoControls(held, shownAt + 9_000), []);
+  assert.equal(undoWrite(held, 1, shownAt + 9_000), null);
+  assert.deepEqual(undoControls(landUndo(held, 1), shownAt + 500), []);
 });
 
 test("a shop gpsr reply keeps Undo for 9 seconds and puts the previous identity back, including none", () => {
-  const named = holdGpsrUndos([], [{ replyIndex: 1, identity: EARLIER }], 0);
-  const empty = holdGpsrUndos([], [{ replyIndex: 1 }], 0);
+  const named = holdUndos([], [{ replyIndex: 1, kind: "gpsr", identity: EARLIER }], 0);
+  const empty = holdUndos([], [{ replyIndex: 1, kind: "gpsr" }], 0);
 
-  assert.deepEqual(gpsrUndoWrite(named, 1, 1_000), { body: EARLIER });
-  assert.deepEqual(gpsrUndoControls(named, 8_999), [{ replyIndex: 1, identity: EARLIER }]);
-  assert.deepEqual(gpsrUndoControls(named, 9_000), []);
-  assert.equal(gpsrUndoWrite(named, 1, 9_000), null);
-  assert.deepEqual(gpsrUndoWrite(empty, 1, 1_000), { body: null });
-  assert.deepEqual(gpsrUndoControls(landGpsrUndo(named, 1), 1_000), []);
-  assert.deepEqual(gpsrUndoControls(named, 1_000), [{ replyIndex: 1, identity: EARLIER }]);
+  assert.deepEqual(undoWrite(named, 1, 1_000), {
+    method: "PUT",
+    path: "/api/shopify/gpsr-identity",
+    body: EARLIER,
+    refresh: ["/api/shopify/status", "/api/images", "/api/images/group"],
+  });
+  assert.deepEqual(undoControls(named, 8_999), [
+    { replyIndex: 1, kind: "gpsr", identity: EARLIER },
+  ]);
+  assert.deepEqual(undoControls(named, 9_000), []);
+  assert.equal(undoWrite(named, 1, 9_000), null);
+  assert.deepEqual(undoWrite(empty, 1, 1_000), {
+    method: "PUT",
+    path: "/api/shopify/gpsr-identity",
+    body: null,
+    refresh: ["/api/shopify/status", "/api/images", "/api/images/group"],
+  });
+  assert.deepEqual(undoControls(landUndo(named, 1), 1_000), []);
+  assert.deepEqual(undoControls(named, 1_000), [{ replyIndex: 1, kind: "gpsr", identity: EARLIER }]);
 });
 
 test("a publications reply and a shop gpsr reply each keep Undo until their own 9 seconds end", () => {
-  const publications = holdPublicationsUndos(
+  const held = holdUndos(
     [],
-    [{ replyIndex: 1, productId: 7, publicationIds: ["gid://shopify/Publication/1"] }],
+    [{ replyIndex: 1, kind: "publications", productId: 7, publicationIds: ["gid://shopify/Publication/1"] }],
     0,
   );
-  const gpsr = holdGpsrUndos([], [{ replyIndex: 3, identity: EARLIER }], 4_000);
+  const both = holdUndos(held, [{ replyIndex: 3, kind: "gpsr", identity: EARLIER }], 4_000);
 
   assert.deepEqual(
-    publicationsUndoControls(publications, 8_000).map((control) => control.replyIndex),
-    [1],
+    undoControls(both, 8_000).map((control) => control.replyIndex),
+    [1, 3],
   );
-  assert.deepEqual(gpsrUndoControls(gpsr, 8_000).map((control) => control.replyIndex), [3]);
-  assert.deepEqual(publicationsUndoControls(publications, 9_000), []);
-  assert.deepEqual(gpsrUndoControls(gpsr, 12_999).map((control) => control.replyIndex), [3]);
-  assert.deepEqual(gpsrUndoControls(gpsr, 13_000), []);
-  assert.deepEqual(publicationsUndoWrite(publications, 1, 1_000), {
-    productId: 7,
+  assert.deepEqual(undoControls(both, 9_000).map((control) => control.replyIndex), [3]);
+  assert.deepEqual(undoControls(both, 13_000), []);
+  assert.deepEqual(undoWrite(both, 1, 1_000), {
+    method: "PUT",
+    path: "/api/images/7",
     body: { shopifyPublicationIds: ["gid://shopify/Publication/1"] },
+    refresh: ["/api/images", "/api/images/group"],
   });
-  assert.deepEqual(publicationsUndoControls([], 0), []);
-  assert.equal(publicationsUndoWrite([], 1, 0), null);
-  assert.deepEqual(gpsrUndoControls([], 0), []);
-  assert.equal(gpsrUndoWrite([], 1, 0), null);
+  assert.deepEqual(undoControls([], 0), []);
+  assert.equal(undoWrite([], 1, 0), null);
 });
 
 const LINEN = {
@@ -411,82 +405,101 @@ const LINEN = {
 
 test("typed listing copy keeps Undo for 9 seconds and restores the previous words, including empty", () => {
   const shownAt = 1_000;
-  const held = holdCopyUndos([], [{ replyIndex: 1, productId: 7, description: "" }], shownAt);
+  const held = holdUndos(
+    [],
+    [{ replyIndex: 1, kind: "copy", productId: 7, description: "" }],
+    shownAt,
+  );
 
-  assert.deepEqual(copyUndoControls(held, shownAt + 8_999), [
-    { replyIndex: 1, productId: 7, description: "" },
+  assert.deepEqual(undoControls(held, shownAt + 8_999), [
+    { replyIndex: 1, kind: "copy", productId: 7, description: "" },
   ]);
-  assert.deepEqual(copyUndoControls(held, shownAt + 9_000), []);
-  assert.equal(copyUndoWrite(held, 1, shownAt + 9_000), null);
-  assert.deepEqual(copyUndoWrite(held, 1, shownAt + 500), {
-    productId: 7,
+  assert.deepEqual(undoControls(held, shownAt + 9_000), []);
+  assert.equal(undoWrite(held, 1, shownAt + 9_000), null);
+  assert.deepEqual(undoWrite(held, 1, shownAt + 500), {
+    method: "PUT",
+    path: "/api/images/7",
     body: { description: null },
+    refresh: ["/api/images", "/api/images/group"],
   });
-  assert.deepEqual(copyUndoControls(held, shownAt + 500), [
-    { replyIndex: 1, productId: 7, description: "" },
-  ]);
-  assert.deepEqual(copyUndoControls(landCopyUndo(held, 1), shownAt + 500), []);
+  assert.deepEqual(undoControls(landUndo(held, 1), shownAt + 500), []);
 });
 
 test("undo restores the previous tags, and a second listing-copy reply keeps its own control", () => {
-  const first = holdCopyUndos([], [{ replyIndex: 1, productId: 7, tags: "linen, blue" }], 0);
-  const both = holdCopyUndos(first, [{ replyIndex: 3, productId: 7, description: "Old copy." }], 1_000);
+  const first = holdUndos([], [{ replyIndex: 1, kind: "copy", productId: 7, tags: "linen, blue" }], 0);
+  const both = holdUndos(
+    first,
+    [{ replyIndex: 3, kind: "copy", productId: 7, description: "Old copy." }],
+    1_000,
+  );
 
   assert.deepEqual(
-    copyUndoControls(both, 8_999).map((control) => control.replyIndex),
+    undoControls(both, 8_999).map((control) => control.replyIndex),
     [1, 3],
   );
-  assert.deepEqual(copyUndoWrite(both, 1, 8_999), {
-    productId: 7,
+  assert.deepEqual(undoWrite(both, 1, 8_999), {
+    method: "PUT",
+    path: "/api/images/7",
     body: { tags: ["linen", "blue"] },
+    refresh: ["/api/images", "/api/images/group"],
   });
-  assert.deepEqual(copyUndoWrite(both, 3, 1_500), {
-    productId: 7,
+  assert.deepEqual(undoWrite(both, 3, 1_500), {
+    method: "PUT",
+    path: "/api/images/7",
     body: { description: "Old copy." },
+    refresh: ["/api/images", "/api/images/group"],
   });
   assert.deepEqual(
-    copyUndoControls(both, 9_000).map((control) => control.replyIndex),
+    undoControls(both, 9_000).map((control) => control.replyIndex),
     [3],
   );
-  assert.deepEqual(copyUndoControls([], 0), []);
+  assert.deepEqual(undoControls([], 0), []);
 });
 
 test("a facts reply keeps Undo for 9 seconds and confirms the previous pack", () => {
   const shownAt = 2_000;
-  const held = holdFactsUndos(
-    [],
-    [{ replyIndex: 1, productId: 7, facts: LINEN }],
-    shownAt,
-  );
+  const held = holdUndos([], [{ replyIndex: 1, kind: "facts", productId: 7, facts: LINEN }], shownAt);
 
-  assert.deepEqual(factsUndoWrite(held, 1, shownAt + 500), { productId: 7, body: LINEN });
-  assert.deepEqual(factsUndoControls(held, shownAt + 8_999), [
-    { replyIndex: 1, productId: 7, facts: LINEN },
+  assert.deepEqual(undoWrite(held, 1, shownAt + 500), {
+    method: "POST",
+    path: "/api/images/7/product-facts/confirm",
+    body: LINEN,
+    refresh: ["/api/images", "/api/images/group"],
+  });
+  assert.deepEqual(undoControls(held, shownAt + 8_999), [
+    { replyIndex: 1, kind: "facts", productId: 7, facts: LINEN },
   ]);
-  assert.deepEqual(factsUndoControls(held, shownAt + 9_000), []);
-  assert.equal(factsUndoWrite(held, 1, shownAt + 9_000), null);
-  assert.deepEqual(factsUndoControls(held, shownAt + 500), [
-    { replyIndex: 1, productId: 7, facts: LINEN },
-  ]);
-  assert.deepEqual(factsUndoControls(landFactsUndo(held, 1), shownAt + 500), []);
+  assert.deepEqual(undoControls(held, shownAt + 9_000), []);
+  assert.equal(undoWrite(held, 1, shownAt + 9_000), null);
+  assert.deepEqual(undoControls(landUndo(held, 1), shownAt + 500), []);
 });
 
 test("a second facts reply keeps the first Undo until that reply's 9 seconds end", () => {
   const wool = { ...LINEN, composition: [{ name: "wool", percent: 100 }] };
-  const first = holdFactsUndos([], [{ replyIndex: 1, productId: 7, facts: LINEN }], 0);
-  const both = holdFactsUndos(first, [{ replyIndex: 3, productId: 9, facts: wool }], 1_000);
+  const first = holdUndos([], [{ replyIndex: 1, kind: "facts", productId: 7, facts: LINEN }], 0);
+  const both = holdUndos(first, [{ replyIndex: 3, kind: "facts", productId: 9, facts: wool }], 1_000);
 
   assert.deepEqual(
-    factsUndoControls(both, 8_999).map((control) => control.replyIndex),
+    undoControls(both, 8_999).map((control) => control.replyIndex),
     [1, 3],
   );
-  assert.deepEqual(factsUndoWrite(both, 1, 8_999), { productId: 7, body: LINEN });
-  assert.deepEqual(factsUndoWrite(both, 3, 9_000), { productId: 9, body: wool });
+  assert.deepEqual(undoWrite(both, 1, 8_999), {
+    method: "POST",
+    path: "/api/images/7/product-facts/confirm",
+    body: LINEN,
+    refresh: ["/api/images", "/api/images/group"],
+  });
+  assert.deepEqual(undoWrite(both, 3, 9_000), {
+    method: "POST",
+    path: "/api/images/9/product-facts/confirm",
+    body: wool,
+    refresh: ["/api/images", "/api/images/group"],
+  });
   assert.deepEqual(
-    factsUndoControls(both, 9_000).map((control) => control.replyIndex),
+    undoControls(both, 9_000).map((control) => control.replyIndex),
     [3],
   );
-  assert.deepEqual(factsUndoControls([], 0), []);
+  assert.deepEqual(undoControls([], 0), []);
 });
 
 test("the card keeps reading the thread while Import is in progress", () => {

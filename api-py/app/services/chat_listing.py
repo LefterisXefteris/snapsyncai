@@ -103,10 +103,7 @@ class ListingReply:
     credits_spent: int = 0
     shown_after: tuple[Shown, ...] | None = None
     continue_turn: bool = False
-    inventory_before: PreviousInventory | None = None
-    selling_before: PreviousSelling | None = None
-    publications_before: PreviousPublications | None = None
-    gpsr_before: PreviousGpsr | None = None
+    before: PreviousInventory | PreviousSelling | PreviousPublications | PreviousGpsr | None = None
 
 
 def proposal_text(proposal: Proposal) -> str:

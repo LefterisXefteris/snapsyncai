@@ -59,7 +59,7 @@ async def test_put_it_live_is_go_live() -> None:
     assert channels.trendyol == []
     assert result.credits_spent == 0
     assert result.shop_changed is False
-    assert result.selling_undos == ()
+    assert result.undos == ()
     assert result.thread[-1] == ("chat", "It's on the Online Store.")
 
 
@@ -112,7 +112,7 @@ async def test_a_named_shopify_push_is_not_go_live() -> None:
     assert channels.shopify == [SHIRT.id]
     assert channels.lived == []
     assert channels.trendyol == []
-    assert result.selling_undos == ()
+    assert result.undos == ()
     assert result.thread[-1] == ("chat", "Pushed to Shopify.")
 
 

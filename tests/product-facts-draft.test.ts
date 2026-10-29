@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { draftsFromConfirmed, shownOnProductPage } from "../client/src/lib/product-facts.ts";
+import {
+  draftsFromConfirmed,
+  publicationsOnTheOpenPage,
+  sellingOnTheOpenPage,
+  shownOnProductPage,
+} from "../client/src/lib/product-facts.ts";
 
 test("the product page shows confirmed facts, including an explicit skip", () => {
   const drafts = draftsFromConfirmed({
@@ -22,6 +27,27 @@ test("the product page shows confirmed facts, including an explicit skip", () =>
   ]);
   assert.equal(drafts.gpsrChoice, "skip");
   assert.equal(drafts.careChoice, "skip");
+});
+
+test("undo of selling is a change the open product page shows", () => {
+  assert.notEqual(
+    sellingOnTheOpenPage({ id: 7, price: "19" }),
+    sellingOnTheOpenPage({ id: 7, price: "12.50" }),
+  );
+  assert.equal(
+    sellingOnTheOpenPage({ id: 7, price: "19" }),
+    sellingOnTheOpenPage({ id: 7, price: "19", shopifyPublicationIds: ["gid://shopify/Publication/3"] } as {
+      id: number;
+      price: string;
+    }),
+  );
+});
+
+test("undo of publications is a change the open product page shows", () => {
+  assert.notEqual(
+    publicationsOnTheOpenPage({ id: 7, shopifyPublicationIds: ["gid://shopify/Publication/3"] }),
+    publicationsOnTheOpenPage({ id: 7, shopifyPublicationIds: ["gid://shopify/Publication/1"] }),
+  );
 });
 
 test("a typed description is a change the open product page shows", () => {

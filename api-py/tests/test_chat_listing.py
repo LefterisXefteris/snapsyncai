@@ -148,7 +148,7 @@ async def test_a_later_message_accepts_spends_one_credit_and_does_not_push() -> 
     assert result.credits_spent == 1
     assert result.shop_changed is False
     assert calls == [0]
-    assert result.selling_undos == ()
+    assert result.undos == ()
     assert result.thread[-1] == ("chat", "Accepted.")
 
 
