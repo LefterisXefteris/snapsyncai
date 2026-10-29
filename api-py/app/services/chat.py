@@ -24,11 +24,18 @@ from app.services.chat_listing import (
     ListingCopy,
     PreviousCopy,
     PreviousFacts,
+    PreviousGpsr,
+    PreviousInventory,
+    PreviousPublications,
+    PreviousSelling,
     Proposal,
     Shown,
     listing_act,
 )
 from app.services.chat_records import (
+    ADJUST,
+    PUBLICATIONS,
+    SELLING,
     SHOP_GPSR,
     PageRecords,
     gpsr_from_payload,
@@ -48,9 +55,12 @@ from app.services.chat_store import (
 MODEL_CALL_LIMIT = 10
 STOPPED = "Stopped after 10 steps."
 UNAVAILABLE = "Chat is not available right now."
+
 CONFIRMED = "Those facts are confirmed."
 CONFIRM_FACTS = "confirm_facts"
 TYPE_COPY = "type_listing_copy"
+# The open product, when the reply names the act and not a product. Delete stays named.
+_OPEN_PAGE = frozenset({ADJUST, SELLING, PUBLICATIONS, CONFIRM_FACTS, TYPE_COPY})
 
 # These stay in the browser. Chat records that, and does not perform them.
 BROWSER_ACTS = {
@@ -106,56 +116,18 @@ class ModelStep:
 
 
 @dataclass(frozen=True)
-class InventoryUndo:
-    """The previous Inventory quantity for one reply. It is not stored on the thread."""
+class Undo:
+    """The previous value of one reply. It is not stored on the thread."""
 
     reply_index: int
-    item_id: int
-    quantity: int
-
-
-@dataclass(frozen=True)
-class SellingUndo:
-    """The previous Selling fields for one reply. They are not stored on the thread."""
-
-    reply_index: int
-    product_id: int
-    fields: Mapping[str, str]
-
-
-@dataclass(frozen=True)
-class CopyUndo:
-    """The previous words of one listing-copy field. They are not stored on the thread."""
-
-    reply_index: int
-    product_id: int
-    fields: Mapping[str, str]
-
-
-@dataclass(frozen=True)
-class FactsUndo:
-    """The previous facts pack for one reply. It is not stored on the thread."""
-
-    reply_index: int
-    product_id: int
-    facts: Mapping[str, object]
-
-
-@dataclass(frozen=True)
-class PublicationsUndo:
-    """The previous publication set for one reply. It is not stored on the thread."""
-
-    reply_index: int
-    product_id: int
-    publication_ids: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class GpsrUndo:
-    """The previous Shop GPSR identity for one reply. It is not stored on the thread."""
-
-    reply_index: int
-    identity: Mapping[str, object] | None
+    kind: str
+    item_id: int | None = None
+    quantity: int | None = None
+    product_id: int | None = None
+    fields: Mapping[str, str] | None = None
+    facts: Mapping[str, object] | None = None
+    publication_ids: tuple[str, ...] | None = None
+    identity: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -165,12 +137,7 @@ class Asked:
     shop_changed: bool
     product: NamedProduct | None = None
     grouped_photo_ids: tuple[str, ...] = ()
-    inventory_undos: tuple[InventoryUndo, ...] = ()
-    selling_undos: tuple[SellingUndo, ...] = ()
-    publication_undos: tuple[PublicationsUndo, ...] = ()
-    gpsr_undos: tuple[GpsrUndo, ...] = ()
-    copy_undos: tuple[CopyUndo, ...] = ()
-    facts_undos: tuple[FactsUndo, ...] = ()
+    undos: tuple[Undo, ...] = ()
 
 
 Model = Callable[[ModelContext], Awaitable[ModelStep]]
@@ -338,6 +305,57 @@ def _draft_photo_ids(ids: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def undo_for(reply_index: int, previous: object) -> Undo | None:
+    """Stamp the previous value with its reply. Empty facts are not a previous pack."""
+    if isinstance(previous, PreviousInventory):
+        return Undo(
+            reply_index,
+            "inventory",
+            item_id=previous.item_id,
+            quantity=previous.quantity,
+        )
+    if isinstance(previous, PreviousSelling):
+        return Undo(
+            reply_index,
+            "selling",
+            product_id=previous.product_id,
+            fields=dict(previous.fields),
+        )
+    if isinstance(previous, PreviousCopy):
+        return Undo(
+            reply_index,
+            "copy",
+            product_id=previous.product_id,
+            fields={previous.field: previous.words},
+        )
+    if isinstance(previous, PreviousFacts):
+        if not previous.facts:
+            return None
+        return Undo(
+            reply_index,
+            "facts",
+            product_id=previous.product_id,
+            facts=dict(previous.facts),
+        )
+    if isinstance(previous, PreviousPublications):
+        return Undo(
+            reply_index,
+            "publications",
+            product_id=previous.product_id,
+            publication_ids=tuple(previous.publication_ids),
+        )
+    if isinstance(previous, PreviousGpsr):
+        identity = None if previous.identity is None else dict(previous.identity)
+        return Undo(reply_index, "gpsr", identity=identity)
+    return None
+
+
+def _remember(undos: list[Undo], reply_index: int, previous: object) -> None:
+    stamped = undo_for(reply_index, previous)
+    if stamped is not None:
+        undos.append(stamped)
+
+
 async def ask(
     store: ThreadStore,
     *,
@@ -369,12 +387,7 @@ async def ask(
         credits = 0
         draft_ids = _draft_photo_ids(draft_photo_ids)
         grouped: tuple[str, ...] = ()
-        undos: list[InventoryUndo] = []
-        selling_undos: list[SellingUndo] = []
-        publication_undos: list[PublicationsUndo] = []
-        gpsr_undos: list[GpsrUndo] = []
-        copy_undos: list[CopyUndo] = []
-        facts_undos: list[FactsUndo] = []
+        undos: list[Undo] = []
         for calls_made in range(MODEL_CALL_LIMIT):
             step = await model(
                 ModelContext(
@@ -400,6 +413,13 @@ async def ask(
                     resolved = None
                     break
                 resolved = found
+            if (
+                resolved is None
+                and open_product is not None
+                and not token
+                and step.act in _OPEN_PAGE
+            ):
+                resolved = open_product
             outcome = await shop_act(
                 act=step.act,
                 listing=listing,
@@ -434,11 +454,21 @@ async def ask(
                     name_it=NAME_IT,
                 )
             if outcome is None:
-                named = bool((step.product or "").strip())
+                named = bool(token)
+                on_open_page = (
+                    resolved is not None
+                    and open_product is not None
+                    and resolved.id == open_product.id
+                    and not named
+                    and step.act in _OPEN_PAGE
+                )
+                product_id = None
+                if resolved is not None and (named or on_open_page):
+                    product_id = resolved.id
                 outcome = await record_act(
                     act=step.act,
                     records=records,
-                    product_id=resolved.id if named and resolved is not None else None,
+                    product_id=product_id,
                     quantity=step.quantity,
                     reason=step.reason,
                     selling=step.selling,
@@ -454,27 +484,7 @@ async def ask(
                     break
             if outcome is not None:
                 thread.append(("chat", outcome.text))
-                if outcome.inventory_before is not None:
-                    before = outcome.inventory_before
-                    undos.append(InventoryUndo(len(thread) - 1, before.item_id, before.quantity))
-                if outcome.selling_before is not None:
-                    earlier = outcome.selling_before
-                    selling_undos.append(
-                        SellingUndo(len(thread) - 1, earlier.product_id, earlier.fields)
-                    )
-                if outcome.publications_before is not None:
-                    earlier_set = outcome.publications_before
-                    publication_undos.append(
-                        PublicationsUndo(
-                            len(thread) - 1,
-                            earlier_set.product_id,
-                            earlier_set.publication_ids,
-                        )
-                    )
-                if outcome.gpsr_before is not None:
-                    gpsr_undos.append(
-                        GpsrUndo(len(thread) - 1, outcome.gpsr_before.identity)
-                    )
+                _remember(undos, len(thread) - 1, outcome.before)
                 if outcome.shown_after is not None:
                     proposals[:] = list(outcome.shown_after)
                 elif outcome.shown is not None:
@@ -495,10 +505,7 @@ async def ask(
                     thread.append(("chat", written))
                     break
                 thread.append(("chat", CONFIRMED))
-                if isinstance(written, PreviousFacts) and written.facts:
-                    facts_undos.append(
-                        FactsUndo(len(thread) - 1, written.product_id, written.facts)
-                    )
+                _remember(undos, len(thread) - 1, written)
             elif step.act == TYPE_COPY:
                 if resolved is None:
                     thread.append(("chat", NAME_IT))
@@ -520,14 +527,7 @@ async def ask(
                     thread.append(("chat", written))
                     break
                 thread.append(("chat", TYPED[next(iter(update))]))
-                if isinstance(written, PreviousCopy):
-                    copy_undos.append(
-                        CopyUndo(
-                            len(thread) - 1,
-                            written.product_id,
-                            {written.field: written.words},
-                        )
-                    )
+                _remember(undos, len(thread) - 1, written)
             elif step.act == GROUP:
                 if len(draft_ids) >= 2:
                     thread.append(("chat", GROUPED))
@@ -550,12 +550,7 @@ async def ask(
             shop_changed=False,
             product=resolved,
             grouped_photo_ids=grouped,
-            inventory_undos=tuple(undos),
-            selling_undos=tuple(selling_undos),
-            publication_undos=tuple(publication_undos),
-            gpsr_undos=tuple(gpsr_undos),
-            copy_undos=tuple(copy_undos),
-            facts_undos=tuple(facts_undos),
+            undos=tuple(undos),
         )
     if pending is not None:
         watch_import(store, user_id, shop_domain, pending)

@@ -214,6 +214,50 @@ function fibreDraft(name: string, percent: number | undefined): FibreRowDraft {
   return { name: OTHER_FIBRE, percent: percentText, otherName: name.trim() };
 }
 
+/** Selling the open product page is showing. A Chat write and Undo change this. Listing copy does not. */
+export function sellingOnTheOpenPage(
+  image:
+    | {
+        id?: number;
+        price?: string | null;
+        compareAtPrice?: string | null;
+        costPerItem?: string | null;
+        sku?: string | null;
+        barcode?: string | null;
+      }
+    | null
+    | undefined,
+): string {
+  if (!image) return "";
+  return JSON.stringify({
+    id: image.id ?? null,
+    price: image.price ?? "",
+    compareAtPrice: image.compareAtPrice ?? "",
+    costPerItem: image.costPerItem ?? "",
+    sku: image.sku ?? "",
+    barcode: image.barcode ?? "",
+  });
+}
+
+/** Publications the open product page is showing. A Chat write and Undo change this. */
+export function publicationsOnTheOpenPage(
+  image:
+    | {
+        id?: number;
+        shopifyPublicationIds?: string[] | null;
+        shopifyProductStatus?: string | null;
+      }
+    | null
+    | undefined,
+): string {
+  if (!image) return "";
+  return JSON.stringify({
+    id: image.id ?? null,
+    shopifyPublicationIds: image.shopifyPublicationIds ?? [],
+    shopifyProductStatus: image.shopifyProductStatus ?? "",
+  });
+}
+
 /** Changes when the open product page should show new facts or typed listing copy. */
 export function shownOnProductPage(
   image:

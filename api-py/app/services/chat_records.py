@@ -54,9 +54,7 @@ NO_STOCK_ROW = "Inventory has no stock row for that SKU."
 WHICH_STOCK_ROW = "Which stock row? More than one uses that SKU."
 NOT_SEEN = "Which product? I don't see that one."
 CONNECT_SHOPIFY = "Connect Shopify in Settings to push this product."
-RECONNECT_PUBLICATIONS = (
-    "Reconnect Shopify in Settings to choose where this product is available."
-)
+RECONNECT_PUBLICATIONS = "Reconnect Shopify in Settings to choose where this product is available."
 CONNECT_GPSR = "Connect Shopify before saving shop GPSR identity."
 WHICH_PUBLICATION = "Which publication? I don't see {name}."
 
@@ -166,7 +164,7 @@ async def _adjust(
     written = await records.adjust_stock(product_id, quantity, words)
     if isinstance(written, str):
         return _asked(written)
-    return ListingReply(STOCK, continue_turn=True, inventory_before=written)
+    return ListingReply(STOCK, continue_turn=True, before=written)
 
 
 async def _selling(
@@ -183,7 +181,7 @@ async def _selling(
     return ListingReply(
         SELLING_SAVED,
         continue_turn=True,
-        selling_before=PreviousSelling(product_id, dict(written)),
+        before=PreviousSelling(product_id, dict(written)),
     )
 
 
@@ -201,7 +199,7 @@ async def _publications(
     return ListingReply(
         PUBLICATIONS_SET,
         continue_turn=True,
-        publications_before=PreviousPublications(product_id, written),
+        before=PreviousPublications(product_id, written),
     )
 
 
@@ -213,7 +211,7 @@ async def _gpsr(records: PageRecords, gpsr: Mapping[str, object] | None) -> List
         return _asked(written)
     if not isinstance(written, PreviousGpsr):
         return _kept(GPSR_SAVED)
-    return ListingReply(GPSR_SAVED, continue_turn=True, gpsr_before=written)
+    return ListingReply(GPSR_SAVED, continue_turn=True, before=written)
 
 
 async def _delete(records: PageRecords, product_id: int) -> ListingReply:
@@ -285,13 +283,17 @@ class ShopRecords:
         if not sku:
             return NO_SKU
         rows = (
-            await self._session.execute(
-                select(InventoryItem).where(
-                    InventoryItem.user_id == self._user_id,
-                    func.lower(InventoryItem.sku) == sku.casefold(),
+            (
+                await self._session.execute(
+                    select(InventoryItem).where(
+                        InventoryItem.user_id == self._user_id,
+                        func.lower(InventoryItem.sku) == sku.casefold(),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not rows:
             return NO_STOCK_ROW
         if len(rows) > 1:
@@ -329,7 +331,9 @@ class ShopRecords:
             return NOT_SEEN
         return previous
 
-    async def publications(self, product_id: int, names: Sequence[str]) -> str | tuple[str, ...] | None:
+    async def publications(
+        self, product_id: int, names: Sequence[str]
+    ) -> str | tuple[str, ...] | None:
         image = await get_image(self._session, product_id, self._user_id)
         if image is None:
             return NOT_SEEN
@@ -353,9 +357,7 @@ class ShopRecords:
                 return WHICH_PUBLICATION.format(name=name)
             ids.append(matches[0]["id"])
         previous = tuple(
-            item
-            for item in (image.shopify_publication_ids or [])
-            if isinstance(item, str) and item
+            item for item in (image.shopify_publication_ids or []) if isinstance(item, str) and item
         )
         saved = await update_image(
             self._session,
